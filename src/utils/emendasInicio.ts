@@ -18,6 +18,7 @@ import {
   type AvisoPedido,
   type TipoAviso
 } from './emendasPedidos';
+import type { CredorNoPedido } from './emendasConferenciaNota';
 
 export interface PedidoComAviso {
   pedido: PedidoEmenda;
@@ -56,7 +57,7 @@ export interface ResumoInicioEmendas {
   semNomeCurto: ItemCaep[];
 }
 
-const TIPOS: TipoAviso[] = ['ataVencida', 'ataNoCorte', 'empenhoAMais', 'divergencia', 'semOficio', 'ataVencendo', 'notaEmitida', 'empenhoAMenos', 'semAutorizacao', 'semNota'];
+const TIPOS: TipoAviso[] = ['ataVencida', 'ataNoCorte', 'empenhoAMais', 'divergencia', 'semOficio', 'ataVencendo', 'credorDiferente', 'notaEmitida', 'empenhoAMenos', 'semAutorizacao', 'semNota'];
 
 /** Item da linha a que o aviso de ata se refere: o que tem a ata mais perto do fim. */
 function itemDoAviso(p: PedidoEmenda, aviso: AvisoPedido | undefined, itens: Map<string, ItemCaep>): ItemCaep | null {
@@ -89,7 +90,8 @@ export function resumoInicioEmendas(
   itensLista: ItemCaep[],
   notas: Map<string, NotaDaLinha>,
   hoje: string,
-  empenho?: Map<string, ConferenciaEmpenho[]>
+  empenho?: Map<string, ConferenciaEmpenho[]>,
+  credor?: Map<string, CredorNoPedido[]>
 ): ResumoInicioEmendas {
   const itens = new Map(itensLista.map((i) => [i.itemKey, i]));
   const porTipo = Object.fromEntries(TIPOS.map((t) => [t, 0])) as Record<TipoAviso, number>;
@@ -112,7 +114,7 @@ export function resumoInicioEmendas(
         if (notaDaLinha(l, notas)) linhasComNota++;
       }
     }
-    const avisos = avisosDoPedido(p, itens, hoje, notas, empenho?.get(p.id));
+    const avisos = avisosDoPedido(p, itens, hoje, notas, empenho?.get(p.id), credor?.get(p.id));
     if (avisos.length === 0) continue;
     for (const t of new Set(avisos.map((a) => a.tipo))) porTipo[t]++;
     if (avisos.some(avisoGrave)) graves++;

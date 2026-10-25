@@ -17,20 +17,33 @@ import { carteiraDetalhe, carteiraNumero, carteiraSubtitle, carteiraValor } from
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { PainelBotoesGavetas, PainelGaveta, type PainelGavetaId } from '../instrumentos/PainelGavetas';
-import { hojeEmBrasilia, useAutoresEmendas, useDiferencasDeEmpenho, useItensCaep, useNotasDasLinhas, usePedidosEmendas, usePodeGerirEmendas } from '../../hooks/useEmendas';
+import {
+  hojeEmBrasilia,
+  useAutoresEmendas,
+  useCredorDiferente,
+  useDiferencasDeEmpenho,
+  useItensCaep,
+  useNotasDasLinhas,
+  useNotasSemPedido,
+  usePedidosEmendas,
+  usePodeGerirEmendas
+} from '../../hooks/useEmendas';
+import { AvisosResolvidosLista, BotaoResolvido, useResolverAviso } from '../avisos/ResolverAviso';
+import { chaveNotaSemPedido, notasSemPedidoPendentes } from '../../utils/emendasConferenciaNota';
 import { emendasAConferir, type EmendaAConferir } from '../../utils/emendasEmpenho';
-import { formatNumber } from '../../utils/format';
+import { formatCurrency, formatNumber } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
-import { AVISO_SEM_OFICIO_DIAS, avisoGrave, identificacaoDoPedido, itensDaLinha, linhasAtivas, ORDEM_ETAPA, ROTULO_ETAPA, type TipoAviso } from '../../utils/emendasPedidos';
+import { AVISO_SEM_OFICIO_DIAS, avisoGrave, identificacaoDoPedido, itensDaLinha, linhasAtivas, numeroDaEmendaEmTexto, ORDEM_ETAPA, ROTULO_ETAPA, type TipoAviso } from '../../utils/emendasPedidos';
 import { nomeDoItem } from '../../utils/emendasQuadro';
 import { prazoDoAviso, resumoInicioEmendas, type ItemLivrePertoDoFim, type PedidoComAviso } from '../../utils/emendasInicio';
-import type { AutorEmenda, EtapaPedido, ItemCaep, NotaDaLinha } from '../../services/emendasService';
+import type { AutorEmenda, EtapaPedido, ItemCaep, NotaDaLinha, NotaSemPedido } from '../../services/emendasService';
 import { AutorDoPedido, ItemDaAta } from './emendasPartes';
 import { DadosItemModal } from './DadosItemModal';
 
 type Aba = 'todas' | TipoAviso;
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
+const SEM_NOTAS_SEM_PEDIDO: NotaSemPedido[] = [];
 const POR_PAGINA = 25;
 const chave = (l: PedidoComAviso) => l.pedido.id;
 
@@ -42,6 +55,7 @@ const ABAS: ReadonlyArray<{ id: TipoAviso; rotulo: string }> = [
   { id: 'divergencia', rotulo: 'Ofício devolvido' },
   { id: 'semOficio', rotulo: `Sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias` },
   { id: 'ataVencendo', rotulo: 'Ata vence em breve' },
+  { id: 'credorDiferente', rotulo: 'Nota de outro fornecedor' },
   { id: 'notaEmitida', rotulo: 'Nota emitida, empenho a registrar' },
   { id: 'empenhoAMenos', rotulo: 'Empenhado a menos' },
   { id: 'semAutorizacao', rotulo: 'Ata sem autorização de empenho' },
@@ -102,6 +116,9 @@ export const EmendasInicioPage: React.FC = () => {
   const { data: itensLista = [], isLoading: carregandoItens, refetch: recarregarItens } = useItensCaep();
   const { data: autores = [] } = useAutoresEmendas();
   const { consulta: consultaEmpenho, conferencia, diferencas } = useDiferencasDeEmpenho();
+  const { porPedido: credor } = useCredorDiferente();
+  const { data: notasSemPedido = SEM_NOTAS_SEM_PEDIDO, isLoading: carregandoSemPedido } = useNotasSemPedido();
+  const { abrir: abrirResolvido, dialog: dialogResolvido, porChave: resolvidos, reexibir } = useResolverAviso();
   const hoje = hojeEmBrasilia();
   const [aba, setAba] = useState<Aba>('todas');
   const [gavetaAberta, setGavetaAberta] = useState<PainelGavetaId | null>('saldoLivre');
@@ -109,7 +126,9 @@ export const EmendasInicioPage: React.FC = () => {
   const [editando, setEditando] = useState<ItemCaep | null>(null);
 
   const carregando = isLoading || carregandoItens;
-  const r = useMemo(() => resumoInicioEmendas(pedidos, itensLista, notas, hoje, diferencas), [pedidos, itensLista, notas, hoje, diferencas]);
+  const r = useMemo(() => resumoInicioEmendas(pedidos, itensLista, notas, hoje, diferencas, credor), [pedidos, itensLista, notas, hoje, diferencas, credor]);
+  const semPedido = useMemo(() => notasSemPedidoPendentes(notasSemPedido, resolvidos), [notasSemPedido, resolvidos]);
+  const semPedidoResolvidas = useMemo(() => notasSemPedido.filter((n) => resolvidos.has(chaveNotaSemPedido(n))), [notasSemPedido, resolvidos]);
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
   const aConferir = useMemo(() => emendasAConferir(conferencia, itens), [conferencia, itens]);
@@ -286,6 +305,48 @@ export const EmendasInicioPage: React.FC = () => {
     }
   ];
 
+  const tituloSemPedido = (n: NotaSemPedido) => `Nota ${n.nota} da emenda ${n.emendaAno ? `${n.emendaAno} · ` : ''}${numeroDaEmendaEmTexto(n.emenda)} sem pedido`;
+  const colunasSemPedido: Column<NotaSemPedido>[] = [
+    {
+      key: 'emenda',
+      header: 'Emenda',
+      priority: 'primary',
+      minWidth: '220px',
+      render: (n) => (
+        <>
+          <div style={{ fontWeight: 700 }}>
+            {n.emendaAno ? `${n.emendaAno} · ` : ''}
+            {numeroDaEmendaEmTexto(n.emenda)}
+          </div>
+          <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>{n.planoInterno ?? 'sem plano interno'}</div>
+        </>
+      )
+    },
+    {
+      key: 'nota',
+      header: 'Nota',
+      nowrap: true,
+      render: (n) => (
+        <>
+          <div style={carteiraNumero}>{n.nota}</div>
+          <div style={carteiraDetalhe}>{n.dataEmissao ? dataBR(n.dataEmissao) : ''}{n.credorNome ? ` · ${curto(n.credorNome, 32)}` : ''}</div>
+        </>
+      )
+    },
+    { key: 'valor', header: 'Empenhado', align: 'right', nowrap: true, sortValue: (n) => n.valorEmpenhado, sortFirstDir: 'desc', render: (n) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(n.valorEmpenhado)}</span> },
+    {
+      key: 'autores',
+      header: 'Pedidos com o mesmo código de autor',
+      minWidth: '200px',
+      render: (n) =>
+        n.autoresDoCodigo.length ? (
+          <span style={carteiraDetalhe}>{n.autoresDoCodigo.join(', ')}: confira o nº da emenda no pedido</span>
+        ) : (
+          <span style={carteiraDetalhe}>nenhum</span>
+        )
+    }
+  ];
+
   const valor = (n: number) => (carregando ? '—' : formatNumber(n));
 
   return (
@@ -349,6 +410,15 @@ export const EmendasInicioPage: React.FC = () => {
                 ? 'todas as notas do SEI no sistema e lidas'
                 : `${plural(aConferir.length, 'emenda', 'emendas')} com nota do SEI fora do sistema ou ainda não lida`,
             atencao: false
+          },
+          {
+            id: 'notasSemPedido',
+            resumo: carregandoSemPedido
+              ? undefined
+              : semPedido.length === 0
+                ? 'toda nota de emenda do ano tem pedido'
+                : `${plural(semPedido.length, 'nota', 'notas')} de emenda sem pedido (${formatCurrency(semPedido.reduce((t, n) => t + n.valorEmpenhado, 0))})`,
+            atencao: semPedido.length > 0
           },
           {
             id: 'semNomeCurto',
@@ -422,6 +492,45 @@ export const EmendasInicioPage: React.FC = () => {
               rowOpen={(e) => () => navigate(`/emendas/pedidos?pedido=${e.pedidoIds[0]}`)}
             />
           )}
+        </PainelGaveta>
+      )}
+      {gavetaAberta === 'notasSemPedido' && (
+        <PainelGaveta
+          id="notasSemPedido"
+          subtitulo="Notas de empenho da UG 200330 do ano com o número de uma emenda no plano interno que nenhum pedido tem: emenda autorizada fora do sistema ou número trocado num pedido. Se o parlamentar já tem pedido, confira o número da emenda nele; se a emenda não é da CAEP, marque como resolvido."
+          onFechar={() => setGavetaAberta(null)}
+        >
+          {semPedido.length === 0 ? (
+            <div style={carteiraSubtitle}>{carregandoSemPedido ? 'Carregando…' : 'Toda nota de emenda do ano tem pedido no sistema.'}</div>
+          ) : (
+            <DataTable<NotaSemPedido>
+              testId="emendas-inicio-sem-pedido"
+              className="data-table-container--flush"
+              data={semPedido}
+              keyExtractor={(n) => `${n.ug}-${n.nota}`}
+              columns={colunasSemPedido}
+              rowOpen={(n) => (n.pedidosDoCodigo[0] ? () => navigate(`/emendas/pedidos?pedido=${n.pedidosDoCodigo[0]}`) : undefined)}
+              rowActions={
+                podeGerir
+                  ? (n) => (
+                      <BotaoResolvido
+                        onClick={() => abrirResolvido({ tipo: 'AVISO', chave: chaveNotaSemPedido(n), titulo: tituloSemPedido(n), contexto: n.planoInterno ?? undefined })}
+                        testId={`emendas-inicio-sem-pedido-resolver-${n.nota}`}
+                      />
+                    )
+                  : undefined
+              }
+            />
+          )}
+          <AvisosResolvidosLista
+            itens={semPedidoResolvidas.map((n) => ({ chave: chaveNotaSemPedido(n), titulo: tituloSemPedido(n), contexto: n.planoInterno ?? undefined }))}
+            porChave={resolvidos}
+            podeReexibir={podeGerir}
+            onReexibir={(chave) => reexibir.mutate({ chave })}
+            reexibindo={reexibir.isPending}
+            testId="emendas-inicio-sem-pedido-resolvidos"
+          />
+          {dialogResolvido}
         </PainelGaveta>
       )}
       {editando && <DadosItemModal item={editando} onClose={() => setEditando(null)} />}

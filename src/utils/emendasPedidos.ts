@@ -7,6 +7,7 @@ import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR, diasEntre, passo
 import { chaveDoContrato, numeroDaChave } from './contractKeyUtils';
 import { formatCurrency } from './format';
 import { avisosDeEmpenho } from './emendasEmpenho';
+import { avisoDeCredor, type CredorNoPedido } from './emendasConferenciaNota';
 import type { PrecoPrevisto } from '../services/emendasQuadroService';
 
 /** Dias de reserva sem ofício até o aviso (decisão de 23/10/2026). */
@@ -230,7 +231,8 @@ export type TipoAviso =
   | 'semAutorizacao'
   | 'empenhoAMais'
   | 'empenhoAMenos'
-  | 'notaEmitida';
+  | 'notaEmitida'
+  | 'credorDiferente';
 
 export interface AvisoPedido {
   tipo: TipoAviso;
@@ -250,10 +252,11 @@ export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = {
   divergencia: 3,
   semOficio: 4,
   ataVencendo: 5,
-  notaEmitida: 6,
-  empenhoAMenos: 7,
-  semAutorizacao: 8,
-  semNota: 9
+  credorDiferente: 6,
+  notaEmitida: 7,
+  empenhoAMenos: 8,
+  semAutorizacao: 9,
+  semNota: 10
 };
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
@@ -302,8 +305,18 @@ export function notaEmitidaSemRegistro(p: PedidoEmenda, notas: Map<string, NotaD
   };
 }
 
-/** `empenho`: diferenças entre o pedido e as notas ainda não resolvidas (migration 187), de diferencasPorPedido. */
-export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, hoje: string, notas?: Map<string, NotaDaLinha>, empenho?: ConferenciaEmpenho[]): AvisoPedido[] {
+/**
+ * `empenho`: diferenças entre o pedido e as notas ainda não resolvidas (migration 187), de diferencasPorPedido.
+ * `credor`: notas ligadas com credor diferente do fornecedor da ata, ainda não resolvidas (migration 190).
+ */
+export function avisosDoPedido(
+  p: PedidoEmenda,
+  itens: Map<string, ItemCaep>,
+  hoje: string,
+  notas?: Map<string, NotaDaLinha>,
+  empenho?: ConferenciaEmpenho[],
+  credor?: CredorNoPedido[]
+): AvisoPedido[] {
   const avisos: AvisoPedido[] = [];
   if (p.etapa === 'RESERVADO' || p.etapa === 'MINUTA') {
     // Depois de uma devolução, conta da devolução: contar da reserva faria o pedido devolvido já nascer atrasado.
@@ -321,6 +334,8 @@ export function avisosDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, ho
   if (semAutorizacao) avisos.push(semAutorizacao);
   const emitida = notas ? notaEmitidaSemRegistro(p, notas) : null;
   if (emitida) avisos.push(emitida);
+  const deOutroFornecedor = p.etapa === 'CANCELADO' ? null : avisoDeCredor(credor);
+  if (deOutroFornecedor) avisos.push(deOutroFornecedor);
   if (notas && jaEmpenhado(p.etapa)) {
     const semNota = linhasSemNota(p, notas).length;
     if (semNota) avisos.push({ tipo: 'semNota', curto: `${semNota} sem nota`, texto: `${semNota} ${semNota === 1 ? 'linha' : 'linhas'} sem nota de empenho` });

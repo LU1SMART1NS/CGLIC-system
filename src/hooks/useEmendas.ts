@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAvisosResolvidos } from './useAvisosResolvidos';
 import { conferenciaPorItem, diferencasPorPedido } from '../utils/emendasEmpenho';
+import { credorPorPedido } from '../utils/emendasConferenciaNota';
 import { useAuth } from '../context/AuthContext';
 import { semContratos } from '../types/rbac';
 import {
@@ -18,11 +19,14 @@ import {
   fetchReservadoPorItem,
   fetchNotasDasLinhas,
   fetchConferenciaEmpenho,
+  fetchCredorDiferente,
+  fetchNotasSemPedido,
   salvarPedidoEmenda,
   avancarPedidoEmenda,
   cancelarPedidoEmenda,
   informarSolicitacaoDaAta,
   type AcaoPedido,
+  type CredorDiferente,
   type BeneficiarioEmenda,
   type BeneficiarioParaSalvar,
   type ConferenciaEmpenho,
@@ -119,6 +123,7 @@ export function useConferenciaEmpenho() {
 }
 
 const SEM_CONFERENCIA: ConferenciaEmpenho[] = [];
+const SEM_CREDOR: CredorDiferente[] = [];
 
 /** Conferência com as diferenças ainda não resolvidas por pedido e a conferência de cada item (etiqueta da linha). */
 export function useDiferencasDeEmpenho() {
@@ -128,6 +133,21 @@ export function useDiferencasDeEmpenho() {
   const diferencas = useMemo(() => diferencasPorPedido(conferencia, porChave), [conferencia, porChave]);
   const porItem = useMemo(() => conferenciaPorItem(conferencia), [conferencia]);
   return { consulta, conferencia, diferencas, porItem, resolvidos: porChave };
+}
+
+/** Notas ligadas com credor diferente do fornecedor da ata (migration 190), por pedido, sem as já resolvidas. */
+export function useCredorDiferente() {
+  const consulta = useQuery({ queryKey: [...CHAVE_EMENDAS, 'credor-diferente'], queryFn: fetchCredorDiferente, staleTime: 5 * 60_000 });
+  const { porChave } = useAvisosResolvidos();
+  const lista = consulta.data ?? SEM_CREDOR;
+  const porPedido = useMemo(() => credorPorPedido(lista, porChave), [lista, porChave]);
+  const todosPorPedido = useMemo(() => credorPorPedido(lista), [lista]);
+  return { consulta, porPedido, todosPorPedido, resolvidos: porChave };
+}
+
+/** Notas de emenda da UG 200330 cuja emenda nenhum pedido tem (migration 190). */
+export function useNotasSemPedido() {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'notas-sem-pedido'], queryFn: fetchNotasSemPedido, staleTime: 5 * 60_000 });
 }
 
 /** Pedido mexe no saldo: recarrega pedidos, reservado e kits (kits possíveis). */
