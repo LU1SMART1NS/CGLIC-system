@@ -1,6 +1,6 @@
 -- ==============================================================================
--- MIGRATION 187: NOTAS DAS EMENDAS ACHADAS SEM NÚMERO DIGITADO (M2 da revisão de 25/10/2026)
--- Versão: 20261025000187_notas_das_emendas_sem_numero.sql
+-- MIGRATION 188: NOTAS DAS EMENDAS ACHADAS SEM NÚMERO DIGITADO (M2 da revisão de 25/10/2026)
+-- Versão: 20261025000188_notas_das_emendas_sem_numero.sql
 --
 -- O servidor já traz do Tesouro as notas citadas no SEI (migrations 184 e 185), mas o número da nota só existia nos
 -- pedidos cujo SEI foi lido; num pedido novo ninguém digita a nota. E as regras de ligação (CONTRATO, ITEM, AUTOR) só
@@ -23,7 +23,7 @@
 -- ------------------------------------------------------------------------------
 ALTER TABLE public.emenda_notas_tesouro_tentativas ADD COLUMN IF NOT EXISTS plano_interno TEXT;
 COMMENT ON COLUMN public.emenda_notas_tesouro_tentativas.plano_interno IS
-  'Plano interno que o Tesouro devolveu para a nota na UG 200330 (migration 187).';
+  'Plano interno que o Tesouro devolveu para a nota na UG 200330 (migration 188).';
 
 ALTER TABLE public.emenda_linha_notas DROP CONSTRAINT IF EXISTS emenda_linha_notas_regra;
 ALTER TABLE public.emenda_linha_notas ADD CONSTRAINT emenda_linha_notas_regra
@@ -129,7 +129,7 @@ BEGIN
     SELECT COALESCE(jsonb_agg(r), '[]'::JSONB) INTO v_cand
       FROM jsonb_array_elements(p_notas) r
      WHERE upper(btrim(r->>'numero')) = v_n.numero AND r->>'ug' IN ('200330', '200331');
-    -- Migration 187: o plano interno da UG das emendas fica guardado, para não perguntar de novo a nota que não é de
+    -- Migration 188: o plano interno da UG das emendas fica guardado, para não perguntar de novo a nota que não é de
     -- nenhum pedido (só volta à fila quando um pedido passa a ter essa emenda).
     SELECT NULLIF(btrim(COALESCE(r->>'picodigo', '') || ' - ' || COALESCE(r->>'pidescricao', '')), '-') INTO v_pi_330
       FROM jsonb_array_elements(v_cand) r WHERE r->>'ug' = '200330' LIMIT 1;
@@ -274,7 +274,7 @@ BEGIN
           FROM l JOIN ic ON ic.item_key = l.item_key JOIN ne ON ne.contract_key = ic.contract_key
          WHERE ne.emenda_txt IS NULL AND ne.autor_pi = substr(l.emenda, 1, 4) AND ne.ano_exercicio = l.ano
          GROUP BY l.id),
-  -- Migration 187: a nota da emenda que não está em contrato nenhum (trazida pelo Tesouro). Vale a nota com o número
+  -- Migration 188: a nota da emenda que não está em contrato nenhum (trazida pelo Tesouro). Vale a nota com o número
   -- exato da emenda no plano interno (e o ano, quando o pedido sabe) cujo credor é o fornecedor da ata do item, pela raiz
   -- do CNPJ. Medição de 25/10/2026: nas linhas com nota, o credor é o fornecedor da ata em 95% (1.537 de 1.623).
   forn AS (
