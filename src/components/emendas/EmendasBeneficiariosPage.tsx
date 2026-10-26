@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Building } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -24,7 +24,7 @@ import {
   useSalvarBeneficiario
 } from '../../hooks/useEmendas';
 import { formatarCep, localDoBeneficiario, rotuloBeneficiario, type BeneficiarioEmenda } from '../../services/emendasService';
-import { faltasDoBeneficiario, paresParecidos, type FaltaDoBeneficiario } from '../../utils/emendasBeneficiarios';
+import { casaBusca, faltasDoBeneficiario, paresParecidos, textoDeBuscaDoBeneficiario, type FaltaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import { BeneficiarioModal } from './BeneficiarioModal';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { JuntarBeneficiariosModal } from './JuntarBeneficiariosModal';
@@ -32,7 +32,6 @@ import { NomeComSigla } from './emendasPartes';
 
 type Segmento = 'completos' | 'faltam' | 'parecidos' | 'inativos' | 'todos';
 
-const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 // Colunas além do nome no padrão das carteiras: carteiraValor e, embaixo, carteiraDetalhe; o que falta em itálico.
 const falta: React.CSSProperties = { ...carteiraDetalhe, marginTop: 0, fontStyle: 'italic' };
 const POR_PAGINA = 25;
@@ -75,14 +74,30 @@ export const EmendasBeneficiariosPage: React.FC = () => {
     return m;
   }, [lista, diferentes]);
 
+  // Busca por palavras em qualquer ordem (nome, sigla, cidade, estado por extenso, contato) ou pelos dígitos do CNPJ.
+  const achaNaBusca = useCallback(
+    (b: BeneficiarioEmenda) => {
+      const digitos = busca.replace(/\D/g, '');
+      return (
+        casaBusca(`${textoDeBuscaDoBeneficiario(b)} ${b.nomeCurto ?? ''} ${b.responsavelNome ?? ''}`, busca) ||
+        (digitos.length >= 4 && (b.cnpj ?? '').includes(digitos))
+      );
+    },
+    [busca]
+  );
+
   const ativos = lista.filter((b) => b.ativo);
+  // Com busca, os números das abas contam só o que a busca acha: mostram em que aba está o que se procura.
+  const ativosAchados = ativos.filter(achaNaBusca);
   const contagem = {
-    completos: ativos.filter((b) => !faltas.get(b.id)?.length).length,
-    faltam: ativos.filter((b) => faltas.get(b.id)?.length).length,
-    parecidos: ativos.filter((b) => parecidoDe.has(b.id)).length
+    completos: ativosAchados.filter((b) => !faltas.get(b.id)?.length).length,
+    faltam: ativosAchados.filter((b) => faltas.get(b.id)?.length).length,
+    parecidos: ativosAchados.filter((b) => parecidoDe.has(b.id)).length,
+    inativos: lista.filter((b) => !b.ativo && achaNaBusca(b)).length,
+    todos: lista.filter(achaNaBusca).length
   };
-  // Abre onde há trabalho: faltando dados enquanto houver; depois, os completos.
-  const ativo: Segmento = segmento ?? (contagem.faltam > 0 ? 'faltam' : 'completos');
+  // Abre onde há trabalho: faltando dados enquanto houver; depois, os completos (pela lista toda, não pela busca).
+  const ativo: Segmento = segmento ?? (ativos.some((b) => faltas.get(b.id)?.length) ? 'faltam' : 'completos');
 
   const doSegmento = useMemo(
     () =>
@@ -98,18 +113,12 @@ export const EmendasBeneficiariosPage: React.FC = () => {
   );
 
   const filtrados = useMemo(() => {
-    const termo = semAcento(busca.trim());
-    const digitos = busca.replace(/\D/g, '');
     return doSegmento
       .filter((b) => !uf || (b.entregaUf ?? '') === uf)
       .filter((b) => !oQueFalta || (faltas.get(b.id) ?? []).includes(oQueFalta as FaltaDoBeneficiario))
       .filter(
-        (b) =>
-          !termo ||
-          semAcento([b.nome, b.sigla, b.nomeCurto, b.razaoSocial, b.entregaMunicipio, b.responsavelNome, ...b.outrosNomes].filter(Boolean).join(' ')).includes(termo) ||
-          (digitos.length >= 4 && (b.cnpj ?? '').includes(digitos))
-      );
-  }, [doSegmento, uf, oQueFalta, busca, faltas]);
+        (b) => achaNaBusca(b));
+  }, [doSegmento, uf, oQueFalta, faltas, achaNaBusca]);
 
   const ufs = useMemo(() => {
     const c = new Map<string, number>();
@@ -284,8 +293,8 @@ export const EmendasBeneficiariosPage: React.FC = () => {
           { id: 'completos', label: 'Completos', count: contagem.completos, dot: 'var(--color-success)' },
           { id: 'faltam', label: 'Faltam dados', count: contagem.faltam, dot: 'var(--color-warning-solid)' },
           { id: 'parecidos', label: 'Parecidos', count: contagem.parecidos, dot: 'var(--color-info-solid)' },
-          { id: 'inativos', label: 'Desativados', count: lista.length - ativos.length },
-          { id: 'todos', label: 'Todos', count: lista.length }
+          { id: 'inativos', label: 'Desativados', count: contagem.inativos },
+          { id: 'todos', label: 'Todos', count: contagem.todos }
         ]}
       />
 

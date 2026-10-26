@@ -4,6 +4,7 @@ vi.mock('../../services/supabaseClient', () => ({ supabase: null }));
 
 import {
   beneficiarioRepetido,
+  casaBusca,
   chaveDaIdentidade,
   chaveDoNome,
   faltasDoBeneficiario,
@@ -13,6 +14,7 @@ import {
   parecidosCom,
   pendenciasDoBeneficiario,
   saoParecidos,
+  textoDeBuscaDoBeneficiario,
   type FormularioBeneficiario
 } from '../emendasBeneficiarios';
 import { cnpjValido, consultarCep, consultarCnpj, localDoBeneficiario, rotuloBeneficiario, type BeneficiarioEmenda } from '../../services/emendasService';
@@ -177,5 +179,46 @@ describe('linkDoWhatsapp', () => {
     expect(linkDoWhatsapp('(61) 2025-3069')).toBeNull();
     expect(linkDoWhatsapp('99999-0000')).toBeNull();
     expect(linkDoWhatsapp(null)).toBeNull();
+  });
+});
+
+describe('busca de beneficiários', () => {
+  const cbmma = ben('1', 'Corpo de Bombeiros Militar do Maranhão', 'São Luís', 'MA', {
+    sigla: 'CBMMA',
+    razaoSocial: 'ESTADO DO MARANHAO - CORPO DE BOMBEIROS MILITARES DO MARANHAO'
+  });
+  const generico = ben('2', 'Corpo de Bombeiros Militar', null, 'AL', { sigla: 'CBMAL' });
+  const texto = (b: BeneficiarioEmenda) => textoDeBuscaDoBeneficiario(b);
+
+  it('acha pelo começo do nome, sem acento e sem maiúsculas', () => {
+    expect(casaBusca(texto(cbmma), 'Corpo de Bomb')).toBe(true);
+    expect(casaBusca(texto(cbmma), 'corpo de bombeiros militar do maranhao')).toBe(true);
+  });
+
+  it('acha com as palavras em qualquer ordem e com "do Estado do"', () => {
+    expect(casaBusca(texto(cbmma), 'bombeiros maranhão')).toBe(true);
+    expect(casaBusca(texto(cbmma), 'Corpo de Bombeiros Militar do Estado do Maranhão')).toBe(true);
+  });
+
+  it('acha pelo estado por extenso quando o nome só tem a UF', () => {
+    expect(casaBusca(texto(generico), 'bombeiros alagoas')).toBe(true);
+    expect(casaBusca(texto(generico), 'bombeiros maranhao')).toBe(false);
+  });
+
+  it('acha pela sigla e pela cidade; palavra que não existe derruba', () => {
+    expect(casaBusca(texto(cbmma), 'cbmma')).toBe(true);
+    expect(casaBusca(texto(cbmma), 'sao luis')).toBe(true);
+    expect(casaBusca(texto(cbmma), 'bombeiros piaui')).toBe(false);
+  });
+
+  it('busca vazia ou só com "de/do" acha todos', () => {
+    expect(casaBusca(texto(cbmma), '  ')).toBe(true);
+    expect(casaBusca(texto(cbmma), 'do')).toBe(true);
+  });
+
+  it('número ordinal: "16º" e "16" acham "16º Grupamento"', () => {
+    const gb = ben('3', '16º Grupamento de Bombeiro Militar', 'Limeira', 'SP');
+    expect(casaBusca(texto(gb), '16º grupamento')).toBe(true);
+    expect(casaBusca(texto(gb), '16 limeira')).toBe(true);
   });
 });

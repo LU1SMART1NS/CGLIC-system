@@ -12,6 +12,7 @@ import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, calcularKit, curto, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta } from '../../utils/emendasKits';
+import { casaBusca, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import { identificacaoDoPedido, itensDaLinha, orgaoDoPedido, precoParaEmenda, valorDaLinha, VOLTA_AO_OFICIO } from '../../utils/emendasPedidos';
 import { nomeDoItem, notaDoPreco } from '../../utils/emendasQuadro';
 import { formatarTelefone, localDoBeneficiario, nomeESigla, rotuloBeneficiario, soDigitos } from '../../services/emendasService';
@@ -248,8 +249,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const podeItem = (i: ItemCaep) => !foraDoPrazo(i) && livre(i.itemKey) > 0;
 
   const ativosBen = useMemo(() => beneficiarios.filter((b) => b.ativo).sort((a, b) => rotuloBeneficiario(a).localeCompare(rotuloBeneficiario(b), 'pt-BR')), [beneficiarios]);
-  const tb = semAcento(buscaBeneficiario.trim());
-  const beneficiariosEncontrados = ativosBen.filter((b) => !tb || semAcento(`${b.nome} ${b.sigla ?? ''} ${b.razaoSocial ?? ''} ${localDoBeneficiario(b) ?? ''}`).includes(tb)).slice(0, MAX_BENEFICIARIOS);
+  const beneficiariosEncontrados = ativosBen.filter((b) => casaBusca(textoDeBuscaDoBeneficiario(b), buscaBeneficiario)).slice(0, MAX_BENEFICIARIOS);
 
   const tel = soDigitos(contatoTelefone);
   const pendencias: Pendencia[] = [];

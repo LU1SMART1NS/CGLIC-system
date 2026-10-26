@@ -35,6 +35,7 @@ import {
 } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
+import { casaBusca, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import {
   atasDoPedido,
   contaDosItens,
@@ -95,7 +96,6 @@ const POR_PAGINA = 25;
 const temAviso = (l: { avisos: AvisoPedido[] }, filtro: string) =>
   filtro === 'com' ? l.avisos.length > 0 : filtro === 'grave' ? l.avisos.some(avisoGrave) : l.avisos.some((a) => a.tipo === filtro);
 const chaveDaLinha = (p: { id: string }) => p.id;
-const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const VARIANTE_ETAPA: Record<EtapaPedido, StatusBadgeVariant> = {
   RESERVADO: 'info',
   MINUTA: 'info',
@@ -609,10 +609,10 @@ export const EmendasPedidosPage: React.FC = () => {
     return valores.map((v) => ({ ...v, count: doSegmento.filter((l) => etapaDoFiltro(l) === v.value).length }));
   }, [segmento, doSegmento, etapaDoFiltro]);
   const filtradas = useMemo(() => {
-    const termo = semAcento(busca.trim());
+    const termo = busca.trim();
     const textoDoBeneficiario = (id: string | null) => {
       const b = id ? beneficiarios.get(id) : undefined;
-      return b ? [b.nome, b.sigla, b.razaoSocial, b.entregaMunicipio, ...b.outrosNomes].filter(Boolean).join(' ') : '';
+      return b ? textoDeBuscaDoBeneficiario(b) : '';
     };
     return doSegmento
       .filter((l) => !filtroEtapa || etapaDoFiltro(l) === filtroEtapa)
@@ -626,7 +626,7 @@ export const EmendasPedidosPage: React.FC = () => {
           .map((x) => `${(x.tipo === 'KIT' ? x.kitNome : itens.get(x.itemKey ?? '')?.descricao) ?? ''} ${textoDoBeneficiario(x.beneficiarioId)} ${x.contratoNumero ?? ''}`)
           .join(' ');
         // O nome do contato da assessoria só entra na busca de quem o vê.
-        return semAcento(`${a?.nome ?? AUTOR_A_DEFINIR} ${podeGerir ? l.contatoNome ?? '' : ''} ${a?.uf ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${ETAPAS.flatMap((e) => seiDaEtapa(l, e.etapa)).join(' ')} ${textoLinhas}`).includes(termo);
+        return casaBusca(`${a?.nome ?? AUTOR_A_DEFINIR} ${podeGerir ? l.contatoNome ?? '' : ''} ${a?.uf ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${ETAPAS.flatMap((e) => seiDaEtapa(l, e.etapa)).join(' ')} ${textoLinhas}`, termo);
       });
   }, [doSegmento, filtroEtapa, etapaDoFiltro, soPedido, filtroAutor, filtroAviso, busca, autorPorId, itens, beneficiarios, podeGerir]);
 
