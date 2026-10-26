@@ -34,7 +34,7 @@ import { curto } from '../../utils/emendasKits';
  * MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa.
  * SOLICITACAO_ATA: a solicitação de empenho de uma ata (migration 178), sem mudar de etapa.
  */
-export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA' | 'CANCELAR';
+export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA' | 'CANCELAR' | 'QUADROS_AUTORIZACAO';
 
 /** De onde a janela foi aberta: a ata e o número que já estão na linha do tempo. */
 export interface ContextoDaJanela {
@@ -77,7 +77,8 @@ const TITULO: Record<AcaoDaJanela, string> = {
   MAIS_EMPENHADO: 'Acrescentar número SEI do empenho',
   MAIS_CONTRATACAO: 'Acrescentar número SEI do despacho para contratação',
   SOLICITACAO_ATA: 'Solicitação de empenho de uma ata',
-  CANCELAR: 'Cancelar o pedido'
+  CANCELAR: 'Cancelar o pedido',
+  QUADROS_AUTORIZACAO: 'Quadros da autorização'
 };
 
 /** Rótulo do campo SEI de cada etapa com documento (migration 174). */

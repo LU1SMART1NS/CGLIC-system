@@ -26,6 +26,7 @@ import {
   cancelarPedidoEmenda,
   registrarAnulacaoEmpenho,
   fetchExecucaoEmendas,
+  fetchDadosDaAtaParaAutorizacao,
   informarSolicitacaoDaAta,
   registrarEnvioCgofi,
   fetchEmendasSiop,
@@ -211,6 +212,11 @@ export function useRegistrarEnvioCgofi() {
 /** Execução de cada emenda pelo Portal da Transparência (migration 204), lida uma vez por dia pelo servidor. */
 export function useExecucaoEmendas({ enabled = true }: LeituraOpcional = {}) {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'execucao-portal'], queryFn: fetchExecucaoEmendas, staleTime: 30 * 60_000, enabled });
+}
+
+/** Dados da ata para os quadros da autorização de empenho (pregão, UASG, fornecedor, SEI da ata assinada). */
+export function useDadosDaAtaParaAutorizacao(ataKey: string | null) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'ata-autorizacao', ataKey], queryFn: () => fetchDadosDaAtaParaAutorizacao(ataKey!), enabled: Boolean(ataKey), staleTime: 30 * 60_000 });
 }
 
 export function useRegistrarAnulacao() {

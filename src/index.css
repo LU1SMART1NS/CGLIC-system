@@ -2059,6 +2059,16 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .reserva-sozinho { align-self: flex-start; }
 .reserva-destino { font-size: 0.8rem; }
 .reserva-destino b { color: var(--primary); }
+.emendas-autorizacao { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 1rem; }
+.emendas-autorizacao__dados { display: flex; flex-direction: column; gap: 0.6rem; background: var(--bg-page, #f8fafc); border-radius: 10px; padding: 0.75rem; }
+.emendas-autorizacao__pedido { display: flex; flex-direction: column; gap: 0.3rem; border: 1px solid var(--color-border, #e2e8f0); border-radius: 8px; background: var(--surface, #fff); padding: 0.5rem 0.65rem; font-size: 0.85rem; }
+.emendas-autorizacao__pedido--este { border-color: var(--primary); }
+.emendas-autorizacao__linha { display: flex; gap: 0.45rem; align-items: flex-start; }
+.emendas-autorizacao__quadros { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
+.emendas-autorizacao__folha { background: #fff; color: #000; border: 1px solid var(--color-border, #e2e8f0); border-radius: 6px; padding: 0.9rem; overflow-x: auto; }
+.emendas-autorizacao__folha table { min-width: 640px; }
+.emendas-autorizacao__registro { display: flex; flex-direction: column; gap: 0.45rem; border-top: 1px solid var(--color-border, #e2e8f0); padding-top: 0.75rem; }
+@media (max-width: 900px) { .emendas-autorizacao { grid-template-columns: minmax(0, 1fr); } }
 .reserva-teto { display: flex; flex-direction: column; gap: 0.35rem; background: var(--bg-page, #f8fafc); border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.6rem 0.75rem; font-size: 0.82rem; }
 .reserva-teto--passa { border-color: var(--color-danger-border); background: var(--color-danger-bg); }
 .reserva-teto__barra { height: 8px; border-radius: 999px; background: var(--surface, #fff); overflow: hidden; }
