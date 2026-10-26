@@ -530,7 +530,14 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
               <div key={a.id} style={carteiraSubtitle}>
                 Empenho anulado em {dataBR(a.anuladoEm)}
                 {a.notas.length ? ` (${listaEmTexto(a.notas)})` : ''}: {a.linhas.length === 1 ? '1 item' : `${a.linhas.length} itens`}, documento SEI {a.documentoSei}.{' '}
-                {a.total ? 'O pedido voltou a "Itens reservados".' : `${a.linhas.length === 1 ? 'O item voltou' : 'Os itens voltaram'} à interlocução no pedido ${a.novoPedidoNumero ?? 'novo'}.`} Motivo: {a.motivo}
+                {a.destino === 'CANCELAR'
+                  ? a.total
+                    ? 'O pedido foi cancelado.'
+                    : `${a.linhas.length === 1 ? 'O item foi cancelado' : 'Os itens foram cancelados'}, sem volta à interlocução.`
+                  : a.total
+                    ? 'O pedido voltou a "Itens reservados".'
+                    : `${a.linhas.length === 1 ? 'O item voltou' : 'Os itens voltaram'} à interlocução no pedido ${a.novoPedidoNumero ?? 'novo'}.`}{' '}
+                Motivo: {a.motivo}
                 {a.criadoPorNome ? ` · registrado por ${a.criadoPorNome}` : ''}
               </div>
             ))}

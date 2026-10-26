@@ -341,6 +341,31 @@ export function linhasComEmpenhoAnulado(p: PedidoEmenda, notas: Map<string, Nota
   return linhasAtivas(p).filter((l) => notaZerada(notas.get(l.id)));
 }
 
+/** Linhas tiradas do pedido por uma anulação parcial registrada (migration 203): canceladas, com o empenho anulado. */
+export function linhasAnuladas(p: PedidoEmenda): LinhaPedido[] {
+  const ids = new Set(p.anulacoes.filter((a) => !a.total).flatMap((a) => a.linhas.map((l) => l.linhaId)));
+  return p.linhas.filter((l) => l.cancelada && ids.has(l.id));
+}
+
+/**
+ * Nota de empenho deste pedido emitida na data da anulação ou depois, numa linha que não está marcada: a compra pode ter
+ * sido refeita nela (pedido 528: a NE 250 da cota reservada foi anulada e a NE 422 da cota ampla comprou os mesmos
+ * smartphones). A janela da anulação mostra essas notas para o gestor escolher "Só cancelar os itens".
+ */
+export function notasEmitidasDepoisDaAnulacao(
+  p: PedidoEmenda,
+  notas: Map<string, NotaDaLinha>,
+  marcadas: ReadonlySet<string>,
+  anuladoEm: string
+): Array<{ linha: LinhaPedido; nota: string; emitidaEm: string }> {
+  if (!anuladoEm) return [];
+  return linhasAtivas(p).flatMap((l) => {
+    const n = notas.get(l.id);
+    if (marcadas.has(l.id) || !n?.nota || !n.emitidaEm || n.emitidaEm < anuladoEm || notaZerada(n)) return [];
+    return [{ linha: l, nota: n.nota, emitidaEm: n.emitidaEm }];
+  });
+}
+
 /** "2026NE000088 e 2026NE000106": as notas zeradas das linhas, para avisos. */
 export const notasDasLinhas = (linhas: LinhaPedido[], notas: Map<string, NotaDaLinha>): string[] =>
   [...new Set(linhas.map((l) => notas.get(l.id)?.nota).filter((n): n is string => Boolean(n)))].sort();
@@ -761,7 +786,10 @@ export function faltaEnvioCgofi(p: PedidoEmenda, notas?: Map<string, NotaDaLinha
     const ls = linhasAtivas(p).filter((l) => solicitacaoDaLinha(p, l)?.id === d.id);
     return Boolean(notas) && ls.length > 0 && ls.every((l) => notas!.get(l.id)?.nota);
   };
-  return solicitacoesAssinadasSemEnvio(p).filter((d) => !empenhada(d));
+  // Solicitação só com itens de empenho anulado (nenhuma linha ativa): não há o que enviar.
+  const soAnulada = (d: DocumentoSeiDoPedido) =>
+    !linhasAtivas(p).some((l) => solicitacaoDaLinha(p, l)?.id === d.id) && linhasAnuladas(p).some((l) => solicitacaoDaLinha(p, l)?.id === d.id);
+  return solicitacoesAssinadasSemEnvio(p).filter((d) => !empenhada(d) && !soAnulada(d));
 }
 
 /** "37082291 (ata 00024/2024, assinada em 23/09/2026)": a solicitação em texto, para avisos e tarefas. */
@@ -869,6 +897,10 @@ export interface RodadaDoPedido {
   semRegistro: number;
   /** As linhas da rodada por situação: "6 contratadas · 1 na CCGA". */
   linhas: string;
+  /** Itens da rodada tirados do pedido por anulação de empenho, com as notas anuladas e a data (migration 203). */
+  anulados: { itens: number; notas: string[]; anuladoEm: string | null };
+  /** Nenhum item ativo na rodada: todos tiveram o empenho anulado. */
+  soAnulados: boolean;
 }
 
 /**
@@ -893,14 +925,23 @@ export function rodadasDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha>
         .sort(([a], [b]) => ORDEM_SITUACAO_LINHA[a] - ORDEM_SITUACAO_LINHA[b])
         .map(([s, n]) => `${n} ${n === 1 ? ROTULO_SITUACAO_LINHA[s as keyof typeof ROTULO_SITUACAO_LINHA].uma : ROTULO_SITUACAO_LINHA[s as keyof typeof ROTULO_SITUACAO_LINHA].varias}`)
         .join(' · ');
+      const anuladas = linhasAnuladas(p).filter((l) => { const s = solicitacaoDaLinha(p, l); return s && ids.has(s.id); });
+      const registros = p.anulacoes.filter((a) => a.linhas.some((x) => anuladas.some((l) => l.id === x.linhaId)));
+      const ativasNaRodada = situacoes.filter(({ s }) => s.solicitacao && ids.has(s.solicitacao.id)).length;
       return {
         assinadaEm: dia || null,
         solicitacoes: sols,
         envios: [...envios.values()].sort((a, b) => (a.data ?? '9999').localeCompare(b.data ?? '9999')),
         faltaEnvio: sols.filter((d) => falta.has(d.id)).length,
         atasSemEnvio: [...new Set(sols.filter((d) => falta.has(d.id)).map((d) => d.ataKey?.split('-')[0] ?? '?'))],
-        semRegistro: sols.filter((d) => d.assinadaEm && !d.enviosCgofi?.length && !falta.has(d.id)).length,
-        linhas
+        semRegistro: anuladas.length && !ativasNaRodada ? 0 : sols.filter((d) => d.assinadaEm && !d.enviosCgofi?.length && !falta.has(d.id)).length,
+        linhas: [linhas, anuladas.length ? `${anuladas.length} com empenho anulado` : ''].filter(Boolean).join(' · '),
+        anulados: {
+          itens: anuladas.length,
+          notas: [...new Set(registros.flatMap((a) => a.notas))].sort(),
+          anuladoEm: registros.map((a) => a.anuladoEm).sort().at(-1) ?? null
+        },
+        soAnulados: anuladas.length > 0 && ativasNaRodada === 0
       };
     });
 }

@@ -6,7 +6,8 @@ import { AppInput, AppTextarea } from '../../design-system/components/FormFields
 import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useRegistrarAnulacao } from '../../hooks/useEmendas';
-import { documentoSeiDaEtapaValido, identificacaoDoPedido, linhasAtivas, linhasComEmpenhoAnulado } from '../../utils/emendasPedidos';
+import { documentoSeiDaEtapaValido, identificacaoDoPedido, linhasAtivas, linhasComEmpenhoAnulado, notasEmitidasDepoisDaAnulacao } from '../../utils/emendasPedidos';
+import { dataBR } from '../../utils/emendasKits';
 import { formatNumber } from '../../utils/format';
 import type { ItemCaep, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
 import { LinhaDoPedido } from './emendasPartes';
@@ -21,8 +22,11 @@ interface Props {
 
 /**
  * Registro da anulação de empenho (protótipo aprovado em 26/10/2026, migration 203): abre com as linhas da nota zerada
- * no Tesouro já marcadas; o gestor confere, informa o documento SEI, a data e o motivo. Todas as linhas: o pedido volta
- * a "Itens reservados"; parte delas: vão para um pedido novo, ligado a este. O saldo da CAEP não muda.
+ * no Tesouro já marcadas; o gestor confere, informa o documento SEI, a data e o motivo, e escolhe o destino dos itens:
+ * - Voltar à interlocução: todas as linhas, o pedido volta a "Itens reservados"; parte delas, vão para um pedido novo,
+ *   ligado a este. O saldo da CAEP não muda.
+ * - Só cancelar (migration 208): a compra foi refeita em outra nota ou não vai acontecer; as linhas são canceladas (todas:
+ *   o pedido inteiro) e a quantidade volta ao saldo da CAEP. A janela aponta as notas do pedido emitidas depois da anulação.
  */
 export const AnulacaoModal: React.FC<Props> = ({ pedido, itens, notas, nomeDoAutor, onClose }) => {
   const registrar = useRegistrarAnulacao();
@@ -32,10 +36,12 @@ export const AnulacaoModal: React.FC<Props> = ({ pedido, itens, notas, nomeDoAut
   const [documento, setDocumento] = useState('');
   const [data, setData] = useState('');
   const [motivo, setMotivo] = useState('');
+  const [destino, setDestino] = useState<'INTERLOCUCAO' | 'CANCELAR'>('INTERLOCUCAO');
   const [tentou, setTentou] = useState(false);
   const hoje = hojeEmBrasilia();
 
   const total = marcadas.size > 0 && marcadas.size === ativas.length;
+  const refeitas = notasEmitidasDepoisDaAnulacao(pedido, notas, marcadas, data);
   const pendencias: string[] = [];
   if (marcadas.size === 0) pendencias.push('pelo menos um item');
   if (!documentoSeiDaEtapaValido(documento)) pendencias.push('o documento SEI da anulação (só números, 7 a 10 dígitos)');
@@ -47,8 +53,16 @@ export const AnulacaoModal: React.FC<Props> = ({ pedido, itens, notas, nomeDoAut
     setTentou(true);
     if (pendencias.length) return;
     try {
-      const r = await registrar.mutateAsync({ pedidoId: pedido.id, versao: pedido.versao, linhas: [...marcadas], documentoSei: documento.replace(/\D/g, ''), data, motivo: motivo.trim() });
-      toast.success(r.total ? `Anulação registrada: o pedido ${pedido.numero} voltou a "Itens reservados".` : `Anulação registrada: os itens foram para o pedido ${r.novoNumero}, em "Itens reservados".`);
+      const r = await registrar.mutateAsync({ pedidoId: pedido.id, versao: pedido.versao, linhas: [...marcadas], documentoSei: documento.replace(/\D/g, ''), data, motivo: motivo.trim(), destino });
+      toast.success(
+        destino === 'CANCELAR'
+          ? r.total
+            ? `Anulação registrada: o pedido ${pedido.numero} foi cancelado.`
+            : 'Anulação registrada: os itens foram cancelados, sem volta à interlocução.'
+          : r.total
+            ? `Anulação registrada: o pedido ${pedido.numero} voltou a "Itens reservados".`
+            : `Anulação registrada: os itens foram para o pedido ${r.novoNumero}, em "Itens reservados".`
+      );
       onClose();
     } catch (err) {
       toast.error((err as Error).message);
@@ -136,7 +150,39 @@ export const AnulacaoModal: React.FC<Props> = ({ pedido, itens, notas, nomeDoAut
           error={tentou && !motivo.trim() ? 'Informe o motivo.' : undefined}
           data-testid="emendas-anulacao-motivo"
         />
-        {marcadas.size > 0 && (
+        <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          <legend style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>O que fazer com os itens</legend>
+          {(
+            [
+              ['INTERLOCUCAO', 'Voltar à interlocução', 'Trocar itens ou beneficiários com o parlamentar e seguir o trâmite de novo.'],
+              ['CANCELAR', 'Só cancelar os itens', 'A compra foi refeita em outra nota ou não vai acontecer. A quantidade volta ao saldo da CAEP.']
+            ] as const
+          ).map(([valor, titulo, texto]) => (
+            <label key={valor} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', fontSize: '0.85rem', padding: '0.45rem 0.6rem', border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 6, cursor: 'pointer' }}>
+              <input type="radio" name="emendas-anulacao-destino" checked={destino === valor} onChange={() => setDestino(valor)} style={{ marginTop: 3 }} data-testid={`emendas-anulacao-destino-${valor}`} />
+              <span>
+                <b>{titulo}</b>
+                <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)' }}>{texto}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        {refeitas.length > 0 && destino === 'INTERLOCUCAO' && (
+          <NoticeBar tone="warning" testId="emendas-anulacao-refeita">
+            Este pedido tem {refeitas.length === 1 ? 'nota emitida' : 'notas emitidas'} na data da anulação ou depois:{' '}
+            {refeitas.map((r) => `${r.nota} em ${dataBR(r.emitidaEm)}`).join('; ')}. Se a compra foi refeita nela, escolha "Só cancelar os itens"
+            para não abrir um pedido que repete a compra.
+          </NoticeBar>
+        )}
+        {marcadas.size > 0 && destino === 'CANCELAR' && (
+          <NoticeBar tone="info" testId="emendas-anulacao-resumo">
+            {total
+              ? `Todos os itens do pedido: o pedido ${pedido.numero} é cancelado. As etapas e os documentos SEI ficam nele.`
+              : `${marcadas.size} de ${ativas.length} itens são cancelados no pedido ${pedido.numero}, sem pedido novo.`}{' '}
+            A quantidade volta ao saldo da CAEP.
+          </NoticeBar>
+        )}
+        {marcadas.size > 0 && destino === 'INTERLOCUCAO' && (
           <NoticeBar tone="info" testId="emendas-anulacao-resumo">
             {total
               ? `Todos os itens do pedido: o pedido ${pedido.numero} volta para "Itens reservados" (interlocução com o parlamentar). As datas e os documentos das etapas seguintes ficam guardados no registro da anulação.`
