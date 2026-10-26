@@ -312,6 +312,16 @@ describe('Pedidos: situação por linha, blocos por ata e O que falta (migration
     perfil.gerir = true;
   });
 
+  it('?ver=emenda: "Registrada em" no lugar de "Vista no SIOP", cabeçalho que ordena e sem a faixa vermelha na linha', () => {
+    perfil.gerir = true;
+    const html = render('/?ver=emenda');
+    expect(html).toContain('Registrada em');
+    expect(html).not.toContain('Vista no SIOP');
+    expect(html).not.toContain('pelo pedido');
+    expect(html).not.toContain('inset 3px 0 0');
+    expect(html).toContain('aria-sort');
+  });
+
   it('por pedido: faixa acima do trilho com as emendas sem pedido, fora da contagem das fases (decisão de 26/10/2026)', () => {
     perfil.gerir = true;
     const html = render('/');

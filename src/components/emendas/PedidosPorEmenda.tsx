@@ -12,6 +12,7 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
+import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { useApagarEmendaSiop, useAsparDosOrgaos, useContatosDasEmendas, useEmendasSiop } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { dataBR } from '../../utils/emendasKits';
@@ -41,6 +42,16 @@ const POR_PAGINA = 25;
 const chave = (l: EmendaNaLista) => l.chave;
 
 const VARIANTE: Record<EmendaNaLista['situacao'], StatusBadgeVariant> = { SEM_CONTATO: 'warning', EM_CONVERSA: 'warning', COM_PEDIDO: 'success' };
+const PESO_SITUACAO: Record<EmendaNaLista['situacao'], number> = { SEM_CONTATO: 2, EM_CONVERSA: 1, COM_PEDIDO: 0 };
+
+// Ordenação pelo cabeçalho, como nas carteiras (?ordem=); sem escolha, fica a ordem da lista (urgentes primeiro).
+const ORDEM: Record<string, CarteiraSortColumn<EmendaNaLista>> = {
+  emenda: { value: (l) => `${l.ano ?? 0}${l.numero}`, firstDir: 'desc' },
+  valor: { value: (l) => l.valor, firstDir: 'desc' },
+  registrada: { value: (l) => l.emenda?.vistaEm ?? null },
+  contato: { value: (l) => l.contatos.at(-1)?.contatoEm ?? null },
+  situacao: { value: (l) => PESO_SITUACAO[l.situacao] + (l.urgente ? 10 : 0), firstDir: 'desc' }
+};
 
 /** Um contato (assessoria ou ASPAR) em cartão: nome, telefone e e-mail para copiar, e os ícones de WhatsApp e e-mail. */
 const CartaoDeContato: React.FC<{
@@ -274,7 +285,12 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
         return casaBusca(`${l.numero} ${numeroDaEmenda(l.numero)} ${a?.nome ?? ''} ${a?.uf ?? ''} ${l.emenda?.objeto ?? ''}`, termo);
       })
     : doSegmento;
-  const { currentPage, setPage, pageItems } = useCarteiraPagination(filtradas, chave, POR_PAGINA);
+  const ordem = useMemo<Record<string, CarteiraSortColumn<EmendaNaLista>>>(
+    () => ({ ...ORDEM, autor: { value: (l) => (l.autorId ? autorPorId.get(l.autorId)?.nome ?? l.autorId : null) } }),
+    [autorPorId]
+  );
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ordem);
+  const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chave, POR_PAGINA);
   const limite = diasSemContatoParaUrgente();
 
   const colunas: Column<EmendaNaLista>[] = [
@@ -283,35 +299,54 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
       header: 'Emenda',
       priority: 'primary',
       nowrap: true,
+      sortValue: ordem.emenda.value,
+      sortFirstDir: 'desc',
       render: (l) => (
         <>
           <div style={carteiraIdentificacao}>{numeroDaEmenda(l.numero)}</div>
-          <div style={carteiraDetalhe}>{l.ano ?? 'ano não informado'}</div>
+          <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>{l.ano ?? 'ano não informado'}</div>
         </>
       )
     },
-    { key: 'autor', header: 'Parlamentar', minWidth: '200px', render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} /> },
-    { key: 'valor', header: 'Valor no SIOP', align: 'right', nowrap: true, render: (l) => (l.valor != null ? <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(l.valor)}</span> : <span style={carteiraDetalhe}>—</span>) },
-    { key: 'gnd', header: 'GND', nowrap: true, render: (l) => <span style={carteiraValor}>{l.gnd ?? '—'}</span> },
+    { key: 'autor', header: 'Parlamentar', minWidth: '200px', sortValue: ordem.autor.value, render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} /> },
     {
-      key: 'vista',
-      header: 'Vista no SIOP',
+      key: 'valor',
+      header: 'Valor no SIOP',
+      align: 'right',
       nowrap: true,
-      render: (l) =>
-        l.emenda ? (
-          <>
-            <div style={carteiraValor}>{dataBR(l.emenda.vistaEm)}</div>
-            {l.diasSemPedido != null && <div style={carteiraDetalhe}>{haDias(l.diasSemPedido)}</div>}
-          </>
-        ) : (
-          <span style={carteiraDetalhe}>pelo pedido</span>
-        )
+      sortValue: ordem.valor.value,
+      sortFirstDir: 'desc',
+      render: (l) => (l.valor != null ? <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(l.valor)}</span> : <span style={carteiraDetalhe}>—</span>)
     },
-    ...(podeGerir
+    { key: 'gnd', header: 'GND', nowrap: true, render: (l) => <span style={carteiraValor}>{l.gnd ?? '—'}</span> },
+    // Com pedido, o que interessa é a etapa dos pedidos; a data do registro e o último contato só valem enquanto não há pedido.
+    ...(segmento !== 'com'
+      ? [
+          {
+            key: 'registrada',
+            header: 'Registrada em',
+            nowrap: true,
+            sortValue: ordem.registrada.value,
+            render: (l: EmendaNaLista) =>
+              l.emenda ? (
+                <>
+                  <div style={carteiraValor}>{dataBR(l.emenda.vistaEm)}</div>
+                  {l.diasSemPedido != null && <div style={carteiraDetalhe}>{haDias(l.diasSemPedido)}</div>}
+                </>
+              ) : (
+                <span style={carteiraDetalhe} title="O nº veio da conferência do pedido com o SIOP; a emenda não foi registrada à parte.">
+                  —
+                </span>
+              )
+          } satisfies Column<EmendaNaLista>
+        ]
+      : []),
+    ...(podeGerir && segmento !== 'com'
       ? [
           {
             key: 'contato',
             header: 'Último contato',
+            sortValue: ordem.contato.value,
             render: (l: EmendaNaLista) => {
               const u = l.contatos.at(-1);
               if (!semPedido(l)) return <span style={carteiraDetalhe}>—</span>;
@@ -327,10 +362,34 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
           } satisfies Column<EmendaNaLista>
         ]
       : []),
+    ...(segmento !== 'sem'
+      ? [
+          {
+            key: 'pedidos',
+            header: 'Pedidos',
+            render: (l: EmendaNaLista) => {
+              if (l.pedidos.length === 0) return <span style={carteiraDetalhe}>—</span>;
+              const etapas = l.pedidos.slice(0, 2).map((p) => `Pedido ${p.numero} · ${ROTULO_ETAPA[p.etapa]}`);
+              return (
+                <>
+                  {etapas.map((t) => (
+                    <div key={t} style={carteiraValor}>
+                      {t}
+                    </div>
+                  ))}
+                  {l.pedidos.length > 2 && <div style={carteiraDetalhe}>+{l.pedidos.length - 2} {l.pedidos.length - 2 === 1 ? 'pedido' : 'pedidos'}</div>}
+                </>
+              );
+            }
+          } satisfies Column<EmendaNaLista>
+        ]
+      : []),
     {
       key: 'situacao',
       header: 'Situação',
       nowrap: true,
+      sortValue: ordem.situacao.value,
+      sortFirstDir: 'desc',
       render: (l) => (
         <span title={l.urgente ? `${l.diasSemContato} dias sem contato registrado (urgente a partir de ${limite})` : undefined} data-testid={`emendas-emenda-situacao-${l.chave}`}>
           <StatusBadge
@@ -396,7 +455,8 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
           className="data-table-container--flush"
           data={pageItems}
           keyExtractor={chave}
-          rowStyle={(l) => (l.urgente ? { boxShadow: 'inset 3px 0 0 var(--color-danger-text)' } : undefined)}
+          sort={{ key: sortKey, dir: sortDir }}
+          onSort={toggle}
           expandedKeys={abertas}
           onToggleExpand={(id) =>
             setAbertas((atual) => {
