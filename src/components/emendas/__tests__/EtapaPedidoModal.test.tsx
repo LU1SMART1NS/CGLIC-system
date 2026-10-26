@@ -11,7 +11,8 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useCancelarPedido: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useInformarSolicitacaoDaAta: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useRegistrarEnvioCgofi: () => ({ isPending: false, mutateAsync: vi.fn() }),
-  usePedidosEmendas: () => ({ data: naLista.pedidos })
+  usePedidosEmendas: () => ({ data: naLista.pedidos }),
+  useEmendasSiop: () => ({ data: [] })
 }));
 vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined }) }));
 vi.mock('../../../design-system/components/Toast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
@@ -44,7 +45,7 @@ const pedido = (etapa: PedidoEmenda['etapa'], documentos: PedidoEmenda['document
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null,
   siopEmenda: '28630004', siopEmendaAno: null, siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null,
   cgofiEm: null, cgofiDocumentoSei: null, empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null, canceladoMotivo: null,
-  versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha('l1', `${A}-00001`, 8), linha('l2', `${B}-00001`, 3)], devolucoes: [], documentos, pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: []
+  versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha('l1', `${A}-00001`, 8), linha('l2', `${B}-00001`, 3)], devolucoes: [], documentos, pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null
 });
 
 describe('janela das etapas: uma solicitação de empenho para cada ata (migration 178)', () => {

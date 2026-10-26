@@ -21,7 +21,8 @@ import {
   Network,
   ScrollText,
   ClipboardList,
-  Building
+  Building,
+  Contact
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -343,6 +344,17 @@ export const navigationConfig: NavItem[] = [
         group: 'Emendas',
         matchPrefixes: ['/emendas/beneficiarios'],
         allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
+        // Assessoria parlamentar dos órgãos estaduais (migration 205): contatos para a emenda sem pedido.
+        id: 'emendas-aspar',
+        label: 'ASPAR dos órgãos',
+        icon: Contact,
+        route: '/emendas/aspar',
+        status: 'active',
+        group: 'Emendas',
+        matchPrefixes: ['/emendas/aspar'],
+        allowedRoles: ['admin', 'gestor_emendas']
       },
       {
         id: 'admin-usuarios',

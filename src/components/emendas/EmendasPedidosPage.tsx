@@ -31,7 +31,8 @@ import {
   usePodeVerContratos,
   useNotasDasLinhas,
   useDiferencasDeEmpenho,
-  useCredorDiferente
+  useCredorDiferente,
+  useEmendasSiop
 } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
@@ -72,7 +73,7 @@ import {
   TIPOS_AVISO,
   type AvisoPedido
 } from '../../utils/emendasPedidos';
-import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ConferenciaEmpenho, type EtapaPedido, type ItemCaep, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
+import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ConferenciaEmpenho, type EmendaSiop, type EtapaPedido, type ItemCaep, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 const SEM_CREDOR: CredorNoPedido[] = [];
@@ -87,6 +88,8 @@ import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
 import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela, type ContextoDaJanela } from './EtapaPedidoModal';
 import { AnulacaoModal } from './AnulacaoModal';
+import { PedidosPorEmenda } from './PedidosPorEmenda';
+import { EmendaSiopModal } from './EmendaSiopModal';
 import type { SobraDaEmenda } from '../../utils/emendasSobra';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
@@ -596,8 +599,10 @@ export const EmendasPedidosPage: React.FC = () => {
   const itemDeOrigem = searchParams.get('item');
   const [abertos, setAbertos] = useState<ReadonlySet<string>>(() => new Set(soPedido ? [soPedido] : []));
   const [busca, setBusca] = useState('');
-  // Ver por autor e filtro de autor ficam no endereço (?ver=autor, ?autor=), para o Voltar do navegador funcionar.
-  const porAutor = searchParams.get('ver') === 'autor';
+  // Ver por autor ou por emenda e filtro de autor ficam no endereço (?ver=autor|emenda, ?autor=), para o Voltar do navegador funcionar.
+  const ver = searchParams.get('ver') === 'autor' ? 'autor' : searchParams.get('ver') === 'emenda' ? 'emenda' : 'pedido';
+  const porAutor = ver === 'autor';
+  const porEmenda = ver === 'emenda';
   const filtroAutor = searchParams.get('autor') ?? '';
   const mudarUrl = (mudar: (p: URLSearchParams) => void) =>
     setSearchParams((atual) => {
@@ -610,6 +615,10 @@ export const EmendasPedidosPage: React.FC = () => {
   const [sobraDoNovo, setSobraDoNovo] = useState<SobraDaEmenda | null>(null);
   const [anulando, setAnulando] = useState<Linha | null>(null);
   const [janela, setJanela] = useState<{ pedido: PedidoEmenda; acao: AcaoDaJanela; contexto?: ContextoDaJanela } | null>(null);
+  // Emendas vistas no SIOP (migration 205): registrar ou alterar, e o pedido novo criado a partir de uma delas.
+  const { data: emendasSiop = [] } = useEmendasSiop();
+  const [editandoEmenda, setEditandoEmenda] = useState<EmendaSiop | 'nova' | null>(null);
+  const [pedidoDaEmenda, setPedidoDaEmenda] = useState<EmendaSiop | null>(null);
 
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
@@ -785,47 +794,79 @@ export const EmendasPedidosPage: React.FC = () => {
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Pedidos"
-        subtitle={porAutor ? 'Quanto cada parlamentar ou bancada tem na fase escolhida.' : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'}
+        subtitle={
+          porAutor
+            ? 'Quanto cada parlamentar ou bancada tem na fase escolhida.'
+            : porEmenda
+              ? 'Emendas vistas no SIOP: as que ainda não viraram pedido avisam até a CAEP falar com o parlamentar.'
+              : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'
+        }
         hint={`A reserva já ocupa o saldo da CAEP e cancelar devolve o saldo. O contrato precisa ser assinado antes do fim da ata: a ${avisoIndicacaoDias()} dias do fim o pedido avisa e a menos de ${corteIndicacaoDias()} dias não entra reserva nem ofício com itens da ata (prazos em Ajustes › Regras de Alertas).`}
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={
-          <CarteiraSegmentTabs<'pedido' | 'autor'>
+          <CarteiraSegmentTabs<'pedido' | 'autor' | 'emenda'>
             testIdPrefix="emendas-pedidos-ver"
             ariaLabel="Ver por"
-            active={porAutor ? 'autor' : 'pedido'}
+            active={ver}
             onSelect={(v) =>
               mudarUrl((p) => {
-                if (v === 'autor') p.set('ver', 'autor');
-                else p.delete('ver');
+                if (v === 'pedido') p.delete('ver');
+                else p.set('ver', v);
               })
             }
             segments={[
               { id: 'pedido', label: 'Por pedido', title: 'Uma linha por pedido, com as etapas e os botões' },
-              { id: 'autor', label: 'Por autor', title: 'Uma linha por parlamentar ou bancada, com os totais' }
+              { id: 'autor', label: 'Por autor', title: 'Uma linha por parlamentar ou bancada, com os totais' },
+              { id: 'emenda', label: 'Por emenda', title: 'Uma linha por emenda vista no SIOP, com ou sem pedido' }
             ]}
           />
         }
         actions={
           <>
-            {podeGerir && <ActionButton action="novo" label="Nova reserva" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-pedidos-novo" />}
+            {podeGerir && porEmenda && <ActionButton action="novo" label="Registrar emenda do SIOP" onClick={() => setEditandoEmenda('nova')} data-testid="emendas-emenda-siop-nova" />}
+            {podeGerir && !porEmenda && <ActionButton action="novo" label="Nova reserva" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-pedidos-novo" />}
             <HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-pedidos-atualizar" tooltipTitle="Recarregar os pedidos" />
           </>
         }
       />
 
-      <CarteiraSegmentTabs<Segmento>
-        testIdPrefix="emendas-pedidos-etapa"
-        ariaLabel="Fase dos pedidos"
-        active={segmento}
-        onSelect={setSegmento}
-        segments={[
-          ...FASES_PEDIDO.map((f) => ({ id: f.id as Segmento, label: f.nome, count: contagem[f.id] ?? 0 })),
-          { id: 'todos', label: 'Todos', count: contagem.todos },
-          { id: 'CANCELADO', label: 'Cancelados', count: contagem.CANCELADO ?? 0 }
-        ]}
-      />
+      {!porEmenda && (
+        <CarteiraSegmentTabs<Segmento>
+          testIdPrefix="emendas-pedidos-etapa"
+          ariaLabel="Fase dos pedidos"
+          active={segmento}
+          onSelect={setSegmento}
+          segments={[
+            ...FASES_PEDIDO.map((f) => ({ id: f.id as Segmento, label: f.nome, count: contagem[f.id] ?? 0 })),
+            { id: 'todos', label: 'Todos', count: contagem.todos },
+            { id: 'CANCELADO', label: 'Cancelados', count: contagem.CANCELADO ?? 0 }
+          ]}
+        />
+      )}
 
-      {porAutor ? (
+      {porEmenda ? (
+        <PedidosPorEmenda
+          pedidos={pedidos}
+          autores={autores}
+          beneficiarios={beneficiariosLista}
+          podeGerir={podeGerir}
+          hoje={hoje}
+          carregandoPedidos={isLoading}
+          erroPedidos={isError}
+          onRetry={() => refetch()}
+          onCriarPedido={setPedidoDaEmenda}
+          onAlterar={setEditandoEmenda}
+          onAbrirPedido={(id) => {
+            setSegmentoBruto('todos');
+            setSoPedido(id);
+            setAbertos(new Set([id]));
+            mudarUrl((p) => {
+              p.delete('ver');
+              p.set('pedido', id);
+            });
+          }}
+        />
+      ) : porAutor ? (
         <PedidosPorAutor
           pedidos={doSegmento}
           todasAsEtapas={segmento === 'todos'}
@@ -993,6 +1034,30 @@ export const EmendasPedidosPage: React.FC = () => {
             setEditando(null);
             setSobraDoNovo(null);
           }}
+        />
+      )}
+      {pedidoDaEmenda && (
+        <PedidoModal
+          pedido={null}
+          emenda={pedidoDaEmenda}
+          autores={autores}
+          itens={itensLista}
+          kits={kits}
+          beneficiarios={beneficiariosLista}
+          reservadoFora={reservadoPorItem(pedidos)}
+          ultimoContato={ultimoContatoPorAutor(pedidos)}
+          hoje={hoje}
+          onClose={() => setPedidoDaEmenda(null)}
+        />
+      )}
+      {editandoEmenda && (
+        <EmendaSiopModal
+          emenda={editandoEmenda === 'nova' ? null : editandoEmenda}
+          emendas={emendasSiop}
+          pedidos={pedidos}
+          autores={autores}
+          beneficiarios={beneficiariosLista}
+          onClose={() => setEditandoEmenda(null)}
         />
       )}
       {anulando && <AnulacaoModal pedido={anulando} itens={itens} notas={notas} nomeDoAutor={nomeDoAutor(anulando.autorId)} onClose={() => setAnulando(null)} />}
