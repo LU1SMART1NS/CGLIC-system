@@ -24,6 +24,7 @@ import {
   salvarPedidoEmenda,
   avancarPedidoEmenda,
   cancelarPedidoEmenda,
+  registrarAnulacaoEmpenho,
   informarSolicitacaoDaAta,
   registrarEnvioCgofi,
   type AcaoPedido,
@@ -197,6 +198,11 @@ export function useInformarSolicitacaoDaAta() {
 export function useRegistrarEnvioCgofi() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: registrarEnvioCgofi, retry: 0, onSettled: invalidar });
+}
+
+export function useRegistrarAnulacao() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: registrarAnulacaoEmpenho, retry: 0, onSettled: invalidar });
 }
 
 export function useCancelarPedido() {

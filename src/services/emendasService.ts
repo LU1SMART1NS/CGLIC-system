@@ -536,6 +536,21 @@ export interface DevolucaoPedido {
   criadoPorNome: string | null;
 }
 
+/** Anulação de empenho registrada no pedido (migration 203). */
+export interface AnulacaoPedido {
+  id: string;
+  /** Total: o próprio pedido voltou a "Itens reservados"; parcial: as linhas foram para o pedido novo. */
+  total: boolean;
+  novoPedidoId: string | null;
+  novoPedidoNumero: number | null;
+  notas: string[];
+  linhas: Array<{ linhaId: string; novaLinhaId: string | null; itemKey: string | null; kitNome: string | null; quantidade: number }>;
+  documentoSei: string;
+  anuladoEm: string;
+  motivo: string;
+  criadoPorNome: string | null;
+}
+
 export interface PedidoEmenda {
   id: string;
   numero: number;
@@ -594,10 +609,15 @@ export interface PedidoEmenda {
   devolucoes: DevolucaoPedido[];
   /** Todos os documentos SEI das etapas (migration 177), com a ata de cada solicitação (migration 178). */
   documentos: DocumentoSeiDoPedido[];
+  /** Pedido de onde vieram os itens, quando este foi aberto por uma anulação parcial de empenho (migration 203). */
+  pedidoOrigemId: string | null;
+  pedidoOrigemNumero: number | null;
+  /** Anulações de empenho registradas neste pedido, da mais antiga à mais nova (migration 203). */
+  anulacoes: AnulacaoPedido[];
 }
 
 export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
-  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes] = await Promise.all([
+  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes, anulacoes] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedidos').select('*').order('numero').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_devolucoes').select('*').order('id').range(de, ate)),
@@ -610,8 +630,36 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
     // Solicitações que cada envio à CGOFI leva (migration 193). Antes da migration a tabela não existe: segue sem ela.
     lerTodasAsPaginas<Record<string, any>>((de, ate) =>
       db().from('emenda_cgofi_solicitacoes').select('cgofi_id, solicitacao_id').order('cgofi_id').order('solicitacao_id').range(de, ate)
+    ).catch(() => []),
+    // Anulações de empenho (migration 203). Antes da migration a tabela não existe: segue sem ela.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+      db().from('emenda_pedido_anulacoes').select('id, pedido_id, novo_pedido_id, total, notas, linhas, documento_sei, anulado_em, motivo, criado_por_nome').order('id').range(de, ate)
     ).catch(() => [])
   ]);
+  const numeroPorId = new Map(pedidos.map((p) => [p.id as string, p.numero as number]));
+  const anulacoesPorPedido = new Map<string, AnulacaoPedido[]>();
+  for (const a of anulacoes) {
+    const lista = anulacoesPorPedido.get(a.pedido_id) ?? [];
+    lista.push({
+      id: a.id,
+      total: Boolean(a.total),
+      novoPedidoId: a.novo_pedido_id ?? null,
+      novoPedidoNumero: a.novo_pedido_id ? numeroPorId.get(a.novo_pedido_id) ?? null : null,
+      notas: Array.isArray(a.notas) ? a.notas : [],
+      linhas: (Array.isArray(a.linhas) ? a.linhas : []).map((l: any) => ({
+        linhaId: l.linha_id,
+        novaLinhaId: l.nova_linha_id ?? null,
+        itemKey: l.item_key ?? null,
+        kitNome: l.kit_nome ?? null,
+        quantidade: num(l.quantidade)
+      })),
+      documentoSei: a.documento_sei,
+      anuladoEm: a.anulado_em,
+      motivo: a.motivo,
+      criadoPorNome: a.criado_por_nome ?? null
+    });
+    anulacoesPorPedido.set(a.pedido_id, lista);
+  }
   const linhasPorDocumento = new Map<string, LinhaDaSolicitacao[]>();
   for (const s of solicitacaoLinhas) {
     const lista = linhasPorDocumento.get(s.documento_id) ?? [];
@@ -724,7 +772,10 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       atualizadoEm: p.atualizado_em ?? null,
       linhas: (porPedido.get(p.id) ?? []).sort((a, b) => a.ordem - b.ordem),
       devolucoes: (devolucoesPorPedido.get(p.id) ?? []).sort((a, b) => a.rodada - b.rodada),
-      documentos: (documentosPorPedido.get(p.id) ?? []).sort((a, b) => (a.data ?? '').localeCompare(b.data ?? '') || a.numero.localeCompare(b.numero))
+      documentos: (documentosPorPedido.get(p.id) ?? []).sort((a, b) => (a.data ?? '').localeCompare(b.data ?? '') || a.numero.localeCompare(b.numero)),
+      pedidoOrigemId: p.pedido_origem_id ?? null,
+      pedidoOrigemNumero: p.pedido_origem_id ? numeroPorId.get(p.pedido_origem_id) ?? null : null,
+      anulacoes: (anulacoesPorPedido.get(p.id) ?? []).sort((a, b) => a.anuladoEm.localeCompare(b.anuladoEm))
     }))
     .sort((a, b) => b.numero - a.numero);
 }
@@ -815,6 +866,28 @@ export async function registrarEnvioCgofi(v: { pedidoId: string; documentoSei: s
     p_solicitacoes: v.solicitacoes
   });
   if (error) throw new Error(mensagemDoBanco(error));
+}
+
+/**
+ * Anulação de empenho (migration 203): as linhas marcadas voltam à interlocução. Se são todas as linhas ativas, o pedido
+ * volta a "Itens reservados"; senão, vão para um pedido novo ligado a este.
+ */
+export async function registrarAnulacaoEmpenho(v: {
+  pedidoId: string;
+  versao: number;
+  linhas: string[];
+  documentoSei: string;
+  data: string;
+  motivo: string;
+}): Promise<{ id: string; versao: number; total: boolean; novoPedidoId: string | null; novoNumero: number | null }> {
+  const { data, error } = await db().rpc('registrar_anulacao_empenho', {
+    p_id: v.pedidoId,
+    p_versao: v.versao,
+    p_dados: { linhas: v.linhas, documento_sei: v.documentoSei, data: v.data, motivo: v.motivo }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  const r = data as Record<string, any>;
+  return { id: r.id, versao: r.versao, total: Boolean(r.total), novoPedidoId: r.novo_pedido_id ?? null, novoNumero: r.novo_numero ?? null };
 }
 
 export async function cancelarPedidoEmenda(id: string, versao: number, motivo: string): Promise<{ id: string; versao: number }> {

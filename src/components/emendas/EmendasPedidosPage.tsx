@@ -42,6 +42,8 @@ import {
   avisoGrave,
   AUTOR_A_DEFINIR,
   avisosDoPedido,
+  listaEmTexto,
+  PODE_ANULAR_EMPENHO,
   dataDaEtapa,
   documentosDaEtapa,
   ETAPAS,
@@ -84,6 +86,7 @@ import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
 import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela, type ContextoDaJanela } from './EtapaPedidoModal';
+import { AnulacaoModal } from './AnulacaoModal';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 type Segmento = 'todos' | FasePedido | 'CANCELADO';
@@ -363,7 +366,8 @@ const OndeEstaOPedido: React.FC<{
   podeGerir: boolean;
   onAcao: (acao: AcaoDaJanela) => void;
   onAlterar: () => void;
-}> = ({ p, notas, podeGerir, onAcao, onAlterar }) => {
+  onAnular: () => void;
+}> = ({ p, notas, podeGerir, onAcao, onAlterar, onAnular }) => {
   const resumo = resumoDasLinhas(p, notas);
   if (p.etapa === 'CANCELADO') {
     return (
@@ -422,6 +426,14 @@ const OndeEstaOPedido: React.FC<{
           </div>
         </>
       )}
+      {/* Anulação que o sistema ainda não viu (nota não zerada no Tesouro): o gestor registra pelas linhas (migration 203). */}
+      {podeGerir && PODE_ANULAR_EMPENHO.has(p.etapa) && (
+        <div>
+          <AppButton size="xs" variant="link" onClick={onAnular} data-testid={`emendas-pedido-anular-${p.id}`}>
+            Registrar anulação de empenho
+          </AppButton>
+        </div>
+      )}
       {semData && <div className="emendas-onde__anterior">Pedido trazido do controle anterior da CAEP: as etapas sem data não tinham data registrada lá.</div>}
     </div>
   );
@@ -439,6 +451,7 @@ interface DetalheProps {
   itemDeOrigem: string | null;
   onAcao: AoAgir;
   onAlterar: () => void;
+  onAnular: () => void;
   /** Empenhado × pedido (migration 187): conferência dos itens das emendas e os avisos já resolvidos. */
   conferencia: ConferenciaEmpenho[];
   conferenciaPorItem: Map<string, ConferenciaEmpenho>;
@@ -451,7 +464,7 @@ interface DetalheProps {
  * Pedido aberto (migration 180): à esquerda, as linhas em blocos por ata, cada uma com a sua situação; à direita, onde
  * o pedido está, a lista "O que falta" com os botões das janelas, e as fases com datas e SEI como histórico.
  */
-const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, itemDeOrigem, onAcao, onAlterar, conferencia, conferenciaPorItem, resolvidos, credor }) => {
+const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, notas, podeGerir, podeVerContratos, hoje, itemDeOrigem, onAcao, onAlterar, onAnular, conferencia, conferenciaPorItem, resolvidos, credor }) => {
   const { precos } = usePrecosParaEmenda();
   const semAutor = !p.autorId;
   const canceladas = p.linhas.filter((l) => l.cancelada);
@@ -459,6 +472,29 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(260px, 1fr)', gap: '1rem', padding: '0.4rem 0' }} className="emendas-detalhe-pedido" data-testid={`emendas-pedido-detalhe-${p.id}`}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', minWidth: 0 }}>
+        {p.avisos
+          .filter((a) => a.tipo === 'empenhoAnulado')
+          .map((a) => (
+            <NoticeBar
+              key={a.tipo}
+              tone="danger"
+              testId={`emendas-pedido-aviso-faixa-${a.tipo}`}
+              action={
+                podeGerir ? (
+                  <AppButton size="sm" onClick={onAnular} data-testid={`emendas-pedido-registrar-anulacao-${p.id}`}>
+                    Registrar anulação
+                  </AppButton>
+                ) : undefined
+              }
+            >
+              <b>Empenho anulado.</b> {a.texto}. Se a nota foi refeita, o aviso some quando o sistema ligar a nota nova.
+            </NoticeBar>
+          ))}
+        {p.pedidoOrigemId && (
+          <NoticeBar tone="info" testId={`emendas-pedido-reaberto-${p.id}`}>
+            <b>Reaberto da anulação de empenho{p.pedidoOrigemNumero ? ` do pedido ${p.pedidoOrigemNumero}` : ''}.</b> Combine com o parlamentar os itens e os beneficiários; depois seguem a minuta, o ofício e a conferência no SIOP, como num pedido novo.
+          </NoticeBar>
+        )}
         {p.avisos
           .filter((a) => a.tipo === 'semOficio' || a.tipo === 'divergencia')
           .map((a) => (
@@ -483,6 +519,18 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
           conferencia={conferenciaPorItem}
           resolvidos={resolvidos}
         />
+        {p.anulacoes.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }} data-testid={`emendas-pedido-anulacoes-${p.id}`}>
+            {p.anulacoes.map((a) => (
+              <div key={a.id} style={carteiraSubtitle}>
+                Empenho anulado em {dataBR(a.anuladoEm)}
+                {a.notas.length ? ` (${listaEmTexto(a.notas)})` : ''}: {a.linhas.length === 1 ? '1 item' : `${a.linhas.length} itens`}, documento SEI {a.documentoSei}.{' '}
+                {a.total ? 'O pedido voltou a "Itens reservados".' : `${a.linhas.length === 1 ? 'O item voltou' : 'Os itens voltaram'} à interlocução no pedido ${a.novoPedidoNumero ?? 'novo'}.`} Motivo: {a.motivo}
+                {a.criadoPorNome ? ` · registrado por ${a.criadoPorNome}` : ''}
+              </div>
+            ))}
+          </div>
+        )}
         {canceladas.length > 0 && (
           <div style={carteiraSubtitle}>
             {canceladas.length} {canceladas.length === 1 ? 'item tirado' : 'itens tirados'} do pedido: {[...new Set(canceladas.map((l) => l.canceladaMotivo).filter(Boolean))].join(' ')}
@@ -504,7 +552,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
             <ContatoDoResponsavel nome={p.contatoNome ?? 'assessoria'} telefone={p.contatoTelefone} email={p.contatoEmail} />
           </div>
         )}
-        <OndeEstaOPedido p={p} notas={notas} podeGerir={podeGerir} onAcao={onAcao} onAlterar={onAlterar} />
+        <OndeEstaOPedido p={p} notas={notas} podeGerir={podeGerir} onAcao={onAcao} onAlterar={onAlterar} onAnular={onAnular} />
         {podeGerir && <OQueFalta p={p} tarefas={tarefas} onAcao={onAcao} onAlterar={onAlterar} />}
         <EtapasDoPedido p={p} notas={notas} podeGerir={podeGerir} podeVerContratos={podeVerContratos} onAcao={onAcao} />
       </div>
@@ -557,6 +605,7 @@ export const EmendasPedidosPage: React.FC = () => {
       return prox;
     });
   const [editando, setEditando] = useState<PedidoEmenda | 'novo' | null>(null);
+  const [anulando, setAnulando] = useState<Linha | null>(null);
   const [janela, setJanela] = useState<{ pedido: PedidoEmenda; acao: AcaoDaJanela; contexto?: ContextoDaJanela } | null>(null);
 
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
@@ -903,6 +952,7 @@ export const EmendasPedidosPage: React.FC = () => {
                   itemDeOrigem={itemDeOrigem}
                   onAcao={(acao, contexto) => setJanela({ pedido: l, acao, contexto })}
                   onAlterar={() => setEditando(l)}
+                  onAnular={() => setAnulando(l)}
                   conferencia={conferencia}
                   credor={credorDoPedido.get(l.id) ?? SEM_CREDOR}
                   conferenciaPorItem={conferenciaPorItem}
@@ -928,6 +978,7 @@ export const EmendasPedidosPage: React.FC = () => {
           onClose={() => setEditando(null)}
         />
       )}
+      {anulando && <AnulacaoModal pedido={anulando} itens={itens} notas={notas} nomeDoAutor={nomeDoAutor(anulando.autorId)} onClose={() => setAnulando(null)} />}
       {janela && (
         <EtapaPedidoModal pedido={janela.pedido} acao={janela.acao} contexto={janela.contexto} itens={itens} nomeDoAutor={nomeDoAutor(janela.pedido.autorId)} onClose={() => setJanela(null)} />
       )}
