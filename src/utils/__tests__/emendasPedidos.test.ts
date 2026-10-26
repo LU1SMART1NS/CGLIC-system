@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { avisosDeEmpenho } from '../emendasEmpenho';
-import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notasEmitidasDepoisDaAnulacao, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { ConferenciaEmpenho, NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
@@ -371,6 +371,33 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
     expect(faltaEnvioCgofi(autorizado)).toHaveLength(1);
     expect(avisosDoPedido(autorizado, itens, HOJE, semNotas).some((a) => a.tipo === 'semEnvioCgofi')).toBe(false);
     expect(tarefasDoPedido(autorizado, itens, semNotas, HOJE, true).some((t) => t.chave === 'envio-cgofi')).toBe(false);
+  });
+
+  it('solicitação só com itens de empenho anulado não pede envio à CGOFI e a rodada mostra o empenho anulado (pedido 528)', () => {
+    const anulada = { ...l3, cancelada: true, canceladaMotivo: 'Empenho anulado em 28/09/2026: voltou à interlocução no pedido 607.' };
+    const enviada = { ...doc('d1', '35938854', A, '2026-06-15', ['l1']), enviosCgofi: [{ numero: '35946757', data: '2026-06-19' }] };
+    const semEnvio = doc('d3', '35939233', B, '2026-06-16', []);
+    const anulacao = { id: 'a1', total: false, destino: 'INTERLOCUCAO' as const, novoPedidoId: null, novoPedidoNumero: 607, notas: ['2026NE000250'], linhas: [{ linhaId: 'l3', novaLinhaId: null, itemKey: l3.itemKey, kitNome: null, quantidade: 5 }], documentoSei: '37079404', anuladoEm: '2026-09-28', motivo: 'x', criadoPorNome: null };
+    const p = pedido({ etapa: 'CONTRATACAO', linhas: [l1, anulada], documentos: [enviada, semEnvio], anulacoes: [anulacao] });
+    expect(faltaEnvioCgofi(p)).toEqual([]);
+    const r = rodadasDoPedido(p, semNotas);
+    expect(r[1]).toMatchObject({ faltaEnvio: 0, semRegistro: 0, soAnulados: true, linhas: '1 com empenho anulado', anulados: { itens: 1, notas: ['2026NE000250'], anuladoEm: '2026-09-28' } });
+    expect(r[0]).toMatchObject({ soAnulados: false, anulados: { itens: 0 } });
+    // Linha cancelada à mão (sem registro de anulação): a regra de antes vale.
+    const semRegistro = pedido({ ...p, anulacoes: [] });
+    expect(faltaEnvioCgofi(semRegistro).map((d) => d.numero)).toEqual(['35939233']);
+  });
+
+  it('notas do pedido emitidas na data da anulação ou depois, fora das linhas marcadas: a compra pode ter sido refeita', () => {
+    const p = pedido({ etapa: 'CONTRATACAO', linhas: [l1, l2, l3] });
+    const notas = new Map<string, NotaDaLinha>([
+      ['l1', { ...nota('l1', '2026NE000422', null), emitidaEm: '2026-10-02', valorEmpenhado: 8365.28 }],
+      ['l2', { ...nota('l2', '2026NE000279', null), emitidaEm: '2026-07-10', valorEmpenhado: 100 }],
+      ['l3', { ...nota('l3', '2026NE000250', null), emitidaEm: '2026-06-22', valorEmpenhado: 0 }]
+    ]);
+    expect(notasEmitidasDepoisDaAnulacao(p, notas, new Set(['l3']), '2026-09-28').map((x) => x.nota)).toEqual(['2026NE000422']);
+    expect(notasEmitidasDepoisDaAnulacao(p, notas, new Set(['l1', 'l3']), '2026-09-28')).toEqual([]);
+    expect(notasEmitidasDepoisDaAnulacao(p, notas, new Set(['l3']), '')).toEqual([]);
   });
 
   it('a linha sabe qual solicitação a cobre: pela ligação gravada ou pela solicitação única da ata', () => {

@@ -540,8 +540,13 @@ export interface DevolucaoPedido {
 /** Anulação de empenho registrada no pedido (migration 203). */
 export interface AnulacaoPedido {
   id: string;
-  /** Total: o próprio pedido voltou a "Itens reservados"; parcial: as linhas foram para o pedido novo. */
+  /** Total: todas as linhas ativas do pedido; parcial: parte delas. */
   total: boolean;
+  /**
+   * INTERLOCUCAO: total, o próprio pedido voltou a "Itens reservados"; parcial, as linhas foram para o pedido novo.
+   * CANCELAR (migration 208): os itens só foram cancelados (total: o pedido inteiro).
+   */
+  destino: 'INTERLOCUCAO' | 'CANCELAR';
   novoPedidoId: string | null;
   novoPedidoNumero: number | null;
   notas: string[];
@@ -636,7 +641,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
     ).catch(() => []),
     // Anulações de empenho (migration 203). Antes da migration a tabela não existe: segue sem ela.
     lerTodasAsPaginas<Record<string, any>>((de, ate) =>
-      db().from('emenda_pedido_anulacoes').select('id, pedido_id, novo_pedido_id, total, notas, linhas, documento_sei, anulado_em, motivo, criado_por_nome').order('id').range(de, ate)
+      db().from('emenda_pedido_anulacoes').select('*').order('id').range(de, ate)
     ).catch(() => [])
   ]);
   const numeroPorId = new Map(pedidos.map((p) => [p.id as string, p.numero as number]));
@@ -646,6 +651,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
     lista.push({
       id: a.id,
       total: Boolean(a.total),
+      destino: a.destino === 'CANCELAR' ? 'CANCELAR' : 'INTERLOCUCAO',
       novoPedidoId: a.novo_pedido_id ?? null,
       novoPedidoNumero: a.novo_pedido_id ? numeroPorId.get(a.novo_pedido_id) ?? null : null,
       notas: Array.isArray(a.notas) ? a.notas : [],
@@ -880,7 +886,8 @@ export async function registrarEnvioCgofi(v: { pedidoId: string; documentoSei: s
 
 /**
  * Anulação de empenho (migration 203): as linhas marcadas voltam à interlocução. Se são todas as linhas ativas, o pedido
- * volta a "Itens reservados"; senão, vão para um pedido novo ligado a este.
+ * volta a "Itens reservados"; senão, vão para um pedido novo ligado a este. Com destino CANCELAR (migration 208), as
+ * linhas só são canceladas (todas: o pedido inteiro).
  */
 export async function registrarAnulacaoEmpenho(v: {
   pedidoId: string;
@@ -889,11 +896,12 @@ export async function registrarAnulacaoEmpenho(v: {
   documentoSei: string;
   data: string;
   motivo: string;
+  destino: 'INTERLOCUCAO' | 'CANCELAR';
 }): Promise<{ id: string; versao: number; total: boolean; novoPedidoId: string | null; novoNumero: number | null }> {
   const { data, error } = await db().rpc('registrar_anulacao_empenho', {
     p_id: v.pedidoId,
     p_versao: v.versao,
-    p_dados: { linhas: v.linhas, documento_sei: v.documentoSei, data: v.data, motivo: v.motivo }
+    p_dados: { linhas: v.linhas, documento_sei: v.documentoSei, data: v.data, motivo: v.motivo, destino: v.destino }
   });
   if (error) throw new Error(mensagemDoBanco(error));
   const r = data as Record<string, any>;

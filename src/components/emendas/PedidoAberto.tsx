@@ -388,6 +388,13 @@ export const RodadasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, Not
               </div>
             )}
           </>
+        ) : r.soAnulados ? (
+          <>
+            <div style={{ fontWeight: 700, color: 'var(--color-danger-text)' }}>Empenho anulado</div>
+            <div style={carteiraDetalhe}>
+              {[r.anulados.notas.join(', '), r.anulados.anuladoEm ? `em ${dataBR(r.anulados.anuladoEm)}` : ''].filter(Boolean).join(' ')}
+            </div>
+          </>
         ) : r.semRegistro > 0 ? (
           <span style={carteiraDetalhe}>envio não registrado por solicitação</span>
         ) : (
