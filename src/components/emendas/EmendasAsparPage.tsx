@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Contact, Mail, MessageCircle, Phone } from 'lucide-react';
+import { Contact } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
@@ -10,8 +10,9 @@ import { carteiraDetalhe, carteiraIdentificacao } from '../carteira/carteiraStyl
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useAsparDosOrgaos } from '../../hooks/useEmendas';
 import { NOME_ORGAO_ASPAR, ORGAOS_ASPAR } from '../../utils/emendasSemPedido';
-import { formatarTelefone, type AsparDoOrgao, type OrgaoAspar } from '../../services/emendasService';
+import { type AsparDoOrgao, type OrgaoAspar } from '../../services/emendasService';
 import { AsparModal } from './AsparModal';
+import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 
 const UFS = ['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'];
 
@@ -47,30 +48,20 @@ export const EmendasAsparPage: React.FC = () => {
         align: 'center',
         render: (l) => {
           const a = l.porOrgao[o];
-          return (
-            <AppButton
-              size="xs"
-              variant="link"
-              onClick={() => setEditando({ uf: l.uf, orgao: o })}
-              title={`${NOME_ORGAO_ASPAR[o]} · ${l.uf}`}
-              style={{ textAlign: 'center', whiteSpace: 'normal' }}
-              data-testid={`emendas-aspar-${l.uf}-${o}`}
-            >
-              {a ? (
-                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <span>{a.nome}</span>
-                  {(a.telefone || a.email) && (
-                    <span style={{ display: 'inline-flex', gap: 8, color: 'var(--primary)' }}>
-                      {a.telefone && a.whatsapp && <MessageCircle size={15} aria-label="WhatsApp" role="img"><title>{`WhatsApp ${formatarTelefone(a.telefone)}`}</title></MessageCircle>}
-                      {a.telefone && !a.whatsapp && <Phone size={15} aria-label="Telefone" role="img"><title>{`Telefone ${formatarTelefone(a.telefone)}`}</title></Phone>}
-                      {a.email && <Mail size={15} aria-label="E-mail" role="img"><title>{`E-mail ${a.email}`}</title></Mail>}
-                    </span>
-                  )}
-                </span>
-              ) : (
+          if (!a) {
+            return (
+              <AppButton size="xs" variant="link" onClick={() => setEditando({ uf: l.uf, orgao: o })} title={`${NOME_ORGAO_ASPAR[o]} · ${l.uf}`} data-testid={`emendas-aspar-${l.uf}-${o}`}>
                 <span style={carteiraDetalhe}>a cadastrar</span>
-              )}
-            </AppButton>
+              </AppButton>
+            );
+          }
+          return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <AppButton size="xs" variant="link" onClick={() => setEditando({ uf: l.uf, orgao: o })} title={`${NOME_ORGAO_ASPAR[o]} · ${l.uf}`} style={{ textAlign: 'center', whiteSpace: 'normal' }} data-testid={`emendas-aspar-${l.uf}-${o}`}>
+                {a.nome}
+              </AppButton>
+              <ContatoDoResponsavel nome={a.nome} telefone={a.telefone} email={a.email} />
+            </span>
           );
         }
       })
