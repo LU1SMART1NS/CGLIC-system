@@ -311,4 +311,23 @@ describe('Pedidos: situação por linha, blocos por ata e O que falta (migration
     expect(html).not.toContain('Último contato');
     perfil.gerir = true;
   });
+
+  it('por pedido: faixa acima do trilho com as emendas sem pedido, fora da contagem das fases (decisão de 26/10/2026)', () => {
+    perfil.gerir = true;
+    const html = render('/');
+    expect(html).toContain('emendas-pedidos-faixa-sem-pedido');
+    expect(html).toContain('2 emendas indicadas no SIOP ainda sem pedido');
+    expect(html).toContain('1 sem contato há 7 dias ou mais');
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('Ver emendas');
+    expect(render('/?ver=emenda')).not.toContain('emendas-pedidos-faixa-sem-pedido');
+  });
+
+  it('faixa para a consulta: sem a urgência, que depende dos contatos que ela não lê', () => {
+    perfil.gerir = false;
+    const html = render('/');
+    expect(html).toContain('2 emendas indicadas no SIOP ainda sem pedido');
+    expect(html).not.toContain('sem contato há');
+    perfil.gerir = true;
+  });
 });

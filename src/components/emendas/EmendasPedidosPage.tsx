@@ -32,8 +32,10 @@ import {
   useNotasDasLinhas,
   useDiferencasDeEmpenho,
   useCredorDiferente,
-  useEmendasSiop
+  useEmendasSiop,
+  useContatosDasEmendas
 } from '../../hooks/useEmendas';
+import { contaEmendasSemPedido, diasSemContatoParaUrgente, emendasNaLista } from '../../utils/emendasSemPedido';
 import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
 import { casaBusca, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
@@ -627,6 +629,9 @@ export const EmendasPedidosPage: React.FC = () => {
   const { data: emendasSiop = [] } = useEmendasSiop();
   const [editandoEmenda, setEditandoEmenda] = useState<EmendaSiop | 'nova' | null>(null);
   const [pedidoDaEmenda, setPedidoDaEmenda] = useState<EmendaSiop | null>(null);
+  // Faixa acima do trilho: as emendas sem pedido não são pedidos (não entram nas fases), mas precisam ser vistas daqui.
+  const { data: contatosDasEmendas = [] } = useContatosDasEmendas();
+  const semPedido = useMemo(() => contaEmendasSemPedido(emendasNaLista(emendasSiop, pedidos, contatosDasEmendas, hoje)), [emendasSiop, pedidos, contatosDasEmendas, hoje]);
 
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
@@ -837,6 +842,25 @@ export const EmendasPedidosPage: React.FC = () => {
           </>
         }
       />
+
+      {!porEmenda && semPedido.total > 0 && (
+        <NoticeBar
+          tone={podeGerir && semPedido.urgentes > 0 ? 'danger' : 'warning'}
+          testId="emendas-pedidos-faixa-sem-pedido"
+          action={
+            <AppButton variant="outline" size="sm" onClick={() => mudarUrl((p) => p.set('ver', 'emenda'))} data-testid="emendas-pedidos-faixa-sem-pedido-ver">
+              Ver emendas
+            </AppButton>
+          }
+        >
+          <b>
+            {semPedido.total === 1 ? '1 emenda indicada no SIOP ainda sem pedido' : `${semPedido.total} emendas indicadas no SIOP ainda sem pedido`}
+          </b>
+          {/* Os contatos só a CAEP e o coordenador leem: para os outros não dá para saber se está urgente. */}
+          {podeGerir && semPedido.urgentes > 0 && ` · ${semPedido.urgentes} sem contato há ${diasSemContatoParaUrgente()} dias ou mais`}
+          {semPedido.valor > 0 && ` · ${formatCurrency(semPedido.valor)}`}
+        </NoticeBar>
+      )}
 
       {!porEmenda && (
         <CarteiraSegmentTabs<Segmento>
