@@ -1,6 +1,6 @@
 -- ==============================================================================
--- MIGRATION 205: EMENDAS SEM PEDIDO (protótipo aprovado em 26/10/2026)
--- Versão: 20261026000205_emendas_sem_pedido.sql
+-- MIGRATION 206: EMENDAS SEM PEDIDO (protótipo aprovado em 26/10/2026)
+-- Versão: 20261026000206_emendas_sem_pedido.sql (renumerada: a 205 em produção é emendas_sobra_senasp)
 --
 -- O parlamentar pode indicar a emenda no SIOP antes de falar com a CAEP. Até aqui o nº da emenda só existia dentro do
 -- pedido (conferência com o SIOP), e a emenda sem pedido não aparecia em lugar nenhum.
