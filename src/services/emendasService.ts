@@ -489,6 +489,8 @@ export interface LinhaPedido {
   kitComposicao: ItemDoKit[] | null;
   quantidade: number;
   beneficiarioId: string | null;
+  /** Nome do beneficiário como veio do controle anterior da CAEP (migration 160), quando a linha não tem cadastro. */
+  beneficiarioNome?: string | null;
   cancelada: boolean;
   canceladaMotivo: string | null;
   /** Documento SEI do empenho; a nota é achada pelo sistema (emenda_linha_notas: pelo SEI, pelo contrato ou pelo plano interno). */
@@ -725,6 +727,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       kitComposicao: Array.isArray(l.kit_composicao) ? l.kit_composicao.map((c: any) => ({ itemKey: c.item_key, quantidade: num(c.quantidade) })) : null,
       quantidade: num(l.quantidade),
       beneficiarioId: l.beneficiario_id ?? null,
+      beneficiarioNome: l.beneficiario_nome ?? null,
       cancelada: Boolean(l.cancelada),
       canceladaMotivo: l.cancelada_motivo ?? null,
       empenhoDocumentoSei: l.empenho_documento_sei ?? null,
@@ -922,6 +925,50 @@ export async function fetchExecucaoEmendas(): Promise<ExecucaoNoPortal[]> {
     empenhadoSenasp: l.empenhado_senasp == null ? null : num(l.empenhado_senasp),
     notasSemValor: l.notas_sem_valor == null ? null : num(l.notas_sem_valor)
   }));
+}
+
+/** O que os quadros da autorização de empenho usam da ata (Compras.gov.br e ata assinada). */
+export interface DadosDaAtaParaAutorizacao {
+  numeroAta: string;
+  codigoUasg: string;
+  modalidade: string | null;
+  numeroCompra: string | null;
+  anoCompra: string | null;
+  papelSenasp: string | null;
+  fornecedorNome: string | null;
+  fornecedorDocumento: string | null;
+  /** Documento SEI da ata assinada (informado na quantidade da ata assinada). */
+  ataAssinadaSei: string | null;
+}
+
+/** Dados da ata para os quadros da autorização (ataKey = "00031/2025-200331"). */
+export async function fetchDadosDaAtaParaAutorizacao(ataKey: string): Promise<DadosDaAtaParaAutorizacao> {
+  const [numeroAta, codigoUasg] = ataKey.split('-');
+  const { data: ata, error } = await db()
+    .from('atas_registro_preco')
+    .select('id, numero_ata, codigo_uasg, modalidade, numero_compra, ano_compra, papel_senasp')
+    .eq('numero_ata', numeroAta)
+    .eq('codigo_uasg', codigoUasg)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(mensagemDoBanco(error));
+  const [{ data: item }, { data: assinada }] = await Promise.all([
+    ata
+      ? db().from('itens_ata').select('fornecedor_razao_social, fornecedor_cnpj_cpf').eq('ata_id', ata.id).not('fornecedor_razao_social', 'is', null).limit(1).maybeSingle()
+      : Promise.resolve({ data: null }),
+    db().from('ata_item_assinada_registros').select('documento_sei, informado_em').like('item_key', `${ataKey}-%`).order('informado_em', { ascending: false }).limit(1).maybeSingle()
+  ]);
+  return {
+    numeroAta,
+    codigoUasg,
+    modalidade: ata?.modalidade ?? null,
+    numeroCompra: ata?.numero_compra ?? null,
+    anoCompra: ata?.ano_compra ?? null,
+    papelSenasp: ata?.papel_senasp ?? null,
+    fornecedorNome: (item as Record<string, any> | null)?.fornecedor_razao_social ?? null,
+    fornecedorDocumento: (item as Record<string, any> | null)?.fornecedor_cnpj_cpf ?? null,
+    ataAssinadaSei: (assinada as Record<string, any> | null)?.documento_sei ?? null
+  };
 }
 
 /** Reservado a parlamentares por item (pedidos não cancelados, kits abertos). */

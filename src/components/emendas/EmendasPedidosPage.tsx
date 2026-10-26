@@ -88,6 +88,7 @@ import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
 import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela, type ContextoDaJanela } from './EtapaPedidoModal';
 import { AnulacaoModal } from './AnulacaoModal';
+import { AutorizacaoQuadrosModal } from './AutorizacaoQuadrosModal';
 import { PedidosPorEmenda } from './PedidosPorEmenda';
 import { EmendaSiopModal } from './EmendaSiopModal';
 import type { SobraDaEmenda } from '../../utils/emendasSobra';
@@ -1061,7 +1062,19 @@ export const EmendasPedidosPage: React.FC = () => {
         />
       )}
       {anulando && <AnulacaoModal pedido={anulando} itens={itens} notas={notas} nomeDoAutor={nomeDoAutor(anulando.autorId)} onClose={() => setAnulando(null)} />}
-      {janela && (
+      {janela?.acao === 'QUADROS_AUTORIZACAO' && janela.contexto?.ataKey && (
+        <AutorizacaoQuadrosModal
+          pedido={janela.pedido}
+          ataKey={janela.contexto.ataKey}
+          pedidos={pedidos}
+          itens={itens}
+          autores={autorPorId}
+          beneficiarios={beneficiarios}
+          podeGerir={podeGerir}
+          onClose={() => setJanela(null)}
+        />
+      )}
+      {janela && janela.acao !== 'QUADROS_AUTORIZACAO' && (
         <EtapaPedidoModal pedido={janela.pedido} acao={janela.acao} contexto={janela.contexto} itens={itens} nomeDoAutor={nomeDoAutor(janela.pedido.autorId)} onClose={() => setJanela(null)} />
       )}
     </PageContainer>
