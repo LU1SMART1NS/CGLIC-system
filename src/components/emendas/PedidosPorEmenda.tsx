@@ -22,7 +22,6 @@ import { ROTULO_ETAPA, ultimoContatoPorAutor } from '../../utils/emendasPedidos'
 import {
   diasSemContatoParaUrgente,
   emendasNaLista,
-  haDias,
   NOME_ORGAO_ASPAR,
   numeroDaEmenda,
   orgaoDoBeneficiario,
@@ -33,7 +32,7 @@ import {
   type EmendaNaLista
 } from '../../utils/emendasSemPedido';
 import { formatarTelefone, nomeESigla, type AsparDoOrgao, type AutorEmenda, type BeneficiarioEmenda, type EmendaSiop, type OrgaoAspar, type PedidoEmenda } from '../../services/emendasService';
-import { AutorDoPedido } from './emendasPartes';
+import { AutorDoPedido, LARGURA_AUTOR } from './emendasPartes';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { ContatoEmendaModal } from './ContatoEmendaModal';
 import { AsparModal } from './AsparModal';
@@ -49,7 +48,6 @@ const PESO_SITUACAO: Record<EmendaNaLista['situacao'], number> = { SEM_CONTATO: 
 const ORDEM: Record<string, CarteiraSortColumn<EmendaNaLista>> = {
   emenda: { value: (l) => `${l.ano ?? 0}${l.numero}`, firstDir: 'desc' },
   valor: { value: (l) => l.valor, firstDir: 'desc' },
-  registrada: { value: (l) => l.emenda?.vistaEm ?? null },
   contato: { value: (l) => l.contatos.at(-1)?.contatoEm ?? null },
   situacao: { value: (l) => PESO_SITUACAO[l.situacao] + (l.urgente ? 10 : 0), firstDir: 'desc' }
 };
@@ -319,7 +317,7 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
         </>
       )
     },
-    { key: 'autor', header: 'Parlamentar', minWidth: '200px', sortValue: ordem.autor.value, render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} /> },
+    { key: 'autor', header: 'Parlamentar', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, sortValue: ordem.autor.value, render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} /> },
     {
       key: 'valor',
       header: 'Valor no SIOP',
@@ -330,28 +328,7 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
       render: (l) => (l.valor != null ? <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(l.valor)}</span> : <span style={carteiraDetalhe}>—</span>)
     },
     { key: 'gnd', header: 'GND', nowrap: true, render: (l) => <span style={carteiraValor}>{l.gnd ?? '—'}</span> },
-    // Com pedido, o que interessa é a etapa dos pedidos; a data do registro e o último contato só valem enquanto não há pedido.
-    ...(segmento !== 'com'
-      ? [
-          {
-            key: 'registrada',
-            header: 'Registrada em',
-            nowrap: true,
-            sortValue: ordem.registrada.value,
-            render: (l: EmendaNaLista) =>
-              l.emenda ? (
-                <>
-                  <div style={carteiraValor}>{dataBR(l.emenda.vistaEm)}</div>
-                  {l.diasSemPedido != null && <div style={carteiraDetalhe}>{haDias(l.diasSemPedido)}</div>}
-                </>
-              ) : (
-                <span style={carteiraDetalhe} title="O nº veio da conferência do pedido com o SIOP; a emenda não foi registrada à parte.">
-                  —
-                </span>
-              )
-          } satisfies Column<EmendaNaLista>
-        ]
-      : []),
+    // Com pedido, o que interessa é a etapa dos pedidos; o último contato só vale enquanto não há pedido.
     ...(podeGerir && segmento !== 'com'
       ? [
           {

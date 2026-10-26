@@ -1101,7 +1101,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 <input
                   type="search"
                   className={`reserva-campo${falta('emendas-pedido-busca-autor') ? ' reserva-erro' : ''}`}
-                  aria-label="Buscar autor"
+                  aria-label="Buscar parlamentar"
                   placeholder="Buscar deputado, senador ou bancada (nome, partido ou UF)"
                   value={buscaAutor}
                   onChange={(e) => setBuscaAutor(e.target.value)}
@@ -1142,7 +1142,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   <span className="reserva-espaco" />
                   <ActionButton action="editar" type="button" size="sm" onClick={() => setEditarContato(true)} data-testid="emendas-pedido-contato-editar" />
                 </div>
-                {contatoSugerido && <span className="reserva-ok">Último contato usado com {autor ? 'este autor' : 'este órgão'}. Confira se continua o mesmo.</span>}
+                {contatoSugerido && <span className="reserva-ok">Último contato usado com {autor ? 'este parlamentar' : 'este órgão'}. Confira se continua o mesmo.</span>}
               </>
             ) : (
               <div className="reserva-grade3">

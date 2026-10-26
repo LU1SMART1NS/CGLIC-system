@@ -21,6 +21,9 @@ const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADO
  * Autor em duas linhas: nome e "Deputado · PL · RJ". Sem autor (reserva para um órgão, migration 163): "Parlamentar a
  * definir" e, embaixo, para qual órgão a CAEP separou.
  */
+/** Mesma largura da coluna do parlamentar em todas as tabelas de Emendas (o navegador não estica conforme as outras colunas). */
+export const LARGURA_AUTOR = '240px';
+
 export const AutorDoPedido: React.FC<{ autor: AutorEmenda | undefined; autorId: string | null; orgao?: string | null; destaque?: boolean }> = ({ autor, autorId, orgao, destaque }) => {
   // Como coluna de identificação (destaque): nome forte e azul e a 2ª linha da Ata; nas outras colunas, valor e detalhe.
   const nome: React.CSSProperties = destaque ? carteiraIdentificacao : carteiraValor;
