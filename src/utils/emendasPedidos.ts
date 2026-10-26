@@ -222,6 +222,7 @@ export function orgaoDoPedido(p: PedidoEmenda, nomeDoBeneficiario: (id: string) 
 }
 
 export type TipoAviso =
+  | 'empenhoAnulado'
   | 'semOficio'
   | 'divergencia'
   | 'ataVencida'
@@ -247,18 +248,19 @@ export interface AvisoPedido {
 
 /** Do mais grave ao mais leve: na lista aparece só o primeiro, com "+N" para os outros. */
 export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = {
-  ataVencida: 0,
-  ataNoCorte: 1,
-  empenhoAMais: 2,
-  divergencia: 3,
-  semOficio: 4,
-  ataVencendo: 5,
-  semEnvioCgofi: 6,
-  credorDiferente: 7,
-  notaEmitida: 8,
-  empenhoAMenos: 9,
-  semAutorizacao: 10,
-  semNota: 11
+  empenhoAnulado: 0,
+  ataVencida: 1,
+  ataNoCorte: 2,
+  empenhoAMais: 3,
+  divergencia: 4,
+  semOficio: 5,
+  ataVencendo: 6,
+  semEnvioCgofi: 7,
+  credorDiferente: 8,
+  notaEmitida: 9,
+  empenhoAMenos: 10,
+  semAutorizacao: 11,
+  semNota: 12
 };
 
 /** Os tipos de aviso do mais grave ao mais leve (ordem de GRAVIDADE_DO_AVISO): trilhos, filtros e cartões percorrem esta lista. */
@@ -266,6 +268,7 @@ export const TIPOS_AVISO: readonly TipoAviso[] = (Object.keys(GRAVIDADE_DO_AVISO
 
 /** Nome de cada aviso, o mesmo em todas as telas (filtro de Pedidos, cartões e filtro do Início). */
 export const ROTULO_AVISO: Record<TipoAviso, string> = {
+  empenhoAnulado: 'Empenho anulado',
   ataVencida: 'Ata encerrada',
   ataNoCorte: 'Prazo de indicação vencido',
   empenhoAMais: 'Empenhado a mais',
@@ -326,6 +329,24 @@ export function notaEmitidaSemRegistro(p: PedidoEmenda, notas: Map<string, NotaD
   };
 }
 
+/** Etapas em que já pode haver nota de empenho a anular (migration 203: a anulação se registra a partir do envio à CGOFI). */
+export const PODE_ANULAR_EMPENHO: ReadonlySet<EtapaPedido> = new Set(['CGOFI', 'EMPENHADO', 'CONTRATACAO']);
+
+/** A nota ligada à linha está com empenhado zero no Tesouro: anulada (ou refeita em outra nota que o sistema ainda não ligou). */
+export const notaZerada = (nota: NotaDaLinha | undefined): boolean => Boolean(nota?.nota) && nota!.valorEmpenhado != null && nota!.valorEmpenhado <= 0.01;
+
+/** Linhas ativas cuja nota de empenho foi zerada: as que a janela da anulação já traz marcadas. */
+export function linhasComEmpenhoAnulado(p: PedidoEmenda, notas: Map<string, NotaDaLinha> | undefined): LinhaPedido[] {
+  if (!notas || !PODE_ANULAR_EMPENHO.has(p.etapa)) return [];
+  return linhasAtivas(p).filter((l) => notaZerada(notas.get(l.id)));
+}
+
+/** "2026NE000088 e 2026NE000106": as notas zeradas das linhas, para avisos. */
+export const notasDasLinhas = (linhas: LinhaPedido[], notas: Map<string, NotaDaLinha>): string[] =>
+  [...new Set(linhas.map((l) => notas.get(l.id)?.nota).filter((n): n is string => Boolean(n)))].sort();
+
+export const listaEmTexto = (xs: string[]): string => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} e ${xs[xs.length - 1]}`);
+
 /**
  * `empenho`: diferenças entre o pedido e as notas ainda não resolvidas (migration 187), de diferencasPorPedido.
  * `credor`: notas ligadas com credor diferente do fornecedor da ata, ainda não resolvidas (migration 190).
@@ -339,6 +360,16 @@ export function avisosDoPedido(
   credor?: CredorNoPedido[]
 ): AvisoPedido[] {
   const avisos: AvisoPedido[] = [];
+  const anuladas = linhasComEmpenhoAnulado(p, notas);
+  if (anuladas.length) {
+    const ns = notasDasLinhas(anuladas, notas!);
+    avisos.push({
+      tipo: 'empenhoAnulado',
+      curto: 'Empenho anulado',
+      texto: `${listaEmTexto(ns)} ${ns.length === 1 ? 'está' : 'estão'} com empenhado zero no Tesouro e ${anuladas.length === 1 ? '1 item não tem' : `${anuladas.length} itens não têm`} outra nota: registre a anulação para ${anuladas.length === 1 ? 'o item voltar' : 'os itens voltarem'} à interlocução com o parlamentar`,
+      linhaId: anuladas[0].id
+    });
+  }
   if (p.etapa === 'RESERVADO' || p.etapa === 'MINUTA') {
     // Depois de uma devolução, conta da devolução: contar da reserva faria o pedido devolvido já nascer atrasado.
     const desde = p.devolvidoEm ?? p.reservadoEm;
@@ -670,11 +701,12 @@ export function intervaloDeDatas(datas: Array<string | null>): string | null {
 // (número SEI, data, ata, linhas cobertas) e o que o sistema acha no Contratos.gov.br.
 // ---------------------------------------------------------------------------------------------------------------
 
-export type SituacaoLinha = 'CANCELADO' | 'ANTES' | 'SOLICITACAO_A_INFORMAR' | 'AGUARDANDO_ASSINATURA' | 'AUTORIZADO' | 'NA_CGOFI' | 'EMPENHADO' | 'NA_CCGA' | 'CONTRATADO';
+export type SituacaoLinha = 'CANCELADO' | 'ANTES' | 'EMPENHO_ANULADO' | 'SOLICITACAO_A_INFORMAR' | 'AGUARDANDO_ASSINATURA' | 'AUTORIZADO' | 'NA_CGOFI' | 'EMPENHADO' | 'NA_CCGA' | 'CONTRATADO';
 
 export const ORDEM_SITUACAO_LINHA: Record<SituacaoLinha, number> = {
   CANCELADO: -1,
   ANTES: 0,
+  EMPENHO_ANULADO: 0.5,
   SOLICITACAO_A_INFORMAR: 1,
   AGUARDANDO_ASSINATURA: 2,
   AUTORIZADO: 3,
@@ -686,6 +718,7 @@ export const ORDEM_SITUACAO_LINHA: Record<SituacaoLinha, number> = {
 
 /** Etiqueta da linha e a forma em texto corrido, no singular e no plural ("3 na CCGA · 6 contratadas"). */
 export const ROTULO_SITUACAO_LINHA: Record<Exclude<SituacaoLinha, 'ANTES' | 'CANCELADO'>, { etiqueta: string; uma: string; varias: string }> = {
+  EMPENHO_ANULADO: { etiqueta: 'Empenho anulado', uma: 'com empenho anulado', varias: 'com empenho anulado' },
   SOLICITACAO_A_INFORMAR: { etiqueta: 'Solicitação a informar', uma: 'com solicitação a informar', varias: 'com solicitação a informar' },
   AGUARDANDO_ASSINATURA: { etiqueta: 'Aguardando a assinatura', uma: 'aguardando a assinatura', varias: 'aguardando a assinatura' },
   AUTORIZADO: { etiqueta: 'Autorizado', uma: 'autorizado', varias: 'autorizados' },
@@ -758,6 +791,10 @@ export function situacaoDaLinha(p: PedidoEmenda, l: LinhaPedido, notas: Map<stri
   const nota = notas.get(l.id);
   const temNota = Boolean(nota?.nota);
   const notaLigada = temNota ? `NE ${nota!.nota} ligada` : 'sem nota ligada no sistema';
+  // Nota zerada no Tesouro (migration 203): a linha espera o registro da anulação ou a nota nova.
+  if (PODE_ANULAR_EMPENHO.has(p.etapa) && notaZerada(nota)) {
+    return { situacao: 'EMPENHO_ANULADO', rotulo: ROTULO_SITUACAO_LINHA.EMPENHO_ANULADO.etiqueta, detalhe: `NE ${nota!.nota} com empenhado zero no Tesouro`, pendente: true, solicitacao: solicitacaoDaLinha(p, l) };
+  }
   const solicitacao = solicitacaoDaLinha(p, l);
   if (!solicitacao) {
     return { situacao: 'SOLICITACAO_A_INFORMAR', rotulo: ROTULO_SITUACAO_LINHA.SOLICITACAO_A_INFORMAR.etiqueta, detalhe: 'nenhuma solicitação de empenho cobre este item', pendente: true, solicitacao: null };

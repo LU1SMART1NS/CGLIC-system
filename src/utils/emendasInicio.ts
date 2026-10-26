@@ -192,6 +192,8 @@ export function resumoInicioEmendas(
 export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string): string {
   const fim = item?.vigenciaFinal;
   switch (a.tipo) {
+    case 'empenhoAnulado':
+      return 'registrar a anulação ou aguardar a nota nova';
     case 'ataVencida':
       return fim ? `encerrou em ${dataBR(fim)}` : 'trocar o item ou tirá-lo do pedido';
     case 'ataNoCorte':
