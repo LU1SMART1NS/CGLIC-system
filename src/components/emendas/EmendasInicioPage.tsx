@@ -60,7 +60,7 @@ import { menorPrecoDisponivel, sobraDasEmendas, type ExecucaoNoPortal, type Sobr
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { prazoDoAviso, resumoInicioEmendas, type ItemLivrePertoDoFim, type PedidoComAviso } from '../../utils/emendasInicio';
 import type { AutorEmenda, EtapaPedido, ItemCaep, NotaDaLinha, NotaSemPedido } from '../../services/emendasService';
-import { AutorDoPedido, ItemDaAta } from './emendasPartes';
+import { AutorDoPedido, LARGURA_AUTOR, ItemDaAta } from './emendasPartes';
 import { DadosItemModal } from './DadosItemModal';
 import { contaEmendasSemPedido, diasSemContatoParaUrgente, emendasNaLista, haDias, numeroDaEmenda, semPedido as emendaSemPedido, textoDias, type EmendaNaLista } from '../../utils/emendasSemPedido';
 
@@ -158,7 +158,7 @@ export const EmendasInicioPage: React.FC = () => {
   }, [pedidos, hoje, itens, notas, portal, precos]);
   const valorDasSobras = sobras.reduce((t, e) => t + e.sobra, 0);
   const colunasSobra: Column<SobraDaEmenda>[] = [
-    { key: 'autor', header: 'Parlamentar', priority: 'primary', minWidth: '200px', render: (e) => <AutorDoPedido autor={e.autorId ? autorPorId.get(e.autorId) : undefined} autorId={e.autorId} destaque /> },
+    { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, render: (e) => <AutorDoPedido autor={e.autorId ? autorPorId.get(e.autorId) : undefined} autorId={e.autorId} destaque /> },
     { key: 'emenda', header: 'Emenda', nowrap: true, render: (e) => <span style={carteiraNumero}>{`${numeroDaEmendaEmTexto(e.emenda)} / ${e.ano}`}</span> },
     { key: 'pedidos', header: 'Pedidos', render: (e) => <span style={carteiraDetalhe}>{e.pedidos.map((p) => p.numero).join(', ')}</span> },
     { key: 'sobra', header: 'Sobra', align: 'right', nowrap: true, render: (e) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(e.sobra)}</span> },
@@ -232,7 +232,8 @@ export const EmendasInicioPage: React.FC = () => {
       key: 'autor',
       header: 'Parlamentar',
       priority: 'primary',
-      minWidth: '200px',
+      width: LARGURA_AUTOR,
+      minWidth: LARGURA_AUTOR,
       sortValue: ordem.autor.value,
       render: ({ pedido: p }) => (
         <>
@@ -288,7 +289,7 @@ export const EmendasInicioPage: React.FC = () => {
   ];
 
   const colunasEmendasSemPedido: Column<EmendaNaLista>[] = [
-    { key: 'autor', header: 'Parlamentar', priority: 'primary', minWidth: '200px', render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} /> },
+    { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} /> },
     { key: 'emenda', header: 'Emenda', nowrap: true, render: (l) => <span style={carteiraValor}>{numeroDaEmenda(l.numero)} / {l.ano}</span> },
     { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(l.valor ?? 0)}</span> },
     { key: 'dias', header: 'Sem pedido há', align: 'right', nowrap: true, render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{textoDias(l.diasSemPedido ?? 0)}</span> },
@@ -356,7 +357,8 @@ export const EmendasInicioPage: React.FC = () => {
       key: 'autor',
       header: 'Parlamentar',
       priority: 'primary',
-      minWidth: '200px',
+      width: LARGURA_AUTOR,
+      minWidth: LARGURA_AUTOR,
       render: (e) => {
         const autorId = e.pedidoIds.map((id) => pedidoPorId.get(id)?.autorId).find(Boolean) ?? null;
         return (

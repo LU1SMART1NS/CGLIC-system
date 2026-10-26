@@ -32,7 +32,7 @@ import {
   type EmendaNaLista
 } from '../../utils/emendasSemPedido';
 import { formatarTelefone, nomeESigla, type AsparDoOrgao, type AutorEmenda, type BeneficiarioEmenda, type EmendaSiop, type OrgaoAspar, type PedidoEmenda } from '../../services/emendasService';
-import { AutorDoPedido } from './emendasPartes';
+import { AutorDoPedido, LARGURA_AUTOR } from './emendasPartes';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { ContatoEmendaModal } from './ContatoEmendaModal';
 import { AsparModal } from './AsparModal';
@@ -317,7 +317,7 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
         </>
       )
     },
-    { key: 'autor', header: 'Parlamentar', minWidth: '200px', sortValue: ordem.autor.value, render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} /> },
+    { key: 'autor', header: 'Parlamentar', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, sortValue: ordem.autor.value, render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} /> },
     {
       key: 'valor',
       header: 'Valor no SIOP',

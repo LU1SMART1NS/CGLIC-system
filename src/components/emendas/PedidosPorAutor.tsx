@@ -17,7 +17,7 @@ import { menorPrecoDisponivel, ROTULO_SITUACAO_SOBRA, type ExecucaoNoPortal, sob
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { useExecucaoEmendas } from '../../hooks/useEmendas';
 import type { AutorEmenda, ItemCaep, NotaDaLinha, PedidoEmenda, TipoAutor } from '../../services/emendasService';
-import { AutorDoPedido } from './emendasPartes';
+import { AutorDoPedido, LARGURA_AUTOR } from './emendasPartes';
 
 /** Chave do filtro de autor para as reservas sem parlamentar (migration 163). */
 export const AUTOR_A_DEFINIR_CHAVE = 'a-definir';
@@ -152,7 +152,7 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chaveDaLinha, POR_PAGINA);
 
   const colunas: Column<Linha>[] = [
-    { key: 'autor', header: 'Autor', priority: 'primary', minWidth: '220px', sortValue: ORDEM.autor.value, render: (l) => <AutorDoPedido autor={l.autor} autorId={l.autorId} destaque /> },
+    { key: 'autor', header: 'Autor', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, sortValue: ORDEM.autor.value, render: (l) => <AutorDoPedido autor={l.autor} autorId={l.autorId} destaque /> },
     { key: 'pedidos', header: 'Pedidos', align: 'right', nowrap: true, sortValue: ORDEM.pedidos.value, sortFirstDir: 'desc', render: (l) => <span style={carteiraNumero}>{formatNumber(l.pedidos)}</span> },
     {
       key: 'valor',

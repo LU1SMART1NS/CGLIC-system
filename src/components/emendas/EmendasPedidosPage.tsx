@@ -79,7 +79,7 @@ import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type Con
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 const SEM_CREDOR: CredorNoPedido[] = [];
-import { AutorDoPedido, ExecucaoDoPedidoResumo, ValorDoPedido } from './emendasPartes';
+import { AutorDoPedido, LARGURA_AUTOR, ExecucaoDoPedidoResumo, ValorDoPedido } from './emendasPartes';
 import { LinhasPorAta, OQueFalta, RodadasDoPedido, type AoAgir } from './PedidoAberto';
 import { EmpenhoDoPedido } from './EmpenhoDoPedido';
 import { CredorDoPedido } from './CredorDoPedido';
@@ -733,7 +733,8 @@ export const EmendasPedidosPage: React.FC = () => {
       key: 'autor',
       header: 'Autor',
       priority: 'primary',
-      minWidth: '200px',
+      width: LARGURA_AUTOR,
+      minWidth: LARGURA_AUTOR,
       sortValue: ordem.autor.value,
       render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} orgao={orgaoDoPedido(l, nomeDoBeneficiario)} destaque />
     },
