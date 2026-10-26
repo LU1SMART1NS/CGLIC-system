@@ -312,10 +312,10 @@ describe('Pedidos: situação por linha, blocos por ata e O que falta (migration
     perfil.gerir = true;
   });
 
-  it('?ver=emenda: "Registrada em" no lugar de "Vista no SIOP", cabeçalho que ordena e sem a faixa vermelha na linha', () => {
+  it('?ver=emenda: sem a coluna da data de registro (decisão de 26/10/2026), cabeçalho que ordena e sem a faixa vermelha na linha', () => {
     perfil.gerir = true;
     const html = render('/?ver=emenda');
-    expect(html).toContain('Registrada em');
+    expect(html).not.toContain('Registrada em');
     expect(html).not.toContain('Vista no SIOP');
     expect(html).not.toContain('pelo pedido');
     expect(html).not.toContain('inset 3px 0 0');
