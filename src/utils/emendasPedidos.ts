@@ -17,7 +17,7 @@ export const ETAPAS: ReadonlyArray<{ etapa: Exclude<EtapaPedido, 'CANCELADO'>; r
   { etapa: 'RESERVADO', rotulo: 'Itens reservados', curto: 'Reservados', descricao: 'A CAEP combinou com o parlamentar e separou a quantidade.' },
   { etapa: 'MINUTA', rotulo: 'Minuta enviada ao parlamentar', curto: 'Minuta', descricao: 'A CAEP mandou a minuta do ofício ao parlamentar.' },
   { etapa: 'OFICIO', rotulo: 'Ofício recebido', curto: 'Ofício', descricao: 'O ofício chegou ao MJSP e virou processo SEI na CAEP.' },
-  { etapa: 'CONFERIDO', rotulo: 'Emenda conferida no SIOP', curto: 'Conferidos', descricao: 'Nº da emenda, autor, valor, GND, beneficiário e objeto batem.' },
+  { etapa: 'CONFERIDO', rotulo: 'Emenda conferida no SIOP', curto: 'Conferidos', descricao: 'Nº da emenda, parlamentar, valor, GND, beneficiário e objeto batem.' },
   { etapa: 'SOLICITADO', rotulo: 'Empenho solicitado', curto: 'Solicitados', descricao: 'A CAEP elaborou a solicitação de empenho e enviou à DGFNSP.' },
   { etapa: 'AUTORIZADO', rotulo: 'Empenho autorizado', curto: 'Autorizados', descricao: 'A DGFNSP assinou a solicitação de empenho.' },
   { etapa: 'CGOFI', rotulo: 'Processo enviado à CGOFI', curto: 'Na CGOFI', descricao: 'A CAEP enviou à CGOFI para fazer o empenho.' },
@@ -480,7 +480,7 @@ export const ROTULO_REGRA_DA_NOTA: Record<RegraDaNota, string> = {
   CONTRATO: 'achada pelo contrato',
   ITEM: 'achada pelo item da ata',
   FORNECEDOR: 'achada pela emenda e pelo fornecedor da ata',
-  AUTOR: 'achada pelo autor'
+  AUTOR: 'achada pelo parlamentar'
 };
 
 /** Por que a linha empenhada ainda não tem nota. */
@@ -1041,7 +1041,7 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
               : p.etapa === 'CONFERIDO'
                 ? 'Uma solicitação para cada ata do pedido.'
                 : p.etapa === 'OFICIO'
-                  ? 'Nº da emenda, autor, valor, GND, beneficiário e objeto.'
+                  ? 'Nº da emenda, parlamentar, valor, GND, beneficiário e objeto.'
                   : 'Próximo passo do pedido.';
       t.push({ chave: 'proxima', titulo: prox.rotulo, detalhe, tom: 'acao', botao: { tipo: 'proxima', rotulo: prox.rotulo } });
     }

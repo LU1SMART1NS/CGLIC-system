@@ -55,7 +55,7 @@ interface Props {
 
 const PONTOS_SIOP: ReadonlyArray<[string, string]> = [
   ['numero_emenda', 'Nº da emenda'],
-  ['autor', 'Autor'],
+  ['autor', 'Parlamentar'],
   ['valor', 'Valor'],
   ['gnd', 'GND'],
   ['beneficiario', 'Beneficiário'],
@@ -225,7 +225,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const linhas = linhasAtivas(pedido);
   const emendaLida = lerNumeroDaEmenda(emenda);
   const conferenciaDaEmenda = modo === 'CONFERIDO' && emendaLida ? conferirNumeroDaEmenda(pedido, emendaLida.numero, emendaLida.ano ?? anoEmenda, pedidos) : null;
-  const nomeDe = (autorId: string | null) => autores.find((a) => a.id === autorId)?.nome ?? 'outro autor';
+  const nomeDe = (autorId: string | null) => autores.find((a) => a.id === autorId)?.nome ?? 'outro parlamentar';
   // A emenda dividida em vários pedidos do mesmo processo: o processo uma vez só ("todos do Processo …").
   const idsDosOutros = [...new Set((conferenciaDaEmenda?.mesmaEmenda ?? []).map((x) => identificacaoDoPedido(x)))];
   const identificacoesDosOutros =

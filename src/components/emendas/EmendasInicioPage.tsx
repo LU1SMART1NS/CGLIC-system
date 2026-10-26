@@ -410,7 +410,7 @@ export const EmendasInicioPage: React.FC = () => {
     { key: 'valor', header: 'Empenhado', align: 'right', nowrap: true, sortValue: (n) => n.valorEmpenhado, sortFirstDir: 'desc', render: (n) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(n.valorEmpenhado)}</span> },
     {
       key: 'autores',
-      header: 'Mesmo autor',
+      header: 'Mesmo parlamentar',
       minWidth: '200px',
       render: (n) =>
         n.autoresDoCodigo.length ? (
@@ -578,7 +578,7 @@ export const EmendasInicioPage: React.FC = () => {
       {gavetaAberta === 'sobraEmenda' && (
         <PainelGaveta
           id="sobraEmenda"
-          subtitulo="Clique na linha para abrir a emenda em Pedidos › Por autor."
+          subtitulo="Clique na linha para abrir a emenda em Pedidos › Por parlamentar."
           hint="Emendas do ano com sobra que compra pelo menos o item mais barato que a CAEP ainda oferece: valor no SIOP menos o empenhado pela SENASP (notas da emenda no Portal da Transparência, ou as ligadas no sistema) e o que está em andamento. O que não for empenhado até o fim do ano perde o crédito."
           onFechar={fecharGaveta}
         >

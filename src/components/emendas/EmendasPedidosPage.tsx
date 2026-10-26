@@ -731,7 +731,7 @@ export const EmendasPedidosPage: React.FC = () => {
   const colunas: Column<Linha>[] = [
     {
       key: 'autor',
-      header: 'Autor',
+      header: 'Parlamentar',
       priority: 'primary',
       width: LARGURA_AUTOR,
       minWidth: LARGURA_AUTOR,
@@ -831,7 +831,7 @@ export const EmendasPedidosPage: React.FC = () => {
             }
             segments={[
               { id: 'pedido', label: 'Por pedido', title: 'Uma linha por pedido, com as etapas e os botões' },
-              { id: 'autor', label: 'Por autor', title: 'Uma linha por parlamentar ou bancada, com os totais' },
+              { id: 'autor', label: 'Por parlamentar', title: 'Uma linha por parlamentar ou bancada, com os totais' },
               { id: 'emenda', label: 'Por emenda', title: 'Uma linha por emenda vista no SIOP, com ou sem pedido' }
             ]}
           />
@@ -931,7 +931,7 @@ export const EmendasPedidosPage: React.FC = () => {
         <>
           <CarteiraFilterBar
             busca={busca}
-            searchPlaceholder={podeGerir ? 'Buscar por autor, contato, ofício, SEI, emenda ou item...' : 'Buscar por autor, ofício, SEI, emenda ou item...'}
+            searchPlaceholder={podeGerir ? 'Buscar por parlamentar, contato, ofício, SEI, emenda ou item...' : 'Buscar por parlamentar, ofício, SEI, emenda ou item...'}
             onChangeBusca={setBusca}
             hasActiveFilters={filtrosAtivos}
             onResetFilters={() => {
@@ -972,7 +972,7 @@ export const EmendasPedidosPage: React.FC = () => {
               />
             )}
             <CarteiraFilterButton
-              label="Autor"
+              label="Parlamentar"
               value={filtroAutor}
               emptyValue=""
               options={opcoesDeAutor}

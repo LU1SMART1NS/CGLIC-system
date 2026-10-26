@@ -152,7 +152,7 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chaveDaLinha, POR_PAGINA);
 
   const colunas: Column<Linha>[] = [
-    { key: 'autor', header: 'Autor', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, sortValue: ORDEM.autor.value, render: (l) => <AutorDoPedido autor={l.autor} autorId={l.autorId} destaque /> },
+    { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, sortValue: ORDEM.autor.value, render: (l) => <AutorDoPedido autor={l.autor} autorId={l.autorId} destaque /> },
     { key: 'pedidos', header: 'Pedidos', align: 'right', nowrap: true, sortValue: ORDEM.pedidos.value, sortFirstDir: 'desc', render: (l) => <span style={carteiraNumero}>{formatNumber(l.pedidos)}</span> },
     {
       key: 'valor',
@@ -323,7 +323,7 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
         errorMessage={errorMessage}
         onRetry={onRetry}
         isEmpty={!isLoading && filtradas.length === 0}
-        emptyTitle={linhas.length === 0 ? 'Nenhum autor com pedido nesta fase.' : 'Nenhum autor encontrado.'}
+        emptyTitle={linhas.length === 0 ? 'Nenhum parlamentar com pedido nesta fase.' : 'Nenhum parlamentar encontrado.'}
         emptyDescription={linhas.length === 0 ? 'Escolha outra fase ou use "Mostrar" para ver também quem não tem pedido.' : 'Ajuste a busca ou os filtros.'}
       >
         <DataTable<Linha>
