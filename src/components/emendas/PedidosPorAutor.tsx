@@ -221,7 +221,7 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
               Valor no SIOP <b>{e.valor == null ? '—' : formatCurrency(e.valor)}</b>
             </span>
             <span>
-              Empenhado <b>{formatCurrency(e.empenhado)}</b> {e.fonteDoEmpenhado === 'PORTAL' ? '(Portal da Transparência)' : '(notas ligadas no sistema)'}
+              Empenhado <b>{formatCurrency(e.empenhado)}</b> {e.fonteDoEmpenhado === 'PORTAL' ? '(notas da SENASP no Portal da Transparência)' : '(notas ligadas no sistema)'}
             </span>
             <span>
               Em andamento <b>{formatCurrency(e.emAndamento)}</b>
@@ -230,9 +230,14 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
               Sobra <b>{formatCurrency(e.sobra)}</b>
             </span>
           </div>
-          {e.situacao === 'conferir' && (
+          {e.situacao === 'conferir' && e.notasSemValor > 0 && (
             <div style={carteiraDetalhe}>
-              {e.linhasSemNota === 1 ? '1 item empenhado ainda sem nota ligada' : `${e.linhasSemNota} itens empenhados ainda sem nota ligada`}: a sobra pelas notas do sistema não é confiável. O Portal da Transparência ainda não tem esta emenda.
+              {e.notasSemValor === 1 ? '1 nota da SENASP' : `${e.notasSemValor} notas da SENASP`} desta emenda no Portal ainda não {e.notasSemValor === 1 ? 'está' : 'estão'} no sistema: o empenhado fica a menos até a busca diária das notas trazê-las.
+            </div>
+          )}
+          {e.situacao === 'conferir' && e.notasSemValor === 0 && (
+            <div style={carteiraDetalhe}>
+              {e.linhasSemNota === 1 ? '1 item empenhado ainda sem nota ligada' : `${e.linhasSemNota} itens empenhados ainda sem nota ligada`}: a sobra pelas notas do sistema não é confiável. As notas da emenda ainda não foram lidas no Portal da Transparência.
             </div>
           )}
           {e.situacao === 'acima' && <div style={carteiraDetalhe}>O empenhado passa do valor no SIOP: confira o valor da emenda no pedido ou a nota ligada.</div>}

@@ -903,7 +903,7 @@ export async function cancelarPedidoEmenda(id: string, versao: number, motivo: s
 /** Execução de cada emenda pelo Portal da Transparência (migration 204). Antes da migration a tabela não existe: lista vazia. */
 export async function fetchExecucaoEmendas(): Promise<ExecucaoNoPortal[]> {
   const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
-    db().from('emenda_execucao_portal').select('codigo, encontrada, valor_empenhado, valor_liquidado, valor_pago, lido_em').order('codigo').range(de, ate)
+    db().from('emenda_execucao_portal').select('*').order('codigo').range(de, ate)
   ).catch(() => []);
   return linhas.map((l) => ({
     codigo: l.codigo,
@@ -911,7 +911,10 @@ export async function fetchExecucaoEmendas(): Promise<ExecucaoNoPortal[]> {
     valorEmpenhado: l.valor_empenhado == null ? null : num(l.valor_empenhado),
     valorLiquidado: l.valor_liquidado == null ? null : num(l.valor_liquidado),
     valorPago: l.valor_pago == null ? null : num(l.valor_pago),
-    lidoEm: l.lido_em ?? null
+    lidoEm: l.lido_em ?? null,
+    notasSenasp: Array.isArray(l.notas_senasp) ? l.notas_senasp.length : null,
+    empenhadoSenasp: l.empenhado_senasp == null ? null : num(l.empenhado_senasp),
+    notasSemValor: l.notas_sem_valor == null ? null : num(l.notas_sem_valor)
   }));
 }
 
