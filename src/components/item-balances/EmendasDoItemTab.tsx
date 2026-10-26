@@ -13,6 +13,7 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { hojeEmBrasilia, usePodeAbrirTelasDeEmendas, useAutoresEmendas, useBeneficiariosEmendas, useItensCaep, useKitsEmendas, useNotasDasLinhas, usePedidosEmendas } from '../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { dataBR, diasEntre, limiteDaIndicacao, passouDoCorte } from '../../utils/emendasKits';
+import { casaBusca } from '../../utils/emendasBeneficiarios';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { FASES_PEDIDO, faseDaEtapa, identificacaoDoPedido, itensDaLinha, linhasAtivas, ORDEM_SITUACAO_LINHA, ROTULO_AVISO, situacaoDaLinha, type FasePedido, type SituacaoDaLinha } from '../../utils/emendasPedidos';
 import { rotuloBeneficiario, type LinhaPedido, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
@@ -32,7 +33,6 @@ interface UsoDoItem {
   fase: FasePedido | null;
 }
 
-const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /**
  * Item 360 › Emendas (decisão de 24/10/2026): o item inteiro nas emendas. Alocado à CAEP → reservado a parlamentares →
@@ -90,12 +90,12 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
   }, [usos]);
   const doSegmento = segmento === 'todos' ? usos : usos.filter((u) => u.fase === segmento);
   const filtrados = useMemo(() => {
-    const termo = semAcento(busca.trim());
+    const termo = busca.trim();
     if (!termo) return doSegmento;
     return doSegmento.filter((u) => {
       const a = u.pedido.autorId ? autorPorId.get(u.pedido.autorId) : undefined;
       const ben = u.linhas.map((x) => nomeDoBeneficiario(x.linha.beneficiarioId) ?? '').join(' ');
-      return semAcento(`${a?.nome ?? 'Parlamentar a definir'} ${a?.uf ?? ''} ${u.pedido.oficioProcessoSei ?? ''} ${u.pedido.siopEmenda ?? ''} ${ben}`).includes(termo);
+      return casaBusca(`${a?.nome ?? 'Parlamentar a definir'} ${a?.uf ?? ''} ${u.pedido.oficioProcessoSei ?? ''} ${u.pedido.siopEmenda ?? ''} ${ben}`, termo);
     });
   }, [doSegmento, busca, autorPorId, nomeDoBeneficiario]);
   const unidadesDoSegmento = doSegmento.reduce((s, u) => s + u.quantidade, 0);

@@ -67,6 +67,33 @@ function palavras(s: string | null | undefined): string[] {
 
 export const chaveDoNome = (s: string | null | undefined): string => palavras(s).join(' ');
 
+/** Nome do estado por extenso, para a busca achar "Maranhão" num cadastro que só guarda "MA". */
+export const NOME_DA_UF: Record<string, string> = {
+  AC: 'Acre', AL: 'Alagoas', AP: 'Amapá', AM: 'Amazonas', BA: 'Bahia', CE: 'Ceará', DF: 'Distrito Federal', ES: 'Espírito Santo',
+  GO: 'Goiás', MA: 'Maranhão', MT: 'Mato Grosso', MS: 'Mato Grosso do Sul', MG: 'Minas Gerais', PA: 'Pará', PB: 'Paraíba',
+  PR: 'Paraná', PE: 'Pernambuco', PI: 'Piauí', RJ: 'Rio de Janeiro', RN: 'Rio Grande do Norte', RS: 'Rio Grande do Sul',
+  RO: 'Rondônia', RR: 'Roraima', SC: 'Santa Catarina', SP: 'São Paulo', SE: 'Sergipe', TO: 'Tocantins'
+};
+
+/**
+ * Busca por palavras: cada palavra digitada precisa aparecer no texto, em qualquer ordem e pelo começo ou meio
+ * ("bomb maranhao" acha "Corpo de Bombeiros Militar do Maranhão"). Sem acento, sem pontuação e sem "de/do/da".
+ */
+export function casaBusca(texto: string, busca: string): boolean {
+  const termos = palavras(busca);
+  if (!termos.length) return true;
+  const alvo = palavras(texto);
+  return termos.every((t) => alvo.some((w) => w.includes(t)));
+}
+
+/** Tudo o que identifica o beneficiário na busca: nome, sigla, outras grafias, razão social, cidade e estado. */
+export function textoDeBuscaDoBeneficiario(
+  b: Pick<BeneficiarioEmenda, 'nome' | 'sigla' | 'razaoSocial' | 'entregaMunicipio' | 'entregaUf' | 'outrosNomes'>
+): string {
+  const uf = b.entregaUf ?? '';
+  return [b.nome, b.sigla, b.razaoSocial, b.entregaMunicipio, uf, uf && `Estado ${NOME_DA_UF[uf] ?? ''}`, ...(b.outrosNomes ?? [])].filter(Boolean).join(' ');
+}
+
 /** Nome + município + UF: o que não pode repetir (chave_identidade do banco). */
 export const chaveDaIdentidade = (nome: string, municipio: string | null | undefined, uf: string | null | undefined): string =>
   chaveDoNome(`${nome} ${municipio ?? ''} ${uf ?? ''}`);
