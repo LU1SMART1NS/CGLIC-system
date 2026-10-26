@@ -81,6 +81,7 @@ const SEM_NOTAS = new Map<string, NotaDaLinha>();
 const SEM_CREDOR: CredorNoPedido[] = [];
 import { AutorDoPedido, LARGURA_AUTOR, ExecucaoDoPedidoResumo, ValorDoPedido } from './emendasPartes';
 import { LinhasPorAta, OQueFalta, RodadasDoPedido, type AoAgir } from './PedidoAberto';
+import { EmendasDoPedido } from './EmendasDoPedido';
 import { EmpenhoDoPedido } from './EmpenhoDoPedido';
 import { CredorDoPedido } from './CredorDoPedido';
 import type { CredorNoPedido } from '../../utils/emendasConferenciaNota';
@@ -567,6 +568,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
           </div>
         )}
         <OndeEstaOPedido p={p} notas={notas} podeGerir={podeGerir} onAcao={onAcao} onAlterar={onAlterar} onAnular={onAnular} />
+        <EmendasDoPedido p={p} podeGerir={podeGerir} />
         {podeGerir && <OQueFalta p={p} tarefas={tarefas} onAcao={onAcao} onAlterar={onAlterar} />}
         <EtapasDoPedido p={p} notas={notas} podeGerir={podeGerir} podeVerContratos={podeVerContratos} onAcao={onAcao} />
       </div>

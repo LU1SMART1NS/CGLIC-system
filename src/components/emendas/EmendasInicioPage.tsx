@@ -36,7 +36,9 @@ import {
   usePodeGerirEmendas
 } from '../../hooks/useEmendas';
 import { AvisosResolvidosLista, BotaoResolvido, useResolverAviso } from '../avisos/ResolverAviso';
-import { chaveNotaSemPedido, notasSemPedidoPendentes } from '../../utils/emendasConferenciaNota';
+import { chaveNotaSemPedido, notasSemPedidoPorEmenda, type EmendaSemPedido } from '../../utils/emendasConferenciaNota';
+import { LigarEmendaModal } from './LigarEmendaModal';
+import { AppButton } from '../../design-system/components/AppButton';
 import { emendasAConferir, type EmendaAConferir } from '../../utils/emendasEmpenho';
 import { formatCurrency, formatCurrencyCompact, formatNumber } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
@@ -143,7 +145,10 @@ export const EmendasInicioPage: React.FC = () => {
   );
   const contaSemPedido = contaEmendasSemPedido(emendasSemPedido);
   const r = useMemo(() => resumoInicioEmendas(pedidos, itensLista, notas, hoje, diferencas, credor), [pedidos, itensLista, notas, hoje, diferencas, credor]);
-  const semPedido = useMemo(() => notasSemPedidoPendentes(notasSemPedido, resolvidos), [notasSemPedido, resolvidos]);
+  // Notas sem pedido agrupadas por emenda (migration 211): as notas da mesma emenda vão juntas para o mesmo pedido.
+  const semPedidoPorEmenda = useMemo(() => notasSemPedidoPorEmenda(notasSemPedido, resolvidos), [notasSemPedido, resolvidos]);
+  const semPedido = useMemo(() => semPedidoPorEmenda.flatMap((g) => g.notas), [semPedidoPorEmenda]);
+  const [ligando, setLigando] = useState<EmendaSemPedido | null>(null);
   const semPedidoResolvidas = useMemo(() => notasSemPedido.filter((n) => resolvidos.has(chaveNotaSemPedido(n))), [notasSemPedido, resolvidos]);
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
@@ -380,51 +385,69 @@ export const EmendasInicioPage: React.FC = () => {
   ];
 
   const tituloSemPedido = (n: NotaSemPedido) => `Nota ${n.nota} da emenda ${n.emendaAno ? `${n.emendaAno} · ` : ''}${numeroDaEmendaEmTexto(n.emenda)} sem pedido`;
-  const colunasSemPedido: Column<NotaSemPedido>[] = [
+  const tituloEmendaSemPedido = (g: EmendaSemPedido) =>
+    `${g.notas.length === 1 ? `Nota ${g.notas[0].nota}` : `${g.notas.length} notas`} da emenda ${g.ano ? `${g.ano} · ` : ''}${numeroDaEmendaEmTexto(g.emenda)} sem pedido`;
+  const colunasSemPedido: Column<EmendaSemPedido>[] = [
     {
       key: 'emenda',
       header: 'Emenda',
       priority: 'primary',
-      minWidth: '220px',
-      render: (n) => (
+      minWidth: '240px',
+      render: (g) => (
         <>
           <div style={{ fontWeight: 700 }}>
-            {n.emendaAno ? `${n.emendaAno} · ` : ''}
-            {numeroDaEmendaEmTexto(n.emenda)}
+            {g.ano ? `${g.ano} · ` : ''}
+            {numeroDaEmendaEmTexto(g.emenda)}
           </div>
-          <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>{n.planoInterno ?? 'sem plano interno'}</div>
+          <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>{g.planoInterno ?? 'sem plano interno'}</div>
         </>
       )
     },
     {
-      key: 'nota',
-      header: 'Nota',
+      key: 'notas',
+      header: 'Notas',
       nowrap: true,
-      render: (n) => (
+      render: (g) => (
         <>
-          <div style={carteiraNumero}>{n.nota}</div>
-          <div style={carteiraDetalhe}>{n.dataEmissao ? dataBR(n.dataEmissao) : ''}{n.credorNome ? ` · ${curto(n.credorNome, 32)}` : ''}</div>
+          {g.notas.map((n) => (
+            <div key={n.empenhoId} style={carteiraNumero}>
+              {n.nota} <span style={carteiraDetalhe}>{n.credorNome ? curto(n.credorNome, 24) : ''}</span>
+            </div>
+          ))}
         </>
       )
     },
-    { key: 'valor', header: 'Empenhado', align: 'right', nowrap: true, sortValue: (n) => n.valorEmpenhado, sortFirstDir: 'desc', render: (n) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(n.valorEmpenhado)}</span> },
+    { key: 'valor', header: 'Empenhado', align: 'right', nowrap: true, sortValue: (g) => g.valor, sortFirstDir: 'desc', render: (g) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(g.valor)}</span> },
     {
-      key: 'autores',
-      header: 'Mesmo parlamentar',
-      minWidth: '200px',
-      render: (n) =>
-        n.autoresDoCodigo.length ? (
+      key: 'pedido',
+      header: 'Pedido provável',
+      minWidth: '240px',
+      render: (g) => {
+        if (!g.sugestao) {
+          return (
+            <>
+              <div style={carteiraDetalhe}>{g.empatados ? `${g.empatados} pedidos com o mesmo valor` : 'sem pedido parecido'}</div>
+              <div style={carteiraDetalhe}>{g.empatados ? 'escolha o pedido ao ligar' : 'confira no SEI; se não é da CAEP, marque como resolvido'}</div>
+            </>
+          );
+        }
+        const s = g.sugestao;
+        return (
           <>
-            <div style={carteiraValor}>{n.autoresDoCodigo.join(', ')}</div>
-            <div style={carteiraDetalhe}>confira o nº da emenda no pedido</div>
+            <div style={carteiraValor}>
+              Pedido {s.pedidoNumero} · {s.autorId ? autorPorId.get(s.autorId)?.nome ?? s.autorId : 'parlamentar a definir'}
+            </div>
+            <div style={carteiraDetalhe}>
+              {s.iguais} de {g.notas.length} {g.notas.length === 1 ? 'nota' : 'notas'} com fornecedor e valor iguais aos itens
+              {s.mesmoCodigo ? '' : ' · outro código de autor'}
+            </div>
           </>
-        ) : (
-          <span style={carteiraDetalhe}>nenhum</span>
-        )
+        );
+      }
     }
   ];
 
-  const valorSemPedido = semPedido.reduce((t, n) => t + n.valorEmpenhado, 0);
+  const valorSemPedido = semPedidoPorEmenda.reduce((t, g) => t + g.valor, 0);
 
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -646,27 +669,40 @@ export const EmendasInicioPage: React.FC = () => {
       {gavetaAberta === 'notasSemPedido' && (
         <PainelGaveta
           id="notasSemPedido"
-          subtitulo="Confira o nº da emenda no pedido ou marque como resolvido."
-          hint="Notas de empenho da UG 200330 do ano com o número de uma emenda no plano interno que nenhum pedido tem: emenda autorizada fora do sistema ou número trocado num pedido. Se a emenda não é da CAEP, marque como resolvido."
+          subtitulo="Ligue a emenda ao pedido ou marque como resolvido."
+          hint="Notas de material (3.3.90.30 e 4.4.90.52) da UG 200330 do ano com o número de uma emenda no plano interno que nenhum pedido tem: a sobra de uma emenda antiga que completou um pedido, número trocado num pedido ou emenda executada fora do sistema. O pedido provável tem itens do mesmo fornecedor com o mesmo valor; o sistema só sugere. Se a emenda não é da CAEP, marque como resolvido."
           onFechar={fecharGaveta}
         >
           {semPedido.length === 0 ? (
             <EmptyState title={carregandoSemPedido ? 'Carregando…' : 'Toda nota de emenda do ano tem pedido no sistema.'} testId="emendas-inicio-sem-pedido-vazio" />
           ) : (
-            <DataTable<NotaSemPedido>
+            <DataTable<EmendaSemPedido>
               testId="emendas-inicio-sem-pedido"
               className="data-table-container--flush"
-              data={semPedido}
-              keyExtractor={(n) => `${n.ug}-${n.nota}`}
+              data={semPedidoPorEmenda}
+              keyExtractor={(g) => g.chave}
               columns={colunasSemPedido}
-              rowOpen={(n) => (n.pedidosDoCodigo[0] ? () => navigate(`/emendas/pedidos?pedido=${n.pedidosDoCodigo[0]}`) : undefined)}
+              rowOpen={(g) => (g.sugestao ? () => navigate(`/emendas/pedidos?pedido=${g.sugestao!.pedidoId}`) : undefined)}
               rowActions={
                 podeGerir
-                  ? (n) => (
-                      <BotaoResolvido
-                        onClick={() => abrirResolvido({ tipo: 'AVISO', chave: chaveNotaSemPedido(n), titulo: tituloSemPedido(n), contexto: n.planoInterno ?? undefined })}
-                        testId={`emendas-inicio-sem-pedido-resolver-${n.nota}`}
-                      />
+                  ? (g) => (
+                      <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                        <AppButton size="xs" variant="secondary" onClick={() => setLigando(g)} data-testid={`emendas-inicio-sem-pedido-ligar-${g.emenda}`}>
+                          {g.sugestao ? `Ligar ao ${g.sugestao.pedidoNumero}` : 'Escolher pedido'}
+                        </AppButton>
+                        <BotaoResolvido
+                          onClick={() =>
+                            abrirResolvido({
+                              tipo: 'AVISO',
+                              chave: chaveNotaSemPedido(g.notas[0]),
+                              outrasChaves: g.notas.slice(1).map(chaveNotaSemPedido),
+                              titulo: tituloEmendaSemPedido(g),
+                              contexto: g.planoInterno ?? undefined
+                            })
+                          }
+                          testId={`emendas-inicio-sem-pedido-resolver-${g.emenda}`}
+                        />
+                      </span>
                     )
                   : undefined
               }
@@ -681,6 +717,7 @@ export const EmendasInicioPage: React.FC = () => {
             testId="emendas-inicio-sem-pedido-resolvidos"
           />
           {dialogResolvido}
+          {ligando && <LigarEmendaModal emenda={ligando} onClose={() => setLigando(null)} />}
         </PainelGaveta>
       )}
       {editando && <DadosItemModal item={editando} onClose={() => setEditando(null)} />}

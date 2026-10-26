@@ -17,7 +17,7 @@ const pedido = (id: string, autorId: string, etapa: PedidoEmenda['etapa'], quant
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: '08027.000215/2026-81', oficioEm: null, divergencia: null, devolvidoEm: null,
   siopEmenda: null, siopEmendaAno: null, siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null,
   cgofiDocumentoSei: null, empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null, canceladoMotivo: null, versao: 1,
-  atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null
+  atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: []
 });
 const autor: AutorEmenda = { id: 'B:MG', nome: 'Bancada MG', tipo: 'BANCADA', nomeCivil: null, partido: null, uf: 'MG', emExercicio: true, legislatura: 57, lidoEm: null };
 

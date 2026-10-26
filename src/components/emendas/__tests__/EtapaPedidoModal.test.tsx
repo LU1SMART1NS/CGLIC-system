@@ -45,7 +45,7 @@ const pedido = (etapa: PedidoEmenda['etapa'], documentos: PedidoEmenda['document
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null,
   siopEmenda: '28630004', siopEmendaAno: null, siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null,
   cgofiEm: null, cgofiDocumentoSei: null, empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null, canceladoMotivo: null,
-  versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha('l1', `${A}-00001`, 8), linha('l2', `${B}-00001`, 3)], devolucoes: [], documentos, pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null
+  versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha('l1', `${A}-00001`, 8), linha('l2', `${B}-00001`, 3)], devolucoes: [], documentos, pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: []
 });
 
 describe('janela das etapas: uma solicitação de empenho para cada ata (migration 178)', () => {
