@@ -58,7 +58,7 @@ export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, em
       contagem: emendas.total,
       vermelho: emendas.urgentes > 0,
       // Só emendas sem pedido: o clique abre a lista delas; com pedidos com aviso, a lista dos pedidos.
-      destino: emendas.semPedido && emendas.semPedido === emendas.total ? '/emendas/pedidos?ver=emenda' : '/emendas/pedidos?aviso=com'
+      destino: emendas.semPedido && emendas.semPedido === emendas.total ? '/emendas/pedidos?ver=emenda&situacao=sem' : '/emendas/pedidos?aviso=com'
     };
 
   // Ajustes (coordenador): UASGs sem grupo confirmado; abre em "A confirmar" e, sem nenhuma lá, em "Sem sugestão".

@@ -292,7 +292,7 @@ describe('Pedidos: situação por linha, blocos por ata e O que falta (migration
 
   it('?ver=emenda: emendas vistas no SIOP sem pedido, a mais antiga sem contato urgente (decisão de 26/10/2026)', () => {
     perfil.gerir = true;
-    const html = render('/?ver=emenda');
+    const html = render('/?ver=emenda&situacao=sem');
     expect(html).toContain('emendas-por-emenda-tabela');
     expect(html).not.toContain('emendas-pedidos-tabela');
     expect(html).toContain('Registrar emenda do SIOP');
@@ -310,6 +310,28 @@ describe('Pedidos: situação por linha, blocos por ata e O que falta (migration
     expect(html).not.toContain('Registrar emenda do SIOP');
     expect(html).not.toContain('Último contato');
     perfil.gerir = true;
+  });
+
+  it('?ver=emenda: "Registrada em" no lugar de "Vista no SIOP", cabeçalho que ordena e sem a faixa vermelha na linha', () => {
+    perfil.gerir = true;
+    const html = render('/?ver=emenda');
+    expect(html).toContain('Registrada em');
+    expect(html).not.toContain('Vista no SIOP');
+    expect(html).not.toContain('pelo pedido');
+    expect(html).not.toContain('inset 3px 0 0');
+    expect(html).toContain('aria-sort');
+  });
+
+  it('?ver=emenda abre em Todas, como as outras telas; ?situacao=com mostra a coluna Pedidos', () => {
+    perfil.gerir = true;
+    const marcado = (html: string, id: string) => new RegExp(`aria-pressed="true"[^>]*data-testid="emendas-por-emenda-situacao-${id}"`).test(html);
+    const html = render('/?ver=emenda');
+    expect(marcado(html, 'todas')).toBe(true);
+    expect(marcado(html, 'sem')).toBe(false);
+    expect(marcado(render('/?ver=emenda&situacao=sem'), 'sem')).toBe(true);
+    const comPedido = render('/?ver=emenda&situacao=com');
+    expect(comPedido).not.toContain('Registrada em');
+    expect(comPedido).not.toContain('Último contato');
   });
 
   it('por pedido: faixa acima do trilho com as emendas sem pedido, fora da contagem das fases (decisão de 26/10/2026)', () => {
