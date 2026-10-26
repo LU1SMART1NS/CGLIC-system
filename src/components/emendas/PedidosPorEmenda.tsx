@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { StatusBadge, type StatusBadgeVariant } from '../../design-system/components/StatusBadge';
 import { ActionButton } from '../../design-system/components/ActionButton';
@@ -266,7 +267,17 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
   const emendas = useEmendasSiop();
   const contatos = useContatosDasEmendas();
   const asparQ = useAsparDosOrgaos();
-  const [segmento, setSegmento] = useState<Segmento>('sem');
+  // Abre em Todas, como as outras telas; os avisos de emenda sem pedido levam direto a ?situacao=sem.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const daUrl = searchParams.get('situacao');
+  const segmento: Segmento = daUrl === 'sem' || daUrl === 'com' ? daUrl : 'todas';
+  const setSegmento = (s: Segmento) =>
+    setSearchParams((atual) => {
+      const prox = new URLSearchParams(atual);
+      if (s === 'todas') prox.delete('situacao');
+      else prox.set('situacao', s);
+      return prox;
+    });
   const [busca, setBusca] = useState('');
   const [abertas, setAbertas] = useState<ReadonlySet<string>>(new Set());
 

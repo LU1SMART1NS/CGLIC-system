@@ -547,7 +547,7 @@ export const EmendasInicioPage: React.FC = () => {
               data={emendasSemPedido}
               keyExtractor={(l) => l.chave}
               columns={colunasEmendasSemPedido}
-              rowOpen={() => () => navigate('/emendas/pedidos?ver=emenda')}
+              rowOpen={() => () => navigate('/emendas/pedidos?ver=emenda&situacao=sem')}
             />
           )}
         </PainelGaveta>

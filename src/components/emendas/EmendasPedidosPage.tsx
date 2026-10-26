@@ -823,6 +823,7 @@ export const EmendasPedidosPage: React.FC = () => {
             active={ver}
             onSelect={(v) =>
               mudarUrl((p) => {
+                p.delete('situacao');
                 if (v === 'pedido') p.delete('ver');
                 else p.set('ver', v);
               })
@@ -848,7 +849,7 @@ export const EmendasPedidosPage: React.FC = () => {
           tone={podeGerir && semPedido.urgentes > 0 ? 'danger' : 'warning'}
           testId="emendas-pedidos-faixa-sem-pedido"
           action={
-            <AppButton variant="outline" size="sm" onClick={() => mudarUrl((p) => p.set('ver', 'emenda'))} data-testid="emendas-pedidos-faixa-sem-pedido-ver">
+            <AppButton variant="outline" size="sm" onClick={() => mudarUrl((p) => (p.set('ver', 'emenda'), p.set('situacao', 'sem')))} data-testid="emendas-pedidos-faixa-sem-pedido-ver">
               Ver emendas
             </AppButton>
           }
