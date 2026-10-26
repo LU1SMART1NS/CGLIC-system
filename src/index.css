@@ -2059,6 +2059,21 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .reserva-sozinho { align-self: flex-start; }
 .reserva-destino { font-size: 0.8rem; }
 .reserva-destino b { color: var(--primary); }
+.reserva-teto { display: flex; flex-direction: column; gap: 0.35rem; background: var(--bg-page, #f8fafc); border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.6rem 0.75rem; font-size: 0.82rem; }
+.reserva-teto--passa { border-color: var(--color-danger-border); background: var(--color-danger-bg); }
+.reserva-teto__barra { height: 8px; border-radius: 999px; background: var(--surface, #fff); overflow: hidden; }
+.reserva-teto__barra i { display: block; height: 100%; background: var(--color-warning-text, #b45309); }
+.reserva-teto--passa .reserva-teto__barra i { background: var(--color-danger-text); }
+.emendas-sobra-barra { display: flex; height: 6px; margin-top: 0.3rem; border-radius: 999px; overflow: hidden; background: var(--bg-page, #eef2f7); min-width: 110px; }
+.emendas-sobra-barra i { display: block; height: 100%; }
+.emendas-sobra-barra__empenhado { background: var(--primary); }
+.emendas-sobra-barra__andamento { background: var(--primary-light, #9bb8e8); }
+.emendas-sobra-barra__sobra { background: var(--color-warning-text, #b45309); }
+.emendas-sobra-autor { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.4rem 0; }
+.emendas-sobra-emenda { display: flex; flex-direction: column; gap: 0.45rem; border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.65rem 0.8rem; background: var(--surface, #fff); }
+.emendas-sobra-emenda__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; }
+.emendas-sobra-emenda__valores { display: flex; flex-wrap: wrap; gap: 0.25rem 1.1rem; font-size: 0.82rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.emendas-sobra-emenda__valores b { color: var(--text-primary, #1e293b); }
 .reserva-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .reserva-segmentos--sm button { padding: 0.25rem 0.7rem; }
 .reserva-grupo { border: 1px solid var(--color-border, #e2e8f0); border-radius: 12px; padding: 0.6rem; display: flex; flex-direction: column; gap: 0.5rem; }
