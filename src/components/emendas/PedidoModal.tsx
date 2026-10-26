@@ -15,6 +15,7 @@ import { buscarItensCaep, calcularKit, curto, dataBR, diasEntre, limiteDaIndicac
 import { casaBusca, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import { identificacaoDoPedido, itensDaLinha, orgaoDoPedido, precoParaEmenda, valorDaLinha, VOLTA_AO_OFICIO } from '../../utils/emendasPedidos';
 import { nomeDoItem, notaDoPreco } from '../../utils/emendasQuadro';
+import { agruparPorBeneficiario, beneficiarioDaLinha, chaveDoConteudo, definirNoGrupo, gradePorItem, moverLinha, repartirLinha, type GrupoReserva } from '../../utils/emendasReserva';
 import { formatarTelefone, localDoBeneficiario, nomeESigla, rotuloBeneficiario, soDigitos } from '../../services/emendasService';
 import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
 import { QuadroGabinete } from './QuadroGabinete';
@@ -42,16 +43,19 @@ interface LinhaEdicao {
   kitNome: string | null;
   kitComposicao: ItemDoKit[] | null;
   quantidade: number;
-  /** null = o beneficiário do pedido; preenchido só quando esta linha vai para outro órgão. */
-  beneficiarioId: string | null;
+  /** Grupo (beneficiário) em que a linha está; ao gravar, a linha leva o beneficiário do grupo. */
+  grupo: string;
 }
 
 interface Rascunho {
   autorId: string;
   paraOrgao: boolean;
   contato: { nome: string; telefone: string; email: string };
-  beneficiarioDoPedido: string | null;
+  grupos?: GrupoReserva[];
+  ativo?: string;
   linhas: LinhaEdicao[];
+  /** Rascunho de antes dos grupos (26/10/2026): beneficiário do pedido + beneficiário próprio por linha. */
+  beneficiarioDoPedido?: string | null;
   observacao: string;
   salvoEm: string;
 }
@@ -75,6 +79,8 @@ const iniciais = (nome: string) =>
 const metaDoAutor = (a: AutorEmenda) => [TIPO_AUTOR[a.tipo], a.partido, a.uf, a.emExercicio === false ? 'fora do cargo' : null].filter(Boolean).join(' · ');
 const doisPrecos = (previsto: number, hoje: number) => Math.abs(previsto - hoje) > 0.004;
 let seq = 0;
+const novaChave = () => `n${++seq}`;
+const novoGrupo = () => `g${++seq}`;
 
 /** Cartão de item ou kit na busca da reserva: nome do quadro (descrição no ⓘ), preço numa coluna fixa e saldo no pé. */
 function CartaoResultado(props: {
@@ -130,10 +136,11 @@ function guardarRascunho(r: Rascunho | null) {
 }
 
 /**
- * Nova reserva ou alteração das linhas de um pedido (protótipo aprovado em 24/10/2026): à esquerda a busca dos itens e
- * kits da CAEP, à direita o pedido, com o total no rodapé. O beneficiário é escolhido uma vez para o pedido e só muda na
- * linha que vai para outro órgão; item repetido soma na mesma linha. Os valores são os previstos para a emenda, os
- * mesmos do quadro do parlamentar. A trava de saldo é conferida aqui e de novo no banco.
+ * Nova reserva ou alteração das linhas de um pedido (protótipos aprovados em 24 e 26/10/2026): à esquerda a busca dos
+ * itens e kits da CAEP, à direita o pedido agrupado por beneficiário, com o total no rodapé. O item tocado no catálogo
+ * entra no grupo marcado ("Itens novos entram aqui") e soma na linha igual do grupo; Repartir divide uma linha entre os
+ * beneficiários, Mover para leva a linha inteira, e a visão Por item mostra a grade item × beneficiário. Os valores são
+ * os previstos para a emenda, os mesmos do quadro do parlamentar. A trava de saldo é conferida aqui e de novo no banco.
  */
 export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, beneficiarios, reservadoFora, ultimoContato, hoje, onClose }) => {
   const salvar = useSalvarPedido();
@@ -141,15 +148,13 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const { precos, ipca, semPrevisao } = usePrecosParaEmenda();
   const semAutorGravado = Boolean(pedido && !pedido.autorId);
 
-  // Linhas gravadas: o beneficiário que todas têm em comum vira o do pedido.
+  // Linhas gravadas: um grupo por beneficiário, na ordem em que aparecem.
   const inicio = useMemo(() => {
-    const gravadas: LinhaEdicao[] =
+    const gravadas =
       pedido?.linhas
         .filter((l) => !l.cancelada)
         .map((l) => ({ chave: l.id, id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, kitNome: l.kitNome, kitComposicao: l.kitComposicao, quantidade: l.quantidade, beneficiarioId: l.beneficiarioId })) ?? [];
-    const bens = new Set(gravadas.map((l) => l.beneficiarioId));
-    const comum = bens.size === 1 ? [...bens][0] : null;
-    return { linhas: comum ? gravadas.map((l) => ({ ...l, beneficiarioId: null })) : gravadas, beneficiario: comum };
+    return agruparPorBeneficiario(gravadas, novoGrupo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [rascunhoAntigo] = useState(() => (pedido ? null : lerRascunho()));
@@ -165,8 +170,12 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const [contatoEmail, setContatoEmail] = useState(pedido?.contatoEmail ?? '');
   const [contatoSugerido, setContatoSugerido] = useState(false);
   const [editarContato, setEditarContato] = useState(false);
-  const [beneficiarioDoPedido, setBeneficiarioDoPedido] = useState<string | null>(inicio.beneficiario);
+  const [grupos, setGrupos] = useState<GrupoReserva[]>(inicio.grupos);
+  const [ativo, setAtivo] = useState(inicio.grupos[0].chave);
   const [linhas, setLinhas] = useState<LinhaEdicao[]>(inicio.linhas);
+  const [vista, setVista] = useState<'beneficiario' | 'item'>('beneficiario');
+  const [repartindo, setRepartindo] = useState<{ chave: string; partes: Record<string, string> } | null>(null);
+  const [movendo, setMovendo] = useState<string | null>(null);
   const [motivo, setMotivo] = useState('');
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<Filtro>('tudo');
@@ -192,6 +201,13 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const tituloDoPedido = pedido ? (pedido.autorId ? autor?.nome ?? '' : orgaoDoPedido(pedido, nomeDoBeneficiario) ?? 'órgão') : '';
   const orgaoNaFrente = (paraOrgao && !pedido) || (semAutorGravado && !autorId);
   const preco = (k: string) => precoParaEmenda(k, porChave, precos);
+  const grupoAtivo = grupos.find((g) => g.chave === ativo) ?? grupos[0];
+  const benDoGrupo = (g: GrupoReserva) => (g.beneficiarioId ? porBeneficiario.get(g.beneficiarioId) : undefined);
+  const nomeDoGrupo = (g: GrupoReserva) => {
+    const b = benDoGrupo(g);
+    return b ? b.sigla || b.nome : orgaoNaFrente ? 'Órgão a escolher' : 'Beneficiário a informar';
+  };
+  const temSemBeneficiario = grupos.some((g) => !g.beneficiarioId);
 
   // Consumo do saldo por item com as linhas desta tela.
   const consumo = useMemo(() => {
@@ -254,7 +270,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const tel = soDigitos(contatoTelefone);
   const pendencias: Pendencia[] = [];
   if (!autorId && !pedido && !paraOrgao) pendencias.push({ texto: 'o parlamentar', alvo: 'emendas-pedido-busca-autor', lado: 'pedido' });
-  if (orgaoNaFrente && (!beneficiarioDoPedido && linhas.some((l) => !l.beneficiarioId))) pendencias.push({ texto: 'o órgão que pediu', alvo: 'emendas-pedido-beneficiario-pedido', lado: 'pedido' });
+  const grupoSemOrgao = orgaoNaFrente ? grupos.find((g) => !g.beneficiarioId && linhas.some((l) => l.grupo === g.chave)) : undefined;
+  if (grupoSemOrgao) pendencias.push({ texto: 'o órgão que pediu', alvo: `emendas-pedido-beneficiario-${grupoSemOrgao.chave}`, lado: 'pedido' });
   if (linhas.length === 0) pendencias.push({ texto: 'pelo menos um item', alvo: 'emendas-pedido-busca', lado: 'itens' });
   if (linhas.some((l) => !(Number.isInteger(l.quantidade) && l.quantidade > 0))) pendencias.push({ texto: 'quantidade inteira maior que zero em cada item', alvo: 'emendas-pedido-linhas', lado: 'pedido' });
   if (linhas.some(passaDoSaldo)) pendencias.push({ texto: 'quantidade dentro do saldo livre da CAEP', alvo: 'emendas-pedido-linhas', lado: 'pedido' });
@@ -262,16 +279,19 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   if (contatoEmail.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contatoEmail.trim())) pendencias.push({ texto: 'e-mail do contato válido', alvo: 'emendas-pedido-contato-email', lado: 'pedido' });
 
   const temConteudo = linhas.length > 0 || Boolean(autorId && !pedido) || Boolean(contatoNome || contatoTelefone || contatoEmail);
-  const mudou = pedido ? tirou > 0 || linhas.length !== inicio.linhas.length || linhas.some((l) => !l.id) : temConteudo;
+  // Pedido gravado: mudou se alguma linha mudou de quantidade ou de beneficiário, ou se entrou ou saiu linha.
+  const assinatura = (ls: { id?: string; quantidade: number; grupo: string }[], gs: GrupoReserva[]) =>
+    ls.map((l) => `${l.id ?? 'nova'}:${l.quantidade}:${beneficiarioDaLinha(l, gs) ?? '-'}`).sort().join('|');
+  const mudou = pedido ? tirou > 0 || assinatura(linhas, grupos) !== assinatura(inicio.linhas, inicio.grupos) : temConteudo;
 
   // Rascunho só da reserva nova: some ao reservar ou descartar.
   useEffect(() => {
     if (pedido || rascunhoAntigo) return;
     if (!temConteudo) return guardarRascunho(null);
     const salvoEm = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    guardarRascunho({ autorId, paraOrgao, contato: { nome: contatoNome, telefone: contatoTelefone, email: contatoEmail }, beneficiarioDoPedido, linhas, observacao, salvoEm });
+    guardarRascunho({ autorId, paraOrgao, contato: { nome: contatoNome, telefone: contatoTelefone, email: contatoEmail }, grupos, ativo, linhas, observacao, salvoEm });
     setRascunhoEm(salvoEm);
-  }, [pedido, rascunhoAntigo, temConteudo, autorId, paraOrgao, contatoNome, contatoTelefone, contatoEmail, beneficiarioDoPedido, linhas, observacao]);
+  }, [pedido, rascunhoAntigo, temConteudo, autorId, paraOrgao, contatoNome, contatoTelefone, contatoEmail, grupos, ativo, linhas, observacao]);
   const [rascunhoPendente, setRascunhoPendente] = useState(Boolean(rascunhoAntigo));
   const recuperarRascunho = () => {
     const r = rascunhoAntigo!;
@@ -280,8 +300,21 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     setContatoNome(r.contato.nome);
     setContatoTelefone(r.contato.telefone);
     setContatoEmail(r.contato.email);
-    setBeneficiarioDoPedido(r.beneficiarioDoPedido);
-    setLinhas(r.linhas.map((l) => ({ ...l, chave: `r${++seq}` })));
+    if (r.grupos?.length) {
+      setGrupos(r.grupos);
+      setAtivo(r.ativo && r.grupos.some((g) => g.chave === r.ativo) ? r.ativo : r.grupos[0].chave);
+      setLinhas(r.linhas.map((l) => ({ ...l, chave: `r${++seq}` })));
+    } else {
+      // Rascunho antigo: a linha sem beneficiário próprio usa o do pedido.
+      const antigas = r.linhas as (LinhaEdicao & { beneficiarioId?: string | null })[];
+      const g = agruparPorBeneficiario(
+        antigas.map(({ grupo: _g, beneficiarioId, ...l }) => ({ ...l, chave: `r${++seq}`, beneficiarioId: beneficiarioId ?? r.beneficiarioDoPedido ?? null })),
+        novoGrupo
+      );
+      setGrupos(g.grupos);
+      setAtivo(g.grupos[0].chave);
+      setLinhas(g.linhas);
+    }
     setObservacao(r.observacao);
     setObsAberta(Boolean(r.observacao));
     setRascunhoPendente(false);
@@ -324,32 +357,28 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   };
 
   const avisarNoCelular = (texto: string) => setRecado({ texto });
-  const adicionarItem = (i: ItemCaep) => {
-    const ja = linhas.find((l) => l.tipo === 'ITEM' && l.itemKey === i.itemKey);
+  // Item ou kit tocado no catálogo entra no grupo marcado; se o grupo já tem, soma na mesma linha.
+  const adicionarNoGrupo = (nova: Omit<LinhaEdicao, 'chave' | 'grupo' | 'quantidade'>, nome: string) => {
+    const g = grupoAtivo.chave;
+    const para = grupos.length > 1 ? ` (${nomeDoGrupo(grupoAtivo)})` : '';
+    const ja = linhas.find((l) => l.grupo === g && chaveDoConteudo(l) === chaveDoConteudo(nova));
     if (ja) {
       setLinhas((ls) => ls.map((l) => (l.chave === ja.chave ? { ...l, quantidade: l.quantidade + 1 } : l)));
       setPiscando(ja.chave);
-      avisarNoCelular(`Já estava no pedido: ${curto(i.nomeCurto || i.descricao, 40).toLowerCase()} passou para ${formatNumber(ja.quantidade + 1)}.`);
+      avisarNoCelular(`Já estava no pedido${para}: ${nome} passou para ${formatNumber(ja.quantidade + 1)}.`);
       return;
     }
-    const chave = `n${++seq}`;
-    setLinhas((ls) => [...ls, { chave, tipo: 'ITEM', itemKey: i.itemKey, kitId: null, kitNome: null, kitComposicao: null, quantidade: 1, beneficiarioId: null }]);
+    const chave = novaChave();
+    const ultima = linhas.map((l) => l.grupo).lastIndexOf(g);
+    const linha: LinhaEdicao = { ...nova, chave, quantidade: 1, grupo: g };
+    setLinhas((ls) => (ultima < 0 ? [...ls, linha] : [...ls.slice(0, ultima + 1), linha, ...ls.slice(ultima + 1)]));
     setPiscando(chave);
-    avisarNoCelular(`${curto(i.nomeCurto || i.descricao, 40)} entrou no pedido.`);
+    avisarNoCelular(`${nome} entrou no pedido${para}.`);
   };
-  const adicionarKit = (k: KitEmenda) => {
-    const ja = linhas.find((l) => l.tipo === 'KIT' && l.kitId === k.id);
-    if (ja) {
-      setLinhas((ls) => ls.map((l) => (l.chave === ja.chave ? { ...l, quantidade: l.quantidade + 1 } : l)));
-      setPiscando(ja.chave);
-      avisarNoCelular(`Já estava no pedido: ${k.nome} passou para ${formatNumber(ja.quantidade + 1)}.`);
-      return;
-    }
-    const chave = `n${++seq}`;
-    setLinhas((ls) => [...ls, { chave, tipo: 'KIT', itemKey: null, kitId: k.id, kitNome: k.nome, kitComposicao: k.itens.map((i) => ({ ...i })), quantidade: 1, beneficiarioId: null }]);
-    setPiscando(chave);
-    avisarNoCelular(`${k.nome} entrou no pedido.`);
-  };
+  const adicionarItem = (i: ItemCaep) =>
+    adicionarNoGrupo({ tipo: 'ITEM', itemKey: i.itemKey, kitId: null, kitNome: null, kitComposicao: null }, curto(i.nomeCurto || i.descricao, 40));
+  const adicionarKit = (k: KitEmenda) =>
+    adicionarNoGrupo({ tipo: 'KIT', itemKey: null, kitId: k.id, kitNome: k.nome, kitComposicao: k.itens.map((i) => ({ ...i })) }, k.nome);
   const muda = (chave: string, parcial: Partial<LinhaEdicao>) => setLinhas((ls) => ls.map((l) => (l.chave === chave ? { ...l, ...parcial } : l)));
   const tirar = (l: LinhaEdicao) => {
     const posicao = linhas.indexOf(l);
@@ -362,19 +391,55 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
       }
     });
   };
-  const separar = (l: LinhaEdicao) => {
-    const nova: LinhaEdicao = { ...l, chave: `n${++seq}`, id: undefined, quantidade: 1, beneficiarioId: null };
-    setLinhas((ls) => ls.flatMap((x) => (x.chave === l.chave ? [{ ...x, quantidade: x.quantidade - 1 }, nova] : [x])));
-    abrirSeletor(nova.chave);
-  };
   const abrirSeletor = (alvo: string | null) => {
     setSeletorAberto(alvo);
     setBuscaBeneficiario('');
   };
-  const escolherBeneficiario = (alvo: string, id: string | null) => {
-    if (alvo === 'pedido') setBeneficiarioDoPedido(id);
-    else muda(alvo, { beneficiarioId: id && id !== beneficiarioDoPedido ? id : null });
+  const escolherBeneficiario = (grupo: string, id: string | null) => {
+    setGrupos((gs) => gs.map((g) => (g.chave === grupo ? { ...g, beneficiarioId: id } : g)));
     setSeletorAberto(null);
+  };
+  const desfazivel = (texto: string) => {
+    const antes = { linhas, grupos, ativo };
+    setRecado({
+      texto,
+      desfazer: () => {
+        setLinhas(antes.linhas);
+        setGrupos(antes.grupos);
+        setAtivo(antes.ativo);
+      }
+    });
+  };
+  const nomeDaLinha = (l: LinhaEdicao) => (l.tipo === 'KIT' ? l.kitNome ?? 'Kit' : nomeDoItem(porChave.get(l.itemKey ?? ''), l.itemKey ?? 'Item'));
+  /** Bloco novo: passa a receber os itens do catálogo e já abre a escolha do órgão. */
+  const novoBeneficiario = () => {
+    const g = novoGrupo();
+    setGrupos((gs) => [...gs, { chave: g, beneficiarioId: null }]);
+    setAtivo(g);
+    setVista('beneficiario');
+    abrirSeletor(g);
+  };
+  const tirarGrupo = (g: GrupoReserva) => {
+    const n = linhas.filter((l) => l.grupo === g.chave).length;
+    desfazivel(`${nomeDoGrupo(g)} saiu do pedido${n ? ` com ${n === 1 ? '1 item' : `${n} itens`}` : ''}.`);
+    const resto = grupos.filter((x) => x !== g);
+    setGrupos(resto);
+    setLinhas((ls) => ls.filter((l) => l.grupo !== g.chave));
+    if (ativo === g.chave) setAtivo(resto[0].chave);
+  };
+  const confirmarRepartir = () => {
+    if (!repartindo) return;
+    const l = linhas.find((x) => x.chave === repartindo.chave);
+    if (!l) return;
+    const partes = new Map(grupos.map((g) => [g.chave, parseInt(repartindo.partes[g.chave] ?? '0', 10) || 0]));
+    desfazivel(`${curto(nomeDaLinha(l), 40)} repartido entre ${[...partes.values()].filter((q) => q > 0).length} beneficiários.`);
+    setLinhas((ls) => repartirLinha(ls, l.chave, partes, novaChave));
+    setRepartindo(null);
+  };
+  const moverPara = (l: LinhaEdicao, destino: GrupoReserva) => {
+    desfazivel(`${curto(nomeDaLinha(l), 40)} foi para ${nomeDoGrupo(destino)}.`);
+    setLinhas((ls) => moverLinha(ls, l.chave, destino.chave));
+    setMovendo(null);
   };
 
   const irPara = (p: Pendencia) => {
@@ -414,10 +479,11 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         contatoTelefone: tel || null,
         contatoEmail: contatoEmail.trim() || null,
         motivo: motivo.trim() || null,
-        linhas: linhas.map((l) => ({ id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, quantidade: l.quantidade, beneficiarioId: l.beneficiarioId ?? beneficiarioDoPedido }))
+        linhas: linhas.map((l) => ({ id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, quantidade: l.quantidade, beneficiarioId: beneficiarioDaLinha(l, grupos) }))
       });
       if (!pedido) guardarRascunho(null);
-      const para = autor?.nome ?? (pedido ? orgaoDoPedido(pedido, nomeDoBeneficiario) : beneficiarioDoPedido ? nomeDoBeneficiario(beneficiarioDoPedido) : null) ?? 'o órgão';
+      const primeiro = grupos.find((g) => g.beneficiarioId)?.beneficiarioId;
+      const para = autor?.nome ?? (pedido ? orgaoDoPedido(pedido, nomeDoBeneficiario) : primeiro ? nomeDoBeneficiario(primeiro) : null) ?? 'o órgão';
       toast.success(semAutorGravado && autorId ? `Parlamentar indicado: ${autor?.nome ?? ''}.` : pedido ? `Pedido de ${para} atualizado.` : `Reserva para ${para} registrada.`);
       onClose();
     } catch (err) {
@@ -429,6 +495,10 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const seletor = ({ alvo, atual, vazio, erro, testId }: { alvo: string; atual: string | null; vazio: string; erro?: boolean; testId: string }) => {
     const b = atual ? porBeneficiario.get(atual) : undefined;
     const aberto = seletorAberto === alvo;
+    // Cada órgão aparece num bloco só: os que já estão em outro bloco saem da lista.
+    const emOutro = new Set(grupos.filter((g) => g.chave !== alvo && g.beneficiarioId).map((g) => g.beneficiarioId));
+    const opcoes = beneficiariosEncontrados.filter((x) => !emOutro.has(x.id));
+    const podeAInformar = !orgaoNaFrente && !grupos.some((g) => g.chave !== alvo && !g.beneficiarioId);
     return (
       <div className="reserva-seletor">
         <button type="button" className={`reserva-seletor__botao${erro ? ' reserva-erro' : ''}`} aria-expanded={aberto} onClick={() => abrirSeletor(aberto ? null : alvo)} data-testid={testId}>
@@ -455,7 +525,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  if (beneficiariosEncontrados[0]) escolherBeneficiario(alvo, beneficiariosEncontrados[0].id);
+                  if (opcoes[0]) escolherBeneficiario(alvo, opcoes[0].id);
                 } else if (e.key === 'Escape') {
                   e.stopPropagation();
                   setSeletorAberto(null);
@@ -464,29 +534,263 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               data-testid={`${testId}-busca`}
             />
             <div className="reserva-lista">
-              {beneficiariosEncontrados.map((x) => (
+              {opcoes.map((x) => (
                 <button type="button" key={x.id} role="option" aria-selected={x.id === atual} onClick={() => escolherBeneficiario(alvo, x.id)}>
                   <b>{nomeESigla(x)}</b>
                   {localDoBeneficiario(x) && <small>{localDoBeneficiario(x)}</small>}
                 </button>
               ))}
-              {beneficiariosEncontrados.length === 0 && <div className="reserva-mudo reserva-lista__vazia">Nenhum órgão encontrado. Cadastre em Ajustes › Beneficiários.</div>}
-              {alvo !== 'pedido' ? (
+              {opcoes.length === 0 && <div className="reserva-mudo reserva-lista__vazia">Nenhum órgão encontrado. Cadastre em Ajustes › Beneficiários.</div>}
+              {podeAInformar && (
                 <button type="button" role="option" aria-selected={!atual} onClick={() => escolherBeneficiario(alvo, null)}>
-                  <b>Usar o do pedido</b>
-                  <small>{beneficiarioDoPedido ? nomeDoBeneficiario(beneficiarioDoPedido) : 'A informar'}</small>
+                  <b>A informar depois</b>
+                  <small>O gabinete ainda não disse para quem é</small>
                 </button>
-              ) : (
-                !orgaoNaFrente && (
-                  <button type="button" role="option" aria-selected={!atual} onClick={() => escolherBeneficiario(alvo, null)}>
-                    <b>A informar depois</b>
-                    <small>O gabinete ainda não disse para quem é</small>
-                  </button>
-                )
               )}
             </div>
           </div>
         )}
+      </div>
+    );
+  };
+
+  // Uma linha do pedido (dentro do bloco do seu beneficiário).
+  const linhaDoPedido = (l: LinhaEdicao) => {
+    const passa = passaDoSaldo(l);
+    const item = l.itemKey ? porChave.get(l.itemKey) : undefined;
+    const valor = valorDaLinha(l, porChave, precos);
+    const valorHoje = valorDaLinha(l, porChave);
+    const umKit = l.tipo === 'KIT' ? valorDaLinha({ ...l, quantidade: 1 }, porChave, precos) : 0;
+    // O mesmo item (ou kit) em outros blocos, para quem reparte saber onde mais ele está.
+    const tambem = grupos.filter((g) => g.chave !== l.grupo && linhas.some((x) => x.grupo === g.chave && chaveDoConteudo(x) === chaveDoConteudo(l))).map(nomeDoGrupo);
+    const outrosGrupos = grupos.filter((g) => g.chave !== l.grupo);
+    const rep = repartindo?.chave === l.chave ? repartindo : null;
+    const somaRep = rep ? grupos.reduce((s, g) => s + (parseInt(rep.partes[g.chave] ?? '0', 10) || 0), 0) : 0;
+    const kitsLivres = l.tipo === 'KIT' ? Math.min(...(l.kitComposicao ?? []).map((c) => Math.floor(livre(c.itemKey) / c.quantidade))) : 0;
+    return (
+      <div key={l.chave} className={`reserva-linha${passa ? ' reserva-linha--erro' : ''}${piscando === l.chave ? ' reserva-linha--nova' : ''}`} data-testid={`emendas-pedido-linha-${l.chave}`}>
+        <div className="reserva-linha__item">
+          {l.tipo === 'KIT' ? (
+            <>
+              <div className="reserva-linha__codigo">
+                <span className="reserva-kit">KIT</span>
+                {l.kitNome ?? 'Kit'}
+              </div>
+              <div className="reserva-mudo">
+                {(l.kitComposicao ?? []).map((c) => `${formatNumber(c.quantidade * (l.quantidade || 0))} ${curto(porChave.get(c.itemKey)?.nomeCurto || porChave.get(c.itemKey)?.descricao || c.itemKey, 28).toLowerCase()}`).join(' · ')}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="reserva-linha__codigo">{item ? rotuloItemDaAta(item) : `${l.itemKey} · item sem alocação da CAEP`}</div>
+              {item && (
+                <button
+                  type="button"
+                  className={`reserva-linha__descricao${abertas.has(l.chave) ? ' reserva-linha__descricao--aberta' : ''}`}
+                  title={abertas.has(l.chave) ? 'Recolher' : 'Ver a descrição inteira'}
+                  onClick={() =>
+                    setAbertas((a) => {
+                      const n = new Set(a);
+                      if (n.has(l.chave)) n.delete(l.chave);
+                      else n.add(l.chave);
+                      return n;
+                    })
+                  }
+                >
+                  {descricaoItemEmFrase(item.descricao)}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        <div className={`reserva-passo${passa ? ' reserva-erro' : ''}`}>
+          <button type="button" aria-label="Diminuir" disabled={l.quantidade <= 1} onClick={() => muda(l.chave, { quantidade: l.quantidade - 1 })}>
+            −
+          </button>
+          <input
+            inputMode="numeric"
+            aria-label={l.tipo === 'KIT' ? 'Kits' : 'Quantidade'}
+            value={l.quantidade || ''}
+            onChange={(e) => {
+              const n = parseInt(e.target.value.replace(/\D/g, ''), 10);
+              muda(l.chave, { quantidade: Number.isFinite(n) ? n : 0 });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowUp' && cabeMaisUm(l)) {
+                e.preventDefault();
+                muda(l.chave, { quantidade: l.quantidade + 1 });
+              } else if (e.key === 'ArrowDown' && l.quantidade > 1) {
+                e.preventDefault();
+                muda(l.chave, { quantidade: l.quantidade - 1 });
+              }
+            }}
+            data-testid={`emendas-pedido-qtd-${l.chave}`}
+          />
+          <button type="button" aria-label="Aumentar" disabled={!cabeMaisUm(l)} onClick={() => muda(l.chave, { quantidade: l.quantidade + 1 })}>
+            +
+          </button>
+        </div>
+        <div className="reserva-linha__valor">
+          {formatCurrency(valor)}
+          {marcasDaLinha(l)}
+          <small>{doisPrecos(valor, valorHoje) ? `previsto · hoje ${formatCurrency(valorHoje)}` : l.tipo === 'KIT' ? `${formatCurrency(umKit)} por kit` : item ? `${formatCurrency(preco(item.itemKey).previsto)} un.` : ''}</small>
+        </div>
+        <div className="reserva-linha__pe">
+          {tambem.length > 0 && <span className="reserva-etiqueta reserva-etiqueta--propria">Também em {tambem.join(', ')}</span>}
+          <span className={passa ? 'reserva-alerta' : 'reserva-mudo'}>
+            {l.tipo === 'KIT'
+              ? passa
+                ? 'Algum item do kit passa do saldo livre'
+                : `Dá para mais ${formatNumber(Math.max(0, kitsLivres))}`
+              : passa
+                ? `Passa ${formatNumber(-livre(l.itemKey!))} do saldo livre (${formatNumber(saldoAntes(l.itemKey!) - ((consumo.get(l.itemKey!) ?? 0) - l.quantidade))})`
+                : livre(l.itemKey!) === 0
+                  ? `Nenhum fica livre de ${formatNumber(saldoAntes(l.itemKey!))}`
+                  : `${livre(l.itemKey!) === 1 ? 'Fica 1 livre' : `Ficam ${formatNumber(livre(l.itemKey!))} livres`} de ${formatNumber(saldoAntes(l.itemKey!))}`}
+          </span>
+          <span className="reserva-espaco" />
+          {outrosGrupos.length > 0 && (
+            <>
+              <AppButton
+                type="button"
+                variant="link"
+                size="xs"
+                onClick={() => {
+                  setMovendo(null);
+                  setRepartindo(rep ? null : { chave: l.chave, partes: Object.fromEntries(grupos.map((g) => [g.chave, g.chave === l.grupo ? String(l.quantidade) : ''])) });
+                }}
+                data-testid={`emendas-pedido-repartir-${l.chave}`}
+              >
+                Repartir
+              </AppButton>
+              <AppButton
+                type="button"
+                variant="link"
+                size="xs"
+                onClick={() => {
+                  setRepartindo(null);
+                  setMovendo(movendo === l.chave ? null : l.chave);
+                }}
+                data-testid={`emendas-pedido-mover-${l.chave}`}
+              >
+                Mover para…
+              </AppButton>
+            </>
+          )}
+          <ActionButton action="remover" type="button" size="xs" label="Tirar" onClick={() => tirar(l)} data-testid={`emendas-pedido-tirar-${l.chave}`} />
+        </div>
+        {rep && (
+          <div className="reserva-repartir" data-testid={`emendas-pedido-repartir-painel-${l.chave}`}>
+            <span className="reserva-rotulo">
+              Repartir {formatNumber(l.quantidade)} {l.tipo === 'KIT' ? (l.quantidade === 1 ? 'kit' : 'kits') : nomeDaLinha(l).toLowerCase()}
+            </span>
+            {grupos.map((g) => (
+              <label key={g.chave} className="reserva-repartir__linha">
+                <span>
+                  {nomeDoGrupo(g)}
+                  {benDoGrupo(g) && localDoBeneficiario(benDoGrupo(g)!) && <small className="reserva-mudo"> · {localDoBeneficiario(benDoGrupo(g)!)}</small>}
+                </span>
+                <input
+                  className="reserva-campo reserva-repartir__qtd"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={rep.partes[g.chave] ?? ''}
+                  onChange={(e) => setRepartindo({ ...rep, partes: { ...rep.partes, [g.chave]: e.target.value.replace(/\D/g, '') } })}
+                  data-testid={`emendas-pedido-repartir-${l.chave}-${g.chave}`}
+                />
+              </label>
+            ))}
+            <div className="reserva-repartir__pe">
+              <span className={somaRep === l.quantidade ? 'reserva-ok' : 'reserva-alerta'}>
+                Soma {formatNumber(somaRep)} de {formatNumber(l.quantidade)}
+                {somaRep < l.quantidade ? ` · faltam ${formatNumber(l.quantidade - somaRep)}` : somaRep > l.quantidade ? ` · sobram ${formatNumber(somaRep - l.quantidade)}` : ''}
+              </span>
+              <span className="reserva-espaco" />
+              <ActionButton action="cancelar" type="button" size="sm" onClick={() => setRepartindo(null)} />
+              <AppButton type="button" size="sm" disabled={somaRep !== l.quantidade} onClick={confirmarRepartir} data-testid={`emendas-pedido-repartir-ok-${l.chave}`}>
+                Repartir
+              </AppButton>
+            </div>
+            <small className="reserva-mudo">Para um órgão que ainda não está no pedido, use antes “+ Outro beneficiário”.</small>
+          </div>
+        )}
+        {movendo === l.chave && (
+          <div className="reserva-repartir" data-testid={`emendas-pedido-mover-painel-${l.chave}`}>
+            <span className="reserva-rotulo">Mover a linha inteira para</span>
+            <div className="reserva-repartir__pe">
+              {outrosGrupos.map((g) => (
+                <AppButton key={g.chave} type="button" variant="outline" size="sm" onClick={() => moverPara(l, g)} data-testid={`emendas-pedido-mover-${l.chave}-${g.chave}`}>
+                  {nomeDoGrupo(g)}
+                </AppButton>
+              ))}
+              <span className="reserva-espaco" />
+              <ActionButton action="cancelar" type="button" size="sm" onClick={() => setMovendo(null)} />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Visão "Por item": grade item × beneficiário; a célula define a quantidade daquele órgão (vazio ou 0 tira).
+  const gradeDoPedido = () => {
+    const linhasDaGrade = gradePorItem(linhas);
+    return (
+      <div className="reserva-grade" data-testid="emendas-pedido-grade">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              {grupos.map((g) => (
+                <th key={g.chave}>{nomeDoGrupo(g)}</th>
+              ))}
+              <th>Total</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhasDaGrade.map((x) => {
+              const passa = passaDoSaldo(x.modelo);
+              return (
+                <tr key={x.conteudo} className={passa ? 'reserva-grade__erro' : undefined}>
+                  <td>
+                    <b>{nomeDaLinha(x.modelo)}</b>
+                    {x.modelo.tipo === 'ITEM' && x.modelo.itemKey && porChave.get(x.modelo.itemKey) && <small className="reserva-mudo">{rotuloItemDaAta(porChave.get(x.modelo.itemKey)!)}</small>}
+                    {passa && <small className="reserva-alerta">Passa do saldo livre</small>}
+                  </td>
+                  {grupos.map((g) => (
+                    <td key={g.chave}>
+                      <input
+                        className="reserva-campo reserva-grade__qtd"
+                        inputMode="numeric"
+                        placeholder="0"
+                        aria-label={`${nomeDaLinha(x.modelo)} para ${nomeDoGrupo(g)}`}
+                        value={x.porGrupo.get(g.chave) || ''}
+                        onChange={(e) => {
+                          const q = parseInt(e.target.value.replace(/\D/g, ''), 10) || 0;
+                          setLinhas((ls) => definirNoGrupo(ls, x.modelo, g.chave, q, novaChave));
+                        }}
+                        data-testid={`emendas-pedido-grade-${x.conteudo}-${g.chave}`}
+                      />
+                    </td>
+                  ))}
+                  <td className="reserva-grade__total">{formatNumber(x.total)}</td>
+                  <td className="reserva-grade__total">{formatCurrency(valorDaLinha({ ...x.modelo, quantidade: x.total }, porChave, precos))}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>Subtotal</td>
+              {grupos.map((g) => (
+                <td key={g.chave}>{formatCurrency(valorTotal(linhas.filter((l) => l.grupo === g.chave), porChave, precos))}</td>
+              ))}
+              <td />
+              <td>{formatCurrency(total)}</td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     );
   };
@@ -590,6 +894,11 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 {formatNumber(kitsEncontrados.length + itensEncontrados.length)} encontrados{itensEncontrados.length > MAX_RESULTADOS ? `; mostrando ${MAX_RESULTADOS} itens, refine a busca` : ''}
               </span>
             </div>
+            {grupos.length > 1 && (
+              <span className="reserva-mudo reserva-destino" data-testid="emendas-pedido-destino">
+                Itens novos entram em <b>{nomeDoGrupo(grupoAtivo)}</b>
+              </span>
+            )}
           </div>
           <div className="reserva-resultados" data-testid="emendas-pedido-resultados">
             {kitsEncontrados.map(({ k, c }) => {
@@ -829,134 +1138,103 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
             )}
           </div>
 
-          <div className="reserva-secao">
-            <span className="reserva-rotulo">{orgaoNaFrente ? 'Órgão que pediu' : 'Beneficiário'}</span>
-            {seletor({ alvo: 'pedido', atual: beneficiarioDoPedido, vazio: orgaoNaFrente ? 'Escolha o órgão' : 'A informar', erro: falta('emendas-pedido-beneficiario-pedido'), testId: 'emendas-pedido-beneficiario-pedido' })}
-            <p className="reserva-mudo reserva-texto">Vale para todos os itens. Se um item for para outro órgão, troque só nele.</p>
-          </div>
-
           <div className="reserva-secao" data-testid="emendas-pedido-linhas">
-            <span className="reserva-rotulo">Itens do pedido ({linhas.length})</span>
-            {linhas.length === 0 && (
-              <div className="reserva-vazio">
-                Nenhum item ainda. Busque {lado === 'pedido' ? 'em Itens da CAEP' : 'ao lado'} e toque em <b>Adicionar</b>.
-                <br />
-                Atalho: tecla <kbd className="reserva-tecla">/</kbd> para buscar e Enter para adicionar o primeiro.
-              </div>
-            )}
-            {linhas.map((l) => {
-              const passa = passaDoSaldo(l);
-              const item = l.itemKey ? porChave.get(l.itemKey) : undefined;
-              const valor = valorDaLinha(l, porChave, precos);
-              const valorHoje = valorDaLinha(l, porChave);
-              const umKit = l.tipo === 'KIT' ? valorDaLinha({ ...l, quantidade: 1 }, porChave, precos) : 0;
-              const propria = l.beneficiarioId ? porBeneficiario.get(l.beneficiarioId) : undefined;
-              const doPedido = beneficiarioDoPedido ? porBeneficiario.get(beneficiarioDoPedido) : undefined;
-              const kitsLivres = l.tipo === 'KIT' ? Math.min(...(l.kitComposicao ?? []).map((c) => Math.floor(livre(c.itemKey) / c.quantidade))) : 0;
-              return (
-                <div key={l.chave} className={`reserva-linha${passa ? ' reserva-linha--erro' : ''}${piscando === l.chave ? ' reserva-linha--nova' : ''}`} data-testid={`emendas-pedido-linha-${l.chave}`}>
-                  <div className="reserva-linha__item">
-                    {l.tipo === 'KIT' ? (
-                      <>
-                        <div className="reserva-linha__codigo">
-                          <span className="reserva-kit">KIT</span>
-                          {l.kitNome ?? 'Kit'}
-                        </div>
-                        <div className="reserva-mudo">
-                          {(l.kitComposicao ?? []).map((c) => `${formatNumber(c.quantidade * (l.quantidade || 0))} ${curto(porChave.get(c.itemKey)?.nomeCurto || porChave.get(c.itemKey)?.descricao || c.itemKey, 28).toLowerCase()}`).join(' · ')}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="reserva-linha__codigo">{item ? rotuloItemDaAta(item) : `${l.itemKey} · item sem alocação da CAEP`}</div>
-                        {item && (
-                          <button
-                            type="button"
-                            className={`reserva-linha__descricao${abertas.has(l.chave) ? ' reserva-linha__descricao--aberta' : ''}`}
-                            title={abertas.has(l.chave) ? 'Recolher' : 'Ver a descrição inteira'}
-                            onClick={() =>
-                              setAbertas((a) => {
-                                const n = new Set(a);
-                                if (n.has(l.chave)) n.delete(l.chave);
-                                else n.add(l.chave);
-                                return n;
-                              })
-                            }
-                          >
-                            {descricaoItemEmFrase(item.descricao)}
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  <div className={`reserva-passo${passa ? ' reserva-erro' : ''}`}>
-                    <button type="button" aria-label="Diminuir" disabled={l.quantidade <= 1} onClick={() => muda(l.chave, { quantidade: l.quantidade - 1 })}>
-                      −
-                    </button>
-                    <input
-                      inputMode="numeric"
-                      aria-label={l.tipo === 'KIT' ? 'Kits' : 'Quantidade'}
-                      value={l.quantidade || ''}
-                      onChange={(e) => {
-                        const n = parseInt(e.target.value.replace(/\D/g, ''), 10);
-                        muda(l.chave, { quantidade: Number.isFinite(n) ? n : 0 });
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'ArrowUp' && cabeMaisUm(l)) {
-                          e.preventDefault();
-                          muda(l.chave, { quantidade: l.quantidade + 1 });
-                        } else if (e.key === 'ArrowDown' && l.quantidade > 1) {
-                          e.preventDefault();
-                          muda(l.chave, { quantidade: l.quantidade - 1 });
-                        }
-                      }}
-                      data-testid={`emendas-pedido-qtd-${l.chave}`}
-                    />
-                    <button type="button" aria-label="Aumentar" disabled={!cabeMaisUm(l)} onClick={() => muda(l.chave, { quantidade: l.quantidade + 1 })}>
-                      +
-                    </button>
-                  </div>
-                  <div className="reserva-linha__valor">
-                    {formatCurrency(valor)}
-                    {marcasDaLinha(l)}
-                    <small>{doisPrecos(valor, valorHoje) ? `previsto · hoje ${formatCurrency(valorHoje)}` : l.tipo === 'KIT' ? `${formatCurrency(umKit)} por kit` : item ? `${formatCurrency(preco(item.itemKey).previsto)} un.` : ''}</small>
-                  </div>
-                  <div className="reserva-linha__pe">
-                    {propria ? (
-                      <span className="reserva-etiqueta reserva-etiqueta--propria">{propria.sigla || propria.nome} · só nesta linha</span>
-                    ) : (
-                      <span className="reserva-etiqueta">{doPedido ? `${doPedido.sigla || doPedido.nome} · do pedido` : 'Beneficiário a informar'}</span>
-                    )}
-                    <span className={passa ? 'reserva-alerta' : 'reserva-mudo'}>
-                      {l.tipo === 'KIT'
-                        ? passa
-                          ? 'Algum item do kit passa do saldo livre'
-                          : `Dá para mais ${formatNumber(Math.max(0, kitsLivres))}`
-                        : passa
-                          ? `Passa ${formatNumber(-livre(l.itemKey!))} do saldo livre (${formatNumber(saldoAntes(l.itemKey!) - ((consumo.get(l.itemKey!) ?? 0) - l.quantidade))})`
-                          : livre(l.itemKey!) === 0
-                            ? `Nenhum fica livre de ${formatNumber(saldoAntes(l.itemKey!))}`
-                            : `${livre(l.itemKey!) === 1 ? 'Fica 1 livre' : `Ficam ${formatNumber(livre(l.itemKey!))} livres`} de ${formatNumber(saldoAntes(l.itemKey!))}`}
-                    </span>
-                    <span className="reserva-espaco" />
-                    <AppButton type="button" variant="link" size="xs" onClick={() => abrirSeletor(seletorAberto === l.chave ? null : l.chave)}>
-                      {propria ? 'Trocar beneficiário' : 'Outro beneficiário'}
-                    </AppButton>
-                    {l.tipo === 'ITEM' && l.quantidade > 1 && (
-                      <AppButton type="button" variant="link" size="xs" onClick={() => separar(l)} data-testid={`emendas-pedido-separar-${l.chave}`}>
-                        Separar 1 para outro órgão
-                      </AppButton>
-                    )}
-                    <ActionButton action="remover" type="button" size="xs" label="Tirar" onClick={() => tirar(l)} data-testid={`emendas-pedido-tirar-${l.chave}`} />
-                  </div>
-                  {seletorAberto === l.chave && (
-                    <div className="reserva-linha__seletor">
-                      {seletor({ alvo: l.chave, atual: l.beneficiarioId, vazio: 'Usar o do pedido', testId: `emendas-pedido-beneficiario-${l.chave}` })}
-                    </div>
-                  )}
+            <div className="reserva-barra">
+              <span className="reserva-rotulo">
+                {grupos.length === 1 ? (orgaoNaFrente ? 'Órgão que pediu' : 'Beneficiário') : `${grupos.length} beneficiários`} · {linhas.length} {linhas.length === 1 ? 'item' : 'itens'}
+              </span>
+              <span className="reserva-espaco" />
+              {grupos.length > 1 && linhas.length > 0 && (
+                <div className="reserva-segmentos reserva-segmentos--sm" role="group" aria-label="Ver o pedido">
+                  <button type="button" aria-pressed={vista === 'beneficiario'} onClick={() => setVista('beneficiario')} data-testid="emendas-pedido-vista-beneficiario">
+                    Por beneficiário
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={vista === 'item'}
+                    onClick={() => {
+                      setVista('item');
+                      setRepartindo(null);
+                      setMovendo(null);
+                    }}
+                    data-testid="emendas-pedido-vista-item"
+                  >
+                    Por item
+                  </button>
                 </div>
-              );
-            })}
+              )}
+            </div>
+            {vista === 'item' && grupos.length > 1 ? (
+              gradeDoPedido()
+            ) : (
+              grupos.map((g, n) => {
+                const doGrupo = linhas.filter((l) => l.grupo === g.chave);
+                const b = benDoGrupo(g);
+                const eAtivo = g.chave === grupoAtivo.chave;
+                return (
+                  <div key={g.chave} className={`reserva-grupo${eAtivo && grupos.length > 1 ? ' reserva-grupo--ativo' : ''}`} data-testid={`emendas-pedido-grupo-${g.chave}`}>
+                    <div className="reserva-grupo__topo">
+                      {grupos.length > 1 && <span className="reserva-grupo__num">{n + 1}</span>}
+                      <div className="reserva-grupo__seletor">
+                        {seletor({
+                          alvo: g.chave,
+                          atual: g.beneficiarioId,
+                          vazio: orgaoNaFrente && n === 0 ? 'Escolha o órgão que pediu' : orgaoNaFrente ? 'Escolha o órgão' : 'Beneficiário a informar',
+                          erro: falta(`emendas-pedido-beneficiario-${g.chave}`),
+                          testId: `emendas-pedido-beneficiario-${g.chave}`
+                        })}
+                      </div>
+                      {grupos.length > 1 && (
+                        <>
+                          {eAtivo ? (
+                            <span className="reserva-grupo__destino">Itens novos entram aqui</span>
+                          ) : (
+                            <AppButton type="button" variant="link" size="xs" onClick={() => setAtivo(g.chave)} data-testid={`emendas-pedido-ativar-${g.chave}`}>
+                              Adicionar itens aqui
+                            </AppButton>
+                          )}
+                          <b className="reserva-grupo__subtotal">{formatCurrency(valorTotal(doGrupo, porChave, precos))}</b>
+                          <ActionButton action="remover" type="button" size="xs" label="Tirar" iconOnly onClick={() => tirarGrupo(g)} data-testid={`emendas-pedido-tirar-grupo-${g.chave}`} />
+                        </>
+                      )}
+                    </div>
+                    {b && !localDoBeneficiario(b) && <span className="reserva-mudo reserva-texto">Sem endereço de entrega no cadastro.</span>}
+                    {doGrupo.length === 0 ? (
+                      <div className="reserva-vazio">
+                        {linhas.length === 0 ? (
+                          <>
+                            Nenhum item ainda. Busque {lado === 'pedido' ? 'em Itens da CAEP' : 'ao lado'} e toque em <b>Adicionar</b>.
+                            <br />
+                            Atalho: tecla <kbd className="reserva-tecla">/</kbd> para buscar e Enter para adicionar o primeiro.
+                          </>
+                        ) : eAtivo ? (
+                          <>
+                            Os itens tocados em <b>Adicionar</b> entram aqui. Para trazer itens que já estão no pedido, use <b>Repartir</b> ou <b>Mover para…</b> na linha.
+                          </>
+                        ) : (
+                          'Sem itens.'
+                        )}
+                      </div>
+                    ) : (
+                      doGrupo.map(linhaDoPedido)
+                    )}
+                  </div>
+                );
+              })
+            )}
+            <div className="reserva-novo-grupo">
+                <ActionButton
+                  action="adicionar"
+                  type="button"
+                  size="sm"
+                  label="Outro beneficiário"
+                  disabled={temSemBeneficiario}
+                  title={temSemBeneficiario ? 'Escolha antes o órgão do bloco que está sem beneficiário.' : undefined}
+                  onClick={novoBeneficiario}
+                  data-testid="emendas-pedido-novo-grupo"
+                />
+                <span className="reserva-mudo">{temSemBeneficiario ? 'Escolha o órgão do bloco acima antes de abrir outro.' : 'O mesmo item pode ir para vários órgãos: use Repartir na linha.'}</span>
+              </div>
             {notas.length > 0 && (
               <div className="reserva-notas" data-testid="emendas-pedido-notas">
                 <b>Preço previsto para a emenda</b>, o mesmo do quadro do parlamentar:
@@ -990,7 +1268,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               <summary>Quadro para o parlamentar</summary>
               <QuadroGabinete
                 autor={autor}
-                linhas={linhas.map((l) => ({ ...l, beneficiarioId: l.beneficiarioId ?? beneficiarioDoPedido }))}
+                linhas={linhas.map((l) => ({ ...l, beneficiarioId: beneficiarioDaLinha(l, grupos) }))}
                 data={pedido?.reservadoEm ?? hoje}
                 devolvidoEm={pedido?.devolvidoEm}
               />
