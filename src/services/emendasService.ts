@@ -100,7 +100,7 @@ export interface ItemCaep {
   vigenciaFinal: string | null;
   ataEncerrada: boolean;
   alocado: number;
-  /** Informados pela CAEP para o quadro da reserva (migration 165): nome curto, GND e versão desses dados. */
+  /** Informados pela CAEP para o quadro da reserva (migration 165): nome na ata assinada, GND e versão desses dados. */
   nomeCurto?: string | null;
   gnd?: 'GND-3' | 'GND-4' | null;
   dadosVersao?: number | null;

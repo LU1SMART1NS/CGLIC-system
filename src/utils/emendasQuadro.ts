@@ -95,7 +95,7 @@ export interface Quadro {
   semBeneficiario: number;
   /** Beneficiários (distintos) sem endereço de entrega: o quadro sai só com a cidade. */
   semEndereco: number;
-  /** Itens sem nome curto da CAEP (sai o começo da descrição do catálogo). */
+  /** Itens sem o nome da ata assinada (sai o começo da descrição do catálogo). */
   semNomeCurto: number;
 }
 
@@ -118,7 +118,7 @@ const mesmoNome = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { sensit
 const pct = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
 const mesAno = (iso: string) => dataBR(iso).slice(3);
 
-/** Nome do item no quadro: o nome curto da CAEP; sem ele, o começo da descrição do catálogo. */
+/** Nome do item no quadro: o nome na ata assinada; sem ele, o começo da descrição do catálogo. */
 export function nomeDoItem(item: ItemCaep | undefined, itemKey: string): string {
   if (!item) return itemKey;
   if (item.nomeCurto?.trim()) return item.nomeCurto.trim();

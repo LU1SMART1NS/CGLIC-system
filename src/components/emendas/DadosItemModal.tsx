@@ -16,7 +16,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** Nome curto e GND do item, como saem no quadro da reserva (migration 165). */
+/** Nome na ata assinada e GND do item, como saem no quadro da reserva (migration 165). */
 export const DadosItemModal: React.FC<Props> = ({ item, onClose }) => {
   const salvar = useSalvarDadosItem();
   const toast = useToast();
@@ -57,10 +57,9 @@ export const DadosItemModal: React.FC<Props> = ({ item, onClose }) => {
           <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary, #334155)' }}>{descricaoItemEmFrase(item.descricao)}</span>
         </div>
         <AppInput
-          label="Nome curto"
-          hint={`Como sai na DESCRIÇÃO ITEM do Anexo. Sem nome curto sai “${nomeDoItem({ ...item, nomeCurto: null }, item.itemKey)}”.`}
+          label="Nome na ata assinada"
+          hint={`Nome do item como está na ata assinada; sai na DESCRIÇÃO ITEM do Anexo. Sem ele sai “${nomeDoItem({ ...item, nomeCurto: null }, item.itemKey)}”.`}
           value={nomeCurto}
-          maxLength={80}
           onChange={(e) => setNomeCurto(e.target.value)}
           data-testid="emendas-dados-item-nome"
         />

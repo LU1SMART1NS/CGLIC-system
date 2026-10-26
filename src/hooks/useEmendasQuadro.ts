@@ -27,7 +27,7 @@ export function usePrecosParaEmenda(): { precos: Map<string, PrecoPrevisto> | un
   return { precos: ajustados, ipca, semPrevisao: isError };
 }
 
-/** Nome curto e GND do item; recarrega os itens da CAEP (o nome e o GND vêm na mesma view). */
+/** Nome na ata assinada e GND do item; recarrega os itens da CAEP (o nome e o GND vêm na mesma view). */
 export function useSalvarDadosItem() {
   const qc = useQueryClient();
   return useMutation({

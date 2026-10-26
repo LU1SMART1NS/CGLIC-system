@@ -84,7 +84,7 @@ const plural = (n: number, um: string, varios: string) => `${formatNumber(n)} ${
 
 /**
  * Início do gestor de emendas (protótipo aprovado em 23/10/2026; padronizado com o Painel em 25/10/2026): os quatro
- * cartões no desenho do Painel, as gavetas com nome curto e a regra no ⓘ, e as pendências dos pedidos num trilho por
+ * cartões no desenho do Painel, as gavetas com rótulo curto e a regra no ⓘ, e as pendências dos pedidos num trilho por
  * gravidade com o filtro de aviso. Os avisos são os mesmos da lista de Pedidos.
  */
 export const EmendasInicioPage: React.FC = () => {
@@ -486,11 +486,11 @@ export const EmendasInicioPage: React.FC = () => {
         <PainelGaveta
           id="semNomeCurto"
           subtitulo={podeGerir ? 'Clique no lápis para dar o nome.' : 'Clique na linha para abrir o item.'}
-          hint="Item alocado à CAEP em ata vigente ainda sem o nome curto. Sem ele, o quadro do parlamentar mostra o começo da descrição do catálogo."
+          hint="Item alocado à CAEP em ata vigente ainda sem o nome na ata assinada. Sem ele, o quadro do parlamentar mostra o começo da descrição do catálogo."
           onFechar={fecharGaveta}
         >
           {r.semNomeCurto.length === 0 ? (
-            <EmptyState title={carregando ? 'Carregando…' : 'Todos os itens das atas vigentes já têm nome curto.'} testId="emendas-inicio-sem-nome-vazio" />
+            <EmptyState title={carregando ? 'Carregando…' : 'Todos os itens das atas vigentes já têm o nome da ata assinada.'} testId="emendas-inicio-sem-nome-vazio" />
           ) : (
             <DataTable<ItemCaep>
               testId="emendas-inicio-sem-nome"
@@ -501,7 +501,7 @@ export const EmendasInicioPage: React.FC = () => {
               rowOpen={(i) => () => navigate(`/emendas/itens?busca=${encodeURIComponent(`${i.numeroAta} item ${Number(i.numeroItem)}`)}`)}
               rowActions={
                 podeGerir
-                  ? (i) => <ActionButton action="editar" iconOnly label={`Nome curto e GND de ${nomeDoItem(i, i.itemKey)}`} onClick={() => setEditando(i)} data-testid={`emendas-inicio-nome-${i.itemKey}`} />
+                  ? (i) => <ActionButton action="editar" iconOnly label={`Nome na ata assinada e GND de ${nomeDoItem(i, i.itemKey)}`} onClick={() => setEditando(i)} data-testid={`emendas-inicio-nome-${i.itemKey}`} />
                   : undefined
               }
             />

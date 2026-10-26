@@ -10,7 +10,7 @@ export const PAINEL_GAVETA_NOMES: Record<PainelGavetaId, string> = {
   distribuicao: 'Distribuição',
   alocacao: 'Alocação',
   saldoLivre: 'Saldo a vencer',
-  semNomeCurto: 'Nome curto',
+  semNomeCurto: 'Nome do item',
   empenhoAConferir: 'Empenho a conferir',
   notasSemPedido: 'Notas sem pedido'
 };

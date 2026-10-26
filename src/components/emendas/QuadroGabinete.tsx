@@ -157,7 +157,7 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
       )}
       {quadro.semNomeCurto > 0 && (
         <div style={aviso} role="status" data-testid={`${testId}-sem-nome`}>
-          {quadro.semNomeCurto === 1 ? '1 item está' : `${quadro.semNomeCurto} itens estão`} sem nome curto e sai com o começo da descrição do catálogo: informe em Itens e kits.
+          {quadro.semNomeCurto === 1 ? '1 item está' : `${quadro.semNomeCurto} itens estão`} sem o nome da ata assinada e sai com o começo da descrição do catálogo: informe em Itens e kits.
         </div>
       )}
       {semGndMisturado && (
