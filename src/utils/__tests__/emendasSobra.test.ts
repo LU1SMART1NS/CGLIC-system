@@ -33,10 +33,24 @@ describe('sobra das emendas (migration 204)', () => {
     expect(e.pedidos.map((p) => p.numero)).toEqual([1, 2]);
   });
 
-  it('o Portal manda no empenhado quando tem a emenda', () => {
+  const portal = (extra: Partial<ExecucaoNoPortal>): ExecucaoNoPortal => ({
+    codigo: '202643600002', encontrada: true, valorEmpenhado: 50000, valorLiquidado: 0, valorPago: 0, lidoEm: null, notasSenasp: 2, empenhadoSenasp: 9990, notasSemValor: 0, ...extra
+  });
+
+  it('com as notas da SENASP lidas no Portal, vale o empenhado delas (não o da emenda inteira)', () => {
     const p = pedido(1, 'CONTRATACAO', [linha('l1', 'a', 3), linha('l2', 'a', 2)]);
-    const [e] = conta([p], [nota('l1', '2026NE000001', 3000)], [{ codigo: '202643600002', encontrada: true, valorEmpenhado: 9990, valorLiquidado: 0, valorPago: 0, lidoEm: null }]);
+    const [e] = conta([p], [nota('l1', '2026NE000001', 3000)], [portal({})]);
     expect(e).toMatchObject({ empenhado: 9990, fonteDoEmpenhado: 'PORTAL', sobra: 10, situacao: 'executada' });
+  });
+
+  it('nota da SENASP que o sistema ainda não tem: a confirmar', () => {
+    const p = pedido(1, 'CONTRATACAO', [linha('l1', 'a', 3)]);
+    expect(conta([p], [nota('l1', 'n', 3000)], [portal({ empenhadoSenasp: 3000, notasSemValor: 1 })])[0]).toMatchObject({ notasSemValor: 1, situacao: 'conferir' });
+  });
+
+  it('documentos ainda não lidos: usa as notas ligadas, não o empenhado da emenda inteira', () => {
+    const p = pedido(1, 'CONTRATACAO', [linha('l1', 'a', 3)]);
+    expect(conta([p], [nota('l1', 'n', 3000)], [portal({ notasSenasp: null, empenhadoSenasp: null })])[0]).toMatchObject({ empenhado: 3000, fonteDoEmpenhado: 'NOTAS' });
   });
 
   it('linha empenhada sem nota e sem o Portal: a confirmar; empenhado acima do valor: acima', () => {

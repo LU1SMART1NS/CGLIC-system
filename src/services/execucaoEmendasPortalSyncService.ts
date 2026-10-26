@@ -5,6 +5,8 @@
  * O servidor pergunta /emendas?codigoEmenda=<ano + nº> de cada emenda com número e ano nos pedidos (do ano corrente e
  * do anterior; emendas_a_ler_no_portal) e grava por gravar_execucao_emendas_portal. O Portal só lista a emenda depois
  * que ela tem execução: sem resposta, a emenda fica como não encontrada e a tela usa as notas ligadas no sistema.
+ * Desde a migration 205 lê também /emendas/documentos/<codigo>: o empenhado do Portal é o da emenda inteira, de todos
+ * os órgãos, e a sobra usa só as notas das UGs da SENASP (200330 e 200331), somadas no banco pela tabela empenhos.
  * Uma vez por dia (cron 'sincronizar-execucao-emendas'); a chave do Portal fica só no servidor.
  */
 import { supabase } from './supabaseClient';
@@ -27,6 +29,35 @@ export interface ExecucaoDaEmenda {
   valor_liquidado: number | null;
   valor_pago: number | null;
   autor: string | null;
+  /** Notas de empenho da SENASP, 'UG:NE' (ex.: '200330:2026NE000309'); null se os documentos não foram lidos. */
+  notas_senasp: string[] | null;
+}
+
+/** UGs da SENASP: a sobra usa só o que elas empenharam (migration 205). */
+const UGS_DA_SENASP = ['200330', '200331'];
+/** Até 30 páginas de 15 documentos (empenhos, liquidações e pagamentos de todos os órgãos da emenda). */
+const MAX_PAGINAS_DOCUMENTOS = 30;
+const POR_PAGINA_DOCUMENTOS = 15;
+
+/** "200330000012026NE000309" → "200330:2026NE000309" se a nota é de uma UG da SENASP; senão null. */
+export function notaDaSenasp(codigoDocumento: unknown): string | null {
+  const m = String(codigoDocumento ?? '').trim().toUpperCase().match(/^(\d{6})\d{5}(\d{4}NE\d{6})$/);
+  return m && UGS_DA_SENASP.includes(m[1]) ? `${m[1]}:${m[2]}` : null;
+}
+
+/** As notas de empenho da SENASP nos documentos da emenda. */
+export async function notasDaSenaspNaEmenda(codigo: string, consultar: ConsultorDoPortal): Promise<string[]> {
+  const notas = new Set<string>();
+  for (let pagina = 1; pagina <= MAX_PAGINAS_DOCUMENTOS; pagina++) {
+    const docs = await consultar(`/emendas/documentos/${codigo}?pagina=${pagina}`);
+    const lista = Array.isArray(docs) ? (docs as Array<Record<string, unknown>>) : [];
+    for (const d of lista) {
+      const n = notaDaSenasp(d.codigoDocumento);
+      if (n) notas.add(n);
+    }
+    if (lista.length < POR_PAGINA_DOCUMENTOS) break;
+  }
+  return [...notas].sort();
 }
 
 /** "1.234.567,89" (Portal) ou número → número; vazio → null. */
@@ -41,7 +72,7 @@ export function valorDoPortal(v: unknown): number | null {
 export async function consultarExecucaoDaEmenda(codigo: string, consultar: ConsultorDoPortal): Promise<ExecucaoDaEmenda> {
   const lista = await consultar(`/emendas?codigoEmenda=${codigo}&pagina=1`);
   const e = (Array.isArray(lista) ? (lista as Array<Record<string, unknown>>) : []).find((x) => String(x.codigoEmenda ?? '').trim() === codigo);
-  if (!e) return { codigo, encontrada: false, valor_empenhado: null, valor_liquidado: null, valor_pago: null, autor: null };
+  if (!e) return { codigo, encontrada: false, valor_empenhado: null, valor_liquidado: null, valor_pago: null, autor: null, notas_senasp: [] };
   const autor = String(e.nomeAutor ?? e.autor ?? '').trim();
   return {
     codigo,
@@ -49,7 +80,8 @@ export async function consultarExecucaoDaEmenda(codigo: string, consultar: Consu
     valor_empenhado: valorDoPortal(e.valorEmpenhado),
     valor_liquidado: valorDoPortal(e.valorLiquidado),
     valor_pago: valorDoPortal(e.valorPago),
-    autor: autor || null
+    autor: autor || null,
+    notas_senasp: await notasDaSenaspNaEmenda(codigo, consultar)
   };
 }
 

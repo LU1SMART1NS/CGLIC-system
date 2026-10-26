@@ -2,8 +2,10 @@
  * Sobra das emendas (protótipo aprovado em 26/10/2026, migration 204). A emenda é a unidade da conta:
  *   sobra = valor no SIOP − empenhado − em andamento.
  * - Valor: o informado na conferência com o SIOP (o maior entre os pedidos da emenda: cada um guarda o da emenda inteira).
- * - Empenhado: o do Portal da Transparência (todas as notas da emenda); sem a emenda no Portal, o das notas ligadas às
- *   linhas no sistema, e a emenda fica "a confirmar" se alguma linha empenhada ainda não tem nota.
+ * - Empenhado: o das notas da SENASP (UGs 200330 e 200331) que o Portal da Transparência liga à emenda, somadas pela
+ *   tabela empenhos (migration 205; o empenhado do Portal é o da emenda inteira, de todos os órgãos). Sem os documentos
+ *   lidos, o das notas ligadas às linhas no sistema. Fica "a confirmar" se alguma linha empenhada ainda não tem nota
+ *   ou se alguma nota da SENASP ainda não está no sistema.
  * - Em andamento: as linhas sem nota dos pedidos antes do empenho, pelo preço previsto (o do quadro do parlamentar).
  * Regras aprovadas: só emendas do ano corrente; uma emenda por pedido; aviso quando a sobra compra o item mais barato.
  */
@@ -19,6 +21,11 @@ export interface ExecucaoNoPortal {
   valorLiquidado: number | null;
   valorPago: number | null;
   lidoEm: string | null;
+  /** Notas da SENASP que o Portal liga à emenda (migration 205); null enquanto os documentos não foram lidos. */
+  notasSenasp: number | null;
+  empenhadoSenasp: number | null;
+  /** Notas da SENASP que o sistema ainda não tem (sem valor na soma). */
+  notasSemValor: number | null;
 }
 
 export type SituacaoDaSobra = 'sobra' | 'conferir' | 'acima' | 'executada' | 'semValor';
@@ -38,6 +45,8 @@ export interface SobraDaEmenda {
   sobra: number;
   /** Linhas dos pedidos empenhados ainda sem nota ligada (só pesa quando o empenhado vem das notas). */
   linhasSemNota: number;
+  /** Notas da SENASP no Portal que o sistema ainda não tem (o empenhado fica a menos). */
+  notasSemValor: number;
   situacao: SituacaoDaSobra;
 }
 
@@ -94,8 +103,10 @@ export function sobraDasEmendas(opts: {
       }
     }
     const doPortal = portal.get(codigo);
-    const peloPortal = Boolean(doPortal?.encontrada && doPortal.valorEmpenhado != null);
-    const empenhado = arredondar(peloPortal ? doPortal!.valorEmpenhado! : [...porNota.values()].reduce((s, v) => s + v, 0));
+    // Só as notas da SENASP (migration 205): o empenhado do Portal é o da emenda inteira, de todos os órgãos.
+    const peloPortal = Boolean(doPortal?.notasSenasp != null && doPortal.empenhadoSenasp != null);
+    const notasSemValor = peloPortal ? doPortal!.notasSemValor ?? 0 : 0;
+    const empenhado = arredondar(peloPortal ? doPortal!.empenhadoSenasp! : [...porNota.values()].reduce((s, v) => s + v, 0));
     emAndamento = arredondar(emAndamento);
     const sobra = valor == null ? 0 : arredondar(valor - empenhado - emAndamento);
     const situacao: SituacaoDaSobra =
@@ -103,7 +114,7 @@ export function sobraDasEmendas(opts: {
         ? 'semValor'
         : empenhado - valor > CENTAVO
           ? 'acima'
-          : !peloPortal && linhasSemNota > 0
+          : (!peloPortal && linhasSemNota > 0) || notasSemValor > 0
             ? 'conferir'
             : sobra >= (minimo ?? 0.01)
               ? 'sobra'
@@ -120,6 +131,7 @@ export function sobraDasEmendas(opts: {
       emAndamento,
       sobra,
       linhasSemNota,
+      notasSemValor,
       situacao
     });
   }

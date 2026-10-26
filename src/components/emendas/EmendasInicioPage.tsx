@@ -577,7 +577,7 @@ export const EmendasInicioPage: React.FC = () => {
         <PainelGaveta
           id="sobraEmenda"
           subtitulo="Clique na linha para abrir a emenda em Pedidos › Por autor."
-          hint="Emendas do ano com sobra que compra pelo menos o item mais barato que a CAEP ainda oferece: valor no SIOP menos o empenhado (Portal da Transparência ou notas ligadas) e o que está em andamento. O que não for empenhado até o fim do ano perde o crédito."
+          hint="Emendas do ano com sobra que compra pelo menos o item mais barato que a CAEP ainda oferece: valor no SIOP menos o empenhado pela SENASP (notas da emenda no Portal da Transparência, ou as ligadas no sistema) e o que está em andamento. O que não for empenhado até o fim do ano perde o crédito."
           onFechar={fecharGaveta}
         >
           {sobras.length === 0 ? (
