@@ -17,7 +17,7 @@ const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null, siopEmendaAno: null,
   siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
   empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null, ...extra
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
 });
 const nota = (linhaId: string): NotaDaLinha => ({
   linhaId, nota: '2026NE000001', regra: 'CONTRATO', motivo: null, contractKey: null, empenhoId: 'e1',

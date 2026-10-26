@@ -3,7 +3,7 @@
  * credor que o fornecedor da ata do item, e a nota de emenda da UG 200330 cuja emenda nenhum pedido tem. Os dois
  * avisos são marcados como resolvidos com justificativa pelo mesmo ✓ Resolvido do empenhado × pedido (tipo EMPENHO).
  */
-import type { CredorDiferente, ItemCaep, NotaSemPedido } from '../services/emendasService';
+import type { CredorDiferente, ItemCaep, NotaSemPedido, PedidoProvavel } from '../services/emendasService';
 import type { AvisoPedido } from './emendasPedidos';
 import { nomeDoItemConferido } from './emendasEmpenho';
 
@@ -65,3 +65,84 @@ export function avisoDeCredor(grupos: CredorNoPedido[] | undefined): AvisoPedido
 /** Notas de emenda sem pedido ainda não marcadas como resolvidas, da maior para a menor. */
 export const notasSemPedidoPendentes = (lista: NotaSemPedido[], resolvidas: { has: (chave: string) => boolean }): NotaSemPedido[] =>
   lista.filter((n) => !resolvidas.has(chaveNotaSemPedido(n))).sort((a, b) => b.valorEmpenhado - a.valorEmpenhado);
+
+// ------------------------------------------------------------------------------
+// Várias emendas por pedido (migration 211)
+// ------------------------------------------------------------------------------
+
+/** Nota e itens do pedido com o mesmo valor: até 5 centavos de diferença, como na regra das notas (migration 192). */
+export const valorIgual = (a: number, b: number): boolean => Math.abs(a - b) <= 0.05 + 1e-9;
+
+/** O pedido sugerido para a emenda: o que tem mais notas com o valor igual ao dos itens do fornecedor ainda sem nota. */
+export interface SugestaoDePedido {
+  pedidoId: string;
+  pedidoNumero: number;
+  autorId: string | null;
+  pedidoEmenda: string | null;
+  pedidoEmendaAno: number | null;
+  /** Notas da emenda com o valor igual aos itens do fornecedor no pedido. */
+  iguais: number;
+  mesmoCodigo: boolean;
+}
+
+/** As notas sem pedido de uma emenda (ano + nº): vão juntas para o mesmo pedido. */
+export interface EmendaSemPedido {
+  chave: string;
+  emenda: string;
+  ano: number | null;
+  planoInterno: string | null;
+  notas: NotaSemPedido[];
+  valor: number;
+  sugestao: SugestaoDePedido | null;
+  /** Sem sugestão: quantos pedidos empatam com notas de valor igual (0 = nenhum pedido parecido). */
+  empatados: number;
+}
+
+/** Como o pedido confere com a nota: a linha do pedido provável daquele pedido, se houver. */
+export const pedidoDaNota = (n: NotaSemPedido, pedidoId: string): PedidoProvavel | undefined => n.pedidosProvaveis.find((c) => c.pedidoId === pedidoId);
+
+/**
+ * Notas sem pedido pendentes agrupadas por emenda, da de maior valor à menor. O pedido sugerido tem mais notas de valor
+ * igual; no empate, vale o do mesmo código de autor; se ainda empatar, não há sugestão (o gestor escolhe).
+ */
+export function notasSemPedidoPorEmenda(lista: NotaSemPedido[], resolvidas: { has: (chave: string) => boolean }): EmendaSemPedido[] {
+  const grupos = new Map<string, NotaSemPedido[]>();
+  for (const n of notasSemPedidoPendentes(lista, resolvidas)) {
+    const chave = `${n.emendaAno ?? ''}|${n.emenda}`;
+    grupos.set(chave, [...(grupos.get(chave) ?? []), n]);
+  }
+  return [...grupos.entries()]
+    .map(([chave, notas]) => {
+      const placar = new Map<string, SugestaoDePedido>();
+      for (const n of notas) {
+        for (const c of n.pedidosProvaveis) {
+          if (!valorIgual(c.valorSemNota, n.valorEmpenhado)) continue;
+          const atual = placar.get(c.pedidoId) ?? {
+            pedidoId: c.pedidoId,
+            pedidoNumero: c.pedidoNumero,
+            autorId: c.autorId,
+            pedidoEmenda: c.pedidoEmenda,
+            pedidoEmendaAno: c.pedidoEmendaAno,
+            iguais: 0,
+            mesmoCodigo: c.mesmoCodigo
+          };
+          atual.iguais += 1;
+          placar.set(c.pedidoId, atual);
+        }
+      }
+      const ordem = [...placar.values()].sort((a, b) => b.iguais - a.iguais || Number(b.mesmoCodigo) - Number(a.mesmoCodigo));
+      const [primeiro, segundo] = ordem;
+      const empata = segundo && segundo.iguais === primeiro.iguais && segundo.mesmoCodigo === primeiro.mesmoCodigo;
+      return {
+        chave,
+        emenda: notas[0].emenda,
+        ano: notas[0].emendaAno,
+        planoInterno: notas[0].planoInterno,
+        notas,
+        valor: notas.reduce((t, n) => t + n.valorEmpenhado, 0),
+        sugestao: primeiro && !empata ? primeiro : null,
+        empatados: primeiro && empata ? ordem.filter((x) => x.iguais === primeiro.iguais && x.mesmoCodigo === primeiro.mesmoCodigo).length : 0
+      };
+    })
+    .sort((a, b) => b.valor - a.valor);
+}

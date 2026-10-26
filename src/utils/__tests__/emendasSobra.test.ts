@@ -16,7 +16,7 @@ const pedido = (numero: number, etapa: PedidoEmenda['etapa'], linhas: LinhaPedid
   siopEmenda: '43600002', siopEmendaAno: 2026, siopValor: 10000, siopGnd: 'GND-4', conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null,
   autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null, empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [],
   canceladoEm: null, canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas, devolucoes: [], documentos: [], pedidoOrigemId: null,
-  pedidoOrigemNumero: null, anulacoes: [], emendaId: null, ...extra
+  pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
 });
 const nota = (linhaId: string, n: string, valor: number): NotaDaLinha => ({
   linhaId, nota: n, regra: 'FORNECEDOR', motivo: null, contractKey: null, empenhoId: `e-${n}`, valorEmpenhado: valor, valorLiquidado: 0, valorPago: 0, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: null, atualizadoEm: null

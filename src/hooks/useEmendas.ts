@@ -21,6 +21,8 @@ import {
   fetchConferenciaEmpenho,
   fetchCredorDiferente,
   fetchNotasSemPedido,
+  ligarEmendaAoPedido,
+  removerEmendaDoPedido,
   salvarPedidoEmenda,
   avancarPedidoEmenda,
   cancelarPedidoEmenda,
@@ -177,6 +179,25 @@ export function useCredorDiferente({ enabled = true }: LeituraOpcional = {}) {
 /** Notas de emenda da UG 200330 cuja emenda nenhum pedido tem (migration 190). */
 export function useNotasSemPedido() {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'notas-sem-pedido'], queryFn: fetchNotasSemPedido, staleTime: 5 * 60_000 });
+}
+
+/** Ligar ou tirar uma emenda do pedido religa as notas: recarrega pedidos, notas e conferências (migration 211). */
+export function useLigarEmendaAoPedido() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: Parameters<typeof ligarEmendaAoPedido>[0]) => ligarEmendaAoPedido(p),
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS] })
+  });
+}
+
+export function useRemoverEmendaDoPedido() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: { id: string; versao: number }) => removerEmendaDoPedido(p.id, p.versao),
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS] })
+  });
 }
 
 /** Pedido mexe no saldo: recarrega pedidos, reservado e kits (kits possíveis). */
