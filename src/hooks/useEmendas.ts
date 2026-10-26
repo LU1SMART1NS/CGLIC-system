@@ -28,6 +28,13 @@ import {
   fetchExecucaoEmendas,
   informarSolicitacaoDaAta,
   registrarEnvioCgofi,
+  fetchEmendasSiop,
+  fetchContatosDasEmendas,
+  fetchAsparDosOrgaos,
+  salvarEmendaSiop,
+  apagarEmendaSiop,
+  registrarContatoEmenda,
+  salvarAsparEmenda,
   type AcaoPedido,
   type CredorDiferente,
   type BeneficiarioEmenda,
@@ -214,6 +221,47 @@ export function useRegistrarAnulacao() {
 export function useCancelarPedido() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: (v: { id: string; versao: number; motivo: string }) => cancelarPedidoEmenda(v.id, v.versao, v.motivo), retry: 0, onSettled: invalidar });
+}
+
+/** Emendas vistas no SIOP (migration 205): todos os que leem as emendas. */
+export function useEmendasSiop({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-siop'], queryFn: fetchEmendasSiop, enabled });
+}
+
+/** Contatos das emendas e ASPAR dos órgãos: só quem trata com eles, coordenador e gestor de emendas (o banco também). */
+export function useContatosDasEmendas({ enabled = true }: LeituraOpcional = {}) {
+  const podeGerir = usePodeGerirEmendas();
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-contatos'], queryFn: fetchContatosDasEmendas, enabled: enabled && podeGerir });
+}
+
+export function useAsparDosOrgaos() {
+  const podeGerir = usePodeGerirEmendas();
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'aspar'], queryFn: fetchAsparDosOrgaos, enabled: podeGerir });
+}
+
+/** Emenda nova ou alterada mexe na lista e nos avisos: recarrega tudo de Emendas, como o pedido. */
+export function useSalvarEmendaSiop() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: salvarEmendaSiop, retry: 0, onSettled: invalidar });
+}
+
+export function useApagarEmendaSiop() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: (v: { id: string; versao: number }) => apagarEmendaSiop(v.id, v.versao), retry: 0, onSettled: invalidar });
+}
+
+export function useRegistrarContatoEmenda() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { emendaId: string; contato: Parameters<typeof registrarContatoEmenda>[1] }) => registrarContatoEmenda(v.emendaId, v.contato),
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'emendas-contatos'] })
+  });
+}
+
+export function useSalvarAspar() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: salvarAsparEmenda, retry: 0, onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'aspar'] }) });
 }
 
 /** Hoje no horário de Brasília (AAAA-MM-DD). */

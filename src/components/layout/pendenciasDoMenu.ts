@@ -14,8 +14,11 @@ export interface FontesDoMenu {
   extras: ContagensExtras;
   /** UASGs sem grupo (GTI) confirmado, com e sem sugestão; só o coordenador recebe número. */
   gruposUasgs?: { aConfirmar: number; semSugestao: number } | null;
-  /** Pedidos de emenda com algum aviso e, deles, os com aviso vermelho; só o coordenador e o gestor de emendas recebem número. */
-  emendas?: { total: number; urgentes: number } | null;
+  /**
+   * Pedidos de emenda com algum aviso mais as emendas sem pedido (migration 205) e, deles, os com aviso vermelho; só o
+   * coordenador e o gestor de emendas recebem número. `semPedido` diz quantas do total são emendas sem pedido.
+   */
+  emendas?: { total: number; urgentes: number; semPedido?: number } | null;
 }
 
 /**
@@ -50,7 +53,13 @@ export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, em
 
   // Emendas (padrão do Financeiro): pedidos com algum aviso; vermelho com aviso vermelho (prazo de indicação vencido, ata
   // encerrada…). Abre Pedidos em "Com algum aviso".
-  if (emendas && emendas.total > 0) r.emendas = { contagem: emendas.total, vermelho: emendas.urgentes > 0, destino: '/emendas/pedidos?aviso=com' };
+  if (emendas && emendas.total > 0)
+    r.emendas = {
+      contagem: emendas.total,
+      vermelho: emendas.urgentes > 0,
+      // Só emendas sem pedido: o clique abre a lista delas; com pedidos com aviso, a lista dos pedidos.
+      destino: emendas.semPedido && emendas.semPedido === emendas.total ? '/emendas/pedidos?ver=emenda' : '/emendas/pedidos?aviso=com'
+    };
 
   // Ajustes (coordenador): UASGs sem grupo confirmado; abre em "A confirmar" e, sem nenhuma lá, em "Sem sugestão".
   const aConfirmar = gruposUasgs?.aConfirmar ?? 0;

@@ -1,7 +1,7 @@
 import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
-import type { AutorEmenda, ItemCaep, LinhaPedido, PedidoEmenda } from '../../../services/emendasService';
+import type { AutorEmenda, ContatoDaEmenda, EmendaSiop, ItemCaep, LinhaPedido, PedidoEmenda } from '../../../services/emendasService';
 
 const item: ItemCaep = {
   itemKey: 'a', numeroAta: '00031/2025', codigoUasg: '200331', numeroItem: '00001', descricao: 'Viatura', codigoPdm: 1,
@@ -17,7 +17,7 @@ const pedido = (id: string, autorId: string | null, etapa: PedidoEmenda['etapa']
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null, siopEmendaAno: null,
   siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
   empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: []
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null
 });
 const autor = (id: string, nome: string, tipo: AutorEmenda['tipo']): AutorEmenda => ({ id, nome, tipo, nomeCivil: null, partido: 'PX', uf: 'SP', emExercicio: true, legislatura: 57, lidoEm: null });
 
@@ -25,6 +25,14 @@ const COM_CONTATO = { ...pedido('p1', 'A1', 'OFICIO', 3), contatoNome: 'Maria da
 const PEDIDOS = [COM_CONTATO, pedido('p2', 'A1', 'EMPENHADO', 2), pedido('p3', 'A2', 'RESERVADO', 1), pedido('p4', null, 'RESERVADO', 4)];
 const ITENS: ItemCaep[] = [item];
 const AUTORES = [autor('A1', 'Deputado Um', 'DEPUTADO'), autor('A2', 'Senadora Dois', 'SENADOR'), autor('A3', 'Bancada Três', 'BANCADA')];
+
+const emendaSiop = (id: string, numero: string, vistaEm: string): EmendaSiop => ({
+  id, ano: 2026, numero, autorId: 'A2', valor: 500_000, gnd: 'GND-4', beneficiarioId: null, objeto: null, vistaEm, observacao: null, versao: 1, criadoPorNome: null
+});
+const EMENDAS = [emendaSiop('e1', '42680021', '2026-10-10'), emendaSiop('e2', '42680022', '2026-10-20')];
+const CONTATOS: ContatoDaEmenda[] = [
+  { id: 'c1', emendaId: 'e2', contatoEm: '2026-10-21', comQuem: 'ASPAR · PM · SP', meio: 'WHATSAPP', resumo: 'vão mandar os itens', criadoPorNome: null, criadoEm: '2026-10-21T12:00:00Z' }
+];
 
 const perfil = vi.hoisted(() => ({ gerir: true }));
 
@@ -40,6 +48,10 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useKitsEmendas: () => ({ data: [] }),
   usePodeGerirEmendas: () => perfil.gerir,
   usePodeVerContratos: () => false,
+  useEmendasSiop: () => ({ data: EMENDAS, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
+  useContatosDasEmendas: () => ({ data: CONTATOS }),
+  useAsparDosOrgaos: () => ({ data: [] }),
+  useApagarEmendaSiop: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useExecucaoEmendas: () => ({ data: [] })
 }));
 vi.mock('../PedidoModal', () => ({ PedidoModal: () => null }));
@@ -276,5 +288,27 @@ describe('Pedidos: situação por linha, blocos por ata e O que falta (migration
     expect(html).toContain('background:var(--primary-light)');
     expect(html).toContain('emendas-item-link');
     expect(html).toContain('/atas/detalhe/00031%2F2025-200331/itens/00001?aba=emendas');
+  });
+
+  it('?ver=emenda: emendas vistas no SIOP sem pedido, a mais antiga sem contato urgente (decisão de 26/10/2026)', () => {
+    perfil.gerir = true;
+    const html = render('/?ver=emenda');
+    expect(html).toContain('emendas-por-emenda-tabela');
+    expect(html).not.toContain('emendas-pedidos-tabela');
+    expect(html).toContain('Registrar emenda do SIOP');
+    expect(html).toContain('4268 0021');
+    expect(html).toContain('Sem pedido · sem contato');
+    expect(html).toContain('13 dias sem contato');
+    expect(html).toContain('Sem pedido · em conversa');
+    expect(html).toContain('ASPAR · PM · SP');
+  });
+
+  it('?ver=emenda para a consulta: sem o botão de registrar e sem a coluna dos contatos', () => {
+    perfil.gerir = false;
+    const html = render('/?ver=emenda');
+    expect(html).toContain('4268 0021');
+    expect(html).not.toContain('Registrar emenda do SIOP');
+    expect(html).not.toContain('Último contato');
+    perfil.gerir = true;
   });
 });
