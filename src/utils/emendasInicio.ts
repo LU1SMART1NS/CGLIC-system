@@ -1,7 +1,7 @@
 /**
  * Início do gestor de emendas (protótipo aprovado em 23/10/2026): o que pede atenção nos pedidos e no saldo da CAEP.
  * Usa os mesmos avisos da lista de Pedidos (avisosDoPedido); as contas novas são o saldo livre perto do fim da ata e os
- * itens que chegaram à CAEP sem nome curto (no quadro do parlamentar sai o começo da descrição do catálogo).
+ * itens que chegaram à CAEP sem o nome da ata assinada (no quadro do parlamentar sai o começo da descrição do catálogo).
  */
 import type { ConferenciaEmpenho, EtapaPedido, ItemCaep, NotaDaLinha, PedidoEmenda } from '../services/emendasService';
 import { avisoIndicacaoDias, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte } from './emendasKits';
@@ -54,7 +54,7 @@ export interface ResumoInicioEmendas {
   reservado: number;
   livre: number;
   livrePertoDoFim: ItemLivrePertoDoFim[];
-  /** Itens com alocação para a CAEP em ata vigente e sem nome curto: a CAEP cadastra antes de oferecer ao parlamentar. */
+  /** Itens com alocação para a CAEP em ata vigente e sem o nome da ata assinada: a CAEP cadastra antes de oferecer ao parlamentar. */
   semNomeCurto: ItemCaep[];
 }
 

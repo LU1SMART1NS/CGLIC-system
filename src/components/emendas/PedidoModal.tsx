@@ -243,7 +243,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const itensEncontrados = filtro === 'kits' ? [] : buscarItensCaep(itens.filter((i) => !i.ataEncerrada), busca);
   // Ata a menos do corte do fim (migration 162): aparece na busca, mas não pode ser escolhida.
   const foraDoPrazo = (i: ItemCaep) => Boolean(i.vigenciaFinal) && passouDoCorte(diasEntre(hoje, i.vigenciaFinal!));
-  // Quem cadastra o nome curto (Emendas › Itens) vê quais itens ainda saem no quadro pelo começo da descrição.
+  // Quem cadastra o nome na ata assinada (Emendas › Itens) vê quais itens ainda saem no quadro pelo começo da descrição.
   const avisarSemNomeCurto = usePodeGerirEmendas();
   const podeItem = (i: ItemCaep) => !foraDoPrazo(i) && livre(i.itemKey) > 0;
 
@@ -651,8 +651,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                       {avisarSemNomeCurto && !i.nomeCurto?.trim() && (
                         <>
                           {' · '}
-                          <span className="reserva-sem-nome-curto" title="Cadastre o nome curto em Emendas › Itens. Sem ele, o quadro do parlamentar usa o começo da descrição.">
-                            sem nome curto
+                          <span className="reserva-sem-nome-curto" title="Cadastre o nome na ata assinada em Emendas › Itens. Sem ele, o quadro do parlamentar usa o começo da descrição.">
+                            sem nome da ata assinada
                           </span>
                         </>
                       )}
