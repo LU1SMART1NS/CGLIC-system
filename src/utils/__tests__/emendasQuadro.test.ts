@@ -94,7 +94,7 @@ describe('quadro da reserva (Anexo)', () => {
 
   it('Tabela (Word e SEI): 6 colunas, item com ata embaixo, beneficiário com sigla e razão social, entrega com endereço e TOTAL A EMPENHAR', () => {
     const html = htmlDaTabela(q);
-    for (const h of ['ITEM', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
+    for (const h of ['OBJETO', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
     expect(html.match(/<th /g)).toHaveLength(6);
     // Título embaixo da tabela; sem fonte, notas nem a marca da nota no preço.
     expect(html.startsWith('<table')).toBe(true);

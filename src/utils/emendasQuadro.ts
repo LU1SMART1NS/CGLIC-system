@@ -1,7 +1,7 @@
 /**
  * Quadro da reserva para o parlamentar (migration 165), fora da tela para poder testar.
  *
- * Formato do Anexo que a CAEP já usa, em 6 colunas: ITEM (nome, e embaixo a ata e o item) · BENEFICIÁRIO FINAL (nome e
+ * Formato do Anexo que a CAEP já usa, em 6 colunas: OBJETO (nome, e embaixo a ata e o item) · BENEFICIÁRIO FINAL (nome e
  * sigla, e embaixo a razão social) · LOCAL DE ENTREGA (cidade, e embaixo o endereço) · QTD · VR UNITÁRIO · VR TOTAL, uma
  * linha por item e beneficiário, kit aberto nos seus itens e somado ao mesmo item avulso, fechando com TOTAL A EMPENHAR. O mesmo item para vários
  * beneficiários sai junto, com o nome e o valor unitário uma vez só (células juntadas na tabela). O valor
@@ -310,9 +310,9 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
 
 const escapar = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const A_DEFINIR = 'a definir';
-export const COLUNAS = ['ITEM', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL'];
+export const COLUNAS = ['OBJETO', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL'];
 
-/** "Ata 00043/2026 · item 00005", a linha de baixo da coluna ITEM. */
+/** "Ata 00043/2026 · item 00005", a linha de baixo da coluna OBJETO. */
 export const ataEItem = (l: Pick<LinhaQuadro, 'ata' | 'item'>): string | null => (l.ata ? `Ata ${l.ata} · item ${l.item}` : null);
 
 /** "10º Batalhão de Polícia Militar · 10º BPM" em texto corrido (WhatsApp). */
