@@ -10,7 +10,7 @@ import { carteiraDetalhe, carteiraIdentificacao } from '../carteira/carteiraStyl
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useAsparDosOrgaos } from '../../hooks/useEmendas';
 import { NOME_ORGAO_ASPAR, ORGAOS_ASPAR } from '../../utils/emendasSemPedido';
-import { formatarTelefone, type AsparDoOrgao, type OrgaoAspar } from '../../services/emendasService';
+import { type AsparDoOrgao, type OrgaoAspar } from '../../services/emendasService';
 import { AsparModal } from './AsparModal';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 
