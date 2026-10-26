@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Contact } from 'lucide-react';
+import { Contact, Mail, MessageCircle, Phone } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
@@ -38,12 +38,13 @@ export const EmendasAsparPage: React.FC = () => {
   const cadastrados = data.length;
 
   const colunas: Column<LinhaUf>[] = [
-    { key: 'uf', header: 'UF', priority: 'primary', nowrap: true, render: (l) => <span style={carteiraIdentificacao}>{l.uf}</span> },
+    { key: 'uf', header: 'UF', align: 'center', priority: 'primary', nowrap: true, render: (l) => <span style={carteiraIdentificacao}>{l.uf}</span> },
     ...ORGAOS_ASPAR.map(
       (o): Column<LinhaUf> => ({
         key: o,
         header: o,
         minWidth: '150px',
+        align: 'center',
         render: (l) => {
           const a = l.porOrgao[o];
           return (
@@ -52,13 +53,19 @@ export const EmendasAsparPage: React.FC = () => {
               variant="link"
               onClick={() => setEditando({ uf: l.uf, orgao: o })}
               title={`${NOME_ORGAO_ASPAR[o]} · ${l.uf}`}
-              style={{ textAlign: 'left', whiteSpace: 'normal' }}
+              style={{ textAlign: 'center', whiteSpace: 'normal' }}
               data-testid={`emendas-aspar-${l.uf}-${o}`}
             >
               {a ? (
-                <span style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <span>{a.nome}</span>
-                  {a.telefone && <span style={carteiraDetalhe}>{formatarTelefone(a.telefone)}</span>}
+                  {(a.telefone || a.email) && (
+                    <span style={{ display: 'inline-flex', gap: 8, color: 'var(--primary)' }}>
+                      {a.telefone && a.whatsapp && <MessageCircle size={15} aria-label="WhatsApp" role="img"><title>{`WhatsApp ${formatarTelefone(a.telefone)}`}</title></MessageCircle>}
+                      {a.telefone && !a.whatsapp && <Phone size={15} aria-label="Telefone" role="img"><title>{`Telefone ${formatarTelefone(a.telefone)}`}</title></Phone>}
+                      {a.email && <Mail size={15} aria-label="E-mail" role="img"><title>{`E-mail ${a.email}`}</title></Mail>}
+                    </span>
+                  )}
                 </span>
               ) : (
                 <span style={carteiraDetalhe}>a cadastrar</span>
