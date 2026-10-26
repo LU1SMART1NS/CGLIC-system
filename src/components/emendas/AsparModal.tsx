@@ -5,6 +5,7 @@ import { AppInput } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { useSalvarAspar } from '../../hooks/useEmendas';
 import { NOME_ORGAO_ASPAR } from '../../utils/emendasSemPedido';
+import { linkDoWhatsapp } from '../../utils/emendasBeneficiarios';
 import { formatarTelefone, soDigitos, type AsparDoOrgao, type OrgaoAspar } from '../../services/emendasService';
 
 interface Props {
@@ -21,7 +22,6 @@ export const AsparModal: React.FC<Props> = ({ uf, orgao, atual, onClose }) => {
   const [nome, setNome] = useState(atual?.nome ?? '');
   const [cargo, setCargo] = useState(atual?.cargo ?? '');
   const [telefone, setTelefone] = useState(atual?.telefone ? formatarTelefone(atual.telefone) : '');
-  const [whatsapp, setWhatsapp] = useState(atual?.whatsapp ?? false);
   const [email, setEmail] = useState(atual?.email ?? '');
   const [tentou, setTentou] = useState(false);
   const tel = soDigitos(telefone);
@@ -30,6 +30,8 @@ export const AsparModal: React.FC<Props> = ({ uf, orgao, atual, onClose }) => {
 
   const gravar = async (apagar: boolean) => {
     try {
+      // Celular (DDD + 9) é o que tem WhatsApp, como no cadastro dos beneficiários; a tela não pergunta.
+      const whatsapp = Boolean(linkDoWhatsapp(tel));
       await salvar.mutateAsync({ uf, orgao, nome: apagar ? '' : nome.trim(), cargo: cargo.trim() || null, telefone: tel || null, whatsapp, email: email.trim() || null });
       toast.success(apagar ? 'Contato tirado.' : 'Contato da ASPAR salvo.');
       onClose();
@@ -64,12 +66,8 @@ export const AsparModal: React.FC<Props> = ({ uf, orgao, atual, onClose }) => {
       <form id="emendas-aspar-form" onSubmit={enviar} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.75rem' }}>
         <AppInput label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} error={tentou && !nome.trim() ? 'Informe o nome.' : undefined} data-testid="emendas-aspar-nome" />
         <AppInput label="Cargo" value={cargo} onChange={(e) => setCargo(e.target.value)} data-testid="emendas-aspar-cargo" />
-        <AppInput label="Telefone" inputMode="tel" placeholder="(61) 99999-0000" value={telefone} onChange={(e) => setTelefone(e.target.value)} error={tentou && telefoneRuim ? 'DDD e 8 ou 9 dígitos.' : undefined} data-testid="emendas-aspar-telefone" />
+        <AppInput label="Telefone" inputMode="tel" placeholder="(61) 99999-0000" value={telefone} onChange={(e) => setTelefone(e.target.value)} error={tentou && telefoneRuim ? 'DDD e 8 ou 9 dígitos.' : undefined} hint="Celular abre o WhatsApp no cartão." data-testid="emendas-aspar-telefone" />
         <AppInput label="E-mail institucional" type="email" value={email} onChange={(e) => setEmail(e.target.value)} error={tentou && emailRuim ? 'E-mail inválido.' : undefined} data-testid="emendas-aspar-email" />
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem' }}>
-          <input type="checkbox" checked={whatsapp} onChange={(e) => setWhatsapp(e.target.checked)} data-testid="emendas-aspar-whatsapp" />
-          O telefone tem WhatsApp
-        </label>
       </form>
     </Modal>
   );
