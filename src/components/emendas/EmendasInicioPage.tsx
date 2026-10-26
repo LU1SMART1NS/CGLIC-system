@@ -26,6 +26,7 @@ import {
   useAutoresEmendas,
   useCredorDiferente,
   useDiferencasDeEmpenho,
+  useExecucaoEmendas,
   useItensCaep,
   useNotasDasLinhas,
   useNotasSemPedido,
@@ -46,12 +47,15 @@ import {
   linhasAtivas,
   numeroDaEmendaEmTexto,
   ORDEM_ETAPA,
+  reservadoPorItem,
   ROTULO_AVISO,
   ROTULO_ETAPA,
   TIPOS_AVISO,
   type TipoAviso
 } from '../../utils/emendasPedidos';
 import { nomeDoItem } from '../../utils/emendasQuadro';
+import { menorPrecoDisponivel, sobraDasEmendas, type ExecucaoNoPortal, type SobraDaEmenda } from '../../utils/emendasSobra';
+import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { prazoDoAviso, resumoInicioEmendas, type ItemLivrePertoDoFim, type PedidoComAviso } from '../../utils/emendasInicio';
 import type { AutorEmenda, EtapaPedido, ItemCaep, NotaDaLinha, NotaSemPedido } from '../../services/emendasService';
 import { AutorDoPedido, ItemDaAta } from './emendasPartes';
@@ -63,7 +67,8 @@ type Segmento = 'graves' | 'atencao' | 'todas';
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 const SEM_NOTAS_SEM_PEDIDO: NotaSemPedido[] = [];
 const POR_PAGINA = 25;
-const GAVETAS: PainelGavetaId[] = ['saldoLivre', 'empenhoAConferir', 'notasSemPedido', 'semNomeCurto'];
+const GAVETAS: PainelGavetaId[] = ['saldoLivre', 'empenhoAConferir', 'notasSemPedido', 'sobraEmenda', 'semNomeCurto'];
+const SEM_PORTAL: ExecucaoNoPortal[] = [];
 const chave = (l: PedidoComAviso) => l.pedido.id;
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -133,6 +138,21 @@ export const EmendasInicioPage: React.FC = () => {
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
   const aConferir = useMemo(() => emendasAConferir(conferencia, itens), [conferencia, itens]);
   const pedidoPorId = useMemo(() => new Map(pedidos.map((p) => [p.id, p])), [pedidos]);
+  // Sobra das emendas do ano (migration 204): as que compram pelo menos o item mais barato que a CAEP ainda oferece.
+  const { precos } = usePrecosParaEmenda();
+  const { data: portal = SEM_PORTAL } = useExecucaoEmendas();
+  const sobras = useMemo(() => {
+    const minimo = menorPrecoDisponivel(itens, reservadoPorItem(pedidos), precos);
+    return sobraDasEmendas({ pedidos, ano: Number(hoje.slice(0, 4)), itens, notas, portal: new Map(portal.map((x) => [x.codigo, x])), precos, minimo }).filter((e) => e.situacao === 'sobra');
+  }, [pedidos, hoje, itens, notas, portal, precos]);
+  const valorDasSobras = sobras.reduce((t, e) => t + e.sobra, 0);
+  const colunasSobra: Column<SobraDaEmenda>[] = [
+    { key: 'autor', header: 'Parlamentar', priority: 'primary', minWidth: '200px', render: (e) => <AutorDoPedido autor={e.autorId ? autorPorId.get(e.autorId) : undefined} autorId={e.autorId} destaque /> },
+    { key: 'emenda', header: 'Emenda', nowrap: true, render: (e) => <span style={carteiraNumero}>{`${numeroDaEmendaEmTexto(e.emenda)} / ${e.ano}`}</span> },
+    { key: 'pedidos', header: 'Pedidos', render: (e) => <span style={carteiraDetalhe}>{e.pedidos.map((p) => p.numero).join(', ')}</span> },
+    { key: 'sobra', header: 'Sobra', align: 'right', nowrap: true, render: (e) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(e.sobra)}</span> },
+    { key: 'prazo', header: 'Prazo', nowrap: true, render: (e) => <span style={carteiraDetalhe}>empenhar até 31/12/{e.ano}</span> }
+  ];
 
   // Item do aviso ou o primeiro item do pedido: o mesmo que a coluna Item · ata mostra.
   const itemDaLinha = useCallback(
@@ -453,6 +473,11 @@ export const EmendasInicioPage: React.FC = () => {
             atencao: semPedido.length > 0
           },
           {
+            id: 'sobraEmenda',
+            resumo: carregando ? undefined : sobras.length === 0 ? 'nenhuma' : `${plural(sobras.length, 'emenda', 'emendas')} · ${formatCurrencyCompact(valorDasSobras)}`,
+            atencao: sobras.length > 0
+          },
+          {
             id: 'semNomeCurto',
             resumo: carregando ? undefined : r.semNomeCurto.length === 0 ? 'todos com nome' : `${plural(r.semNomeCurto.length, 'item', 'itens')} sem nome`,
             atencao: r.semNomeCurto.length > 0
@@ -478,6 +503,27 @@ export const EmendasInicioPage: React.FC = () => {
               keyExtractor={(x) => x.item.itemKey}
               columns={colunasLivre}
               rowOpen={(x) => () => navigate(`/emendas/itens?busca=${encodeURIComponent(`${x.item.numeroAta} item ${Number(x.item.numeroItem)}`)}`)}
+            />
+          )}
+        </PainelGaveta>
+      )}
+      {gavetaAberta === 'sobraEmenda' && (
+        <PainelGaveta
+          id="sobraEmenda"
+          subtitulo="Clique na linha para abrir a emenda em Pedidos › Por autor."
+          hint="Emendas do ano com sobra que compra pelo menos o item mais barato que a CAEP ainda oferece: valor no SIOP menos o empenhado (Portal da Transparência ou notas ligadas) e o que está em andamento. O que não for empenhado até o fim do ano perde o crédito."
+          onFechar={fecharGaveta}
+        >
+          {sobras.length === 0 ? (
+            <EmptyState title={carregando ? 'Carregando…' : 'Nenhuma emenda do ano com sobra para novo pedido.'} testId="emendas-inicio-sobra-vazio" />
+          ) : (
+            <DataTable<SobraDaEmenda>
+              testId="emendas-inicio-sobra"
+              className="data-table-container--flush"
+              data={sobras}
+              keyExtractor={(e) => e.codigo}
+              columns={colunasSobra}
+              rowOpen={(e) => () => navigate(`/emendas/pedidos?ver=autor&emenda=${e.codigo}`)}
             />
           )}
         </PainelGaveta>

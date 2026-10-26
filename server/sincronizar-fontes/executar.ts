@@ -54,6 +54,11 @@ import {
   sincronizarNotasDasEmendasDoTesouro
 } from '../../src/services/notasEmendasTesouroSyncService';
 import {
+  contarExecucaoEmendasPendentes,
+  ORCAMENTO_EXECUCAO_EMENDAS_MS,
+  sincronizarExecucaoDasEmendas
+} from '../../src/services/execucaoEmendasPortalSyncService';
+import {
   contarReajusteAtasPendentes,
   ORCAMENTO_REAJUSTE_ATAS_MS,
   sincronizarReajusteAtas
@@ -69,12 +74,12 @@ import { lerAmbiente } from './ambiente';
  */
 export const ORCAMENTO_DE_TEMPO_MS = 100_000;
 
-export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias', 'cadastro_uasgs', 'itens_notas_siafi', 'saldo_contabil', 'autores_emendas', 'emendas_portal', 'reajuste_atas', 'notas_emendas_tesouro'] as const;
+export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias', 'cadastro_uasgs', 'itens_notas_siafi', 'saldo_contabil', 'autores_emendas', 'emendas_portal', 'reajuste_atas', 'notas_emendas_tesouro', 'execucao_emendas'] as const;
 export type RecursoDoServidor = (typeof RECURSOS_DO_SERVIDOR)[number];
 
 export interface PedidoDeSincronizacao {
   recurso: RecursoDoServidor;
-  /** Obrigatória para todos os recursos, exceto saldos_itens, cadastro_uasgs, autores_emendas, reajuste_atas e notas_emendas_tesouro, que valem para todas as carteiras. */
+  /** Obrigatória para todos os recursos, exceto saldos_itens, cadastro_uasgs, autores_emendas, reajuste_atas, notas_emendas_tesouro e execucao_emendas, que valem para todas as carteiras. */
   uasg?: string;
   /** Ignora a validade (só o coordenador). */
   forcar?: boolean;
@@ -123,6 +128,9 @@ export interface DependenciasDeExecucao {
   contarNotasEmendasTesouroPendentes: typeof contarNotasEmendasTesouroPendentes;
   /** Medição da API de emendas do Portal da Transparência (só em modo de teste: não grava nada). */
   medirEmendasDoPortal: typeof medirEmendasDoPortal;
+  /** Execução de cada emenda dos pedidos pelo Portal da Transparência (migration 204), uma vez por dia. */
+  sincronizarExecucaoDasEmendas: typeof sincronizarExecucaoDasEmendas;
+  contarExecucaoEmendasPendentes: typeof contarExecucaoEmendasPendentes;
   /** Chave da API do Portal da Transparência (segredo PORTAL_TRANSPARENCIA_CHAVE da Edge Function). */
   chaveDoPortal: () => string | undefined;
   buscarContratosNasFontes: typeof buscarContratosNasFontes;
@@ -190,6 +198,8 @@ const PADRAO: DependenciasDeExecucao = {
   sincronizarNotasDasEmendasDoTesouro,
   contarNotasEmendasTesouroPendentes,
   medirEmendasDoPortal,
+  sincronizarExecucaoDasEmendas,
+  contarExecucaoEmendasPendentes,
   chaveDoPortal: () => lerAmbiente('PORTAL_TRANSPARENCIA_CHAVE')?.trim() || undefined,
   buscarContratosNasFontes,
   fetchArpsDasFontes,
@@ -203,7 +213,7 @@ export function validarPedido(corpo: unknown): { ok: true; pedido: PedidoDeSincr
   if (typeof recurso !== 'string' || !(RECURSOS_DO_SERVIDOR as readonly string[]).includes(recurso)) {
     return { ok: false, erro: `Recurso inválido. Use: ${RECURSOS_DO_SERVIDOR.join(', ')}.` };
   }
-  if (recurso !== 'saldos_itens' && recurso !== 'cadastro_uasgs' && recurso !== 'autores_emendas' && recurso !== 'emendas_portal' && recurso !== 'reajuste_atas' && recurso !== 'notas_emendas_tesouro') {
+  if (recurso !== 'saldos_itens' && recurso !== 'cadastro_uasgs' && recurso !== 'autores_emendas' && recurso !== 'emendas_portal' && recurso !== 'reajuste_atas' && recurso !== 'notas_emendas_tesouro' && recurso !== 'execucao_emendas') {
     if (typeof uasg !== 'string' || !UASGS_CGLIC.includes(uasg.trim())) {
       return { ok: false, erro: `UASG inválida. Use: ${UASGS_CGLIC.join(', ')}.` };
     }
@@ -255,6 +265,8 @@ export async function executarPedido(
       consulta = await deps.contarReajusteAtasPendentes();
     } else if (pedido.recurso === 'notas_emendas_tesouro') {
       consulta = await deps.contarNotasEmendasTesouroPendentes(deps.chaveDoPortal());
+    } else if (pedido.recurso === 'execucao_emendas') {
+      consulta = await deps.contarExecucaoEmendasPendentes(deps.chaveDoPortal());
     } else if (pedido.recurso === 'emendas_portal') {
       consulta = await deps.medirEmendasDoPortal({ chave: deps.chaveDoPortal(), orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
     } else if (pedido.recurso === 'itens_notas_siafi') {
@@ -288,6 +300,8 @@ export async function executarPedido(
     resultado = await deps.sincronizarReajusteAtas({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_REAJUSTE_ATAS_MS, leitor: criarLeitorDeArquivos() });
   } else if (pedido.recurso === 'notas_emendas_tesouro') {
     resultado = await deps.sincronizarNotasDasEmendasDoTesouro({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_NOTAS_EMENDAS_TESOURO_MS, chave: deps.chaveDoPortal() });
+  } else if (pedido.recurso === 'execucao_emendas') {
+    resultado = await deps.sincronizarExecucaoDasEmendas({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_EXECUCAO_EMENDAS_MS, chave: deps.chaveDoPortal() });
   } else if (pedido.recurso === 'emendas_portal') {
     // Medição: só existe em modo de teste (dry); não há o que gravar.
     resultado = { status: 'ERRO', erro: 'emendas_portal só roda em modo de teste (dry).' };

@@ -25,6 +25,7 @@ import {
   avancarPedidoEmenda,
   cancelarPedidoEmenda,
   registrarAnulacaoEmpenho,
+  fetchExecucaoEmendas,
   informarSolicitacaoDaAta,
   registrarEnvioCgofi,
   type AcaoPedido,
@@ -198,6 +199,11 @@ export function useInformarSolicitacaoDaAta() {
 export function useRegistrarEnvioCgofi() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: registrarEnvioCgofi, retry: 0, onSettled: invalidar });
+}
+
+/** Execução de cada emenda pelo Portal da Transparência (migration 204), lida uma vez por dia pelo servidor. */
+export function useExecucaoEmendas({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'execucao-portal'], queryFn: fetchExecucaoEmendas, staleTime: 30 * 60_000, enabled });
 }
 
 export function useRegistrarAnulacao() {

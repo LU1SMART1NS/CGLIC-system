@@ -39,7 +39,8 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useBeneficiariosEmendas: () => ({ data: [] }),
   useKitsEmendas: () => ({ data: [] }),
   usePodeGerirEmendas: () => perfil.gerir,
-  usePodeVerContratos: () => false
+  usePodeVerContratos: () => false,
+  useExecucaoEmendas: () => ({ data: [] })
 }));
 vi.mock('../PedidoModal', () => ({ PedidoModal: () => null }));
 vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined, ipca: null, semPrevisao: false }) }));
@@ -62,23 +63,24 @@ describe('Pedidos: ver por pedido ou por autor', () => {
     expect(render('/?autor=a-definir')).toContain('1 de 4 pedidos');
   });
 
-  it('?ver=autor soma os pedidos por autor; com Todos mostra Já empenhado', () => {
+  it('?ver=autor soma os pedidos por autor, com as emendas do ano e a sobra', () => {
     const html = render('/?ver=autor');
     expect(html).toContain('emendas-por-autor-tabela');
     expect(html).not.toContain('emendas-pedidos-tabela');
     expect(html).toContain('Valor reservado');
-    expect(html).toContain('Já empenhado');
+    expect(html).toContain('Emendas 2026');
+    expect(html).toContain('Sobra');
+    expect(html).toContain('emendas-sobra-faixa');
     // A1 (2 pedidos, R$ 500), A2 e "Parlamentar a definir"; A3 não tem pedido
     expect(html).toContain('Deputado Um');
     expect(html).toContain('Parlamentar a definir');
     expect(html).not.toContain('Bancada Três');
   });
 
-  it('por autor respeita a fase escolhida e tira Já empenhado', () => {
+  it('por autor respeita a fase escolhida no valor reservado', () => {
     // ?etapa=RESERVADO abre a fase Interlocução (Reservado, Minuta e Ofício).
     const html = render('/?ver=autor&etapa=RESERVADO');
     expect(html).toContain('Valor nesta fase');
-    expect(html).not.toContain('Já empenhado');
     expect(html).toContain('Senadora Dois');
     expect(html).toContain('Deputado Um');
   });

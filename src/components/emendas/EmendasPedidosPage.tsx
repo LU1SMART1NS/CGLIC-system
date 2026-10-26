@@ -87,6 +87,7 @@ import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
 import { PedidoModal } from './PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela, type ContextoDaJanela } from './EtapaPedidoModal';
 import { AnulacaoModal } from './AnulacaoModal';
+import type { SobraDaEmenda } from '../../utils/emendasSobra';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 type Segmento = 'todos' | FasePedido | 'CANCELADO';
@@ -605,6 +606,8 @@ export const EmendasPedidosPage: React.FC = () => {
       return prox;
     });
   const [editando, setEditando] = useState<PedidoEmenda | 'novo' | null>(null);
+  // Reserva nova aberta por "Novo pedido com a sobra" (migration 204): o parlamentar e a emenda já vêm escolhidos.
+  const [sobraDoNovo, setSobraDoNovo] = useState<SobraDaEmenda | null>(null);
   const [anulando, setAnulando] = useState<Linha | null>(null);
   const [janela, setJanela] = useState<{ pedido: PedidoEmenda; acao: AcaoDaJanela; contexto?: ContextoDaJanela } | null>(null);
 
@@ -835,9 +838,19 @@ export const EmendasPedidosPage: React.FC = () => {
           onAbrirAutor={(chave) =>
             mudarUrl((p) => {
               p.delete('ver');
+              p.delete('emenda');
               p.set('autor', chave);
             })
           }
+          todosOsPedidos={pedidos}
+          notas={notas}
+          ano={Number(hoje.slice(0, 4))}
+          podeGerir={podeGerir}
+          emendaInicial={searchParams.get('emenda')}
+          onNovoComSobra={(e) => {
+            setSobraDoNovo(e);
+            setEditando('novo');
+          }}
         />
       ) : (
         <>
@@ -975,7 +988,11 @@ export const EmendasPedidosPage: React.FC = () => {
           reservadoFora={reservadoPorItem(pedidos, editando === 'novo' ? undefined : editando.id)}
           ultimoContato={ultimoContatoPorAutor(pedidos)}
           hoje={hoje}
-          onClose={() => setEditando(null)}
+          sobra={editando === 'novo' ? sobraDoNovo : null}
+          onClose={() => {
+            setEditando(null);
+            setSobraDoNovo(null);
+          }}
         />
       )}
       {anulando && <AnulacaoModal pedido={anulando} itens={itens} notas={notas} nomeDoAutor={nomeDoAutor(anulando.autorId)} onClose={() => setAnulando(null)} />}

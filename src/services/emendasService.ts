@@ -7,6 +7,7 @@
  * CNPJ e CEP são consultados no navegador na hora do cadastro (BrasilAPI, aberta e com CORS; ViaCEP como
  * reserva do CEP). Nada disso é sincronização: o que a pessoa confere é o que grava.
  */
+import type { ExecucaoNoPortal } from '../utils/emendasSobra';
 import { supabase } from './supabaseClient';
 import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { mensagemDeErro } from './sincronizacaoFontesService';
@@ -802,6 +803,8 @@ export async function salvarPedidoEmenda(p: {
   contatoEmail: string | null;
   motivo?: string | null;
   linhas: LinhaParaSalvar[];
+  /** Pedido novo com a sobra de uma emenda do mesmo parlamentar (migration 204): nasce com o número e o ano dela. */
+  emendaDaSobra?: { numero: string; ano: number } | null;
 }): Promise<{ id: string; versao: number; numero: number }> {
   const { data, error } = await db().rpc('salvar_pedido_emenda', {
     p_pedido: {
@@ -814,6 +817,7 @@ export async function salvarPedidoEmenda(p: {
       contato_telefone: p.contatoTelefone,
       contato_email: p.contatoEmail,
       motivo: p.motivo ?? null,
+      emenda_da_sobra: p.emendaDaSobra ?? null,
       linhas: p.linhas.map((l) => ({ id: l.id ?? null, tipo: l.tipo, item_key: l.itemKey ?? null, kit_id: l.kitId ?? null, quantidade: l.quantidade, beneficiario_id: l.beneficiarioId }))
     }
   });
@@ -894,6 +898,21 @@ export async function cancelarPedidoEmenda(id: string, versao: number, motivo: s
   const { data, error } = await db().rpc('cancelar_pedido_emenda', { p_id: id, p_versao: versao, p_motivo: motivo });
   if (error) throw new Error(mensagemDoBanco(error));
   return data as { id: string; versao: number };
+}
+
+/** Execução de cada emenda pelo Portal da Transparência (migration 204). Antes da migration a tabela não existe: lista vazia. */
+export async function fetchExecucaoEmendas(): Promise<ExecucaoNoPortal[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+    db().from('emenda_execucao_portal').select('codigo, encontrada, valor_empenhado, valor_liquidado, valor_pago, lido_em').order('codigo').range(de, ate)
+  ).catch(() => []);
+  return linhas.map((l) => ({
+    codigo: l.codigo,
+    encontrada: Boolean(l.encontrada),
+    valorEmpenhado: l.valor_empenhado == null ? null : num(l.valor_empenhado),
+    valorLiquidado: l.valor_liquidado == null ? null : num(l.valor_liquidado),
+    valorPago: l.valor_pago == null ? null : num(l.valor_pago),
+    lidoEm: l.lido_em ?? null
+  }));
 }
 
 /** Reservado a parlamentares por item (pedidos não cancelados, kits abertos). */

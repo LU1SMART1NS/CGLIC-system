@@ -13,8 +13,9 @@ import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, calcularKit, curto, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta } from '../../utils/emendasKits';
 import { casaBusca, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
-import { identificacaoDoPedido, itensDaLinha, orgaoDoPedido, precoParaEmenda, valorDaLinha, VOLTA_AO_OFICIO } from '../../utils/emendasPedidos';
+import { identificacaoDoPedido, itensDaLinha, numeroDaEmendaEmTexto, orgaoDoPedido, precoParaEmenda, valorDaLinha, VOLTA_AO_OFICIO } from '../../utils/emendasPedidos';
 import { nomeDoItem, notaDoPreco } from '../../utils/emendasQuadro';
+import type { SobraDaEmenda } from '../../utils/emendasSobra';
 import { agruparPorBeneficiario, beneficiarioDaLinha, chaveDoConteudo, definirNoGrupo, gradePorItem, moverLinha, repartirLinha, type GrupoReserva } from '../../utils/emendasReserva';
 import { formatarTelefone, localDoBeneficiario, nomeESigla, rotuloBeneficiario, soDigitos } from '../../services/emendasService';
 import type { AutorEmenda, BeneficiarioEmenda, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
@@ -31,6 +32,8 @@ interface Props {
   /** Último contato da assessoria usado com cada autor: sugerido na nova reserva. */
   ultimoContato: Map<string, Pick<PedidoEmenda, 'contatoNome' | 'contatoTelefone' | 'contatoEmail'>>;
   hoje: string;
+  /** "Novo pedido com a sobra" (migration 204): o parlamentar e a emenda já escolhidos, e o disponível dela no topo. */
+  sobra?: SobraDaEmenda | null;
   onClose: () => void;
 }
 
@@ -142,7 +145,7 @@ function guardarRascunho(r: Rascunho | null) {
  * beneficiários, Mover para leva a linha inteira, e a visão Por item mostra a grade item × beneficiário. Os valores são
  * os previstos para a emenda, os mesmos do quadro do parlamentar. A trava de saldo é conferida aqui e de novo no banco.
  */
-export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, beneficiarios, reservadoFora, ultimoContato, hoje, onClose }) => {
+export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, beneficiarios, reservadoFora, ultimoContato, hoje, sobra, onClose }) => {
   const salvar = useSalvarPedido();
   const toast = useToast();
   const { precos, ipca, semPrevisao } = usePrecosParaEmenda();
@@ -157,9 +160,10 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     return agruparPorBeneficiario(gravadas, novoGrupo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [rascunhoAntigo] = useState(() => (pedido ? null : lerRascunho()));
+  // O pedido da sobra não usa o rascunho da reserva comum: são reservas diferentes.
+  const [rascunhoAntigo] = useState(() => (pedido || sobra ? null : lerRascunho()));
 
-  const [autorId, setAutorId] = useState(pedido?.autorId ?? '');
+  const [autorId, setAutorId] = useState(pedido?.autorId ?? sobra?.autorId ?? '');
   // Reserva para um órgão (migration 163): nova reserva sem parlamentar.
   const [paraOrgao, setParaOrgao] = useState(false);
   const [buscaAutor, setBuscaAutor] = useState('');
@@ -286,12 +290,12 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
 
   // Rascunho só da reserva nova: some ao reservar ou descartar.
   useEffect(() => {
-    if (pedido || rascunhoAntigo) return;
+    if (pedido || rascunhoAntigo || sobra) return;
     if (!temConteudo) return guardarRascunho(null);
     const salvoEm = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     guardarRascunho({ autorId, paraOrgao, contato: { nome: contatoNome, telefone: contatoTelefone, email: contatoEmail }, grupos, ativo, linhas, observacao, salvoEm });
     setRascunhoEm(salvoEm);
-  }, [pedido, rascunhoAntigo, temConteudo, autorId, paraOrgao, contatoNome, contatoTelefone, contatoEmail, grupos, ativo, linhas, observacao]);
+  }, [pedido, rascunhoAntigo, sobra, temConteudo, autorId, paraOrgao, contatoNome, contatoTelefone, contatoEmail, grupos, ativo, linhas, observacao]);
   const [rascunhoPendente, setRascunhoPendente] = useState(Boolean(rascunhoAntigo));
   const recuperarRascunho = () => {
     const r = rascunhoAntigo!;
@@ -479,6 +483,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         contatoTelefone: tel || null,
         contatoEmail: contatoEmail.trim() || null,
         motivo: motivo.trim() || null,
+        emendaDaSobra: sobra ? { numero: sobra.emenda, ano: sobra.ano } : null,
         linhas: linhas.map((l) => ({ id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, quantidade: l.quantidade, beneficiarioId: beneficiarioDaLinha(l, grupos) }))
       });
       if (!pedido) guardarRascunho(null);
@@ -806,7 +811,13 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
       size="xxl"
       className="reserva-modal"
       testId="emendas-pedido-modal"
-      title={pedido ? `${semAutorGravado ? 'Reserva para' : 'Alterar o pedido de'} ${tituloDoPedido} · ${identificacaoDoPedido(pedido)}` : 'Nova reserva'}
+      title={
+        pedido
+          ? `${semAutorGravado ? 'Reserva para' : 'Alterar o pedido de'} ${tituloDoPedido} · ${identificacaoDoPedido(pedido)}`
+          : sobra
+            ? `Novo pedido com a sobra da emenda ${numeroDaEmendaEmTexto(sobra.emenda)} / ${sobra.ano}`
+            : 'Nova reserva'
+      }
       footer={
         <div className="reserva-rodape">
           {tentou && pendencias.length > 0 && (
@@ -1032,7 +1043,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
 
           <div className="reserva-secao">
             <span className="reserva-rotulo">{semAutorGravado ? 'Parlamentar que assumiu a reserva (quando houver)' : 'Para quem é a reserva'}</span>
-            {!pedido && (
+            {!pedido && !sobra && (
               <div className="reserva-segmentos" role="group" aria-label="Tipo de reserva">
                 <button
                   type="button"
@@ -1066,7 +1077,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   <b>{autor.nome}</b>
                   <small>{metaDoAutor(autor)}</small>
                 </span>
-                {(!pedido || semAutorGravado) && (
+                {((!pedido && !sobra) || semAutorGravado) && (
                   <ActionButton action="editar" type="button" size="sm" label="Trocar" onClick={() => setAutorId('')} />
                 )}
               </div>
@@ -1138,6 +1149,25 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
             )}
           </div>
 
+          {sobra && (
+            <div className={`reserva-teto${total > sobra.sobra + 0.004 ? ' reserva-teto--passa' : ''}`} data-testid="emendas-pedido-teto">
+              <div className="reserva-barra">
+                <b>Disponível da emenda: {formatCurrency(sobra.sobra)}</b>
+                <span className="reserva-espaco" />
+                <span className="reserva-mudo">
+                  Pedido: {formatCurrency(total)} ·{' '}
+                  {total > sobra.sobra + 0.004 ? <b className="reserva-alerta">passa {formatCurrency(total - sobra.sobra)}</b> : `restam ${formatCurrency(sobra.sobra - total)}`}
+                </span>
+              </div>
+              <div className="reserva-teto__barra">
+                <i style={{ width: `${Math.min(100, sobra.sobra > 0 ? (total / sobra.sobra) * 100 : 100)}%` }} />
+              </div>
+              <span className="reserva-mudo">
+                Valor da emenda {formatCurrency(sobra.valor ?? 0)} − empenhado {formatCurrency(sobra.empenhado)} − em andamento {formatCurrency(sobra.emAndamento)}. Preço previsto, como no quadro do parlamentar.
+                {total > sobra.sobra + 0.004 ? ' O pedido passa do disponível: reduza as quantidades ou confirme com o parlamentar outra fonte para a diferença.' : ''}
+              </span>
+            </div>
+          )}
           <div className="reserva-secao" data-testid="emendas-pedido-linhas">
             <div className="reserva-barra">
               <span className="reserva-rotulo">
