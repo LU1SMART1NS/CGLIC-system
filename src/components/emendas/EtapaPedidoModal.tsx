@@ -4,7 +4,7 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppSelect, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useInformarSolicitacaoDaAta, usePedidosEmendas, useRegistrarEnvioCgofi } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useEmendasSiop, useInformarSolicitacaoDaAta, usePedidosEmendas, useRegistrarEnvioCgofi } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import {
@@ -204,6 +204,18 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const { precos } = usePrecosParaEmenda();
   const [gnd, setGnd] = useState(pedido.siopGnd ?? 'GND-4');
   const [pontos, setPontos] = useState<Record<string, boolean>>({});
+  // Pedido criado a partir da emenda registrada (migration 205): a conferência já vem com o nº, o valor e o GND dela.
+  const { data: emendasSiop } = useEmendasSiop();
+  const daEmenda = pedido.emendaId ? emendasSiop?.find((e) => e.id === pedido.emendaId) : undefined;
+  const [preenchido, setPreenchido] = useState(false);
+  // Ajuste durante a renderização (a emenda pode chegar depois de a janela abrir), uma vez só.
+  if (!preenchido && daEmenda && !pedido.siopEmenda) {
+    setPreenchido(true);
+    setEmenda(numeroDaEmendaEmTexto(daEmenda.numero));
+    setAnoEmenda(daEmenda.ano);
+    setValor(daEmenda.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    setGnd(daEmenda.gnd);
+  }
   const [divergencia, setDivergencia] = useState(pedido.divergencia ?? '');
   const [motivo, setMotivo] = useState(MOTIVOS_CANCELAMENTO[0]);
   const [outroMotivo, setOutroMotivo] = useState('');

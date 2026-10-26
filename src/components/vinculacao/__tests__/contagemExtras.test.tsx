@@ -97,12 +97,19 @@ describe('números novos: Financeiro e Início', () => {
   });
 
   it('Emendas: pedidos com aviso, vermelho quando há urgente, e o clique abre Pedidos em "Com algum aviso"', () => {
-    vi.mocked(useContagemEmendas).mockReturnValue({ total: 67, urgentes: 8 });
+    vi.mocked(useContagemEmendas).mockReturnValue({ total: 67, urgentes: 8, semPedido: 2 });
     const html = menu();
     expect(html).toMatch(/class="app-rail-count app-rail-count--urgente"[^>]*data-testid="rail-count-emendas"[^>]*>67</);
     expect(html).toContain('href="/emendas/pedidos?aviso=com"');
-    vi.mocked(useContagemEmendas).mockReturnValue({ total: 59, urgentes: 0 });
+    vi.mocked(useContagemEmendas).mockReturnValue({ total: 59, urgentes: 0, semPedido: 0 });
     expect(menu()).toMatch(/class="app-rail-count"[^>]*data-testid="rail-count-emendas"[^>]*>59</);
+  });
+
+  it('Emendas: só emendas sem pedido, o clique abre Pedidos › Por emenda', () => {
+    vi.mocked(useContagemEmendas).mockReturnValue({ total: 3, urgentes: 1, semPedido: 3 });
+    const html = menu();
+    expect(html).toMatch(/data-testid="rail-count-emendas"[^>]*>3</);
+    expect(html).toContain('href="/emendas/pedidos?ver=emenda"');
   });
 
   it('Ajustes (coordenador): UASGs sem grupo confirmado, e o clique abre Grupos das UASGs em "A confirmar"', () => {

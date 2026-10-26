@@ -615,6 +615,8 @@ export interface PedidoEmenda {
   pedidoOrigemNumero: number | null;
   /** Anulações de empenho registradas neste pedido, da mais antiga à mais nova (migration 203). */
   anulacoes: AnulacaoPedido[];
+  /** Emenda registrada de onde o pedido nasceu, ou a do nº conferido no SIOP (migration 205). */
+  emendaId: string | null;
 }
 
 export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
@@ -776,7 +778,8 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       documentos: (documentosPorPedido.get(p.id) ?? []).sort((a, b) => (a.data ?? '').localeCompare(b.data ?? '') || a.numero.localeCompare(b.numero)),
       pedidoOrigemId: p.pedido_origem_id ?? null,
       pedidoOrigemNumero: p.pedido_origem_id ? numeroPorId.get(p.pedido_origem_id) ?? null : null,
-      anulacoes: (anulacoesPorPedido.get(p.id) ?? []).sort((a, b) => a.anuladoEm.localeCompare(b.anuladoEm))
+      anulacoes: (anulacoesPorPedido.get(p.id) ?? []).sort((a, b) => a.anuladoEm.localeCompare(b.anuladoEm)),
+      emendaId: p.emenda_id ?? null
     }))
     .sort((a, b) => b.numero - a.numero);
 }
@@ -802,6 +805,8 @@ export async function salvarPedidoEmenda(p: {
   contatoTelefone: string | null;
   contatoEmail: string | null;
   motivo?: string | null;
+  /** Só no pedido novo: a emenda registrada de onde ele nasce (migration 205). */
+  emendaId?: string | null;
   linhas: LinhaParaSalvar[];
   /** Pedido novo com a sobra de uma emenda do mesmo parlamentar (migration 204): nasce com o número e o ano dela. */
   emendaDaSobra?: { numero: string; ano: number } | null;
@@ -817,6 +822,7 @@ export async function salvarPedidoEmenda(p: {
       contato_telefone: p.contatoTelefone,
       contato_email: p.contatoEmail,
       motivo: p.motivo ?? null,
+      emenda_id: p.emendaId ?? null,
       emenda_da_sobra: p.emendaDaSobra ?? null,
       linhas: p.linhas.map((l) => ({ id: l.id ?? null, tipo: l.tipo, item_key: l.itemKey ?? null, kit_id: l.kitId ?? null, quantidade: l.quantidade, beneficiario_id: l.beneficiarioId }))
     }
@@ -1092,3 +1098,160 @@ export async function fetchNotasSemPedido(): Promise<NotaSemPedido[]> {
   }));
 }
 
+
+// ------------------------------------------------------------------------------
+// Emendas vistas no SIOP, contatos e ASPAR dos órgãos (migration 205)
+// ------------------------------------------------------------------------------
+
+export type Gnd = 'GND-3' | 'GND-4';
+
+/** Emenda que a CAEP viu no SIOP, com ou sem pedido. */
+export interface EmendaSiop {
+  id: string;
+  ano: number;
+  /** 8 dígitos: os 4 do autor e os 4 da emenda. */
+  numero: string;
+  autorId: string;
+  valor: number;
+  gnd: Gnd;
+  beneficiarioId: string | null;
+  objeto: string | null;
+  /** Dia em que a CAEP viu a emenda no SIOP: o aviso conta daqui. */
+  vistaEm: string;
+  observacao: string | null;
+  versao: number;
+  criadoPorNome: string | null;
+}
+
+export type MeioDoContato = 'TELEFONE' | 'WHATSAPP' | 'EMAIL' | 'REUNIAO';
+
+export interface ContatoDaEmenda {
+  id: string;
+  emendaId: string;
+  contatoEm: string;
+  comQuem: string;
+  meio: MeioDoContato;
+  resumo: string;
+  criadoPorNome: string | null;
+  criadoEm: string;
+}
+
+export type OrgaoAspar = 'PM' | 'BM' | 'PC' | 'PCI' | 'SSP';
+
+/** Assessoria parlamentar de um órgão estadual. */
+export interface AsparDoOrgao {
+  uf: string;
+  orgao: OrgaoAspar;
+  nome: string;
+  cargo: string | null;
+  telefone: string | null;
+  whatsapp: boolean;
+  email: string | null;
+  atualizadoPorNome: string | null;
+  atualizadoEm: string | null;
+}
+
+export async function fetchEmendasSiop(): Promise<EmendaSiop[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emendas_siop').select('*').order('id').range(de, ate));
+  return linhas.map((e) => ({
+    id: e.id,
+    ano: num(e.ano),
+    numero: e.numero,
+    autorId: e.autor_id,
+    valor: num(e.valor),
+    gnd: e.gnd,
+    beneficiarioId: e.beneficiario_id ?? null,
+    objeto: e.objeto ?? null,
+    vistaEm: e.vista_em,
+    observacao: e.observacao ?? null,
+    versao: e.versao,
+    criadoPorNome: e.criado_por_nome ?? null
+  }));
+}
+
+export async function fetchContatosDasEmendas(): Promise<ContatoDaEmenda[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_siop_contatos').select('*').order('id').range(de, ate));
+  return linhas
+    .map((c) => ({
+      id: c.id,
+      emendaId: c.emenda_id,
+      contatoEm: c.contato_em,
+      comQuem: c.com_quem,
+      meio: c.meio,
+      resumo: c.resumo,
+      criadoPorNome: c.criado_por_nome ?? null,
+      criadoEm: c.criado_em
+    }))
+    .sort((a, b) => a.contatoEm.localeCompare(b.contatoEm) || a.criadoEm.localeCompare(b.criadoEm));
+}
+
+export async function fetchAsparDosOrgaos(): Promise<AsparDoOrgao[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_aspar').select('*').order('uf').order('orgao').range(de, ate));
+  return linhas.map((a) => ({
+    uf: a.uf,
+    orgao: a.orgao,
+    nome: a.nome,
+    cargo: a.cargo ?? null,
+    telefone: a.telefone ?? null,
+    whatsapp: Boolean(a.whatsapp),
+    email: a.email ?? null,
+    atualizadoPorNome: a.atualizado_por_nome ?? null,
+    atualizadoEm: a.atualizado_em ?? null
+  }));
+}
+
+export interface EmendaParaSalvar {
+  id?: string;
+  versao?: number;
+  /** Como no SIOP: "2026 4268 0021" ou os 8 dígitos com o ano à parte. */
+  numero: string;
+  ano: number | null;
+  autorId: string;
+  valor: number;
+  gnd: Gnd;
+  beneficiarioId: string | null;
+  objeto: string | null;
+  vistaEm: string;
+  observacao: string | null;
+}
+
+export async function salvarEmendaSiop(e: EmendaParaSalvar): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('salvar_emenda_siop', {
+    p: {
+      id: e.id ?? null,
+      versao: e.versao ?? null,
+      numero: e.numero,
+      ano: e.ano,
+      autor_id: e.autorId,
+      valor: e.valor,
+      gnd: e.gnd,
+      beneficiario_id: e.beneficiarioId,
+      objeto: e.objeto,
+      vista_em: e.vistaEm,
+      observacao: e.observacao
+    }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+export async function apagarEmendaSiop(id: string, versao: number): Promise<void> {
+  const { error } = await db().rpc('apagar_emenda_siop', { p_id: id, p_versao: versao });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
+
+export async function registrarContatoEmenda(emendaId: string, c: { contatoEm: string; comQuem: string; meio: MeioDoContato; resumo: string }): Promise<void> {
+  const { error } = await db().rpc('registrar_contato_emenda', {
+    p_emenda_id: emendaId,
+    p: { contato_em: c.contatoEm, com_quem: c.comQuem, meio: c.meio, resumo: c.resumo }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
+
+/** Nome vazio apaga o contato daquele órgão na UF. */
+export async function salvarAsparEmenda(a: { uf: string; orgao: OrgaoAspar; nome: string; cargo: string | null; telefone: string | null; whatsapp: boolean; email: string | null }): Promise<void> {
+  const { error } = await db().rpc('salvar_aspar_emenda', {
+    p: { uf: a.uf, orgao: a.orgao, nome: a.nome, cargo: a.cargo, telefone: a.telefone, whatsapp: a.whatsapp, email: a.email }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
