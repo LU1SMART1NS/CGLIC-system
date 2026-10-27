@@ -140,7 +140,13 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
   const maximo = Math.min(...regras.map((r) => r.livre));
   const limita = regras.find((r) => r.livre === maximo)!;
   const quebradas = qtd > 0 ? regras.filter((r) => qtd > r.livre) : [];
-  const usadoUasg = destinoValido ? usadoNoLimite(adesoes, q.remanejamentosNaoParticipante, uasg).total : 0;
+  const daUasg = destinoValido ? usadoNoLimite(adesoes, q.remanejamentosNaoParticipante, uasg) : { adesoes: 0, remanejado: 0, total: 0 };
+  const usadoUasg = daUasg.total;
+  // O que o órgão escolhido já recebeu neste item, separado por origem.
+  const jaRecebeu = [
+    daUasg.remanejado > 0 ? `${formatNumber(daUasg.remanejado)} un remanejadas` : '',
+    daUasg.adesoes > 0 ? `${formatNumber(daUasg.adesoes)} un em adesões` : ''
+  ].filter(Boolean).join(' e ');
   const usadoTotal = usadoNoLimite(adesoes, q.remanejamentosNaoParticipante).total;
   const motivo = motivoDaRegra(limita, { senasp, homologado: p.homologado, usadoUasg, limiteAdesao: p.limiteAdesao });
 
@@ -206,7 +212,7 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
             participantes={p.participantes}
             sugeridos={sugeridos}
             ufInicial={cadastroOrigem?.siglaUf ?? null}
-            avisoDoEscolhido={usadoUasg > 0 ? `Já tem ${formatNumber(usadoUasg)} em adesões neste item.` : null}
+            avisoDoEscolhido={jaRecebeu ? `Já tem ${jaRecebeu} neste item.` : null}
           />
           {precisaDoNome && (
             <label style={campo}>
