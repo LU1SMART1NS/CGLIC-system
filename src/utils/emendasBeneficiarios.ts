@@ -21,13 +21,15 @@ export interface FormularioBeneficiario {
   responsavelEmail: string;
 }
 
-/** O que impede salvar; vazio = pode salvar. Só o nome é obrigatório (migration 166); o resto, se vier, vem certo. */
+/** O que impede salvar; vazio = pode salvar. Nome e UF são obrigatórios (migrations 166 e 212: a UF filtra os órgãos
+ *  no pedido do parlamentar); o resto, se vier, vem certo. */
 export function pendenciasDoBeneficiario(f: FormularioBeneficiario): string[] {
   const p: string[] = [];
   if (!chaveDoNome(f.nome)) p.push('nome da unidade');
   const cep = soDigitos(f.entregaCep);
   if (cep && cep.length !== 8) p.push('CEP com 8 números');
-  if (f.entregaUf.trim() && !UFS.has(f.entregaUf.trim().toUpperCase())) p.push('UF válida');
+  if (!f.entregaUf.trim()) p.push('UF');
+  else if (!UFS.has(f.entregaUf.trim().toUpperCase())) p.push('UF válida');
   const tel = soDigitos(f.responsavelTelefone);
   if (tel && (tel.length < 10 || tel.length > 11)) p.push('telefone com DDD (10 ou 11 números)');
   if (f.responsavelEmail.trim() && !EMAIL_VALIDO.test(f.responsavelEmail.trim())) p.push('e-mail válido');
@@ -93,6 +95,10 @@ export function textoDeBuscaDoBeneficiario(
   const uf = b.entregaUf ?? '';
   return [b.nome, b.sigla, b.razaoSocial, b.entregaMunicipio, uf, uf && `Estado ${NOME_DA_UF[uf] ?? ''}`, ...(b.outrosNomes ?? [])].filter(Boolean).join(' ');
 }
+
+/** O órgão entra na lista do pedido do parlamentar da UF `uf`? Sem UF de um dos lados, entra (não some por falta de dado). */
+export const daUfDoParlamentar = (b: Pick<BeneficiarioEmenda, 'entregaUf'>, uf: string | null | undefined): boolean =>
+  !uf || !b.entregaUf || b.entregaUf === uf;
 
 /** Nome + município + UF: o que não pode repetir (chave_identidade do banco). */
 export const chaveDaIdentidade = (nome: string, municipio: string | null | undefined, uf: string | null | undefined): string =>
