@@ -31,12 +31,12 @@ export const GRUPO_GTI_INFO: Record<GrupoDaFatia, { rotulo: string; curto: strin
   CONDPCI: { rotulo: 'CONDPCI', curto: 'CONDPCI', descricao: 'Polícias Científicas', cor: 'var(--gti-condpci)' },
   CONSESP: { rotulo: 'CONSESP', curto: 'CONSESP', descricao: 'Secretarias de Segurança Pública', cor: 'var(--gti-consesp)' },
   CNGM: { rotulo: 'CNGM', curto: 'CNGM', descricao: 'Guardas e secretarias municipais', cor: 'var(--gti-cngm)' },
-  OUTROS: { rotulo: 'Outros', curto: 'Outros', descricao: 'Polícia Penal e fora dos conselhos', cor: 'var(--gti-outros)' },
+  OUTROS: { rotulo: 'Outros', curto: 'Outros', descricao: 'Fora dos cinco GTIs', cor: 'var(--gti-outros)' },
   A_CONFIRMAR: { rotulo: 'A confirmar', curto: 'A confirmar', descricao: 'Grupo da UASG ainda não confirmado', cor: 'var(--gti-a-confirmar)' }
 };
 
-/** Rótulo com a descrição ("CNCG · Polícias Militares"), o mesmo nas telas de grupos das UASGs e dos beneficiários. */
-export const rotuloDoGrupo = (g: GrupoDaFatia) => `${GRUPO_GTI_INFO[g].rotulo} · ${GRUPO_GTI_INFO[g].descricao}`;
+/** Rótulo com a descrição ("CNCG · Polícias Militares"; Outros fica só "Outros"), o mesmo nas telas de grupos das UASGs e dos beneficiários. */
+export const rotuloDoGrupo = (g: GrupoDaFatia) => (g === 'OUTROS' ? GRUPO_GTI_INFO[g].rotulo : `${GRUPO_GTI_INFO[g].rotulo} · ${GRUPO_GTI_INFO[g].descricao}`);
 
 const ehPrincipal = (v: string): v is GrupoPrincipal => v === 'CNGM' || (GRUPOS_GTI as readonly string[]).includes(v);
 
