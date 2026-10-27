@@ -62,7 +62,7 @@ describe('Início do gestor de emendas', () => {
     const empenhado = pedidos.find((p) => p.id === 'empenhado')!;
     const diferenca: ConferenciaEmpenho = {
       emenda: '202630840008', itemKey: 'longe', qtdPedido: 3, qtdNasNotas: 5, notas: ['2026NE000001'], pedidos: [1], pedidoIds: [empenhado.id],
-      situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: []
+      situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [], notasAnuladas: []
     };
     const notas = new Map([[comNota.id, nota(comNota.id)]]);
     expect(avisosDosPedidosParaOMenu(pedidos, ITENS, HOJE, notas, new Map([[empenhado.id, [diferenca]]]))).toEqual({

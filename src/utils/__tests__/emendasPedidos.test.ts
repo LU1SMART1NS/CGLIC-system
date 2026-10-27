@@ -490,7 +490,7 @@ describe('ROTULO_AVISO — um nome por aviso em todas as telas', () => {
     expect(TIPOS_AVISO[0]).toBe('empenhoAnulado');
   });
   it('a etiqueta curta dos avisos de empenho é o mesmo nome do filtro', () => {
-    const c: ConferenciaEmpenho = { emenda: '202612340001', itemKey: '00033/2025-200331-00003', qtdPedido: 38, qtdNasNotas: 41, notas: ['2026NE000456'], pedidoIds: ['p1'], pedidos: [1], situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [] };
+    const c: ConferenciaEmpenho = { emenda: '202612340001', itemKey: '00033/2025-200331-00003', qtdPedido: 38, qtdNasNotas: 41, notas: ['2026NE000456'], pedidoIds: ['p1'], pedidos: [1], situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [], notasAnuladas: [] };
     const [mais] = avisosDeEmpenho([c], new Map());
     const [menos] = avisosDeEmpenho([{ ...c, situacao: 'A_MENOS', qtdNasNotas: 30 }], new Map());
     expect(mais.curto).toBe(ROTULO_AVISO.empenhoAMais);

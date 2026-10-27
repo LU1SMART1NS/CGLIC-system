@@ -5,7 +5,7 @@ import type { ConferenciaEmpenho, ItemCaep, PedidoEmenda } from '../../services/
 
 const conf = (extra: Partial<ConferenciaEmpenho>): ConferenciaEmpenho => ({
   emenda: '71250002', itemKey: '00018/2025-200331-00002', qtdPedido: 197, qtdNasNotas: 200, notas: ['2026NE000175'], pedidos: [445], pedidoIds: ['p445'],
-  situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [], ...extra
+  situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [], notasAnuladas: [], ...extra
 });
 const itens = new Map<string, ItemCaep>([
   ['00018/2025-200331-00002', { itemKey: '00018/2025-200331-00002', numeroAta: '00018/2025', codigoUasg: '200331', numeroItem: '00002', descricao: 'Camioneta/SUV', nomeCurto: 'Trailblazer', codigoPdm: 1, valorUnitario: 1, vigenciaFinal: '2027-01-01', ataEncerrada: false, alocado: 300 } as ItemCaep],
@@ -57,10 +57,19 @@ describe('empenhado × pedido das emendas', () => {
   });
 
   it('motivo a conferir junta notas fora, não lidas e por valor', () => {
-    expect(motivoAConferir({ notasFora: [], notasNaoLidas: ['2026NE000099'], notasPorValor: ['2026NE000024'], notasComItemSemAta: [] })).toBe(
+    expect(motivoAConferir({ notasFora: [], notasNaoLidas: ['2026NE000099'], notasPorValor: ['2026NE000024'], notasComItemSemAta: [], notasAnuladas: [] })).toBe(
       'nota ainda não lida no Portal (2026NE000099); nota em reais, sem quantidade (2026NE000024)'
     );
-    expect(motivoAConferir({ notasFora: [], notasNaoLidas: ['1', '2', '3', '4', '5'], notasPorValor: [], notasComItemSemAta: [] })).toBe('5 notas ainda não lidas no Portal (1, 2, 3 e mais 2)');
+    expect(motivoAConferir({ notasFora: [], notasNaoLidas: ['1', '2', '3', '4', '5'], notasPorValor: [], notasComItemSemAta: [], notasAnuladas: [] })).toBe('5 notas ainda não lidas no Portal (1, 2, 3 e mais 2)');
+  });
+
+  it('nota anulada no Tesouro aparece como anulada, não como não lida', () => {
+    expect(motivoAConferir({ notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [], notasAnuladas: ['2026NE000080'] })).toBe(
+      'nota anulada no Tesouro (2026NE000080): registre a anulação no pedido'
+    );
+    expect(motivoAConferir({ notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [], notasAnuladas: ['2026NE000088', '2026NE000106'] })).toBe(
+      '2 notas anuladas no Tesouro (2026NE000088, 2026NE000106): registre a anulação no pedido'
+    );
   });
 
   it('lista a conferir: uma linha por emenda, com o que as notas lidas já mostram', () => {

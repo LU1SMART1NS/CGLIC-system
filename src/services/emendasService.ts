@@ -1073,7 +1073,8 @@ export async function fetchNotasDasLinhas(): Promise<Map<string, NotaDaLinha>> {
 /**
  * Empenhado × pedido (migration 187): por emenda e item, a soma das linhas dos pedidos já empenhados e a soma das
  * notas da emenda lidas no Portal da Transparência. A_MAIS é certeza; A_MENOS só quando todas as notas do SEI estão no
- * sistema e lidas; A_CONFERIR quando falta nota, há nota não lida, nota por valor ou item sem ata.
+ * sistema e lidas; A_CONFERIR quando falta nota, há nota não lida, nota por valor, item sem ata ou nota anulada (valor
+ * empenhado zero no Tesouro, migration 216).
  */
 export type SituacaoConferencia = 'IGUAL' | 'A_MAIS' | 'A_MENOS' | 'A_CONFERIR' | 'SEM_NOTA';
 
@@ -1090,6 +1091,7 @@ export interface ConferenciaEmpenho {
   notasNaoLidas: string[];
   notasPorValor: string[];
   notasComItemSemAta: string[];
+  notasAnuladas: string[];
 }
 
 const lista = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
@@ -1110,7 +1112,8 @@ export async function fetchConferenciaEmpenho(): Promise<ConferenciaEmpenho[]> {
     notasFora: lista(r.notas_fora),
     notasNaoLidas: lista(r.notas_nao_lidas),
     notasPorValor: lista(r.notas_por_valor),
-    notasComItemSemAta: lista(r.notas_com_item_sem_ata)
+    notasComItemSemAta: lista(r.notas_com_item_sem_ata),
+    notasAnuladas: lista(r.notas_anuladas)
   }));
 }
 
