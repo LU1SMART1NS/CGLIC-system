@@ -588,7 +588,63 @@ export interface AtaManager {
   updatedAt: string;
 }
 
-export interface ContractTaskTemplateTask {
+// -------------------------------------------------------------
+// Modelo de gestão da CCGA (migrations 210 e 215): ação do gestor, regra de prazo
+// e andamento do pedido (orientar). Comum a Atas e Contratos.
+// -------------------------------------------------------------
+/** O que o gestor faz na tarefa: ASSINAR = disponibilizar para assinatura; LANCAR = sistema estruturante. */
+export type AcaoGestor = 'FAZER' | 'ORIENTAR' | 'CONFERIR' | 'ASSINAR' | 'LANCAR' | 'ACOMPANHAR';
+
+/** De onde a data é contada: fim da vigência, assinatura, partida do módulo, tarefa anterior ou fixa. */
+export type PrazoAncora = 'VIGENCIA_FIM' | 'INICIO' | 'APLICACAO' | 'ANTERIOR' | 'FIXO';
+
+/** Regra da tarefa no modelo (copiada para o plano ao aplicar). */
+export interface RegraTarefaGestao {
+  acao?: AcaoGestor;
+  comQuem?: string;
+  /** O que pedir (orientar) ou o que conferir (conferir). */
+  lista?: string[];
+  nota?: string;
+  modeloSei?: string;
+  prazoTexto?: string;
+  prazoAncora?: PrazoAncora;
+  prazoDias?: number;
+  prazoUteis?: boolean;
+  respostaTexto?: string;
+  respostaDias?: number;
+  respostaUteis?: boolean;
+  /** Esforço estimado em minutos (expectativa da planilha da CGLIC). */
+  esforcoMin?: number;
+  /** Vale para todas as atas do mesmo pregão. */
+  doPregao?: boolean;
+}
+
+/** Andamento da tarefa no plano: data ajustada pelo gestor e as duas marcas do orientar. */
+export interface AndamentoTarefaGestao {
+  templateTaskId?: string;
+  prazoAjustado?: boolean;
+  prazoMinimo?: string;
+  /** Orientar: data esperada da resposta. */
+  prazoResposta?: string;
+  pedidoEnviadoEm?: string;
+  pedidoSei?: string;
+  respostaEm?: string;
+  respostaSei?: string;
+}
+
+/** Detalhes do módulo no modelo: quando entra, base, processo SEI e variantes. */
+export interface DetalhesModeloGestao {
+  gatilho?: string;
+  gatilhoDias?: number;
+  quando?: string;
+  base?: string;
+  processoTipo?: string;
+  variantes?: string[];
+  /** 'CCGA' nos módulos padrão da migration 210. */
+  origemModelo?: string;
+}
+
+export interface ContractTaskTemplateTask extends RegraTarefaGestao {
   id: string;
   macrotaskId: string;
   nome: string;
@@ -606,7 +662,7 @@ export interface ContractTaskTemplateMacrotask {
   tarefas: ContractTaskTemplateTask[];
 }
 
-export interface ContractTaskTemplate {
+export interface ContractTaskTemplate extends DetalhesModeloGestao {
   id: string;
   nome: string;
   descricao?: string;
@@ -618,7 +674,7 @@ export interface ContractTaskTemplate {
 
 export type TaskOrigin = 'MODELO' | 'PERSONALIZADA';
 
-export interface ContractTask {
+export interface ContractTask extends RegraTarefaGestao, AndamentoTarefaGestao {
   id: string;
   macrotaskId: string;
   nome: string;
@@ -649,6 +705,11 @@ export interface TaskPlanModuleRef {
   templateId?: string;
   nome: string;
   appliedAt?: string;
+  /** Linha do módulo (migration 210): processo SEI em que corre e data de partida das tarefas. */
+  processoTipo?: string;
+  processoSei?: string;
+  variante?: string;
+  ancoraData?: string;
 }
 
 export interface ContractTaskMacrotask {
@@ -689,7 +750,7 @@ export interface ContractTaskPlan {
 // trocando a chave derivada contractKey pela chave natural e estável da
 // própria Ata — numeroAtaRegistroPreco, mesma convenção de AtaManager).
 // -------------------------------------------------------------
-export interface AtaTaskTemplateTask {
+export interface AtaTaskTemplateTask extends RegraTarefaGestao {
   id: string;
   macrotaskId: string;
   nome: string;
@@ -705,7 +766,7 @@ export interface AtaTaskTemplateMacrotask {
   tarefas: AtaTaskTemplateTask[];
 }
 
-export interface AtaTaskTemplate {
+export interface AtaTaskTemplate extends DetalhesModeloGestao {
   id: string;
   nome: string;
   descricao?: string;
@@ -715,7 +776,7 @@ export interface AtaTaskTemplate {
   macrotarefas: AtaTaskTemplateMacrotask[];
 }
 
-export interface AtaTask {
+export interface AtaTask extends RegraTarefaGestao, AndamentoTarefaGestao {
   id: string;
   macrotaskId: string;
   nome: string;

@@ -33,6 +33,7 @@ import { chaveAvisoEmpenho, etiquetaDaConferencia, type EtiquetaConferencia } fr
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
 import { BeneficiarioDaLinha, LinhaDoPedido, SituacaoDaLinhaEtiqueta, ValorPrevisto } from './emendasPartes';
 import type { AcaoDaJanela, ContextoDaJanela } from './EtapaPedidoModal';
+import { podeMontarQuadros } from '../../utils/emendasAutorizacao';
 
 export type AoAgir = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) => void;
 
@@ -216,6 +217,14 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
             </button>
             {estaAberto && (
               <div className="emendas-bloco-ata__corpo">
+                {/* Quadros da autorização de empenho da ata, para colar no SEI (protótipo de 26/10/2026). */}
+                {g.chave !== 'KITS' && podeGerir && podeMontarQuadros(p) && (
+                  <div>
+                    <AppButton size="xs" variant="link" onClick={() => onAcao('QUADROS_AUTORIZACAO', { ataKey: g.chave })} data-testid={`emendas-pedido-quadros-${g.numeroAta}`}>
+                      Quadros da autorização
+                    </AppButton>
+                  </div>
+                )}
                 {g.chave !== 'KITS' && depoisDaSolicitacao && (
                   <div className="emendas-bloco-ata__sols" data-testid={`emendas-pedido-sols-${g.numeroAta}`}>
                     <span style={{ ...carteiraDetalhe, fontWeight: 700 }}>Solicitação de empenho</span>
@@ -387,6 +396,13 @@ export const RodadasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, Not
                 {r.envios.length > 0 ? `Falta o envio ${r.atasSemEnvio.length === 1 ? 'da ata' : 'das atas'} ${r.atasSemEnvio.join(', ')}` : 'Falta o envio à CGOFI'}
               </div>
             )}
+          </>
+        ) : r.soAnulados ? (
+          <>
+            <div style={{ fontWeight: 700, color: 'var(--color-danger-text)' }}>Empenho anulado</div>
+            <div style={carteiraDetalhe}>
+              {[r.anulados.notas.join(', '), r.anulados.anuladoEm ? `em ${dataBR(r.anulados.anuladoEm)}` : ''].filter(Boolean).join(' ')}
+            </div>
           </>
         ) : r.semRegistro > 0 ? (
           <span style={carteiraDetalhe}>envio não registrado por solicitação</span>

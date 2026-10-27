@@ -28,6 +28,19 @@ import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { ActionButton, AppButton, DataTable, EmptyState, InfoHint, Modal, SummaryBar, useConfirmDialog } from '../../design-system';
 import { lerNumeroSei, descreverNumeroSei } from '../../utils/numeroSei';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
+import type { AtualizarModuloInput, MarcaTarefaInput } from '../../adapters/modeloGestaoRpcAdapter';
+import {
+  aguardandoResposta,
+  formatarEsforco,
+  grupoDaTarefa,
+  prazoEfetivo,
+  rotuloLista,
+  textoRegraPrazo,
+  textoRegraResposta,
+  type GrupoTarefa
+} from '../../utils/modeloGestao';
+import { AcaoEtiqueta, MarcaOrientarForm, ModuloDados, PlanoContadores, PregaoEtiqueta, RegraDetalhes, type ContagemGrupos } from './modeloGestaoPlano';
+import { GRUPO_INFO } from '../../utils/modeloGestao';
 
 /**
  * Plano de gestão: mesma tela para Contrato e Ata. O componente só desenha; quem usa informa por
@@ -73,6 +86,15 @@ export interface TaskPlanLabels {
   semGestorMsg: string;
 }
 
+/** Modelo oferecido no "Aplicar modelo" (só os ativos). */
+export interface TaskPlanTemplateOption {
+  id: string;
+  nome: string;
+  /** Quando o módulo costuma entrar e em que processo SEI corre (modelos da CCGA). */
+  quando?: string;
+  processoTipo?: string;
+}
+
 export interface TaskPlanController {
   /** Chave do instrumento nos hooks de tarefa (contractKey ou ataKey). */
   entityKey: string;
@@ -80,7 +102,12 @@ export interface TaskPlanController {
   labels: TaskPlanLabels;
   useUpdateTask: (key: string) => PlanMutation<TaskUpdateVars>;
   useDeleteTask: (key: string) => PlanMutation<string>;
-  templates: Array<{ id: string; nome: string }>;
+  /** Modelo de gestão da CCGA (migration 210): as duas marcas do orientar, o ajuste da data e o módulo. */
+  useMarcarPedido: (key: string) => PlanMutation<MarcaTarefaInput>;
+  useRegistrarResposta: (key: string) => PlanMutation<MarcaTarefaInput>;
+  useAjustarPrazo: (key: string) => PlanMutation<{ taskId: string; prazo: string | null }>;
+  useAtualizarModulo: (key: string) => PlanMutation<AtualizarModuloInput>;
+  templates: TaskPlanTemplateOption[];
   loadingTemplates: boolean;
   applyTemplate: PlanAction<[templateId: string, onSuccess: () => void, moduloNome?: string]>;
   startPlan: PlanAction<[]>;
@@ -129,12 +156,21 @@ const StatusSoLeitura: React.FC<{ status: ContractTaskStatusValue }> = ({ status
 };
 
 /** Linha de uma tarefa do plano, igual em Contrato e Ata. */
-export type TaskPlanRowController = Pick<TaskPlanController, 'entityKey' | 'gestorNome' | 'labels' | 'useUpdateTask' | 'useDeleteTask' | 'somenteLeitura'>;
+export type TaskPlanRowController = Pick<
+  TaskPlanController,
+  'entityKey' | 'gestorNome' | 'labels' | 'useUpdateTask' | 'useDeleteTask' | 'useMarcarPedido' | 'useRegistrarResposta' | 'useAjustarPrazo' | 'somenteLeitura'
+>;
 
 export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowController; numero?: string }> = ({ task, controller, numero }) => {
-  const { entityKey, gestorNome, labels, useUpdateTask, useDeleteTask, somenteLeitura = false } = controller;
+  const { entityKey, gestorNome, labels, useUpdateTask, useDeleteTask, useMarcarPedido, useRegistrarResposta, useAjustarPrazo, somenteLeitura = false } = controller;
   const updateMutation = useUpdateTask(entityKey);
   const deleteMutation = useDeleteTask(entityKey);
+  const marcarPedido = useMarcarPedido(entityKey);
+  const registrarResposta = useRegistrarResposta(entityKey);
+  const ajustarPrazo = useAjustarPrazo(entityKey);
+  // Orientar: formulário da marca aberta (pedido enviado ou resposta recebida).
+  const [marca, setMarca] = useState<'PEDIDO' | 'RESPOSTA' | null>(null);
+  const [verRegra, setVerRegra] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const nomeTarefa = stripNumeracaoManual(task.nome);
   const [nome, setNome] = useState(nomeTarefa);
@@ -153,7 +189,15 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
   const sistemaDestino = (task as ContractTask).sistemaDestino;
 
   const isOpen = task.status !== 'CONCLUIDA' && task.status !== 'NAO_APLICAVEL';
-  const attention = isOpen ? classifyTaskAttention(task as ContractTask) : null;
+  // Com o pedido enviado, o aviso conta pela resposta esperada, não pela data de envio.
+  const esperando = aguardandoResposta(task);
+  const attention = isOpen ? classifyTaskAttention({ ...(task as ContractTask), prazo: prazoEfetivo(task) }) : null;
+  const regraPrazo = textoRegraPrazo(task);
+  const regraResposta = textoRegraResposta(task);
+  const temRegra = !!task.prazoAncora && task.prazoAncora !== 'FIXO';
+  const esforco = formatarEsforco(task.esforcoMin);
+  const temDetalhes = !!(task.lista?.length || task.nota || task.modeloSei || esforco);
+  const orientarAberto = isOpen && task.acao === 'ORIENTAR';
   const urgencyLabel =
     attention?.level === 'VENCIDA'
       ? `${Math.abs(attention.diasRestantes ?? 0)} ${Math.abs(attention.diasRestantes ?? 0) === 1 ? 'dia útil' : 'dias úteis'} de atraso`
@@ -188,9 +232,12 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
     );
   };
 
-  // Ao abrir, o campo relê o número (pode ter sido gravado pela pergunta da conclusão).
+  // Ao abrir, os campos releem o número e a data (podem ter mudado pela conclusão ou pelo recálculo).
   const alternarDetalhes = () => {
-    if (!expanded) setSei(task.seiNumero || '');
+    if (!expanded) {
+      setSei(task.seiNumero || '');
+      setPrazo(task.prazo || '');
+    }
     setExpanded(!expanded);
   };
 
@@ -206,7 +253,8 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
       // Vazio limpa o responsável próprio e a tarefa volta a herdar o gestor.
       responsavelNome: responsavel.nome.trim(),
       responsavelUserId: responsavel.nome.trim() ? responsavel.userId : undefined,
-      prazo: prazo || null,
+      // Só grava a data se o gestor mudou: com regra, a data mudada fica marcada como ajustada.
+      prazo: prazo && prazo !== task.prazo ? prazo : null,
       observacao: observacao || null,
       sei: novoSei === (task.seiNumero ?? null) ? undefined : novoSei
     });
@@ -268,6 +316,9 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
               {numero ? `${numero}. ${nomeTarefa}` : nomeTarefa}
             </span>
 
+            {task.acao && <AcaoEtiqueta acao={task.acao} comQuem={task.comQuem} />}
+            {task.doPregao && <PregaoEtiqueta />}
+
 
             {task.seiNumero && <NumeroSeiEtiqueta numero={task.seiNumero} />}
 
@@ -278,8 +329,21 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
-            {task.prazo ? <span>Prazo: {formatDateBR(task.prazo)}</span> : isOpen && <span>Sem prazo definido</span>}
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+            {esperando ? (
+              <span data-testid="plan-aguardando">
+                {task.prazoResposta ? <>Resposta até {formatDateBR(task.prazoResposta)}</> : 'Aguardando resposta'}
+                {task.pedidoEnviadoEm && <> · pedido em {formatDateBR(task.pedidoEnviadoEm)}</>}
+                {task.pedidoSei && <> · SEI {task.pedidoSei}</>}
+              </span>
+            ) : task.prazo ? (
+              <span>
+                Prazo: {formatDateBR(task.prazo)}
+                {isOpen && temRegra && (task.prazoAjustado ? ' · ajustada por você' : regraPrazo ? ` · ${regraPrazo}` : '')}
+              </span>
+            ) : (
+              isOpen && <span>Sem prazo definido</span>
+            )}
             {describeResponsavel(task.responsavelNome, gestorNome) && (
               <span>Resp: {describeResponsavel(task.responsavelNome, gestorNome)}</span>
             )}
@@ -291,7 +355,22 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
         </div>
 
         {/* Ações e Expansor */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+          {temDetalhes && (
+            <AppButton type="button" variant="link" size="sm" aria-expanded={verRegra} onClick={() => setVerRegra(!verRegra)}>
+              {task.lista?.length ? `${rotuloLista(task.acao)} (${task.lista.length})` : 'Detalhes'}
+            </AppButton>
+          )}
+          {orientarAberto && !somenteLeitura && !esperando && (
+            <AppButton type="button" variant="outline" size="sm" onClick={() => setMarca(marca === 'PEDIDO' ? null : 'PEDIDO')} disabled={marcarPedido.isPending}>
+              Pedido enviado
+            </AppButton>
+          )}
+          {orientarAberto && !somenteLeitura && esperando && (
+            <AppButton type="button" variant="outline" size="sm" onClick={() => setMarca(marca === 'RESPOSTA' ? null : 'RESPOSTA')} disabled={registrarResposta.isPending}>
+              Resposta recebida
+            </AppButton>
+          )}
           {externalLinkUrl && (
             <a
               href={externalLinkUrl}
@@ -334,6 +413,39 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           )}
         </div>
       </div>
+
+      {verRegra && temDetalhes && (
+        <RegraDetalhes
+          rotulo={rotuloLista(task.acao)}
+          lista={task.lista}
+          nota={task.nota}
+          modeloSei={task.modeloSei}
+          esforco={esforco}
+          regraPrazo={regraPrazo}
+          regraResposta={regraResposta}
+        />
+      )}
+
+      {marca === 'PEDIDO' && (
+        <MarcaOrientarForm
+          taskId={task.id}
+          tipo="PEDIDO"
+          isPending={marcarPedido.isPending}
+          error={marcarPedido.error}
+          onCancel={() => setMarca(null)}
+          onSubmit={({ sei: numero, data }) => marcarPedido.mutate({ taskId: task.id, sei: numero, data }, { onSuccess: () => setMarca(null) })}
+        />
+      )}
+      {marca === 'RESPOSTA' && (
+        <MarcaOrientarForm
+          taskId={task.id}
+          tipo="RESPOSTA"
+          isPending={registrarResposta.isPending}
+          error={registrarResposta.error}
+          onCancel={() => setMarca(null)}
+          onSubmit={({ sei: numero, data }) => registrarResposta.mutate({ taskId: task.id, sei: numero, data }, { onSuccess: () => setMarca(null) })}
+        />
+      )}
 
       {perguntandoSei && (
         <form
@@ -450,6 +562,27 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
               onChange={(e) => setPrazo(e.target.value)}
               className="form-input"
             />
+            {temRegra && (
+              <div data-testid="plan-prazo-regra" style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                {task.prazoAjustado ? (
+                  <>
+                    Data ajustada por você.{' '}
+                    <AppButton
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      disabled={ajustarPrazo.isPending}
+                      onClick={() => ajustarPrazo.mutate({ taskId: task.id, prazo: null }, { onSuccess: () => setExpanded(false) })}
+                    >
+                      Voltar à regra
+                    </AppButton>
+                  </>
+                ) : (
+                  <>Projetada pela regra{regraPrazo ? `: ${regraPrazo}` : ''}. Se mudar, a data fica como ajustada por você.</>
+                )}
+                <MutationError error={ajustarPrazo.error} />
+              </div>
+            )}
           </div>
 
           <div style={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: gestorNome ? '#64748b' : 'var(--color-warning-text)', marginTop: '-0.4rem' }}>
@@ -520,6 +653,9 @@ export const TaskPlanSection: React.FC<{
 }> = ({ plan, isLoading = false, controller: c }) => {
   const { labels } = c;
   const confirm = useConfirmDialog();
+  const atualizarModulo = c.useAtualizarModulo(c.entityKey);
+  // Contador clicado no topo: mostra só as tarefas daquele grupo.
+  const [filtro, setFiltro] = useState<GrupoTarefa | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [showApplyModel, setShowApplyModel] = useState(false);
   const [nomeNovoModulo, setNomeNovoModulo] = useState<string | null>(null);
@@ -562,6 +698,16 @@ export const TaskPlanSection: React.FC<{
     if (!selectedTemplateId || !nomeNovoModulo?.trim()) return;
     c.applyTemplate.run(selectedTemplateId, finishApply, nomeNovoModulo.trim());
   };
+
+  const modeloEscolhido = c.templates.find((tpl) => tpl.id === selectedTemplateId);
+  const dicaModelo = modeloEscolhido && (modeloEscolhido.quando || modeloEscolhido.processoTipo) && (
+    <div data-testid="task-plan-modelo-dica" style={{ fontSize: '0.78rem', color: '#475569' }}>
+      {modeloEscolhido.quando && <>Quando: {modeloEscolhido.quando}</>}
+      {modeloEscolhido.quando && modeloEscolhido.processoTipo && ' · '}
+      {modeloEscolhido.processoTipo && <>Corre no {modeloEscolhido.processoTipo.charAt(0).toLowerCase() + modeloEscolhido.processoTipo.slice(1)}</>}
+      {'. As datas das tarefas são calculadas pela regra de cada uma.'}
+    </div>
+  );
 
   if (isLoading) {
     return <DataTable columns={[]} data={[]} keyExtractor={() => ''} isLoading testId="task-plan-loading" />;
@@ -616,6 +762,7 @@ export const TaskPlanSection: React.FC<{
               </AppButton>
             </div>
 
+            {dicaModelo}
             <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
               ou{' '}
               <AppButton
@@ -652,10 +799,25 @@ export const TaskPlanSection: React.FC<{
       (n, macro) =>
         n +
         macro.tarefas.filter(
-          (t) => t.status !== 'CONCLUIDA' && t.status !== 'NAO_APLICAVEL' && classifyTaskAttention(t).level === 'VENCIDA'
+          (t) =>
+            t.status !== 'CONCLUIDA' &&
+            t.status !== 'NAO_APLICAVEL' &&
+            classifyTaskAttention({ ...(t as ContractTask), prazo: prazoEfetivo(t) }).level === 'VENCIDA'
         ).length,
       0
     );
+
+  const contagem: ContagemGrupos = { COMIGO: 0, COBRAR: 0, AGUARDANDO: 0, FONTE: 0 };
+  for (const macro of plan.macrotarefas) {
+    for (const t of macro.tarefas as PlanTask[]) {
+      const g = grupoDaTarefa(t);
+      if (g !== 'FEITA') contagem[g]++;
+    }
+  }
+  const visivel = (t: PlanTask) => !filtro || grupoDaTarefa(t) === filtro;
+  const gruposVisiveis = filtro
+    ? moduleGroups.filter((g) => g.macrotarefas.some((m) => (m.tarefas as PlanTask[]).some(visivel)))
+    : moduleGroups;
 
   return (
     <div>
@@ -731,6 +893,21 @@ export const TaskPlanSection: React.FC<{
         </div>
       </div>
 
+      {progresso.total > 0 && <PlanoContadores contagem={contagem} ativo={filtro} onChange={setFiltro} />}
+      {filtro && filtro !== 'FEITA' && (
+        <div data-testid="task-plan-filtro" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem', color: '#475569', marginBottom: '0.75rem' }}>
+          <span>
+            Mostrando: <strong>{GRUPO_INFO[filtro].rotulo}</strong> ({GRUPO_INFO[filtro].descricao})
+          </span>
+          <AppButton type="button" variant="link" size="sm" onClick={() => setFiltro(null)}>
+            Mostrar todas
+          </AppButton>
+        </div>
+      )}
+      {filtro && gruposVisiveis.length === 0 && (
+        <div style={{ fontSize: '0.85rem', color: '#64748b', padding: '0.75rem 0' }}>Nenhuma tarefa neste grupo.</div>
+      )}
+
       {showApplyModel && !c.somenteLeitura && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -761,6 +938,7 @@ export const TaskPlanSection: React.FC<{
             </AppButton>
             <InfoHint testId="task-plan-apply-note" content="As etapas e tarefas do modelo são acrescentadas ao plano atual; nada do que já existe é alterado." />
           </div>
+          {dicaModelo}
         </div>
       )}
 
@@ -777,7 +955,7 @@ export const TaskPlanSection: React.FC<{
 
       {/* Lista de Macrotarefas e Tarefas */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {moduleGroups.map((group) => {
+        {gruposVisiveis.map((group) => {
           const collapsed = collapsedGroups.has(group.key);
           return (
           <div key={group.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -810,7 +988,20 @@ export const TaskPlanSection: React.FC<{
                   : undefined
               }
             />
-        {!collapsed && group.macrotarefas.map((macro, macroIndex) => (
+            {!collapsed && group.modulo && (group.modulo.processoTipo || group.modulo.ancoraData) && (
+              <ModuloDados
+                key={`${group.modulo.id}-${group.modulo.processoSei ?? ''}-${group.modulo.ancoraData ?? ''}`}
+                modulo={group.modulo}
+                somenteLeitura={c.somenteLeitura}
+                isPending={atualizarModulo.isPending}
+                error={atualizarModulo.error}
+                onSave={({ processoSei, ancora }) => {
+                  if (!processoSei && !ancora) return;
+                  atualizarModulo.mutate({ moduloId: group.modulo!.id, processoSei, ancora });
+                }}
+              />
+            )}
+        {!collapsed && group.macrotarefas.map((macro, macroIndex) => (filtro && !(macro.tarefas as PlanTask[]).some(visivel)) ? null : (
           <div
             key={macro.id}
             style={{
@@ -830,10 +1021,10 @@ export const TaskPlanSection: React.FC<{
             />
 
             <div>
-              {macro.tarefas.map((tarefa, tarefaIndex) => (
-                <TaskPlanRow key={tarefa.id} task={tarefa} controller={c} numero={numeroTarefa(macroIndex, tarefaIndex)} />
-              ))}
-              {!c.somenteLeitura && <AddTaskForm
+              {macro.tarefas.map((tarefa, tarefaIndex) =>
+                visivel(tarefa) ? <TaskPlanRow key={tarefa.id} task={tarefa} controller={c} numero={numeroTarefa(macroIndex, tarefaIndex)} /> : null
+              )}
+              {!c.somenteLeitura && !filtro && <AddTaskForm
                 gestorNome={c.gestorNome}
                 isPending={c.createTask.isPending}
                 onSubmit={(values) =>
@@ -852,7 +1043,7 @@ export const TaskPlanSection: React.FC<{
           );
         })}
 
-        {!c.somenteLeitura && (
+        {!c.somenteLeitura && !filtro && (
           <AddMacrotaskForm
             isPending={c.saveMacrotask.isPending}
             onSubmit={(nome) => c.saveMacrotask.run({ planId: plan.id, nome: stripNumeracaoManual(nome) })}

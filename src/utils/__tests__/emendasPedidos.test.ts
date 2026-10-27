@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { avisosDeEmpenho } from '../emendasEmpenho';
-import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notasEmitidasDepoisDaAnulacao, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { ConferenciaEmpenho, NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
@@ -21,7 +21,7 @@ const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null, siopEmendaAno: null,
   siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
   empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], ...extra
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
 });
 const itens = new Map([item('a'), item('b', { valorUnitario: 10, numeroAta: '00061/2024', vigenciaFinal: '2026-12-19' }), item('v', { ataEncerrada: true, numeroAta: '00020/2025', vigenciaFinal: '2026-05-28' })].map((i) => [i.itemKey, i]));
 const kit = linha({ tipo: 'KIT', itemKey: null, kitId: 'k', kitComposicao: [{ itemKey: 'a', quantidade: 1 }, { itemKey: 'b', quantidade: 2 }], quantidade: 10 });
@@ -373,6 +373,33 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
     expect(tarefasDoPedido(autorizado, itens, semNotas, HOJE, true).some((t) => t.chave === 'envio-cgofi')).toBe(false);
   });
 
+  it('solicitação só com itens de empenho anulado não pede envio à CGOFI e a rodada mostra o empenho anulado (pedido 528)', () => {
+    const anulada = { ...l3, cancelada: true, canceladaMotivo: 'Empenho anulado em 28/09/2026: voltou à interlocução no pedido 607.' };
+    const enviada = { ...doc('d1', '35938854', A, '2026-06-15', ['l1']), enviosCgofi: [{ numero: '35946757', data: '2026-06-19' }] };
+    const semEnvio = doc('d3', '35939233', B, '2026-06-16', []);
+    const anulacao = { id: 'a1', total: false, destino: 'INTERLOCUCAO' as const, novoPedidoId: null, novoPedidoNumero: 607, notas: ['2026NE000250'], linhas: [{ linhaId: 'l3', novaLinhaId: null, itemKey: l3.itemKey, kitNome: null, quantidade: 5 }], documentoSei: '37079404', anuladoEm: '2026-09-28', motivo: 'x', criadoPorNome: null };
+    const p = pedido({ etapa: 'CONTRATACAO', linhas: [l1, anulada], documentos: [enviada, semEnvio], anulacoes: [anulacao] });
+    expect(faltaEnvioCgofi(p)).toEqual([]);
+    const r = rodadasDoPedido(p, semNotas);
+    expect(r[1]).toMatchObject({ faltaEnvio: 0, semRegistro: 0, soAnulados: true, linhas: '1 com empenho anulado', anulados: { itens: 1, notas: ['2026NE000250'], anuladoEm: '2026-09-28' } });
+    expect(r[0]).toMatchObject({ soAnulados: false, anulados: { itens: 0 } });
+    // Linha cancelada à mão (sem registro de anulação): a regra de antes vale.
+    const semRegistro = pedido({ ...p, anulacoes: [] });
+    expect(faltaEnvioCgofi(semRegistro).map((d) => d.numero)).toEqual(['35939233']);
+  });
+
+  it('notas do pedido emitidas na data da anulação ou depois, fora das linhas marcadas: a compra pode ter sido refeita', () => {
+    const p = pedido({ etapa: 'CONTRATACAO', linhas: [l1, l2, l3] });
+    const notas = new Map<string, NotaDaLinha>([
+      ['l1', { ...nota('l1', '2026NE000422', null), emitidaEm: '2026-10-02', valorEmpenhado: 8365.28 }],
+      ['l2', { ...nota('l2', '2026NE000279', null), emitidaEm: '2026-07-10', valorEmpenhado: 100 }],
+      ['l3', { ...nota('l3', '2026NE000250', null), emitidaEm: '2026-06-22', valorEmpenhado: 0 }]
+    ]);
+    expect(notasEmitidasDepoisDaAnulacao(p, notas, new Set(['l3']), '2026-09-28').map((x) => x.nota)).toEqual(['2026NE000422']);
+    expect(notasEmitidasDepoisDaAnulacao(p, notas, new Set(['l1', 'l3']), '2026-09-28')).toEqual([]);
+    expect(notasEmitidasDepoisDaAnulacao(p, notas, new Set(['l3']), '')).toEqual([]);
+  });
+
   it('a linha sabe qual solicitação a cobre: pela ligação gravada ou pela solicitação única da ata', () => {
     const p = pedido({ etapa: 'AUTORIZADO', linhas: [l1, l2, l3], documentos: [doc('d1', '37098929', A, '2026-09-24', ['l1']), doc('d2', '37099000', A, null, []), doc('d3', '37104393', B, '2026-09-24', [])] });
     expect(situacaoDaLinha(p, l1, semNotas)).toMatchObject({ situacao: 'AUTORIZADO', solicitacao: { numero: '37098929' } });
@@ -460,13 +487,41 @@ describe('ROTULO_AVISO — um nome por aviso em todas as telas', () => {
       expect(ROTULO_AVISO[t].split(' ').length).toBeLessThanOrEqual(7);
     }
     expect([...TIPOS_AVISO]).toEqual([...TIPOS_AVISO].sort((a, b) => GRAVIDADE_DO_AVISO[a] - GRAVIDADE_DO_AVISO[b]));
-    expect(TIPOS_AVISO[0]).toBe('ataVencida');
+    expect(TIPOS_AVISO[0]).toBe('empenhoAnulado');
   });
   it('a etiqueta curta dos avisos de empenho é o mesmo nome do filtro', () => {
-    const c: ConferenciaEmpenho = { emenda: '202612340001', itemKey: '00033/2025-200331-00003', qtdPedido: 38, qtdNasNotas: 41, notas: ['2026NE000456'], pedidoIds: ['p1'], pedidos: [1], situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [] };
+    const c: ConferenciaEmpenho = { emenda: '202612340001', itemKey: '00033/2025-200331-00003', qtdPedido: 38, qtdNasNotas: 41, notas: ['2026NE000456'], pedidoIds: ['p1'], pedidos: [1], situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [], notasAnuladas: [] };
     const [mais] = avisosDeEmpenho([c], new Map());
     const [menos] = avisosDeEmpenho([{ ...c, situacao: 'A_MENOS', qtdNasNotas: 30 }], new Map());
     expect(mais.curto).toBe(ROTULO_AVISO.empenhoAMais);
     expect(menos.curto).toBe(ROTULO_AVISO.empenhoAMenos);
+  });
+});
+
+describe('empenho anulado (migration 203)', () => {
+  const nota = (linhaId: string, n: string | null, valorEmpenhado: number | null): NotaDaLinha => ({ linhaId, nota: n, regra: n ? 'FORNECEDOR' : null, motivo: n ? null : 'SEM_CONTRATO', contractKey: null, empenhoId: n ? 'e' : null, valorEmpenhado, valorLiquidado: null, valorPago: null, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: null, atualizadoEm: null });
+  const zerada = linha({ id: 'z', itemKey: 'a' });
+  const boa = linha({ id: 'b', itemKey: 'b' });
+  const semNota = linha({ id: 's', itemKey: 'a' });
+  const notas = new Map([nota('z', '2026NE000088', 0), nota('b', '2026NE000093', 301912.31), nota('s', null, null)].map((n) => [n.linhaId, n]));
+
+  it('só a linha com nota zerada no Tesouro, e só depois do envio à CGOFI', () => {
+    const p = pedido({ etapa: 'CONTRATACAO', linhas: [zerada, boa, semNota] });
+    expect(linhasComEmpenhoAnulado(p, notas).map((l) => l.id)).toEqual(['z']);
+    expect(linhasComEmpenhoAnulado(pedido({ etapa: 'AUTORIZADO', linhas: [zerada] }), notas)).toEqual([]);
+    expect(linhasComEmpenhoAnulado(pedido({ etapa: 'CONTRATACAO', linhas: [{ ...zerada, cancelada: true }] }), notas)).toEqual([]);
+  });
+
+  it('aviso grave, o primeiro da lista, com a nota no texto', () => {
+    const avisos = avisosDoPedido(pedido({ etapa: 'CONTRATACAO', linhas: [zerada, boa] }), itens, HOJE, notas);
+    expect(avisos[0]).toMatchObject({ tipo: 'empenhoAnulado', curto: 'Empenho anulado', linhaId: 'z' });
+    expect(avisos[0].texto).toContain('2026NE000088');
+    expect(avisos[0].texto).toContain('1 item não tem outra nota');
+  });
+
+  it('a linha mostra "Empenho anulado"', () => {
+    const p = pedido({ etapa: 'EMPENHADO', linhas: [zerada, boa] });
+    expect(situacaoDaLinha(p, zerada, notas)).toMatchObject({ situacao: 'EMPENHO_ANULADO', pendente: true });
+    expect(situacaoDaLinha(p, boa, notas).situacao).not.toBe('EMPENHO_ANULADO');
   });
 });

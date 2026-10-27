@@ -21,11 +21,23 @@ import {
   fetchConferenciaEmpenho,
   fetchCredorDiferente,
   fetchNotasSemPedido,
+  ligarEmendaAoPedido,
+  removerEmendaDoPedido,
   salvarPedidoEmenda,
   avancarPedidoEmenda,
   cancelarPedidoEmenda,
+  registrarAnulacaoEmpenho,
+  fetchExecucaoEmendas,
+  fetchDadosDaAtaParaAutorizacao,
   informarSolicitacaoDaAta,
   registrarEnvioCgofi,
+  fetchEmendasSiop,
+  fetchContatosDasEmendas,
+  fetchAsparDosOrgaos,
+  salvarEmendaSiop,
+  apagarEmendaSiop,
+  registrarContatoEmenda,
+  salvarAsparEmenda,
   type AcaoPedido,
   type CredorDiferente,
   type BeneficiarioEmenda,
@@ -169,6 +181,25 @@ export function useNotasSemPedido() {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'notas-sem-pedido'], queryFn: fetchNotasSemPedido, staleTime: 5 * 60_000 });
 }
 
+/** Ligar ou tirar uma emenda do pedido religa as notas: recarrega pedidos, notas e conferências (migration 211). */
+export function useLigarEmendaAoPedido() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: Parameters<typeof ligarEmendaAoPedido>[0]) => ligarEmendaAoPedido(p),
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS] })
+  });
+}
+
+export function useRemoverEmendaDoPedido() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: { id: string; versao: number }) => removerEmendaDoPedido(p.id, p.versao),
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS] })
+  });
+}
+
 /** Pedido mexe no saldo: recarrega pedidos, reservado e kits (kits possíveis). */
 function useInvalidarPedidos() {
   const qc = useQueryClient();
@@ -199,9 +230,65 @@ export function useRegistrarEnvioCgofi() {
   return useMutation({ mutationFn: registrarEnvioCgofi, retry: 0, onSettled: invalidar });
 }
 
+/** Execução de cada emenda pelo Portal da Transparência (migration 204), lida uma vez por dia pelo servidor. */
+export function useExecucaoEmendas({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'execucao-portal'], queryFn: fetchExecucaoEmendas, staleTime: 30 * 60_000, enabled });
+}
+
+/** Dados da ata para os quadros da autorização de empenho (pregão, UASG, fornecedor, SEI da ata assinada). */
+export function useDadosDaAtaParaAutorizacao(ataKey: string | null) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'ata-autorizacao', ataKey], queryFn: () => fetchDadosDaAtaParaAutorizacao(ataKey!), enabled: Boolean(ataKey), staleTime: 30 * 60_000 });
+}
+
+export function useRegistrarAnulacao() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: registrarAnulacaoEmpenho, retry: 0, onSettled: invalidar });
+}
+
 export function useCancelarPedido() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: (v: { id: string; versao: number; motivo: string }) => cancelarPedidoEmenda(v.id, v.versao, v.motivo), retry: 0, onSettled: invalidar });
+}
+
+/** Emendas vistas no SIOP (migration 205): todos os que leem as emendas. */
+export function useEmendasSiop({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-siop'], queryFn: fetchEmendasSiop, enabled });
+}
+
+/** Contatos das emendas e ASPAR dos órgãos: só quem trata com eles, coordenador e gestor de emendas (o banco também). */
+export function useContatosDasEmendas({ enabled = true }: LeituraOpcional = {}) {
+  const podeGerir = usePodeGerirEmendas();
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-contatos'], queryFn: fetchContatosDasEmendas, enabled: enabled && podeGerir });
+}
+
+export function useAsparDosOrgaos() {
+  const podeGerir = usePodeGerirEmendas();
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'aspar'], queryFn: fetchAsparDosOrgaos, enabled: podeGerir });
+}
+
+/** Emenda nova ou alterada mexe na lista e nos avisos: recarrega tudo de Emendas, como o pedido. */
+export function useSalvarEmendaSiop() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: salvarEmendaSiop, retry: 0, onSettled: invalidar });
+}
+
+export function useApagarEmendaSiop() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: (v: { id: string; versao: number }) => apagarEmendaSiop(v.id, v.versao), retry: 0, onSettled: invalidar });
+}
+
+export function useRegistrarContatoEmenda() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { emendaId: string; contato: Parameters<typeof registrarContatoEmenda>[1] }) => registrarContatoEmenda(v.emendaId, v.contato),
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'emendas-contatos'] })
+  });
+}
+
+export function useSalvarAspar() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: salvarAsparEmenda, retry: 0, onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'aspar'] }) });
 }
 
 /** Hoje no horário de Brasília (AAAA-MM-DD). */

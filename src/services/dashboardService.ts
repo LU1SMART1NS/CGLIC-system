@@ -74,6 +74,7 @@ import { alocadoAcimaDoLimite, limiteComPreposicao, limiteProvisorio } from '../
 import { VIGENCIA_RULES, PAGAMENTO_RULES, TAREFA_RULES, classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
 import { motivoDoLembrete, motivoDoReajuste } from '../utils/motivoDetalhe';
+import { prazoEfetivo } from '../utils/modeloGestao';
 
 /**
  * Auxiliar para cálculo de dias restantes de vigência
@@ -921,7 +922,9 @@ export function calculateAttentionSummary(params: {
     for (const macro of plan.macrotarefas) {
       for (const task of macro.tarefas) {
         if (task.status === 'CONCLUIDA' || task.status === 'NAO_APLICAVEL') continue;
-        const prazo = task.prazo ? parseDateBRT(task.prazo) : null;
+        // Orientar com pedido enviado: conta pela resposta esperada (migration 210).
+        const prazoTarefa = prazoEfetivo(task);
+        const prazo = prazoTarefa ? parseDateBRT(prazoTarefa) : null;
         if (!prazo) continue;
         const dias = differenceInBusinessDays(prazo, currentDate);
         const nivelPrazo = classifyTarefaPrazo(dias);
@@ -938,7 +941,7 @@ export function calculateAttentionSummary(params: {
           numeroContrato: `ARP ${numAta}`,
           taskId: task.id,
           diasRelevantes: dias,
-          dataAlvo: task.prazo,
+          dataAlvo: prazoTarefa,
           badgeLabel: dias < 0 ? `Vencida (${dias} d.u.)` : dias === 0 ? 'Vence Hoje' : du(dias)
         });
       }

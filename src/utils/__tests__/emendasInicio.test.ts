@@ -17,7 +17,7 @@ const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null, siopEmendaAno: null,
   siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
   empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], ...extra
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
 });
 const nota = (linhaId: string): NotaDaLinha => ({
   linhaId, nota: '2026NE000001', regra: 'CONTRATO', motivo: null, contractKey: null, empenhoId: 'e1',
@@ -62,7 +62,7 @@ describe('Início do gestor de emendas', () => {
     const empenhado = pedidos.find((p) => p.id === 'empenhado')!;
     const diferenca: ConferenciaEmpenho = {
       emenda: '202630840008', itemKey: 'longe', qtdPedido: 3, qtdNasNotas: 5, notas: ['2026NE000001'], pedidos: [1], pedidoIds: [empenhado.id],
-      situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: []
+      situacao: 'A_MAIS', notasFora: [], notasNaoLidas: [], notasPorValor: [], notasComItemSemAta: [], notasAnuladas: []
     };
     const notas = new Map([[comNota.id, nota(comNota.id)]]);
     expect(avisosDosPedidosParaOMenu(pedidos, ITENS, HOJE, notas, new Map([[empenhado.id, [diferenca]]]))).toEqual({

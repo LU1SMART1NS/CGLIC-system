@@ -1,7 +1,7 @@
-import { beforeAll, describe, it, expect, vi } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
-import type { AutorEmenda, ItemCaep, LinhaPedido, PedidoEmenda } from '../../../services/emendasService';
+import type { AutorEmenda, ContatoDaEmenda, EmendaSiop, ItemCaep, LinhaPedido, PedidoEmenda } from '../../../services/emendasService';
 
 const item: ItemCaep = {
   itemKey: 'a', numeroAta: '00031/2025', codigoUasg: '200331', numeroItem: '00001', descricao: 'Viatura', codigoPdm: 1,
@@ -17,14 +17,30 @@ const pedido = (id: string, autorId: string | null, etapa: PedidoEmenda['etapa']
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null, siopEmendaAno: null,
   siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
   empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)], devolucoes: [], documentos: []
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: []
 });
 const autor = (id: string, nome: string, tipo: AutorEmenda['tipo']): AutorEmenda => ({ id, nome, tipo, nomeCivil: null, partido: 'PX', uf: 'SP', emExercicio: true, legislatura: 57, lidoEm: null });
 
 const COM_CONTATO = { ...pedido('p1', 'A1', 'OFICIO', 3), contatoNome: 'Maria da Assessoria', contatoTelefone: '61999990000', contatoEmail: 'maria@camara.leg.br' };
+// Pedido empenhado com duas emendas (migration 211): a conferida e a sobra de uma emenda de 2024.
+const DUAS_EMENDAS: PedidoEmenda = {
+  ...pedido('p5', 'A3', 'CONTRATACAO', 2),
+  numero: 520,
+  siopEmenda: '71070008',
+  siopEmendaAno: 2026,
+  outrasEmendas: [{ id: 'o1', ano: 2024, numero: '71070011', documentoSei: '35633634', observacao: 'sobra de 2024', criadoPorNome: 'Luís', criadoEm: '2026-10-26T18:00:00Z' }]
+};
 const PEDIDOS = [COM_CONTATO, pedido('p2', 'A1', 'EMPENHADO', 2), pedido('p3', 'A2', 'RESERVADO', 1), pedido('p4', null, 'RESERVADO', 4)];
 const ITENS: ItemCaep[] = [item];
 const AUTORES = [autor('A1', 'Deputado Um', 'DEPUTADO'), autor('A2', 'Senadora Dois', 'SENADOR'), autor('A3', 'Bancada Três', 'BANCADA')];
+
+const emendaSiop = (id: string, numero: string, vistaEm: string): EmendaSiop => ({
+  id, ano: 2026, numero, autorId: 'A2', valor: 500_000, gnd: 'GND-4', beneficiarioId: null, objeto: null, vistaEm, observacao: null, versao: 1, criadoPorNome: null
+});
+const EMENDAS = [emendaSiop('e1', '42680021', '2026-10-10'), emendaSiop('e2', '42680022', '2026-10-20')];
+const CONTATOS: ContatoDaEmenda[] = [
+  { id: 'c1', emendaId: 'e2', contatoEm: '2026-10-21', comQuem: 'ASPAR · PM · SP', meio: 'WHATSAPP', resumo: 'vão mandar os itens', criadoPorNome: null, criadoEm: '2026-10-21T12:00:00Z' }
+];
 
 const perfil = vi.hoisted(() => ({ gerir: true }));
 
@@ -39,7 +55,15 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useBeneficiariosEmendas: () => ({ data: [] }),
   useKitsEmendas: () => ({ data: [] }),
   usePodeGerirEmendas: () => perfil.gerir,
-  usePodeVerContratos: () => false
+  usePodeVerContratos: () => false,
+  useEmendasSiop: () => ({ data: EMENDAS, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
+  useContatosDasEmendas: () => ({ data: CONTATOS }),
+  useAsparDosOrgaos: () => ({ data: [] }),
+  useApagarEmendaSiop: () => ({ isPending: false, mutateAsync: vi.fn() }),
+  useExecucaoEmendas: () => ({ data: [] }),
+  useRemoverEmendaDoPedido: () => ({ isPending: false, mutateAsync: vi.fn() }),
+  useLigarEmendaAoPedido: () => ({ isPending: false, mutateAsync: vi.fn() }),
+  useNotasSemPedido: () => ({ data: [] })
 }));
 vi.mock('../PedidoModal', () => ({ PedidoModal: () => null }));
 vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined, ipca: null, semPrevisao: false }) }));
@@ -62,23 +86,24 @@ describe('Pedidos: ver por pedido ou por autor', () => {
     expect(render('/?autor=a-definir')).toContain('1 de 4 pedidos');
   });
 
-  it('?ver=autor soma os pedidos por autor; com Todos mostra Já empenhado', () => {
+  it('?ver=autor soma os pedidos por autor, com as emendas do ano e a sobra', () => {
     const html = render('/?ver=autor');
     expect(html).toContain('emendas-por-autor-tabela');
     expect(html).not.toContain('emendas-pedidos-tabela');
     expect(html).toContain('Valor reservado');
-    expect(html).toContain('Já empenhado');
+    expect(html).toContain('Emendas 2026');
+    expect(html).toContain('Sobra');
+    expect(html).toContain('emendas-sobra-faixa');
     // A1 (2 pedidos, R$ 500), A2 e "Parlamentar a definir"; A3 não tem pedido
     expect(html).toContain('Deputado Um');
     expect(html).toContain('Parlamentar a definir');
     expect(html).not.toContain('Bancada Três');
   });
 
-  it('por autor respeita a fase escolhida e tira Já empenhado', () => {
+  it('por autor respeita a fase escolhida no valor reservado', () => {
     // ?etapa=RESERVADO abre a fase Interlocução (Reservado, Minuta e Ofício).
     const html = render('/?ver=autor&etapa=RESERVADO');
     expect(html).toContain('Valor nesta fase');
-    expect(html).not.toContain('Já empenhado');
     expect(html).toContain('Senadora Dois');
     expect(html).toContain('Deputado Um');
   });
@@ -274,5 +299,99 @@ describe('Pedidos: situação por linha, blocos por ata e O que falta (migration
     expect(html).toContain('background:var(--primary-light)');
     expect(html).toContain('emendas-item-link');
     expect(html).toContain('/atas/detalhe/00031%2F2025-200331/itens/00001?aba=emendas');
+  });
+
+  it('?ver=emenda: emendas vistas no SIOP sem pedido, a mais antiga sem contato urgente (decisão de 26/10/2026)', () => {
+    perfil.gerir = true;
+    const html = render('/?ver=emenda&situacao=sem');
+    expect(html).toContain('emendas-por-emenda-tabela');
+    expect(html).not.toContain('emendas-pedidos-tabela');
+    expect(html).toContain('Registrar emenda do SIOP');
+    expect(html).toContain('4268 0021');
+    expect(html).toContain('Sem pedido · sem contato');
+    expect(html).toContain('13 dias sem contato');
+    expect(html).toContain('Sem pedido · em conversa');
+    expect(html).toContain('ASPAR · PM · SP');
+  });
+
+  it('?ver=emenda para a consulta: sem o botão de registrar e sem a coluna dos contatos', () => {
+    perfil.gerir = false;
+    const html = render('/?ver=emenda');
+    expect(html).toContain('4268 0021');
+    expect(html).not.toContain('Registrar emenda do SIOP');
+    expect(html).not.toContain('Último contato');
+    perfil.gerir = true;
+  });
+
+  it('?ver=emenda: sem a coluna da data de registro (decisão de 26/10/2026), cabeçalho que ordena e sem a faixa vermelha na linha', () => {
+    perfil.gerir = true;
+    const html = render('/?ver=emenda');
+    expect(html).not.toContain('Registrada em');
+    expect(html).not.toContain('Vista no SIOP');
+    expect(html).not.toContain('pelo pedido');
+    expect(html).not.toContain('inset 3px 0 0');
+    expect(html).toContain('aria-sort');
+  });
+
+  it('?ver=emenda abre em Todas, como as outras telas; ?situacao=com mostra a coluna Pedidos', () => {
+    perfil.gerir = true;
+    const marcado = (html: string, id: string) => new RegExp(`aria-pressed="true"[^>]*data-testid="emendas-por-emenda-situacao-${id}"`).test(html);
+    const html = render('/?ver=emenda');
+    expect(marcado(html, 'todas')).toBe(true);
+    expect(marcado(html, 'sem')).toBe(false);
+    expect(marcado(render('/?ver=emenda&situacao=sem'), 'sem')).toBe(true);
+    const comPedido = render('/?ver=emenda&situacao=com');
+    expect(comPedido).not.toContain('Registrada em');
+    expect(comPedido).not.toContain('Último contato');
+  });
+
+  it('por pedido: faixa acima do trilho com as emendas sem pedido, fora da contagem das fases (decisão de 26/10/2026)', () => {
+    perfil.gerir = true;
+    const html = render('/');
+    expect(html).toContain('emendas-pedidos-faixa-sem-pedido');
+    expect(html).toContain('2 emendas indicadas no SIOP ainda sem pedido');
+    expect(html).toContain('1 sem contato há 7 dias ou mais');
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('Ver emendas');
+    expect(render('/?ver=emenda')).not.toContain('emendas-pedidos-faixa-sem-pedido');
+  });
+
+  it('faixa para a consulta: sem a urgência, que depende dos contatos que ela não lê', () => {
+    perfil.gerir = false;
+    const html = render('/');
+    expect(html).toContain('2 emendas indicadas no SIOP ainda sem pedido');
+    expect(html).not.toContain('sem contato há');
+    perfil.gerir = true;
+  });
+});
+
+describe('Pedidos: várias emendas por pedido (migration 211)', () => {
+  beforeAll(() => {
+    PEDIDOS.push(DUAS_EMENDAS);
+  });
+  afterAll(() => {
+    PEDIDOS.pop();
+  });
+
+  it('o pedido aberto lista a emenda conferida e a outra, com quem ligou, o SEI e o botão de tirar', () => {
+    perfil.gerir = true;
+    const html = render('/?pedido=p5');
+    expect(html).toContain('emendas-pedido-emendas-p5');
+    expect(html).toContain('Emendas do pedido');
+    expect(html).toContain('2026 · 7107 0008');
+    expect(html).toContain('2024 · 7107 0011');
+    expect(html).toContain('outra emenda · ligada por Luís em 26/10/2026 · SEI 35633634');
+    expect(html).toContain('sobra de 2024');
+    expect(html).toContain('emendas-pedido-emenda-tirar-71070011');
+    expect(html).toContain('emendas-pedido-emenda-adicionar-p5');
+  });
+
+  it('a consulta vê as emendas, sem os botões', () => {
+    perfil.gerir = false;
+    const html = render('/?pedido=p5');
+    expect(html).toContain('2024 · 7107 0011');
+    expect(html).not.toContain('emendas-pedido-emenda-tirar-71070011');
+    expect(html).not.toContain('emendas-pedido-emenda-adicionar-p5');
+    perfil.gerir = true;
   });
 });

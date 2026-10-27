@@ -1,7 +1,9 @@
 import React from 'react';
+import type { DetalhesModeloGestao, RegraTarefaGestao } from '../../types';
+import type { TipoInstrumento } from '../../adapters/modeloGestaoRpcAdapter';
 
 /** Formato comum dos modelos de gestão (Atas e Contratos têm a mesma estrutura). */
-export interface TaskTemplateTask {
+export interface TaskTemplateTask extends RegraTarefaGestao {
   id: string;
   nome: string;
   ordem: number;
@@ -16,7 +18,7 @@ export interface TaskTemplateMacrotask {
   tarefas: TaskTemplateTask[];
 }
 
-export interface TaskTemplate {
+export interface TaskTemplate extends DetalhesModeloGestao {
   id: string;
   nome: string;
   descricao?: string;
@@ -59,6 +61,8 @@ export interface TaskTemplatesCopy {
 }
 
 export interface TaskTemplatesKit {
+  /** Atas ou contratos: escolhe as RPCs da regra e dos detalhes do modelo (migration 215). */
+  tipo: TipoInstrumento;
   hooks: TaskTemplatesHooks;
   copy: TaskTemplatesCopy;
   /** Só o coordenador altera os modelos (migration 199); o gestor só vê. Preenchido pela tela. */

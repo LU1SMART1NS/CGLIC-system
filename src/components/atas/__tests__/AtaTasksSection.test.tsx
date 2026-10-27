@@ -7,6 +7,10 @@ import type { AtaTask, AtaTaskPlan, ContractDashboardRecord, ContractTask, Contr
 const { idle } = vi.hoisted(() => ({ idle: () => ({ mutate: () => {}, isPending: false, error: null }) }));
 
 // O plano é editável para gestor e coordenador; a consulta só lê (TaskPlanSection.test.tsx).
+vi.mock('../../../hooks/useModeloGestao', () => {
+  const parado = () => ({ mutate: () => undefined, isPending: false, error: null });
+  return { useMarcarPedidoTarefa: parado, useRegistrarRespostaTarefa: parado, useAjustarPrazoTarefa: parado, useAtualizarModulo: parado };
+});
 vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ role: 'gestor' }) }));
 vi.mock('../../../hooks/useUpdateAtaTask', () => ({ useUpdateAtaTask: idle }));
 vi.mock('../../../hooks/useApplyAtaTaskTemplate', () => ({ useApplyAtaTaskTemplate: idle }));

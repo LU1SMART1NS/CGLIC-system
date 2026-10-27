@@ -18,7 +18,7 @@ import {
 
 /** O que o ✓ resolve: um aviso com chave (saldo, reajuste, lembrete) ou uma tarefa do plano (concluir). */
 export type AlvoResolucao =
-  | { tipo: 'AVISO'; chave: string; titulo: string; contexto?: string }
+  | { tipo: 'AVISO'; chave: string; titulo: string; contexto?: string; /** Mais avisos resolvidos com a mesma justificativa (as notas de uma emenda). */ outrasChaves?: string[] }
   | { tipo: 'TAREFA_ATA' | 'TAREFA_CONTRATO'; taskId: string; titulo: string; contexto?: string };
 
 const REGRA: Record<AvisoResolvivelTipo, string> = {
@@ -81,8 +81,10 @@ export function useResolverAviso() {
     setErro(null);
     try {
       if (alvo.tipo === 'AVISO') {
-        await resolver.mutateAsync({ chave: alvo.chave, tipo: tipoDaChave(alvo.chave), justificativa });
-        toast.success('Aviso marcado como resolvido.');
+        for (const chave of [alvo.chave, ...(alvo.outrasChaves ?? [])]) {
+          await resolver.mutateAsync({ chave, tipo: tipoDaChave(chave), justificativa });
+        }
+        toast.success(alvo.outrasChaves?.length ? `${alvo.outrasChaves.length + 1} avisos marcados como resolvidos.` : 'Aviso marcado como resolvido.');
       } else {
         const tabela = alvo.tipo === 'TAREFA_ATA' ? 'ata_tasks' : 'contract_tasks';
         const observacao = await observacaoComJustificativa(tabela, alvo.taskId, justificativa);

@@ -24,8 +24,11 @@ import { PainelCartao, PainelCartoes, type PainelCartaoLinha } from '../instrume
 import {
   hojeEmBrasilia,
   useAutoresEmendas,
+  useContatosDasEmendas,
   useCredorDiferente,
   useDiferencasDeEmpenho,
+  useEmendasSiop,
+  useExecucaoEmendas,
   useItensCaep,
   useNotasDasLinhas,
   useNotasSemPedido,
@@ -33,7 +36,9 @@ import {
   usePodeGerirEmendas
 } from '../../hooks/useEmendas';
 import { AvisosResolvidosLista, BotaoResolvido, useResolverAviso } from '../avisos/ResolverAviso';
-import { chaveNotaSemPedido, notasSemPedidoPendentes } from '../../utils/emendasConferenciaNota';
+import { chaveNotaSemPedido, notasSemPedidoPorEmenda, type EmendaSemPedido } from '../../utils/emendasConferenciaNota';
+import { LigarEmendaModal } from './LigarEmendaModal';
+import { AppButton } from '../../design-system/components/AppButton';
 import { emendasAConferir, type EmendaAConferir } from '../../utils/emendasEmpenho';
 import { formatCurrency, formatCurrencyCompact, formatNumber } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
@@ -46,16 +51,20 @@ import {
   linhasAtivas,
   numeroDaEmendaEmTexto,
   ORDEM_ETAPA,
+  reservadoPorItem,
   ROTULO_AVISO,
   ROTULO_ETAPA,
   TIPOS_AVISO,
   type TipoAviso
 } from '../../utils/emendasPedidos';
 import { nomeDoItem } from '../../utils/emendasQuadro';
+import { menorPrecoDisponivel, sobraDasEmendas, type ExecucaoNoPortal, type SobraDaEmenda } from '../../utils/emendasSobra';
+import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { prazoDoAviso, resumoInicioEmendas, type ItemLivrePertoDoFim, type PedidoComAviso } from '../../utils/emendasInicio';
 import type { AutorEmenda, EtapaPedido, ItemCaep, NotaDaLinha, NotaSemPedido } from '../../services/emendasService';
-import { AutorDoPedido, ItemDaAta } from './emendasPartes';
+import { AutorDoPedido, LARGURA_AUTOR, ItemDaAta } from './emendasPartes';
 import { DadosItemModal } from './DadosItemModal';
+import { contaEmendasSemPedido, diasSemContatoParaUrgente, emendasNaLista, haDias, numeroDaEmenda, semPedido as emendaSemPedido, textoDias, type EmendaNaLista } from '../../utils/emendasSemPedido';
 
 /** Trilho das pendências: a pergunta principal é a gravidade; o tipo de aviso vira o filtro "+ Aviso". */
 type Segmento = 'graves' | 'atencao' | 'todas';
@@ -63,7 +72,8 @@ type Segmento = 'graves' | 'atencao' | 'todas';
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 const SEM_NOTAS_SEM_PEDIDO: NotaSemPedido[] = [];
 const POR_PAGINA = 25;
-const GAVETAS: PainelGavetaId[] = ['saldoLivre', 'empenhoAConferir', 'notasSemPedido', 'semNomeCurto'];
+const GAVETAS: PainelGavetaId[] = ['emendasSemPedido', 'saldoLivre', 'empenhoAConferir', 'notasSemPedido', 'sobraEmenda', 'semNomeCurto'];
+const SEM_PORTAL: ExecucaoNoPortal[] = [];
 const chave = (l: PedidoComAviso) => l.pedido.id;
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -84,7 +94,7 @@ const plural = (n: number, um: string, varios: string) => `${formatNumber(n)} ${
 
 /**
  * Início do gestor de emendas (protótipo aprovado em 23/10/2026; padronizado com o Painel em 25/10/2026): os quatro
- * cartões no desenho do Painel, as gavetas com nome curto e a regra no ⓘ, e as pendências dos pedidos num trilho por
+ * cartões no desenho do Painel, as gavetas com rótulo curto e a regra no ⓘ, e as pendências dos pedidos num trilho por
  * gravidade com o filtro de aviso. Os avisos são os mesmos da lista de Pedidos.
  */
 export const EmendasInicioPage: React.FC = () => {
@@ -98,6 +108,9 @@ export const EmendasInicioPage: React.FC = () => {
   const { consulta: consultaEmpenho, conferencia, diferencas } = useDiferencasDeEmpenho();
   const { porPedido: credor } = useCredorDiferente();
   const { data: notasSemPedido = SEM_NOTAS_SEM_PEDIDO, isLoading: carregandoSemPedido } = useNotasSemPedido();
+  // Emendas vistas no SIOP e ainda sem pedido (migration 205): avisam desde o registro.
+  const { data: emendasSiop, isLoading: carregandoEmendas } = useEmendasSiop();
+  const { data: contatosDasEmendas } = useContatosDasEmendas();
   const { abrir: abrirResolvido, dialog: dialogResolvido, porChave: resolvidos, reexibir } = useResolverAviso();
   const hoje = hojeEmBrasilia();
   const [segmento, setSegmento] = useState<Segmento>('todas');
@@ -126,13 +139,36 @@ export const EmendasInicioPage: React.FC = () => {
   const fecharGaveta = () => gavetaAberta && alternarGaveta(gavetaAberta);
 
   const carregando = isLoading || carregandoItens;
+  const emendasSemPedido = useMemo(
+    () => emendasNaLista(emendasSiop ?? [], pedidos, contatosDasEmendas ?? [], hoje).filter(emendaSemPedido),
+    [emendasSiop, pedidos, contatosDasEmendas, hoje]
+  );
+  const contaSemPedido = contaEmendasSemPedido(emendasSemPedido);
   const r = useMemo(() => resumoInicioEmendas(pedidos, itensLista, notas, hoje, diferencas, credor), [pedidos, itensLista, notas, hoje, diferencas, credor]);
-  const semPedido = useMemo(() => notasSemPedidoPendentes(notasSemPedido, resolvidos), [notasSemPedido, resolvidos]);
+  // Notas sem pedido agrupadas por emenda (migration 211): as notas da mesma emenda vão juntas para o mesmo pedido.
+  const semPedidoPorEmenda = useMemo(() => notasSemPedidoPorEmenda(notasSemPedido, resolvidos), [notasSemPedido, resolvidos]);
+  const semPedido = useMemo(() => semPedidoPorEmenda.flatMap((g) => g.notas), [semPedidoPorEmenda]);
+  const [ligando, setLigando] = useState<EmendaSemPedido | null>(null);
   const semPedidoResolvidas = useMemo(() => notasSemPedido.filter((n) => resolvidos.has(chaveNotaSemPedido(n))), [notasSemPedido, resolvidos]);
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
   const aConferir = useMemo(() => emendasAConferir(conferencia, itens), [conferencia, itens]);
   const pedidoPorId = useMemo(() => new Map(pedidos.map((p) => [p.id, p])), [pedidos]);
+  // Sobra das emendas do ano (migration 204): as que compram pelo menos o item mais barato que a CAEP ainda oferece.
+  const { precos } = usePrecosParaEmenda();
+  const { data: portal = SEM_PORTAL } = useExecucaoEmendas();
+  const sobras = useMemo(() => {
+    const minimo = menorPrecoDisponivel(itens, reservadoPorItem(pedidos), precos);
+    return sobraDasEmendas({ pedidos, ano: Number(hoje.slice(0, 4)), itens, notas, portal: new Map(portal.map((x) => [x.codigo, x])), precos, minimo }).filter((e) => e.situacao === 'sobra');
+  }, [pedidos, hoje, itens, notas, portal, precos]);
+  const valorDasSobras = sobras.reduce((t, e) => t + e.sobra, 0);
+  const colunasSobra: Column<SobraDaEmenda>[] = [
+    { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, render: (e) => <AutorDoPedido autor={e.autorId ? autorPorId.get(e.autorId) : undefined} autorId={e.autorId} destaque /> },
+    { key: 'emenda', header: 'Emenda', nowrap: true, render: (e) => <span style={carteiraNumero}>{`${numeroDaEmendaEmTexto(e.emenda)} / ${e.ano}`}</span> },
+    { key: 'pedidos', header: 'Pedidos', render: (e) => <span style={carteiraDetalhe}>{e.pedidos.map((p) => p.numero).join(', ')}</span> },
+    { key: 'sobra', header: 'Sobra', align: 'right', nowrap: true, render: (e) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(e.sobra)}</span> },
+    { key: 'prazo', header: 'Prazo', nowrap: true, render: (e) => <span style={carteiraDetalhe}>empenhar até 31/12/{e.ano}</span> }
+  ];
 
   // Item do aviso ou o primeiro item do pedido: o mesmo que a coluna Item · ata mostra.
   const itemDaLinha = useCallback(
@@ -201,7 +237,8 @@ export const EmendasInicioPage: React.FC = () => {
       key: 'autor',
       header: 'Parlamentar',
       priority: 'primary',
-      minWidth: '200px',
+      width: LARGURA_AUTOR,
+      minWidth: LARGURA_AUTOR,
       sortValue: ordem.autor.value,
       render: ({ pedido: p }) => (
         <>
@@ -256,6 +293,31 @@ export const EmendasInicioPage: React.FC = () => {
     }
   ];
 
+  const colunasEmendasSemPedido: Column<EmendaNaLista>[] = [
+    { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} /> },
+    { key: 'emenda', header: 'Emenda', nowrap: true, render: (l) => <span style={carteiraValor}>{numeroDaEmenda(l.numero)} / {l.ano}</span> },
+    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(l.valor ?? 0)}</span> },
+    { key: 'dias', header: 'Sem pedido há', align: 'right', nowrap: true, render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{textoDias(l.diasSemPedido ?? 0)}</span> },
+    {
+      key: 'contato',
+      header: 'Último contato',
+      render: (l) => {
+        const u = l.contatos.at(-1);
+        return (
+          <>
+            <StatusBadge
+              label={u ? `contato ${haDias(l.diasSemContato ?? 0)}` : 'sem contato'}
+              variant={l.urgente ? 'danger' : 'warning'}
+              size="sm"
+              dot={false}
+            />
+            {u && <div style={carteiraDetalhe}>{u.comQuem}</div>}
+          </>
+        );
+      }
+    }
+  ];
+
   const colunasLivre: Column<ItemLivrePertoDoFim>[] = [
     { key: 'item', header: 'Item', priority: 'primary', minWidth: '260px', sortValue: (x) => x.item.descricao, render: (x) => <ItemDaAta item={x.item} comLinks /> },
     { key: 'livre', header: 'Livre', align: 'right', nowrap: true, sortValue: (x) => x.livre, sortFirstDir: 'desc', render: (x) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(x.livre)}</span> },
@@ -300,7 +362,8 @@ export const EmendasInicioPage: React.FC = () => {
       key: 'autor',
       header: 'Parlamentar',
       priority: 'primary',
-      minWidth: '200px',
+      width: LARGURA_AUTOR,
+      minWidth: LARGURA_AUTOR,
       render: (e) => {
         const autorId = e.pedidoIds.map((id) => pedidoPorId.get(id)?.autorId).find(Boolean) ?? null;
         return (
@@ -322,51 +385,69 @@ export const EmendasInicioPage: React.FC = () => {
   ];
 
   const tituloSemPedido = (n: NotaSemPedido) => `Nota ${n.nota} da emenda ${n.emendaAno ? `${n.emendaAno} · ` : ''}${numeroDaEmendaEmTexto(n.emenda)} sem pedido`;
-  const colunasSemPedido: Column<NotaSemPedido>[] = [
+  const tituloEmendaSemPedido = (g: EmendaSemPedido) =>
+    `${g.notas.length === 1 ? `Nota ${g.notas[0].nota}` : `${g.notas.length} notas`} da emenda ${g.ano ? `${g.ano} · ` : ''}${numeroDaEmendaEmTexto(g.emenda)} sem pedido`;
+  const colunasSemPedido: Column<EmendaSemPedido>[] = [
     {
       key: 'emenda',
       header: 'Emenda',
       priority: 'primary',
-      minWidth: '220px',
-      render: (n) => (
+      minWidth: '240px',
+      render: (g) => (
         <>
           <div style={{ fontWeight: 700 }}>
-            {n.emendaAno ? `${n.emendaAno} · ` : ''}
-            {numeroDaEmendaEmTexto(n.emenda)}
+            {g.ano ? `${g.ano} · ` : ''}
+            {numeroDaEmendaEmTexto(g.emenda)}
           </div>
-          <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>{n.planoInterno ?? 'sem plano interno'}</div>
+          <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>{g.planoInterno ?? 'sem plano interno'}</div>
         </>
       )
     },
     {
-      key: 'nota',
-      header: 'Nota',
+      key: 'notas',
+      header: 'Notas',
       nowrap: true,
-      render: (n) => (
+      render: (g) => (
         <>
-          <div style={carteiraNumero}>{n.nota}</div>
-          <div style={carteiraDetalhe}>{n.dataEmissao ? dataBR(n.dataEmissao) : ''}{n.credorNome ? ` · ${curto(n.credorNome, 32)}` : ''}</div>
+          {g.notas.map((n) => (
+            <div key={n.empenhoId} style={carteiraNumero}>
+              {n.nota} <span style={carteiraDetalhe}>{n.credorNome ? curto(n.credorNome, 24) : ''}</span>
+            </div>
+          ))}
         </>
       )
     },
-    { key: 'valor', header: 'Empenhado', align: 'right', nowrap: true, sortValue: (n) => n.valorEmpenhado, sortFirstDir: 'desc', render: (n) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(n.valorEmpenhado)}</span> },
+    { key: 'valor', header: 'Empenhado', align: 'right', nowrap: true, sortValue: (g) => g.valor, sortFirstDir: 'desc', render: (g) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(g.valor)}</span> },
     {
-      key: 'autores',
-      header: 'Mesmo autor',
-      minWidth: '200px',
-      render: (n) =>
-        n.autoresDoCodigo.length ? (
+      key: 'pedido',
+      header: 'Pedido provável',
+      minWidth: '240px',
+      render: (g) => {
+        if (!g.sugestao) {
+          return (
+            <>
+              <div style={carteiraDetalhe}>{g.empatados ? `${g.empatados} pedidos com o mesmo valor` : 'sem pedido parecido'}</div>
+              <div style={carteiraDetalhe}>{g.empatados ? 'escolha o pedido ao ligar' : 'confira no SEI; se não é da CAEP, marque como resolvido'}</div>
+            </>
+          );
+        }
+        const s = g.sugestao;
+        return (
           <>
-            <div style={carteiraValor}>{n.autoresDoCodigo.join(', ')}</div>
-            <div style={carteiraDetalhe}>confira o nº da emenda no pedido</div>
+            <div style={carteiraValor}>
+              Pedido {s.pedidoNumero} · {s.autorId ? autorPorId.get(s.autorId)?.nome ?? s.autorId : 'parlamentar a definir'}
+            </div>
+            <div style={carteiraDetalhe}>
+              {s.iguais} de {g.notas.length} {g.notas.length === 1 ? 'nota' : 'notas'} com fornecedor e valor iguais aos itens
+              {s.mesmoCodigo ? '' : ' · outro código de autor'}
+            </div>
           </>
-        ) : (
-          <span style={carteiraDetalhe}>nenhum</span>
-        )
+        );
+      }
     }
   ];
 
-  const valorSemPedido = semPedido.reduce((t, n) => t + n.valorEmpenhado, 0);
+  const valorSemPedido = semPedidoPorEmenda.reduce((t, g) => t + g.valor, 0);
 
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -434,6 +515,15 @@ export const EmendasInicioPage: React.FC = () => {
       <PainelBotoesGavetas
         botoes={[
           {
+            id: 'emendasSemPedido',
+            resumo: carregandoEmendas
+              ? undefined
+              : contaSemPedido.total === 0
+                ? 'em dia'
+                : `${plural(contaSemPedido.total, 'emenda', 'emendas')}${contaSemPedido.urgentes ? ` · ${formatNumber(contaSemPedido.urgentes)} ${contaSemPedido.urgentes === 1 ? 'urgente' : 'urgentes'}` : ''}`,
+            atencao: contaSemPedido.total > 0
+          },
+          {
             id: 'saldoLivre',
             resumo: carregando
               ? undefined
@@ -453,6 +543,11 @@ export const EmendasInicioPage: React.FC = () => {
             atencao: semPedido.length > 0
           },
           {
+            id: 'sobraEmenda',
+            resumo: carregando ? undefined : sobras.length === 0 ? 'nenhuma' : `${plural(sobras.length, 'emenda', 'emendas')} · ${formatCurrencyCompact(valorDasSobras)}`,
+            atencao: sobras.length > 0
+          },
+          {
             id: 'semNomeCurto',
             resumo: carregando ? undefined : r.semNomeCurto.length === 0 ? 'todos com nome' : `${plural(r.semNomeCurto.length, 'item', 'itens')} sem nome`,
             atencao: r.semNomeCurto.length > 0
@@ -461,6 +556,27 @@ export const EmendasInicioPage: React.FC = () => {
         aberta={gavetaAberta}
         onToggle={alternarGaveta}
       />
+      {gavetaAberta === 'emendasSemPedido' && (
+        <PainelGaveta
+          id="emendasSemPedido"
+          subtitulo="Clique na linha para ver os contatos da emenda."
+          hint={`Emendas que a CAEP viu no SIOP e que ainda não viraram pedido. Avisam desde o dia do registro e ficam urgentes com ${diasSemContatoParaUrgente()} dias sem contato registrado com a assessoria do parlamentar ou com a ASPAR dos órgãos (Ajustes › Regras de Alertas).`}
+          onFechar={fecharGaveta}
+        >
+          {emendasSemPedido.length === 0 ? (
+            <EmptyState title={carregandoEmendas ? 'Carregando…' : 'Nenhuma emenda sem pedido.'} testId="emendas-inicio-sem-pedido-vazio" />
+          ) : (
+            <DataTable<EmendaNaLista>
+              testId="emendas-inicio-sem-pedido"
+              className="data-table-container--flush"
+              data={emendasSemPedido}
+              keyExtractor={(l) => l.chave}
+              columns={colunasEmendasSemPedido}
+              rowOpen={() => () => navigate('/emendas/pedidos?ver=emenda&situacao=sem')}
+            />
+          )}
+        </PainelGaveta>
+      )}
       {gavetaAberta === 'saldoLivre' && (
         <PainelGaveta
           id="saldoLivre"
@@ -482,15 +598,36 @@ export const EmendasInicioPage: React.FC = () => {
           )}
         </PainelGaveta>
       )}
+      {gavetaAberta === 'sobraEmenda' && (
+        <PainelGaveta
+          id="sobraEmenda"
+          subtitulo="Clique na linha para abrir a emenda em Pedidos › Por parlamentar."
+          hint="Emendas do ano com sobra que compra pelo menos o item mais barato que a CAEP ainda oferece: valor no SIOP menos o empenhado pela SENASP (notas da emenda no Portal da Transparência, ou as ligadas no sistema) e o que está em andamento. O que não for empenhado até o fim do ano perde o crédito."
+          onFechar={fecharGaveta}
+        >
+          {sobras.length === 0 ? (
+            <EmptyState title={carregando ? 'Carregando…' : 'Nenhuma emenda do ano com sobra para novo pedido.'} testId="emendas-inicio-sobra-vazio" />
+          ) : (
+            <DataTable<SobraDaEmenda>
+              testId="emendas-inicio-sobra"
+              className="data-table-container--flush"
+              data={sobras}
+              keyExtractor={(e) => e.codigo}
+              columns={colunasSobra}
+              rowOpen={(e) => () => navigate(`/emendas/pedidos?ver=autor&emenda=${e.codigo}`)}
+            />
+          )}
+        </PainelGaveta>
+      )}
       {gavetaAberta === 'semNomeCurto' && (
         <PainelGaveta
           id="semNomeCurto"
           subtitulo={podeGerir ? 'Clique no lápis para dar o nome.' : 'Clique na linha para abrir o item.'}
-          hint="Item alocado à CAEP em ata vigente ainda sem o nome curto. Sem ele, o quadro do parlamentar mostra o começo da descrição do catálogo."
+          hint="Item alocado à CAEP em ata vigente ainda sem o nome na ata assinada. Sem ele, o quadro do parlamentar mostra o começo da descrição do catálogo."
           onFechar={fecharGaveta}
         >
           {r.semNomeCurto.length === 0 ? (
-            <EmptyState title={carregando ? 'Carregando…' : 'Todos os itens das atas vigentes já têm nome curto.'} testId="emendas-inicio-sem-nome-vazio" />
+            <EmptyState title={carregando ? 'Carregando…' : 'Todos os itens das atas vigentes já têm o nome da ata assinada.'} testId="emendas-inicio-sem-nome-vazio" />
           ) : (
             <DataTable<ItemCaep>
               testId="emendas-inicio-sem-nome"
@@ -501,7 +638,7 @@ export const EmendasInicioPage: React.FC = () => {
               rowOpen={(i) => () => navigate(`/emendas/itens?busca=${encodeURIComponent(`${i.numeroAta} item ${Number(i.numeroItem)}`)}`)}
               rowActions={
                 podeGerir
-                  ? (i) => <ActionButton action="editar" iconOnly label={`Nome curto e GND de ${nomeDoItem(i, i.itemKey)}`} onClick={() => setEditando(i)} data-testid={`emendas-inicio-nome-${i.itemKey}`} />
+                  ? (i) => <ActionButton action="editar" iconOnly label={`Nome na ata assinada e GND de ${nomeDoItem(i, i.itemKey)}`} onClick={() => setEditando(i)} data-testid={`emendas-inicio-nome-${i.itemKey}`} />
                   : undefined
               }
             />
@@ -532,27 +669,40 @@ export const EmendasInicioPage: React.FC = () => {
       {gavetaAberta === 'notasSemPedido' && (
         <PainelGaveta
           id="notasSemPedido"
-          subtitulo="Confira o nº da emenda no pedido ou marque como resolvido."
-          hint="Notas de empenho da UG 200330 do ano com o número de uma emenda no plano interno que nenhum pedido tem: emenda autorizada fora do sistema ou número trocado num pedido. Se a emenda não é da CAEP, marque como resolvido."
+          subtitulo="Ligue a emenda ao pedido ou marque como resolvido."
+          hint="Notas de material (3.3.90.30 e 4.4.90.52) da UG 200330 do ano com o número de uma emenda no plano interno que nenhum pedido tem: a sobra de uma emenda antiga que completou um pedido, número trocado num pedido ou emenda executada fora do sistema. O pedido provável tem itens do mesmo fornecedor com o mesmo valor; o sistema só sugere. Se a emenda não é da CAEP, marque como resolvido."
           onFechar={fecharGaveta}
         >
           {semPedido.length === 0 ? (
             <EmptyState title={carregandoSemPedido ? 'Carregando…' : 'Toda nota de emenda do ano tem pedido no sistema.'} testId="emendas-inicio-sem-pedido-vazio" />
           ) : (
-            <DataTable<NotaSemPedido>
+            <DataTable<EmendaSemPedido>
               testId="emendas-inicio-sem-pedido"
               className="data-table-container--flush"
-              data={semPedido}
-              keyExtractor={(n) => `${n.ug}-${n.nota}`}
+              data={semPedidoPorEmenda}
+              keyExtractor={(g) => g.chave}
               columns={colunasSemPedido}
-              rowOpen={(n) => (n.pedidosDoCodigo[0] ? () => navigate(`/emendas/pedidos?pedido=${n.pedidosDoCodigo[0]}`) : undefined)}
+              rowOpen={(g) => (g.sugestao ? () => navigate(`/emendas/pedidos?pedido=${g.sugestao!.pedidoId}`) : undefined)}
               rowActions={
                 podeGerir
-                  ? (n) => (
-                      <BotaoResolvido
-                        onClick={() => abrirResolvido({ tipo: 'AVISO', chave: chaveNotaSemPedido(n), titulo: tituloSemPedido(n), contexto: n.planoInterno ?? undefined })}
-                        testId={`emendas-inicio-sem-pedido-resolver-${n.nota}`}
-                      />
+                  ? (g) => (
+                      <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                        <AppButton size="xs" variant="secondary" onClick={() => setLigando(g)} data-testid={`emendas-inicio-sem-pedido-ligar-${g.emenda}`}>
+                          {g.sugestao ? `Ligar ao ${g.sugestao.pedidoNumero}` : 'Escolher pedido'}
+                        </AppButton>
+                        <BotaoResolvido
+                          onClick={() =>
+                            abrirResolvido({
+                              tipo: 'AVISO',
+                              chave: chaveNotaSemPedido(g.notas[0]),
+                              outrasChaves: g.notas.slice(1).map(chaveNotaSemPedido),
+                              titulo: tituloEmendaSemPedido(g),
+                              contexto: g.planoInterno ?? undefined
+                            })
+                          }
+                          testId={`emendas-inicio-sem-pedido-resolver-${g.emenda}`}
+                        />
+                      </span>
                     )
                   : undefined
               }
@@ -567,6 +717,7 @@ export const EmendasInicioPage: React.FC = () => {
             testId="emendas-inicio-sem-pedido-resolvidos"
           />
           {dialogResolvido}
+          {ligando && <LigarEmendaModal emenda={ligando} onClose={() => setLigando(null)} />}
         </PainelGaveta>
       )}
       {editando && <DadosItemModal item={editando} onClose={() => setEditando(null)} />}

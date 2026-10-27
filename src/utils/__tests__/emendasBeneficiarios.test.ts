@@ -4,8 +4,10 @@ vi.mock('../../services/supabaseClient', () => ({ supabase: null }));
 
 import {
   beneficiarioRepetido,
+  casaBusca,
   chaveDaIdentidade,
   chaveDoNome,
+  daUfDoParlamentar,
   faltasDoBeneficiario,
   linkDoWhatsapp,
   naturezaNaoPublica,
@@ -13,6 +15,7 @@ import {
   parecidosCom,
   pendenciasDoBeneficiario,
   saoParecidos,
+  textoDeBuscaDoBeneficiario,
   type FormularioBeneficiario
 } from '../emendasBeneficiarios';
 import { cnpjValido, consultarCep, consultarCnpj, localDoBeneficiario, rotuloBeneficiario, type BeneficiarioEmenda } from '../../services/emendasService';
@@ -44,10 +47,12 @@ describe('pendenciasDoBeneficiario', () => {
     expect(pendenciasDoBeneficiario(ok)).toEqual([]);
   });
 
-  it('só o nome é obrigatório', () => {
-    expect(pendenciasDoBeneficiario({ ...vazio, nome: 'Polícia Civil' })).toEqual([]);
-    expect(pendenciasDoBeneficiario(vazio)).toEqual(['nome da unidade']);
-    expect(pendenciasDoBeneficiario({ ...vazio, nome: ' - ' })).toEqual(['nome da unidade']);
+  it('só o nome e a UF são obrigatórios', () => {
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: 'Polícia Civil', entregaUf: 'BA' })).toEqual([]);
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: 'Polícia Civil' })).toEqual(['UF']);
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: 'Polícia Civil', entregaUf: '  ' })).toEqual(['UF']);
+    expect(pendenciasDoBeneficiario(vazio)).toEqual(['nome da unidade', 'UF']);
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: ' - ', entregaUf: 'BA' })).toEqual(['nome da unidade']);
   });
 
   it('o que vier preenchido vem certo', () => {
@@ -57,6 +62,15 @@ describe('pendenciasDoBeneficiario', () => {
       'telefone com DDD (10 ou 11 números)',
       'e-mail válido'
     ]);
+  });
+});
+
+describe('daUfDoParlamentar', () => {
+  it('só os órgãos da UF do parlamentar; sem UF de um dos lados, entra', () => {
+    expect(daUfDoParlamentar(ben('1', 'PM', 'Salvador', 'BA'), 'BA')).toBe(true);
+    expect(daUfDoParlamentar(ben('1', 'PM', 'São Paulo', 'SP'), 'BA')).toBe(false);
+    expect(daUfDoParlamentar(ben('1', 'PM', null, null), 'BA')).toBe(true);
+    expect(daUfDoParlamentar(ben('1', 'PM', 'São Paulo', 'SP'), null)).toBe(true);
   });
 });
 
@@ -177,5 +191,46 @@ describe('linkDoWhatsapp', () => {
     expect(linkDoWhatsapp('(61) 2025-3069')).toBeNull();
     expect(linkDoWhatsapp('99999-0000')).toBeNull();
     expect(linkDoWhatsapp(null)).toBeNull();
+  });
+});
+
+describe('busca de beneficiários', () => {
+  const cbmma = ben('1', 'Corpo de Bombeiros Militar do Maranhão', 'São Luís', 'MA', {
+    sigla: 'CBMMA',
+    razaoSocial: 'ESTADO DO MARANHAO - CORPO DE BOMBEIROS MILITARES DO MARANHAO'
+  });
+  const generico = ben('2', 'Corpo de Bombeiros Militar', null, 'AL', { sigla: 'CBMAL' });
+  const texto = (b: BeneficiarioEmenda) => textoDeBuscaDoBeneficiario(b);
+
+  it('acha pelo começo do nome, sem acento e sem maiúsculas', () => {
+    expect(casaBusca(texto(cbmma), 'Corpo de Bomb')).toBe(true);
+    expect(casaBusca(texto(cbmma), 'corpo de bombeiros militar do maranhao')).toBe(true);
+  });
+
+  it('acha com as palavras em qualquer ordem e com "do Estado do"', () => {
+    expect(casaBusca(texto(cbmma), 'bombeiros maranhão')).toBe(true);
+    expect(casaBusca(texto(cbmma), 'Corpo de Bombeiros Militar do Estado do Maranhão')).toBe(true);
+  });
+
+  it('acha pelo estado por extenso quando o nome só tem a UF', () => {
+    expect(casaBusca(texto(generico), 'bombeiros alagoas')).toBe(true);
+    expect(casaBusca(texto(generico), 'bombeiros maranhao')).toBe(false);
+  });
+
+  it('acha pela sigla e pela cidade; palavra que não existe derruba', () => {
+    expect(casaBusca(texto(cbmma), 'cbmma')).toBe(true);
+    expect(casaBusca(texto(cbmma), 'sao luis')).toBe(true);
+    expect(casaBusca(texto(cbmma), 'bombeiros piaui')).toBe(false);
+  });
+
+  it('busca vazia ou só com "de/do" acha todos', () => {
+    expect(casaBusca(texto(cbmma), '  ')).toBe(true);
+    expect(casaBusca(texto(cbmma), 'do')).toBe(true);
+  });
+
+  it('número ordinal: "16º" e "16" acham "16º Grupamento"', () => {
+    const gb = ben('3', '16º Grupamento de Bombeiro Militar', 'Limeira', 'SP');
+    expect(casaBusca(texto(gb), '16º grupamento')).toBe(true);
+    expect(casaBusca(texto(gb), '16 limeira')).toBe(true);
   });
 });

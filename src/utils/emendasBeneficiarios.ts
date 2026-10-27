@@ -21,13 +21,15 @@ export interface FormularioBeneficiario {
   responsavelEmail: string;
 }
 
-/** O que impede salvar; vazio = pode salvar. Só o nome é obrigatório (migration 166); o resto, se vier, vem certo. */
+/** O que impede salvar; vazio = pode salvar. Nome e UF são obrigatórios (migrations 166 e 212: a UF filtra os órgãos
+ *  no pedido do parlamentar); o resto, se vier, vem certo. */
 export function pendenciasDoBeneficiario(f: FormularioBeneficiario): string[] {
   const p: string[] = [];
   if (!chaveDoNome(f.nome)) p.push('nome da unidade');
   const cep = soDigitos(f.entregaCep);
   if (cep && cep.length !== 8) p.push('CEP com 8 números');
-  if (f.entregaUf.trim() && !UFS.has(f.entregaUf.trim().toUpperCase())) p.push('UF válida');
+  if (!f.entregaUf.trim()) p.push('UF');
+  else if (!UFS.has(f.entregaUf.trim().toUpperCase())) p.push('UF válida');
   const tel = soDigitos(f.responsavelTelefone);
   if (tel && (tel.length < 10 || tel.length > 11)) p.push('telefone com DDD (10 ou 11 números)');
   if (f.responsavelEmail.trim() && !EMAIL_VALIDO.test(f.responsavelEmail.trim())) p.push('e-mail válido');
@@ -66,6 +68,37 @@ function palavras(s: string | null | undefined): string[] {
 }
 
 export const chaveDoNome = (s: string | null | undefined): string => palavras(s).join(' ');
+
+/** Nome do estado por extenso, para a busca achar "Maranhão" num cadastro que só guarda "MA". */
+export const NOME_DA_UF: Record<string, string> = {
+  AC: 'Acre', AL: 'Alagoas', AP: 'Amapá', AM: 'Amazonas', BA: 'Bahia', CE: 'Ceará', DF: 'Distrito Federal', ES: 'Espírito Santo',
+  GO: 'Goiás', MA: 'Maranhão', MT: 'Mato Grosso', MS: 'Mato Grosso do Sul', MG: 'Minas Gerais', PA: 'Pará', PB: 'Paraíba',
+  PR: 'Paraná', PE: 'Pernambuco', PI: 'Piauí', RJ: 'Rio de Janeiro', RN: 'Rio Grande do Norte', RS: 'Rio Grande do Sul',
+  RO: 'Rondônia', RR: 'Roraima', SC: 'Santa Catarina', SP: 'São Paulo', SE: 'Sergipe', TO: 'Tocantins'
+};
+
+/**
+ * Busca por palavras: cada palavra digitada precisa aparecer no texto, em qualquer ordem e pelo começo ou meio
+ * ("bomb maranhao" acha "Corpo de Bombeiros Militar do Maranhão"). Sem acento, sem pontuação e sem "de/do/da".
+ */
+export function casaBusca(texto: string, busca: string): boolean {
+  const termos = palavras(busca);
+  if (!termos.length) return true;
+  const alvo = palavras(texto);
+  return termos.every((t) => alvo.some((w) => w.includes(t)));
+}
+
+/** Tudo o que identifica o beneficiário na busca: nome, sigla, outras grafias, razão social, cidade e estado. */
+export function textoDeBuscaDoBeneficiario(
+  b: Pick<BeneficiarioEmenda, 'nome' | 'sigla' | 'razaoSocial' | 'entregaMunicipio' | 'entregaUf' | 'outrosNomes'>
+): string {
+  const uf = b.entregaUf ?? '';
+  return [b.nome, b.sigla, b.razaoSocial, b.entregaMunicipio, uf, uf && `Estado ${NOME_DA_UF[uf] ?? ''}`, ...(b.outrosNomes ?? [])].filter(Boolean).join(' ');
+}
+
+/** O órgão entra na lista do pedido do parlamentar da UF `uf`? Sem UF de um dos lados, entra (não some por falta de dado). */
+export const daUfDoParlamentar = (b: Pick<BeneficiarioEmenda, 'entregaUf'>, uf: string | null | undefined): boolean =>
+  !uf || !b.entregaUf || b.entregaUf === uf;
 
 /** Nome + município + UF: o que não pode repetir (chave_identidade do banco). */
 export const chaveDaIdentidade = (nome: string, municipio: string | null | undefined, uf: string | null | undefined): string =>

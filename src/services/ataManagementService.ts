@@ -1,4 +1,5 @@
 import { moduleFromRow } from '../utils/taskPlanModules';
+import { completarModulo, lerAndamentoTarefa, lerDetalhesModelo, lerRegraTarefa, prazoEfetivo } from '../utils/modeloGestao';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import type {
   AtaTaskTemplate,
@@ -38,8 +39,9 @@ export function calculateAtaTaskPlanProgress(macrotarefas: AtaTaskMacrotask[]): 
         if (tarefa.status === 'EM_ANDAMENTO') emAndamento++;
         else pendentes++;
 
-        if (tarefa.prazo) {
-          const prazoDate = new Date(`${tarefa.prazo}T00:00:00`);
+        const prazoTarefa = prazoEfetivo(tarefa);
+        if (prazoTarefa) {
+          const prazoDate = new Date(`${prazoTarefa}T00:00:00`);
           if (!isNaN(prazoDate.getTime()) && prazoDate < today) {
             atrasadas++;
           }
@@ -86,7 +88,8 @@ export async function fetchAtaTaskTemplates(): Promise<AtaTaskTemplate[]> {
       macrotaskId: t.macrotask_id,
       nome: t.nome,
       ordem: t.ordem,
-      executionMode: t.execution_mode || undefined
+      executionMode: t.execution_mode || undefined,
+      ...lerRegraTarefa(t)
     });
     tasksByMacrotask.set(t.macrotask_id, list);
   }
@@ -111,7 +114,8 @@ export async function fetchAtaTaskTemplates(): Promise<AtaTaskTemplate[]> {
     ativo: t.ativo,
     createdAt: t.created_at,
     updatedAt: t.updated_at,
-    macrotarefas: macrotasksByTemplate.get(t.id) || []
+    macrotarefas: macrotasksByTemplate.get(t.id) || [],
+    ...lerDetalhesModelo(t)
   }));
 }
 
@@ -131,13 +135,15 @@ export async function fetchAtaTaskPlan(ataKey: string): Promise<AtaTaskPlan | nu
   if (planError) throw planError;
   if (!plan) return null;
 
-  const { data: macrotasks, error: macrotasksError } = await client
-    .from('ata_task_macrotasks')
-    .select('*')
-    .eq('plan_id', plan.id)
-    .order('ordem', { ascending: true });
+  // Etapas e linhas dos módulos (migration 210: processo SEI e data de partida de cada módulo).
+  const [{ data: macrotasks, error: macrotasksError }, { data: modulosData, error: modulosError }] = await Promise.all([
+    client.from('ata_task_macrotasks').select('*').eq('plan_id', plan.id).order('ordem', { ascending: true }),
+    client.from('ata_task_modulos').select('*').eq('plan_id', plan.id)
+  ]);
 
   if (macrotasksError) throw macrotasksError;
+  if (modulosError) throw modulosError;
+  const modulos = new Map<string, any>((modulosData || []).map((r: any) => [r.modulo_id, r]));
 
   const macrotaskIds = (macrotasks || []).map((m: any) => m.id);
   let tasks: any[] = [];
@@ -171,7 +177,9 @@ export async function fetchAtaTaskPlan(ataKey: string): Promise<AtaTaskPlan | nu
       atualizadoEm: t.atualizado_em,
       concluidoEm: t.concluido_em || undefined,
       concluidoPor: t.concluido_por || undefined,
-      seiNumero: t.sei_numero || undefined
+      seiNumero: t.sei_numero || undefined,
+      ...lerRegraTarefa(t),
+      ...lerAndamentoTarefa(t)
     });
     tasksByMacrotask.set(t.macrotask_id, list);
   }
@@ -182,7 +190,7 @@ export async function fetchAtaTaskPlan(ataKey: string): Promise<AtaTaskPlan | nu
     nome: m.nome,
     ordem: m.ordem,
     origem: m.origem || undefined,
-    modulo: moduleFromRow(m),
+    modulo: completarModulo(moduleFromRow(m), modulos),
     tarefas: tasksByMacrotask.get(m.id) || []
   }));
 
@@ -251,7 +259,9 @@ export async function fetchAllAtaTaskPlans(): Promise<Record<string, AtaTaskPlan
         atualizadoEm: t.atualizado_em,
         concluidoEm: t.concluido_em || undefined,
         concluidoPor: t.concluido_por || undefined,
-        seiNumero: t.sei_numero || undefined
+        seiNumero: t.sei_numero || undefined,
+        ...lerRegraTarefa(t),
+        ...lerAndamentoTarefa(t)
       });
       tasksByMacrotask.set(t.macrotask_id, list);
     }

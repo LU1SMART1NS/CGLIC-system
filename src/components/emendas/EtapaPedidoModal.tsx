@@ -4,7 +4,7 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppSelect, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useInformarSolicitacaoDaAta, usePedidosEmendas, useRegistrarEnvioCgofi } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useEmendasSiop, useInformarSolicitacaoDaAta, usePedidosEmendas, useRegistrarEnvioCgofi } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import {
@@ -34,7 +34,7 @@ import { curto } from '../../utils/emendasKits';
  * MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa.
  * SOLICITACAO_ATA: a solicitação de empenho de uma ata (migration 178), sem mudar de etapa.
  */
-export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA' | 'CANCELAR';
+export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA' | 'CANCELAR' | 'QUADROS_AUTORIZACAO';
 
 /** De onde a janela foi aberta: a ata e o número que já estão na linha do tempo. */
 export interface ContextoDaJanela {
@@ -55,7 +55,7 @@ interface Props {
 
 const PONTOS_SIOP: ReadonlyArray<[string, string]> = [
   ['numero_emenda', 'Nº da emenda'],
-  ['autor', 'Autor'],
+  ['autor', 'Parlamentar'],
   ['valor', 'Valor'],
   ['gnd', 'GND'],
   ['beneficiario', 'Beneficiário'],
@@ -77,7 +77,8 @@ const TITULO: Record<AcaoDaJanela, string> = {
   MAIS_EMPENHADO: 'Acrescentar número SEI do empenho',
   MAIS_CONTRATACAO: 'Acrescentar número SEI do despacho para contratação',
   SOLICITACAO_ATA: 'Solicitação de empenho de uma ata',
-  CANCELAR: 'Cancelar o pedido'
+  CANCELAR: 'Cancelar o pedido',
+  QUADROS_AUTORIZACAO: 'Quadros da autorização'
 };
 
 /** Rótulo do campo SEI de cada etapa com documento (migration 174). */
@@ -204,6 +205,18 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const { precos } = usePrecosParaEmenda();
   const [gnd, setGnd] = useState(pedido.siopGnd ?? 'GND-4');
   const [pontos, setPontos] = useState<Record<string, boolean>>({});
+  // Pedido criado a partir da emenda registrada (migration 205): a conferência já vem com o nº, o valor e o GND dela.
+  const { data: emendasSiop } = useEmendasSiop();
+  const daEmenda = pedido.emendaId ? emendasSiop?.find((e) => e.id === pedido.emendaId) : undefined;
+  const [preenchido, setPreenchido] = useState(false);
+  // Ajuste durante a renderização (a emenda pode chegar depois de a janela abrir), uma vez só.
+  if (!preenchido && daEmenda && !pedido.siopEmenda) {
+    setPreenchido(true);
+    setEmenda(numeroDaEmendaEmTexto(daEmenda.numero));
+    setAnoEmenda(daEmenda.ano);
+    setValor(daEmenda.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    setGnd(daEmenda.gnd);
+  }
   const [divergencia, setDivergencia] = useState(pedido.divergencia ?? '');
   const [motivo, setMotivo] = useState(MOTIVOS_CANCELAMENTO[0]);
   const [outroMotivo, setOutroMotivo] = useState('');
@@ -212,7 +225,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const linhas = linhasAtivas(pedido);
   const emendaLida = lerNumeroDaEmenda(emenda);
   const conferenciaDaEmenda = modo === 'CONFERIDO' && emendaLida ? conferirNumeroDaEmenda(pedido, emendaLida.numero, emendaLida.ano ?? anoEmenda, pedidos) : null;
-  const nomeDe = (autorId: string | null) => autores.find((a) => a.id === autorId)?.nome ?? 'outro autor';
+  const nomeDe = (autorId: string | null) => autores.find((a) => a.id === autorId)?.nome ?? 'outro parlamentar';
   // A emenda dividida em vários pedidos do mesmo processo: o processo uma vez só ("todos do Processo …").
   const idsDosOutros = [...new Set((conferenciaDaEmenda?.mesmaEmenda ?? []).map((x) => identificacaoDoPedido(x)))];
   const identificacoesDosOutros =

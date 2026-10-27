@@ -81,10 +81,11 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Grupos das UASGs', '/admin/grupos-uasgs'],
         ['Unidades Internas', '/admin/departamentos'],
         ['Beneficiários', '/emendas/beneficiarios'],
+        ['ASPAR dos órgãos', '/emendas/aspar'],
         ['Usuários e Servidores', '/admin/usuarios'],
         ['Perfis e Permissões', '/admin/perfis']
       ]);
-      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Emendas', 'Acesso', 'Acesso']);
+      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Emendas', 'Emendas', 'Acesso', 'Acesso']);
     });
 
     it('não deve conter itens legados isolados no menu (SEI, Exportar Excel, Prorrogações soltas)', () => {
@@ -334,7 +335,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       ]);
       // Beneficiários é cadastro de apoio: fica em Ajustes, no grupo Emendas
       expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => [c.label, c.route, c.group])).toEqual([
-        ['Beneficiários', '/emendas/beneficiarios', 'Emendas']
+        ['Beneficiários', '/emendas/beneficiarios', 'Emendas'],
+        ['ASPAR dos órgãos', '/emendas/aspar', 'Emendas']
       ]);
       expect(findAreaForTabs(visible, '/emendas/beneficiarios')?.id).toBe('configuracoes');
     });

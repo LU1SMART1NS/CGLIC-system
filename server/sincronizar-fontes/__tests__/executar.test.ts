@@ -31,6 +31,8 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     sincronizarNotasDasEmendasDoTesouro: vi.fn(async () => sucesso(181)),
     contarNotasEmendasTesouroPendentes: vi.fn(async () => ({ pendentes: 198, amostra: '2026NE000043', amostraUgs: [] })),
     medirEmendasDoPortal: vi.fn(async () => ({ ano2026: { emendas: 12 } })),
+    sincronizarExecucaoDasEmendas: vi.fn(async () => sucesso(44)),
+    contarExecucaoEmendasPendentes: vi.fn(async () => ({ emendas: 44, amostra: null })),
     chaveDoPortal: () => 'chave-de-teste',
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
@@ -303,6 +305,24 @@ describe('notas das emendas pelo Tesouro', () => {
     expect(d.sincronizarNotasDasEmendasDoTesouro).not.toHaveBeenCalled();
     expect(d.contarNotasEmendasTesouroPendentes).toHaveBeenCalledWith('chave-de-teste');
     expect(r).toMatchObject({ dry: true, consulta: { pendentes: 198 } });
+  });
+});
+
+describe('execução das emendas pelo Portal (migration 204)', () => {
+  it('vale para todas as carteiras (sem UASG) e grava com a chave e o orçamento de tempo', async () => {
+    expect(validarPedido({ recurso: 'execucao_emendas' })).toMatchObject({ ok: true, pedido: { recurso: 'execucao_emendas' } });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'execucao_emendas', forcar: true, dry: false }, d);
+    expect(d.sincronizarExecucaoDasEmendas).toHaveBeenCalledWith({ forcar: true, orcamentoMs: expect.any(Number), chave: 'chave-de-teste' });
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 44 } });
+  });
+
+  it('no teste (dry) só conta a fila e consulta uma emenda, sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'execucao_emendas', forcar: false, dry: true }, d);
+    expect(d.sincronizarExecucaoDasEmendas).not.toHaveBeenCalled();
+    expect(d.contarExecucaoEmendasPendentes).toHaveBeenCalledWith('chave-de-teste');
+    expect(r).toMatchObject({ dry: true, consulta: { emendas: 44 } });
   });
 });
 

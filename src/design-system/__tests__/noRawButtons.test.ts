@@ -24,7 +24,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/contracts/planTaskEditing.tsx': 1, // cabeçalho recolhível
   'src/components/emendas/EmendasPedidosPage.tsx': 1, // cabeçalho recolhível das fases do pedido
   'src/components/emendas/PedidoAberto.tsx': 1, // cabeçalho recolhível dos blocos por ata do pedido
-  'src/components/emendas/PedidoModal.tsx': 13, // abas do celular, chips de filtro, segmentos Parlamentar/Órgão, seletor e opções de beneficiário e autor, descrição que abre e o − e + da quantidade
+  'src/components/emendas/PedidoModal.tsx': 14, // abas do celular, chips de filtro, segmentos Parlamentar/Órgão e Por beneficiário/Por item, seletor e opções de beneficiário e autor, descrição que abre e o − e + da quantidade
   'src/components/instrument360/HealthStripParts.tsx': 1, // tile clicável
   'src/components/instrument360/Instrument360Hero.tsx': 1, // nome que volta ao resumo (barra encolhida)
   'src/components/instrument360/Instrument360HeroResumo.tsx': 1, // nome que volta ao cartão (barra azul do celular)
@@ -37,6 +37,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/instrumentos/PainelGavetas.tsx': 1, // botão de área que abre a gaveta (chip com resumo)
   'src/components/gti/InteresseGti.tsx': 1, // botão de gaveta "Interesse por GTI" (mesmo padrão do Início)
   'src/components/modals/ExportExcelModal.tsx': 7, // presets e chips de grupo
+  'src/components/plan/modeloGestaoPlano.tsx': 1, // contadores do plano que filtram as tarefas (chips de filtro)
   'src/components/plan/TaskPlanSection.tsx': 1, // seletor de status
   'src/design-system/components/AppButton.tsx': 2, // o próprio componente (e a menção no comentário)
   'src/design-system/components/Modal.tsx': 1, // fechar

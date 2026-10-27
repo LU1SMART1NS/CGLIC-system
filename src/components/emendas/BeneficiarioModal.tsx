@@ -334,7 +334,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
 
         <div style={secao}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={rotulo}>Endereço de entrega · opcional</span>
+            <span style={rotulo}>Endereço de entrega · só a UF é obrigatória</span>
             {receita?.sedeCep && (
               <AppButton type="button" variant="link" size="sm" onClick={() => void buscarCep(receita.sedeCep!)}>
                 Usar o CEP da sede
@@ -371,7 +371,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
             <AppInput label="Complemento" placeholder="Bloco, sala, portão" value={f.entregaComplemento} onChange={(e) => muda('entregaComplemento', e.target.value)} />
             <AppInput label="Bairro" value={f.entregaBairro} onChange={(e) => muda('entregaBairro', e.target.value)} />
             <AppInput label="Município" value={f.entregaMunicipio} onChange={(e) => muda('entregaMunicipio', e.target.value)} data-testid="emendas-beneficiario-municipio" />
-            <AppInput label="UF" value={f.entregaUf} maxLength={2} onChange={(e) => muda('entregaUf', e.target.value.toUpperCase())} data-testid="emendas-beneficiario-uf" />
+            <AppInput label="UF *" value={f.entregaUf} maxLength={2} onChange={(e) => muda('entregaUf', e.target.value.toUpperCase())} data-testid="emendas-beneficiario-uf" />
           </div>
           <span style={{ fontSize: '0.76rem', color: 'var(--color-text-muted)' }}>O CEP preenche logradouro, bairro e município; tudo pode ser corrigido antes de salvar.</span>
         </div>

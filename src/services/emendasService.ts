@@ -7,6 +7,7 @@
  * CNPJ e CEP são consultados no navegador na hora do cadastro (BrasilAPI, aberta e com CORS; ViaCEP como
  * reserva do CEP). Nada disso é sincronização: o que a pessoa confere é o que grava.
  */
+import type { ExecucaoNoPortal } from '../utils/emendasSobra';
 import { supabase } from './supabaseClient';
 import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { mensagemDeErro } from './sincronizacaoFontesService';
@@ -100,7 +101,7 @@ export interface ItemCaep {
   vigenciaFinal: string | null;
   ataEncerrada: boolean;
   alocado: number;
-  /** Informados pela CAEP para o quadro da reserva (migration 165): nome curto, GND e versão desses dados. */
+  /** Informados pela CAEP para o quadro da reserva (migration 165): nome na ata assinada, GND e versão desses dados. */
   nomeCurto?: string | null;
   gnd?: 'GND-3' | 'GND-4' | null;
   dadosVersao?: number | null;
@@ -488,6 +489,8 @@ export interface LinhaPedido {
   kitComposicao: ItemDoKit[] | null;
   quantidade: number;
   beneficiarioId: string | null;
+  /** Nome do beneficiário como veio do controle anterior da CAEP (migration 160), quando a linha não tem cadastro. */
+  beneficiarioNome?: string | null;
   cancelada: boolean;
   canceladaMotivo: string | null;
   /** Documento SEI do empenho; a nota é achada pelo sistema (emenda_linha_notas: pelo SEI, pelo contrato ou pelo plano interno). */
@@ -533,6 +536,26 @@ export interface DevolucaoPedido {
   oficioProcessoSei: string | null;
   motivo: string;
   devolvidoEm: string;
+  criadoPorNome: string | null;
+}
+
+/** Anulação de empenho registrada no pedido (migration 203). */
+export interface AnulacaoPedido {
+  id: string;
+  /** Total: todas as linhas ativas do pedido; parcial: parte delas. */
+  total: boolean;
+  /**
+   * INTERLOCUCAO: total, o próprio pedido voltou a "Itens reservados"; parcial, as linhas foram para o pedido novo.
+   * CANCELAR (migration 208): os itens só foram cancelados (total: o pedido inteiro).
+   */
+  destino: 'INTERLOCUCAO' | 'CANCELAR';
+  novoPedidoId: string | null;
+  novoPedidoNumero: number | null;
+  notas: string[];
+  linhas: Array<{ linhaId: string; novaLinhaId: string | null; itemKey: string | null; kitNome: string | null; quantidade: number }>;
+  documentoSei: string;
+  anuladoEm: string;
+  motivo: string;
   criadoPorNome: string | null;
 }
 
@@ -594,10 +617,30 @@ export interface PedidoEmenda {
   devolucoes: DevolucaoPedido[];
   /** Todos os documentos SEI das etapas (migration 177), com a ata de cada solicitação (migration 178). */
   documentos: DocumentoSeiDoPedido[];
+  /** Pedido de onde vieram os itens, quando este foi aberto por uma anulação parcial de empenho (migration 203). */
+  pedidoOrigemId: string | null;
+  pedidoOrigemNumero: number | null;
+  /** Anulações de empenho registradas neste pedido, da mais antiga à mais nova (migration 203). */
+  anulacoes: AnulacaoPedido[];
+  /** Emenda registrada de onde o pedido nasceu, ou a do nº conferido no SIOP (migration 205). */
+  emendaId: string | null;
+  /** Outras emendas do pedido, além da conferida (migration 211): a sobra de uma emenda antiga que completou o pedido. */
+  outrasEmendas: OutraEmendaDoPedido[];
+}
+
+export interface OutraEmendaDoPedido {
+  id: string;
+  ano: number;
+  /** 8 dígitos, como siopEmenda. */
+  numero: string;
+  documentoSei: string | null;
+  observacao: string | null;
+  criadoPorNome: string | null;
+  criadoEm: string;
 }
 
 export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
-  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes] = await Promise.all([
+  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes, anulacoes, outras] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedidos').select('*').order('numero').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_devolucoes').select('*').order('id').range(de, ate)),
@@ -610,8 +653,53 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
     // Solicitações que cada envio à CGOFI leva (migration 193). Antes da migration a tabela não existe: segue sem ela.
     lerTodasAsPaginas<Record<string, any>>((de, ate) =>
       db().from('emenda_cgofi_solicitacoes').select('cgofi_id, solicitacao_id').order('cgofi_id').order('solicitacao_id').range(de, ate)
-    ).catch(() => [])
+    ).catch(() => []),
+    // Anulações de empenho (migration 203). Antes da migration a tabela não existe: segue sem ela.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+      db().from('emenda_pedido_anulacoes').select('*').order('id').range(de, ate)
+    ).catch(() => []),
+    // Outras emendas dos pedidos (migration 211). Antes da migration a tabela não existe: segue sem ela.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_emendas').select('*').order('id').range(de, ate)).catch(() => [])
   ]);
+  const numeroPorId = new Map(pedidos.map((p) => [p.id as string, p.numero as number]));
+  const anulacoesPorPedido = new Map<string, AnulacaoPedido[]>();
+  for (const a of anulacoes) {
+    const lista = anulacoesPorPedido.get(a.pedido_id) ?? [];
+    lista.push({
+      id: a.id,
+      total: Boolean(a.total),
+      destino: a.destino === 'CANCELAR' ? 'CANCELAR' : 'INTERLOCUCAO',
+      novoPedidoId: a.novo_pedido_id ?? null,
+      novoPedidoNumero: a.novo_pedido_id ? numeroPorId.get(a.novo_pedido_id) ?? null : null,
+      notas: Array.isArray(a.notas) ? a.notas : [],
+      linhas: (Array.isArray(a.linhas) ? a.linhas : []).map((l: any) => ({
+        linhaId: l.linha_id,
+        novaLinhaId: l.nova_linha_id ?? null,
+        itemKey: l.item_key ?? null,
+        kitNome: l.kit_nome ?? null,
+        quantidade: num(l.quantidade)
+      })),
+      documentoSei: a.documento_sei,
+      anuladoEm: a.anulado_em,
+      motivo: a.motivo,
+      criadoPorNome: a.criado_por_nome ?? null
+    });
+    anulacoesPorPedido.set(a.pedido_id, lista);
+  }
+  const outrasPorPedido = new Map<string, OutraEmendaDoPedido[]>();
+  for (const o of outras) {
+    const lista = outrasPorPedido.get(o.pedido_id) ?? [];
+    lista.push({
+      id: o.id,
+      ano: Number(o.ano),
+      numero: String(o.numero),
+      documentoSei: o.documento_sei ?? null,
+      observacao: o.observacao ?? null,
+      criadoPorNome: o.criado_por_nome ?? null,
+      criadoEm: o.criado_em
+    });
+    outrasPorPedido.set(o.pedido_id, lista);
+  }
   const linhasPorDocumento = new Map<string, LinhaDaSolicitacao[]>();
   for (const s of solicitacaoLinhas) {
     const lista = linhasPorDocumento.get(s.documento_id) ?? [];
@@ -674,6 +762,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       kitComposicao: Array.isArray(l.kit_composicao) ? l.kit_composicao.map((c: any) => ({ itemKey: c.item_key, quantidade: num(c.quantidade) })) : null,
       quantidade: num(l.quantidade),
       beneficiarioId: l.beneficiario_id ?? null,
+      beneficiarioNome: l.beneficiario_nome ?? null,
       cancelada: Boolean(l.cancelada),
       canceladaMotivo: l.cancelada_motivo ?? null,
       empenhoDocumentoSei: l.empenho_documento_sei ?? null,
@@ -724,7 +813,12 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       atualizadoEm: p.atualizado_em ?? null,
       linhas: (porPedido.get(p.id) ?? []).sort((a, b) => a.ordem - b.ordem),
       devolucoes: (devolucoesPorPedido.get(p.id) ?? []).sort((a, b) => a.rodada - b.rodada),
-      documentos: (documentosPorPedido.get(p.id) ?? []).sort((a, b) => (a.data ?? '').localeCompare(b.data ?? '') || a.numero.localeCompare(b.numero))
+      documentos: (documentosPorPedido.get(p.id) ?? []).sort((a, b) => (a.data ?? '').localeCompare(b.data ?? '') || a.numero.localeCompare(b.numero)),
+      pedidoOrigemId: p.pedido_origem_id ?? null,
+      pedidoOrigemNumero: p.pedido_origem_id ? numeroPorId.get(p.pedido_origem_id) ?? null : null,
+      anulacoes: (anulacoesPorPedido.get(p.id) ?? []).sort((a, b) => a.anuladoEm.localeCompare(b.anuladoEm)),
+      emendaId: p.emenda_id ?? null,
+      outrasEmendas: (outrasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))
     }))
     .sort((a, b) => b.numero - a.numero);
 }
@@ -750,7 +844,11 @@ export async function salvarPedidoEmenda(p: {
   contatoTelefone: string | null;
   contatoEmail: string | null;
   motivo?: string | null;
+  /** Só no pedido novo: a emenda registrada de onde ele nasce (migration 205). */
+  emendaId?: string | null;
   linhas: LinhaParaSalvar[];
+  /** Pedido novo com a sobra de uma emenda do mesmo parlamentar (migration 204): nasce com o número e o ano dela. */
+  emendaDaSobra?: { numero: string; ano: number } | null;
 }): Promise<{ id: string; versao: number; numero: number }> {
   const { data, error } = await db().rpc('salvar_pedido_emenda', {
     p_pedido: {
@@ -763,6 +861,8 @@ export async function salvarPedidoEmenda(p: {
       contato_telefone: p.contatoTelefone,
       contato_email: p.contatoEmail,
       motivo: p.motivo ?? null,
+      emenda_id: p.emendaId ?? null,
+      emenda_da_sobra: p.emendaDaSobra ?? null,
       linhas: p.linhas.map((l) => ({ id: l.id ?? null, tipo: l.tipo, item_key: l.itemKey ?? null, kit_id: l.kitId ?? null, quantidade: l.quantidade, beneficiario_id: l.beneficiarioId }))
     }
   });
@@ -817,10 +917,96 @@ export async function registrarEnvioCgofi(v: { pedidoId: string; documentoSei: s
   if (error) throw new Error(mensagemDoBanco(error));
 }
 
+/**
+ * Anulação de empenho (migration 203): as linhas marcadas voltam à interlocução. Se são todas as linhas ativas, o pedido
+ * volta a "Itens reservados"; senão, vão para um pedido novo ligado a este. Com destino CANCELAR (migration 208), as
+ * linhas só são canceladas (todas: o pedido inteiro).
+ */
+export async function registrarAnulacaoEmpenho(v: {
+  pedidoId: string;
+  versao: number;
+  linhas: string[];
+  documentoSei: string;
+  data: string;
+  motivo: string;
+  destino: 'INTERLOCUCAO' | 'CANCELAR';
+}): Promise<{ id: string; versao: number; total: boolean; novoPedidoId: string | null; novoNumero: number | null }> {
+  const { data, error } = await db().rpc('registrar_anulacao_empenho', {
+    p_id: v.pedidoId,
+    p_versao: v.versao,
+    p_dados: { linhas: v.linhas, documento_sei: v.documentoSei, data: v.data, motivo: v.motivo, destino: v.destino }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  const r = data as Record<string, any>;
+  return { id: r.id, versao: r.versao, total: Boolean(r.total), novoPedidoId: r.novo_pedido_id ?? null, novoNumero: r.novo_numero ?? null };
+}
+
 export async function cancelarPedidoEmenda(id: string, versao: number, motivo: string): Promise<{ id: string; versao: number }> {
   const { data, error } = await db().rpc('cancelar_pedido_emenda', { p_id: id, p_versao: versao, p_motivo: motivo });
   if (error) throw new Error(mensagemDoBanco(error));
   return data as { id: string; versao: number };
+}
+
+/** Execução de cada emenda pelo Portal da Transparência (migration 204). Antes da migration a tabela não existe: lista vazia. */
+export async function fetchExecucaoEmendas(): Promise<ExecucaoNoPortal[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+    db().from('emenda_execucao_portal').select('*').order('codigo').range(de, ate)
+  ).catch(() => []);
+  return linhas.map((l) => ({
+    codigo: l.codigo,
+    encontrada: Boolean(l.encontrada),
+    valorEmpenhado: l.valor_empenhado == null ? null : num(l.valor_empenhado),
+    valorLiquidado: l.valor_liquidado == null ? null : num(l.valor_liquidado),
+    valorPago: l.valor_pago == null ? null : num(l.valor_pago),
+    lidoEm: l.lido_em ?? null,
+    notasSenasp: Array.isArray(l.notas_senasp) ? l.notas_senasp.length : null,
+    empenhadoSenasp: l.empenhado_senasp == null ? null : num(l.empenhado_senasp),
+    notasSemValor: l.notas_sem_valor == null ? null : num(l.notas_sem_valor)
+  }));
+}
+
+/** O que os quadros da autorização de empenho usam da ata (Compras.gov.br e ata assinada). */
+export interface DadosDaAtaParaAutorizacao {
+  numeroAta: string;
+  codigoUasg: string;
+  modalidade: string | null;
+  numeroCompra: string | null;
+  anoCompra: string | null;
+  papelSenasp: string | null;
+  fornecedorNome: string | null;
+  fornecedorDocumento: string | null;
+  /** Documento SEI da ata assinada (informado na quantidade da ata assinada). */
+  ataAssinadaSei: string | null;
+}
+
+/** Dados da ata para os quadros da autorização (ataKey = "00031/2025-200331"). */
+export async function fetchDadosDaAtaParaAutorizacao(ataKey: string): Promise<DadosDaAtaParaAutorizacao> {
+  const [numeroAta, codigoUasg] = ataKey.split('-');
+  const { data: ata, error } = await db()
+    .from('atas_registro_preco')
+    .select('id, numero_ata, codigo_uasg, modalidade, numero_compra, ano_compra, papel_senasp')
+    .eq('numero_ata', numeroAta)
+    .eq('codigo_uasg', codigoUasg)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(mensagemDoBanco(error));
+  const [{ data: item }, { data: assinada }] = await Promise.all([
+    ata
+      ? db().from('itens_ata').select('fornecedor_razao_social, fornecedor_cnpj_cpf').eq('ata_id', ata.id).not('fornecedor_razao_social', 'is', null).limit(1).maybeSingle()
+      : Promise.resolve({ data: null }),
+    db().from('ata_item_assinada_registros').select('documento_sei, informado_em').like('item_key', `${ataKey}-%`).order('informado_em', { ascending: false }).limit(1).maybeSingle()
+  ]);
+  return {
+    numeroAta,
+    codigoUasg,
+    modalidade: ata?.modalidade ?? null,
+    numeroCompra: ata?.numero_compra ?? null,
+    anoCompra: ata?.ano_compra ?? null,
+    papelSenasp: ata?.papel_senasp ?? null,
+    fornecedorNome: (item as Record<string, any> | null)?.fornecedor_razao_social ?? null,
+    fornecedorDocumento: (item as Record<string, any> | null)?.fornecedor_cnpj_cpf ?? null,
+    ataAssinadaSei: (assinada as Record<string, any> | null)?.documento_sei ?? null
+  };
 }
 
 /** Reservado a parlamentares por item (pedidos não cancelados, kits abertos). */
@@ -887,7 +1073,8 @@ export async function fetchNotasDasLinhas(): Promise<Map<string, NotaDaLinha>> {
 /**
  * Empenhado × pedido (migration 187): por emenda e item, a soma das linhas dos pedidos já empenhados e a soma das
  * notas da emenda lidas no Portal da Transparência. A_MAIS é certeza; A_MENOS só quando todas as notas do SEI estão no
- * sistema e lidas; A_CONFERIR quando falta nota, há nota não lida, nota por valor ou item sem ata.
+ * sistema e lidas; A_CONFERIR quando falta nota, há nota não lida, nota por valor, item sem ata ou nota anulada (valor
+ * empenhado zero no Tesouro, migration 216).
  */
 export type SituacaoConferencia = 'IGUAL' | 'A_MAIS' | 'A_MENOS' | 'A_CONFERIR' | 'SEM_NOTA';
 
@@ -904,6 +1091,7 @@ export interface ConferenciaEmpenho {
   notasNaoLidas: string[];
   notasPorValor: string[];
   notasComItemSemAta: string[];
+  notasAnuladas: string[];
 }
 
 const lista = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
@@ -924,7 +1112,8 @@ export async function fetchConferenciaEmpenho(): Promise<ConferenciaEmpenho[]> {
     notasFora: lista(r.notas_fora),
     notasNaoLidas: lista(r.notas_nao_lidas),
     notasPorValor: lista(r.notas_por_valor),
-    notasComItemSemAta: lista(r.notas_com_item_sem_ata)
+    notasComItemSemAta: lista(r.notas_com_item_sem_ata),
+    notasAnuladas: lista(r.notas_anuladas)
   }));
 }
 
@@ -962,7 +1151,22 @@ export async function fetchCredorDiferente(): Promise<CredorDiferente[]> {
   }));
 }
 
-/** Nota de emenda da UG 200330, do ano, cuja emenda nenhum pedido tem (migration 190). */
+/** Pedido com itens do fornecedor da nota sem pedido (migration 211): só sugestão. */
+export interface PedidoProvavel {
+  pedidoId: string;
+  pedidoNumero: number;
+  autorId: string | null;
+  pedidoEmenda: string | null;
+  pedidoEmendaAno: number | null;
+  /** Valor dos itens do fornecedor no pedido (quantidade × preço da ata). */
+  valorItens: number;
+  /** Só dos itens ainda sem nota: é o que a nota pode pagar. */
+  valorSemNota: number;
+  /** A emenda conferida do pedido tem o mesmo código de autor (4 primeiros dígitos). */
+  mesmoCodigo: boolean;
+}
+
+/** Nota de material de emenda da UG 200330, do ano, cuja emenda nenhum pedido tem (migrations 190 e 211). */
 export interface NotaSemPedido {
   empenhoId: string;
   nota: string;
@@ -976,12 +1180,34 @@ export interface NotaSemPedido {
   /** Parlamentares dos pedidos com o mesmo código de autor (4 primeiros dígitos da emenda). */
   autoresDoCodigo: string[];
   pedidosDoCodigo: string[];
+  /** Pedidos com itens do mesmo fornecedor (migration 211). */
+  pedidosProvaveis: PedidoProvavel[];
 }
 
 export async function fetchNotasSemPedido(): Promise<NotaSemPedido[]> {
-  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
-    db().from('v_emendas_notas_sem_pedido').select('*').order('emenda').order('nota').range(de, ate)
-  );
+  const [linhas, provaveis] = await Promise.all([
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('v_emendas_notas_sem_pedido').select('*').order('emenda').order('nota').range(de, ate)),
+    // Antes da migration 211 a view não existe: segue sem os pedidos prováveis.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+      db().from('v_emendas_notas_sem_pedido_pedidos').select('*').order('empenho_id').order('pedido_numero').range(de, ate)
+    ).catch(() => [])
+  ]);
+  const provaveisPorNota = new Map<string, PedidoProvavel[]>();
+  for (const c of provaveis) {
+    provaveisPorNota.set(c.empenho_id, [
+      ...(provaveisPorNota.get(c.empenho_id) ?? []),
+      {
+        pedidoId: c.pedido_id,
+        pedidoNumero: Number(c.pedido_numero),
+        autorId: c.autor_id ?? null,
+        pedidoEmenda: c.pedido_emenda ?? null,
+        pedidoEmendaAno: c.pedido_emenda_ano == null ? null : Number(c.pedido_emenda_ano),
+        valorItens: num(c.valor_itens),
+        valorSemNota: num(c.valor_sem_nota),
+        mesmoCodigo: Boolean(c.mesmo_codigo)
+      }
+    ]);
+  }
   return linhas.map((r) => ({
     empenhoId: r.empenho_id,
     nota: r.nota,
@@ -993,7 +1219,192 @@ export async function fetchNotasSemPedido(): Promise<NotaSemPedido[]> {
     emenda: r.emenda,
     emendaAno: r.emenda_ano == null ? null : Number(r.emenda_ano),
     autoresDoCodigo: lista(r.autores_do_codigo),
-    pedidosDoCodigo: lista(r.pedidos_do_codigo)
+    pedidosDoCodigo: lista(r.pedidos_do_codigo),
+    pedidosProvaveis: provaveisPorNota.get(r.empenho_id) ?? []
   }));
 }
 
+/** OUTRA: mais uma emenda no pedido. TROCA: o nº conferido estava errado e passa a ser este (migration 211). */
+export type ModoLigarEmenda = 'OUTRA' | 'TROCA';
+
+export async function ligarEmendaAoPedido(p: {
+  pedidoId: string;
+  versao: number;
+  numero: string;
+  ano: number;
+  modo: ModoLigarEmenda;
+  documentoSei: string | null;
+  observacao: string | null;
+}): Promise<{ versao: number; linhasComNotaDaEmenda: number }> {
+  const { data, error } = await db().rpc('ligar_emenda_ao_pedido', {
+    p_pedido_id: p.pedidoId,
+    p_versao: p.versao,
+    p: { numero: p.numero, ano: p.ano, modo: p.modo, documento_sei: p.documentoSei, observacao: p.observacao }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  const r = (data ?? {}) as Record<string, unknown>;
+  return { versao: Number(r.versao), linhasComNotaDaEmenda: Number(r.linhas_com_nota_da_emenda ?? 0) };
+}
+
+export async function removerEmendaDoPedido(id: string, versao: number): Promise<void> {
+  const { error } = await db().rpc('remover_emenda_do_pedido', { p_id: id, p_versao: versao });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
+
+
+// ------------------------------------------------------------------------------
+// Emendas vistas no SIOP, contatos e ASPAR dos órgãos (migration 205)
+// ------------------------------------------------------------------------------
+
+export type Gnd = 'GND-3' | 'GND-4';
+
+/** Emenda que a CAEP viu no SIOP, com ou sem pedido. */
+export interface EmendaSiop {
+  id: string;
+  ano: number;
+  /** 8 dígitos: os 4 do autor e os 4 da emenda. */
+  numero: string;
+  autorId: string;
+  valor: number;
+  gnd: Gnd;
+  beneficiarioId: string | null;
+  objeto: string | null;
+  /** Dia em que a CAEP viu a emenda no SIOP: o aviso conta daqui. */
+  vistaEm: string;
+  observacao: string | null;
+  versao: number;
+  criadoPorNome: string | null;
+}
+
+export type MeioDoContato = 'TELEFONE' | 'WHATSAPP' | 'EMAIL' | 'REUNIAO';
+
+export interface ContatoDaEmenda {
+  id: string;
+  emendaId: string;
+  contatoEm: string;
+  comQuem: string;
+  meio: MeioDoContato;
+  resumo: string;
+  criadoPorNome: string | null;
+  criadoEm: string;
+}
+
+export type OrgaoAspar = 'PM' | 'BM' | 'PC' | 'PCI' | 'SSP';
+
+/** Assessoria parlamentar de um órgão estadual. */
+export interface AsparDoOrgao {
+  uf: string;
+  orgao: OrgaoAspar;
+  nome: string;
+  cargo: string | null;
+  telefone: string | null;
+  whatsapp: boolean;
+  email: string | null;
+  atualizadoPorNome: string | null;
+  atualizadoEm: string | null;
+}
+
+export async function fetchEmendasSiop(): Promise<EmendaSiop[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emendas_siop').select('*').order('id').range(de, ate));
+  return linhas.map((e) => ({
+    id: e.id,
+    ano: num(e.ano),
+    numero: e.numero,
+    autorId: e.autor_id,
+    valor: num(e.valor),
+    gnd: e.gnd,
+    beneficiarioId: e.beneficiario_id ?? null,
+    objeto: e.objeto ?? null,
+    vistaEm: e.vista_em,
+    observacao: e.observacao ?? null,
+    versao: e.versao,
+    criadoPorNome: e.criado_por_nome ?? null
+  }));
+}
+
+export async function fetchContatosDasEmendas(): Promise<ContatoDaEmenda[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_siop_contatos').select('*').order('id').range(de, ate));
+  return linhas
+    .map((c) => ({
+      id: c.id,
+      emendaId: c.emenda_id,
+      contatoEm: c.contato_em,
+      comQuem: c.com_quem,
+      meio: c.meio,
+      resumo: c.resumo,
+      criadoPorNome: c.criado_por_nome ?? null,
+      criadoEm: c.criado_em
+    }))
+    .sort((a, b) => a.contatoEm.localeCompare(b.contatoEm) || a.criadoEm.localeCompare(b.criadoEm));
+}
+
+export async function fetchAsparDosOrgaos(): Promise<AsparDoOrgao[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_aspar').select('*').order('uf').order('orgao').range(de, ate));
+  return linhas.map((a) => ({
+    uf: a.uf,
+    orgao: a.orgao,
+    nome: a.nome,
+    cargo: a.cargo ?? null,
+    telefone: a.telefone ?? null,
+    whatsapp: Boolean(a.whatsapp),
+    email: a.email ?? null,
+    atualizadoPorNome: a.atualizado_por_nome ?? null,
+    atualizadoEm: a.atualizado_em ?? null
+  }));
+}
+
+export interface EmendaParaSalvar {
+  id?: string;
+  versao?: number;
+  /** Como no SIOP: "2026 4268 0021" ou os 8 dígitos com o ano à parte. */
+  numero: string;
+  ano: number | null;
+  autorId: string;
+  valor: number;
+  gnd: Gnd;
+  beneficiarioId: string | null;
+  objeto: string | null;
+  vistaEm: string;
+  observacao: string | null;
+}
+
+export async function salvarEmendaSiop(e: EmendaParaSalvar): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('salvar_emenda_siop', {
+    p: {
+      id: e.id ?? null,
+      versao: e.versao ?? null,
+      numero: e.numero,
+      ano: e.ano,
+      autor_id: e.autorId,
+      valor: e.valor,
+      gnd: e.gnd,
+      beneficiario_id: e.beneficiarioId,
+      objeto: e.objeto,
+      vista_em: e.vistaEm,
+      observacao: e.observacao
+    }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+export async function apagarEmendaSiop(id: string, versao: number): Promise<void> {
+  const { error } = await db().rpc('apagar_emenda_siop', { p_id: id, p_versao: versao });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
+
+export async function registrarContatoEmenda(emendaId: string, c: { contatoEm: string; comQuem: string; meio: MeioDoContato; resumo: string }): Promise<void> {
+  const { error } = await db().rpc('registrar_contato_emenda', {
+    p_emenda_id: emendaId,
+    p: { contato_em: c.contatoEm, com_quem: c.comQuem, meio: c.meio, resumo: c.resumo }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
+
+/** Nome vazio apaga o contato daquele órgão na UF. */
+export async function salvarAsparEmenda(a: { uf: string; orgao: OrgaoAspar; nome: string; cargo: string | null; telefone: string | null; whatsapp: boolean; email: string | null }): Promise<void> {
+  const { error } = await db().rpc('salvar_aspar_emenda', {
+    p: { uf: a.uf, orgao: a.orgao, nome: a.nome, cargo: a.cargo, telefone: a.telefone, whatsapp: a.whatsapp, email: a.email }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+}

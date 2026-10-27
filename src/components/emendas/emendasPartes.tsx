@@ -21,6 +21,9 @@ const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADO
  * Autor em duas linhas: nome e "Deputado · PL · RJ". Sem autor (reserva para um órgão, migration 163): "Parlamentar a
  * definir" e, embaixo, para qual órgão a CAEP separou.
  */
+/** Mesma largura da coluna do parlamentar em todas as tabelas de Emendas (o navegador não estica conforme as outras colunas). */
+export const LARGURA_AUTOR = '240px';
+
 export const AutorDoPedido: React.FC<{ autor: AutorEmenda | undefined; autorId: string | null; orgao?: string | null; destaque?: boolean }> = ({ autor, autorId, orgao, destaque }) => {
   // Como coluna de identificação (destaque): nome forte e azul e a 2ª linha da Ata; nas outras colunas, valor e detalhe.
   const nome: React.CSSProperties = destaque ? carteiraIdentificacao : carteiraValor;
@@ -203,8 +206,8 @@ export const EmpenhoDaLinha: React.FC<{
 };
 
 /** Cor da etiqueta de situação da linha: pendência em amarelo, antes do empenho em azul, empenhada e contratada em verde. */
-const varianteDaSituacao = (s: SituacaoDaLinha): 'warning' | 'info' | 'success' | 'neutral' =>
-  s.situacao === 'CANCELADO' ? 'neutral' : s.pendente || s.situacao === 'SOLICITACAO_A_INFORMAR' || s.situacao === 'AGUARDANDO_ASSINATURA' ? 'warning' : ORDEM_SITUACAO_LINHA[s.situacao] >= ORDEM_SITUACAO_LINHA.EMPENHADO ? 'success' : 'info';
+const varianteDaSituacao = (s: SituacaoDaLinha): 'warning' | 'info' | 'success' | 'neutral' | 'danger' =>
+  s.situacao === 'CANCELADO' ? 'neutral' : s.situacao === 'EMPENHO_ANULADO' ? 'danger' : s.pendente || s.situacao === 'SOLICITACAO_A_INFORMAR' || s.situacao === 'AGUARDANDO_ASSINATURA' ? 'warning' : ORDEM_SITUACAO_LINHA[s.situacao] >= ORDEM_SITUACAO_LINHA.EMPENHADO ? 'success' : 'info';
 
 /** Situação da linha do pedido (migration 180): a etiqueta e, embaixo, a solicitação, a nota ligada ou o que falta. */
 export const SituacaoDaLinhaEtiqueta: React.FC<{ s: SituacaoDaLinha; testId?: string }> = ({ s, testId }) => (

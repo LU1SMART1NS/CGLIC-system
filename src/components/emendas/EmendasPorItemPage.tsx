@@ -126,7 +126,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
       sortValue: ORDEM.quadro.value,
       render: (l) => (
         <>
-          {l.nomeCurto ? <div style={carteiraValor}>{l.nomeCurto}</div> : <div style={{ ...carteiraDetalhe, marginTop: 0 }}>sem nome curto</div>}
+          {l.nomeCurto ? <div style={carteiraValor}>{l.nomeCurto}</div> : <div style={{ ...carteiraDetalhe, marginTop: 0 }}>sem nome da ata assinada</div>}
           <div style={{ marginTop: '0.2rem' }}>
             {l.gnd ? <StatusBadge label={l.gnd === 'GND-4' ? 'GND-4 · Investimento' : 'GND-3 · Custeio'} variant="neutral" size="sm" dot={false} /> : <StatusBadge label="GND a informar" variant="warning" size="sm" dot={false} />}
           </div>
@@ -228,7 +228,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
           rowOpen={(l) => () => navigate(`${buildAtaItemPath(l.numeroAta, l.codigoUasg, l.numeroItem)}?aba=emendas`)}
           rowActions={
             podeGerir
-              ? (l) => <ActionButton action="editar" iconOnly label={`Nome curto e GND de ${l.nomeCurto ?? rotuloItemDaAta(l)}`} onClick={() => setEditando(l)} data-testid={`emendas-itens-dados-${l.itemKey}`} />
+              ? (l) => <ActionButton action="editar" iconOnly label={`Nome na ata assinada e GND de ${l.nomeCurto ?? rotuloItemDaAta(l)}`} onClick={() => setEditando(l)} data-testid={`emendas-itens-dados-${l.itemKey}`} />
               : undefined
           }
         />
