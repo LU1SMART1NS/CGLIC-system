@@ -54,13 +54,13 @@ export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gr
   if (financeiro && financeiro.total > 0) r['execucao-financeira'] = { contagem: financeiro.total, vermelho: financeiro.urgente, destino: '/pagamentos' };
 
   // Emendas (padrão do Financeiro): pedidos com algum aviso; vermelho com aviso vermelho (prazo de indicação vencido, ata
-  // encerrada…). Abre Pedidos em "Com algum aviso".
+  // encerrada…). Abre Pedidos sem filtro.
   if (emendas && emendas.total > 0)
     r.emendas = {
       contagem: emendas.total,
       vermelho: emendas.urgentes > 0,
-      // Só emendas sem pedido: o clique abre a lista delas; com pedidos com aviso, a lista dos pedidos.
-      destino: emendas.semPedido && emendas.semPedido === emendas.total ? '/emendas/emendas?situacao=sem' : '/emendas/pedidos?aviso=com'
+      // Só emendas sem pedido: o clique abre a lista delas; com pedidos com aviso, Pedidos sem filtro.
+      destino: emendas.semPedido && emendas.semPedido === emendas.total ? '/emendas/emendas?situacao=sem' : '/emendas/pedidos'
     };
 
   // Ajustes: UASGs (coordenador) e beneficiários de emenda (coordenador e gestor de emendas) sem grupo confirmado. Abre
