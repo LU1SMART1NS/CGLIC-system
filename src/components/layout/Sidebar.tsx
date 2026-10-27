@@ -44,7 +44,8 @@ const lastVisitByArea = new Map<string, string>();
 export function areaTarget(area: NavItem): string | undefined {
   const last = lastVisitByArea.get(area.id);
   if (last && area.children?.some((child) => child.route === last.split('?')[0])) return last;
-  return area.children?.[0]?.route ?? area.route;
+  const entrada = area.entradaId ? area.children?.find((child) => child.id === area.entradaId) : undefined;
+  return (entrada ?? area.children?.[0])?.route ?? area.route;
 }
 
 export function rememberAreaVisit(areas: NavItem[], pathname: string, search: string): void {
