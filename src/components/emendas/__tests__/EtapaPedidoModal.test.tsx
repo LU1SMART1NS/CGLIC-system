@@ -12,6 +12,7 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useInformarSolicitacaoDaAta: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useRegistrarEnvioCgofi: () => ({ isPending: false, mutateAsync: vi.fn() }),
   usePedidosEmendas: () => ({ data: naLista.pedidos }),
+  usePedidoEmDiaNaTela: () => () => true,
   useEmendasSiop: () => ({ data: [] })
 }));
 vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined }) }));
