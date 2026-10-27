@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { avisosDeEmpenho } from '../emendasEmpenho';
-import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notasEmitidasDepoisDaAnulacao, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notasEmitidasDepoisDaAnulacao, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, reservaDoItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { ConferenciaEmpenho, NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
@@ -523,5 +523,24 @@ describe('empenho anulado (migration 203)', () => {
     const p = pedido({ etapa: 'EMPENHADO', linhas: [zerada, boa] });
     expect(situacaoDaLinha(p, zerada, notas)).toMatchObject({ situacao: 'EMPENHO_ANULADO', pendente: true });
     expect(situacaoDaLinha(p, boa, notas).situacao).not.toBe('EMPENHO_ANULADO');
+  });
+});
+
+describe('reservaDoItem (mínimo da CAEP na alocação)', () => {
+  it('só a reserva sem empenho fica "a empenhar"; linha com empenho SEI conta como empenhada mesmo sem solicitação ligada', () => {
+    const pedidos = [
+      pedido({ etapa: 'CONTRATACAO', linhas: [linha({ id: 'c1', itemKey: 'a', quantidade: 3 })] }),
+      pedido({ etapa: 'CONFERIDO', linhas: [linha({ id: 'c2', itemKey: 'a', quantidade: 2, empenhoDocumentoSei: '36423104' })] }),
+      pedido({ etapa: 'RESERVADO', linhas: [linha({ id: 'r1', itemKey: 'a', quantidade: 5 }), linha({ id: 'r2', itemKey: 'a', quantidade: 9, cancelada: true })] }),
+      pedido({ etapa: 'CANCELADO', linhas: [linha({ id: 'x', itemKey: 'a', quantidade: 50 })] }),
+      pedido({ etapa: 'RESERVADO', linhas: [kit] })
+    ];
+    expect(reservaDoItem(pedidos, 'a', new Map())).toEqual({ total: 20, aEmpenhar: 15 });
+  });
+
+  it('nota anulada no Tesouro volta a ser reserva a empenhar', () => {
+    const nota = { linhaId: 'c1', nota: '2026NE000123', valorEmpenhado: 0 } as NotaDaLinha;
+    const pedidos = [pedido({ etapa: 'CONTRATACAO', linhas: [linha({ id: 'c1', itemKey: 'a', quantidade: 3 })] })];
+    expect(reservaDoItem(pedidos, 'a', new Map([['c1', nota]]))).toEqual({ total: 3, aEmpenhar: 3 });
   });
 });

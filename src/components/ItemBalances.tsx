@@ -456,15 +456,21 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const totalUGQty = quantitativoSenasp(
     unidades,
     arp.codigoUnidadeGerenciadora,
-    // Sem os órgãos do item, o registrado vem da base da view, que já tem o desconto: devolve antes de descontar aqui.
-    saldoDoItem ? quantidadeBaseSenasp(saldoDoItem) + descontoRegistradoAcima : Number(item.quantidadeHomologadaItem) || 0
+    // Sem os órgãos do item, vale o registrado gravado na view; a base da view já é a cota (sem gerenciado, remanejado e
+    // desconto), e descontar de novo aqui contaria duas vezes.
+    saldoDoItem
+      ? (saldoDoItem.quantidade_registrada_senasp != null ? Number(saldoDoItem.quantidade_registrada_senasp) || 0 : quantidadeBaseSenasp(saldoDoItem) + descontoRegistradoAcima)
+      : Number(item.quantidadeHomologadaItem) || 0
   );
   // Com a ata assinada informada (migration 109), a base do saldo e o limite da alocação são a cota própria:
   // o registrado da SENASP menos o que ela gerencia para os órgãos participantes.
   const { data: quantitativos, isLoading: quantitativosLoading, consulta: quantitativosQuery } = useQuantitativosDoItem(canonicalItemKey);
   // Só na ata da SENASP: na ata de outro órgão (migration 114) a base continua o registrado (ou o aprovado na adesão).
   const cotaPropriaInformada = !ataDeOutroOrgao(arp) && quantitativos.informado;
-  const baseSaldo = (cotaPropriaInformada ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty) - descontoRegistradoAcima;
+  // O remanejado da cota SENASP a não participantes (migration 219) sai da cota até o Compras.gov.br mostrar a queda
+  // (o banco já desconta: saida_nao_participante é só a parte que a fonte ainda não reflete).
+  const saidaNaoParticipante = ataDeOutroOrgao(arp) ? 0 : quantitativos.saidaNaoParticipante;
+  const baseSaldo = (cotaPropriaInformada ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty) - saidaNaoParticipante - descontoRegistradoAcima;
   // Ata da SENASP sem a ata assinada e com outros órgãos registrados: o limite da alocação é provisório (migration 116,
   // só aviso). Enquanto os quantitativos carregam não avisa, para não piscar.
   const outrosOrgaosRegistrados = unidades.filter((u) => !isUnidadeSenasp(u, arp.codigoUnidadeGerenciadora) && (Number(u.quantidadeRegistrada) || 0) > 0).length;
