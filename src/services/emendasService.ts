@@ -1038,6 +1038,13 @@ export async function fetchDadosDaAtaParaAutorizacao(ataKey: string): Promise<Da
 }
 
 /** Reservado a parlamentares por item (pedidos não cancelados, kits abertos). */
+/** Reservado a parlamentares de um item (emendas_reservado_do_item, migration 157): o mínimo da CAEP na alocação. */
+export async function fetchReservadoDoItem(itemKey: string): Promise<number> {
+  const { data, error } = await db().rpc('emendas_reservado_do_item', { p_item_key: itemKey });
+  if (error) throw new Error(error.message);
+  return num(data);
+}
+
 export async function fetchReservadoPorItem(): Promise<Map<string, number>> {
   const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('v_emendas_reservado_por_item').select('item_key, reservado').order('item_key').range(de, ate));
   return new Map(linhas.map((r) => [r.item_key as string, num(r.reservado)]));

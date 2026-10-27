@@ -10,7 +10,8 @@ import { useSaveEmpenhoLinks } from '../../hooks/useSaveEmpenhoLinks';
 import { useContratadoDoItem } from '../../hooks/useContratadoDoItem';
 import { alocacoesPorContrato, contratadoPorNomeDaUnidade } from '../../utils/contratadoPorUnidade';
 import { summarizeAllocationExecution } from '../../utils/allocationExecution';
-import { avaliarEdicao, linhasIniciais, listaParaGravar, normUnidade, vinculosSemRemovidas, type LinhaAlocacao } from '../../utils/alocacaoEdicao';
+import { useReservadoDoItem } from '../../hooks/useEmendas';
+import { avaliarEdicao, linhasIniciais, listaParaGravar, normUnidade, ROTULO_MOTIVO_DO_MINIMO, UNIDADE_DAS_EMENDAS, vinculosSemRemovidas, type LinhaAlocacao } from '../../utils/alocacaoEdicao';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
 import { MENSAGEM_CONFLITO_EDICAO } from '../../utils/conflitoEdicao';
 import { formatNumber } from '../item-balances/itemBalanceUtils';
@@ -64,8 +65,8 @@ export const CatalogoVazioAviso: React.FC = () => (
 
 /**
  * Janela "Alocação do item", a mesma na fila Itens às unidades e na aba Alocação interna do Item 360: lista as
- * unidades já alocadas com o contratado e o empenhado de cada uma, edita a quantidade na linha (mínimo = o maior dos
- * dois), remove (só sem contrato nem empenho vinculado) e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
+ * unidades já alocadas com o contratado, o empenhado e (na CAEP) o reservado a parlamentares, edita a quantidade na
+ * linha (mínimo = o maior dos três), remove (só sem contrato, empenho vinculado nem reserva) e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
  */
 export const AlocarUnidadeModal: React.FC<AlocarUnidadeModalProps> = ({ item, ...rest }) =>
   item ? <JanelaAlocacao key={`${item.numeroAta}-${item.uasg}-${item.numeroItem}`} item={item} {...rest} /> : null;
@@ -77,19 +78,22 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   const linksQuery = useItemEmpenhoLinks(item.numeroAta, item.uasg, item.numeroItem);
   const { data: estado, isLoading: alocacoesLoading } = alocacoesQuery;
   const { data: linksState, isLoading: linksLoading } = linksQuery;
+  // Sem o reservado, a janela não edita: a CAEP poderia ficar abaixo da reserva sem aviso (o banco recusaria ao gravar).
+  const reservadoQuery = useReservadoDoItem(itemKey);
   // Sem as alocações ou os vínculos lidos do banco, a janela não edita: gravar a partir de uma lista que não chegou
   // apagaria o que está salvo.
-  const naoCarregou = alocacoesQuery.isError || linksQuery.isError;
-  const relendo = alocacoesQuery.isFetching || linksQuery.isFetching;
+  const naoCarregou = alocacoesQuery.isError || linksQuery.isError || reservadoQuery.isError;
+  const relendo = alocacoesQuery.isFetching || linksQuery.isFetching || reservadoQuery.isFetching;
   const tentarDeNovo = () => {
     if (alocacoesQuery.isError) void alocacoesQuery.refetch();
     if (linksQuery.isError) void linksQuery.refetch();
+    if (reservadoQuery.isError) void reservadoQuery.refetch();
   };
   const { data: empenhoDoItem, isLoading: vinculosLoading } = useEmpenhoDoItem(itemKey);
   const { data: contratado, isLoading: contratadoLoading } = useContratadoDoItem(itemKey);
   const salvarAlocacoes = useSaveAllocations();
   const salvarLinks = useSaveEmpenhoLinks();
-  const carregando = departmentsLoading || alocacoesLoading || linksLoading || vinculosLoading || contratadoLoading;
+  const carregando = departmentsLoading || alocacoesLoading || linksLoading || vinculosLoading || contratadoLoading || reservadoQuery.isLoading;
   const salvando = salvarAlocacoes.isPending || salvarLinks.isPending;
 
   // Linhas gravadas (derivadas das alocações e dos empenhos); a primeira edição passa a valer no lugar delas.
@@ -98,11 +102,11 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
     const gravadas = estado?.allocations ?? [];
     const exec = summarizeAllocationExecution(gravadas, empenhoDoItem, linksState?.links ?? {}, alocacoesPorContrato(contratado.contratos, gravadas));
     const inativas = new Set(departments.filter((d) => !d.ativo).map((d) => normUnidade(d.sigla)));
-    return linhasIniciais(gravadas, exec.porAlocacao, contratadoPorNomeDaUnidade(contratado.unidades)).map((l) => {
+    return linhasIniciais(gravadas, exec.porAlocacao, contratadoPorNomeDaUnidade(contratado.unidades), reservadoQuery.data ?? 0).map((l) => {
       const linha = inativas.has(normUnidade(l.unitName)) ? { ...l, inativa: true } : l;
-      return linha.id === removerId && linha.vinculados === 0 && linha.contratado === 0 ? { ...linha, removida: true } : linha;
+      return linha.id === removerId && linha.vinculados === 0 && linha.contratado === 0 && !(linha.reservado ?? 0) ? { ...linha, removida: true } : linha;
     });
-  }, [carregando, naoCarregou, estado, empenhoDoItem, linksState, removerId, contratado, departments]);
+  }, [carregando, naoCarregou, estado, empenhoDoItem, linksState, removerId, contratado, departments, reservadoQuery.data]);
   const [editadas, setEditadas] = React.useState<LinhaAlocacao[] | null>(null);
   const linhas = editadas ?? iniciais;
   const setLinhas = (f: (ls: LinhaAlocacao[]) => LinhaAlocacao[]) => setEditadas((prev) => f(prev ?? iniciais ?? []));
@@ -167,6 +171,8 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   };
 
   const base = Math.max(item.quantitativoSenasp, aval.totalAlocado, 1);
+  // Coluna Reservado: só quando o item tem a CAEP na lista ou alguma reserva.
+  const comReserva = lista.some((l) => (l.reservado ?? 0) > 0 || normUnidade(l.unitName) === normUnidade(UNIDADE_DAS_EMENDAS));
   const ativas = lista.filter((l) => !l.removida);
   const corDe = (id: string) => CORES[lista.findIndex((l) => l.id === id) % CORES.length];
 
@@ -213,7 +219,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
             </AppButton>
           }
         >
-          Não foi possível carregar {alocacoesQuery.isError ? 'as alocações' : 'os vínculos das notas às unidades'} deste item. Nada pode ser
+          Não foi possível carregar {alocacoesQuery.isError ? 'as alocações' : linksQuery.isError ? 'os vínculos das notas às unidades' : 'o reservado a parlamentares'} deste item. Nada pode ser
           alterado até carregar.
         </NoticeBar>
       ) : carregando || !linhas ? (
@@ -277,6 +283,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                       <th style={thStyle}>Unidade interna</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Contratado</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Empenhado</th>
+                      {comReserva && <th style={{ ...thStyle, textAlign: 'right' }} title="Pedidos de emenda ativos deste item, no menu Emendas">Reservado</th>}
                       <th style={{ ...thStyle, textAlign: 'right' }}>Alocado</th>
                       <th style={thStyle} aria-label="Ações" />
                     </tr>
@@ -302,6 +309,11 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                           </td>
                           <td data-rotulo="Contratado" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.contratado)}</td>
                           <td data-rotulo="Empenhado" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.empenhado)}</td>
+                          {comReserva && (
+                            <td data-rotulo="Reservado" data-testid={`alocar-unidade-reservado-${l.unitName}`} style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: l.reservado ? 700 : undefined, ...riscado }}>
+                              {l.reservado ? formatNumber(l.reservado) : '—'}
+                            </td>
+                          )}
                           <td data-rotulo="Alocado" style={{ ...td, textAlign: 'right' }}>
                             {l.removida ? (
                               <span style={{ fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.original)}</span>
@@ -323,7 +335,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                                 />
                                 {a.alterada && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-warning-text)', marginTop: '0.15rem' }}>antes {formatNumber(l.original)}</span>}
                                 {a.acimaDoGravado && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>máximo {formatNumber(l.original)} (desativada)</span>}
-                                {a.abaixoDoMinimo && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>mínimo {formatNumber(a.minimo)}{l.contratado > 0 && l.contratado >= l.empenhado ? ' (contratado)' : l.empenhado > 0 ? ' (empenhado)' : ''}</span>}
+                                {a.abaixoDoMinimo && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>mínimo {formatNumber(a.minimo)}{a.motivoDoMinimo ? ` (${ROTULO_MOTIVO_DO_MINIMO[a.motivoDoMinimo]})` : ''}</span>}
                               </>
                             )}
                           </td>
@@ -337,6 +349,8 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                                 label={
                                   a.podeRemover
                                     ? `Remover a alocação de ${l.unitName}`
+                                    : l.reservado
+                                      ? `${l.unitName} tem ${formatNumber(l.reservado)} reservados a parlamentares. Para remover, a reserva precisa ser liberada antes, em Emendas › Pedidos.`
                                     : l.contratado > 0
                                       ? `${l.unitName} tem ${formatNumber(l.contratado)} contratados. Para remover, a unidade precisa sair antes das divisões dos contratos (feito pelo gestor da ata).`
                                       : `${l.unitName} tem ${l.vinculados} ${l.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, os empenhos precisam ser desvinculados antes (feito pelo gestor da ata).`

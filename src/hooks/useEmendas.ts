@@ -19,6 +19,7 @@ import {
   salvarKitEmenda,
   fetchPedidosEmendas,
   fetchReservadoPorItem,
+  fetchReservadoDoItem,
   fetchNotasDasLinhas,
   fetchConferenciaEmpenho,
   fetchCredorDiferente,
@@ -166,6 +167,11 @@ export function usePedidosEmendas({ enabled = true }: LeituraOpcional = {}) {
 
 export function useReservadoPorItem() {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'reservado'], queryFn: fetchReservadoPorItem });
+}
+
+/** Reservado a parlamentares de um item: mínimo da CAEP na alocação e no remanejamento da cota SENASP. */
+export function useReservadoDoItem(itemKey: string, { enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'reservado', itemKey], queryFn: () => fetchReservadoDoItem(itemKey), enabled: enabled && Boolean(itemKey) });
 }
 
 /** Nota de empenho e execução de cada linha empenhada (migration 164; o banco refaz de hora em hora). */

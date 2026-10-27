@@ -28,6 +28,7 @@ import { useSyncContractItemQuantity } from '../hooks/useSyncContractItemQuantit
 import { useEmpenhoDoItem } from '../hooks/useEmpenhoDoItem';
 import { useContratadoDoItem } from '../hooks/useContratadoDoItem';
 import { alocacoesPorContrato, contratadoPorNomeDaUnidade } from '../utils/contratadoPorUnidade';
+import { UNIDADE_DAS_EMENDAS } from '../utils/alocacaoEdicao';
 import { AjustarQuantidadeModal, type ContratoParaAjustar } from './item-balances/AjustarQuantidadeModal';
 import { UnidadesDoContratoModal, type ContratoParaDividir } from './item-balances/UnidadesDoContratoModal';
 import { QuantidadeContratadaCelula, UnidadesDoContratoCelula } from './item-balances/ContratadoCells';
@@ -109,8 +110,6 @@ interface ItemBalancesProps {
 const ITEM_TABS: ItemTab[] = ['quantitativos', 'contratos', 'adesoes'];
 // Gestor de saldo não vê contratos: fica com os quantitativos (empenhado por unidade incluído) e as adesões.
 const SALDOS_ITEM_TABS: ItemTab[] = ['quantitativos', 'adesoes'];
-/** Unidade interna das emendas (unidade_das_emendas() no banco): com alocação a ela, o item ganha a aba Emendas. */
-const UNIDADE_DAS_EMENDAS = 'CAEP';
 /** Perfis que leem as emendas (emendas.view: migrations 155, 180 e 198, esta para o gestor de atas e contratos). */
 const LEEM_EMENDAS = new Set(['admin', 'gestor', 'gestor_emendas', 'gestor_saldos', 'leitor']);
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
@@ -826,6 +825,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               alocado={alocacoesComErro ? null : totalAllocatedSum}
               totalUnidadesInternas={allocations.length}
               unidadesInternas={unidadesInternasDoItem}
+              unidadesAlocadas={alocacoesComErro ? undefined : allocationRows}
               adesoes={adesoes}
               limiteAdesao={totalLimiteAdesao}
             />
