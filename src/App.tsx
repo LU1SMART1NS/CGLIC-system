@@ -47,6 +47,7 @@ const EmendasInicioPage = lazyComRecarga(() => import('./components/emendas/Emen
 const EmendasPedidosPage = lazyComRecarga(() => import('./components/emendas/EmendasPedidosPage').then((m) => ({ default: m.EmendasPedidosPage })));
 const EmendasItensEKitsPage = lazyComRecarga(() => import('./components/emendas/EmendasItensEKitsPage').then((m) => ({ default: m.EmendasItensEKitsPage })));
 const EmendasBeneficiariosPage = lazyComRecarga(() => import('./components/emendas/EmendasBeneficiariosPage').then((m) => ({ default: m.EmendasBeneficiariosPage })));
+const EmendasGruposBeneficiariosPage = lazyComRecarga(() => import('./components/emendas/EmendasGruposBeneficiariosPage').then((m) => ({ default: m.EmendasGruposBeneficiariosPage })));
 const EmendasAsparPage = lazyComRecarga(() => import('./components/emendas/EmendasAsparPage').then((m) => ({ default: m.EmendasAsparPage })));
 const Pedido360Page = lazyComRecarga(() => import('./components/emendas/pedido360/Pedido360Page').then((m) => ({ default: m.Pedido360Page })));
 const EmendasParlamentaresPage = lazyComRecarga(() => import('./components/emendas/parlamentares/EmendasParlamentaresPage').then((m) => ({ default: m.EmendasParlamentaresPage })));
@@ -469,6 +470,15 @@ const AppContent: React.FC = () => {
               element={
                 <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
                   <EmendasBeneficiariosPage />
+                </RequireRole>
+              }
+            />
+            {/* Grupo de cada beneficiário (migration 218): base da coluna Captação principal; a consulta só lê. */}
+            <Route
+              path="/emendas/grupos-beneficiarios"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasGruposBeneficiariosPage />
                 </RequireRole>
               }
             />

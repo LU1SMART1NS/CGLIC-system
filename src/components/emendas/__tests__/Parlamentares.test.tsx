@@ -53,7 +53,8 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useCredorDiferente: () => ({ porPedido: new Map(), todosPorPedido: new Map(), resolvidos: new Set<string>() }),
   usePodeGerirEmendas: () => perfil.gerir,
   usePodeVerContratos: () => false,
-  useApagarEmendaSiop: () => ({ isPending: false, mutateAsync: vi.fn() })
+  useApagarEmendaSiop: () => ({ isPending: false, mutateAsync: vi.fn() }),
+  useMapaGruposBeneficiarios: () => new Map()
 }));
 vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined, ipca: null, semPrevisao: false }) }));
 vi.mock('../PedidoModal', () => ({ PedidoModal: () => null }));
@@ -85,6 +86,12 @@ describe('Emendas › Parlamentares (aba)', () => {
     for (const t of ['Deputados', 'Senadores', 'Bancadas', 'Todos']) expect(html).toContain(`>${t}<`);
     expect(html).toContain('Emendas 2026');
     expect(html).toContain('emendas-sobra-faixa');
+  });
+
+  it('a Captação principal da antiga visão Por parlamentar continua aqui (migration 218)', () => {
+    const html = render('/emendas/parlamentares');
+    expect(html).toContain('Captação principal');
+    expect(html).toContain('emendas-parlamentares-captacao-filter-gti');
   });
 
   it('a coluna Pago soma as notas dos pedidos do parlamentar', () => {

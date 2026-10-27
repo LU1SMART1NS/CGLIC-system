@@ -76,7 +76,8 @@ vi.mock('../../../hooks/useEmendas', () => ({
   usePodeVerContratos: () => false,
   useRemoverEmendaDoPedido: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useLigarEmendaAoPedido: () => ({ isPending: false, mutateAsync: vi.fn() }),
-  useNotasSemPedido: () => ({ data: [] })
+  useNotasSemPedido: () => ({ data: [] }),
+  useMapaGruposBeneficiarios: () => new Map()
 }));
 vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined, ipca: null, semPrevisao: false }) }));
 vi.mock('../PedidoModal', () => ({ PedidoModal: () => null }));

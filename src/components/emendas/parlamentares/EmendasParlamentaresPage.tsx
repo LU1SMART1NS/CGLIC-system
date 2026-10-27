@@ -16,12 +16,15 @@ import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCart
 import { carteiraDetalhe, carteiraNumero, carteiraValor } from '../../carteira/carteiraStyles';
 import { AdminListShell } from '../../admin/shared/AdminListShell';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
-import { hojeEmBrasilia, useAutoresEmendas, useItensCaep, useNotasDasLinhas, usePedidosEmendas } from '../../../hooks/useEmendas';
+import { hojeEmBrasilia, useAutoresEmendas, useItensCaep, useMapaGruposBeneficiarios, useNotasDasLinhas, usePedidosEmendas } from '../../../hooks/useEmendas';
+import { contarPorGti, passaFiltroGti, type FatiasDaAta } from '../../../config/gruposGti';
+import { GRUPOS_CAPTACAO, fatiasDaCaptacao, lerFiltroCaptacao, lerModoCaptacao } from '../../../config/captacaoEmendas';
+import { CelulaCaptacao, FiltroCaptacao } from '../CaptacaoDoPedido';
 import { formatCurrency, formatNumber } from '../../../utils/format';
 import { AUTOR_A_DEFINIR, AUTOR_A_DEFINIR_CHAVE } from '../../../utils/emendasPedidos';
 import { ROTULO_SITUACAO_SOBRA, type SobraDoAutor } from '../../../utils/emendasSobra';
 import { pagoPorParlamentar, type ExecucaoDoParlamentar } from '../../../utils/emendasParlamentar';
-import type { AutorEmenda, NotaDaLinha, TipoAutor } from '../../../services/emendasService';
+import type { AutorEmenda, NotaDaLinha, PedidoEmenda, TipoAutor } from '../../../services/emendasService';
 import { AutorDoPedido, LARGURA_AUTOR } from '../emendasPartes';
 import { BarraDaEmenda } from './SobraDaEmendaCartao';
 import { VARIANTE_SOBRA } from './sobraVisual';
@@ -34,6 +37,9 @@ interface Linha {
   /** Emendas do ano corrente do parlamentar (migration 204). */
   emendas: SobraDoAutor | undefined;
   execucao: ExecucaoDoParlamentar | undefined;
+  /** Pedidos do parlamentar, para a Captação principal (migration 218). */
+  lista: PedidoEmenda[];
+  captacao?: FatiasDaAta;
 }
 
 type Tipo = 'todos' | TipoAutor;
@@ -75,6 +81,16 @@ export const EmendasParlamentaresPage: React.FC = () => {
   const uf = searchParams.get('uf') ?? '';
   const situacao = searchParams.get('emendas') ?? '';
   const mostrar = searchParams.get('mostrar') ?? '';
+  // Captação principal (migration 218), como em Pedidos: ?captacao= e ?captacaoConta=.
+  const filtroCaptacao = lerFiltroCaptacao(searchParams.get('captacao'));
+  const modoCaptacao = lerModoCaptacao(searchParams.get('captacaoConta'));
+  const gruposDosBeneficiarios = useMapaGruposBeneficiarios();
+  const mudarUrl = (mudar: (p: URLSearchParams) => void) =>
+    setSearchParams((atual) => {
+      const prox = new URLSearchParams(atual);
+      mudar(prox);
+      return prox;
+    });
   const mudar = (chave: string, valor: string) =>
     setSearchParams(
       (atual) => {
@@ -89,7 +105,7 @@ export const EmendasParlamentaresPage: React.FC = () => {
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
   const autorPorId = useMemo(() => new Map(autores.map((a) => [a.id, a])), [autores]);
   const ativos = useMemo(() => pedidos.filter((p) => p.etapa !== 'CANCELADO'), [pedidos]);
-  const { emendas, porAutor, minimo } = useSobraDasEmendas(pedidos, itens, notas, ano);
+  const { emendas, porAutor, minimo, precos } = useSobraDasEmendas(pedidos, itens, notas, ano);
   const pago = useMemo(() => pagoPorParlamentar(ativos, notas), [ativos, notas]);
 
   const linhas: Linha[] = useMemo(() => {
@@ -97,18 +113,22 @@ export const EmendasParlamentaresPage: React.FC = () => {
     for (const p of ativos) {
       // Reservas para órgãos (sem parlamentar ainda, migration 163) ficam juntas numa linha "Parlamentar a definir".
       const chave = p.autorId ?? '';
-      const l = m.get(chave) ?? { autorId: p.autorId, autor: p.autorId ? autorPorId.get(p.autorId) : undefined, pedidos: 0, emendas: p.autorId ? porAutor.get(p.autorId) : undefined, execucao: p.autorId ? pago.get(p.autorId) : undefined };
+      const l = m.get(chave) ?? { autorId: p.autorId, autor: p.autorId ? autorPorId.get(p.autorId) : undefined, pedidos: 0, emendas: p.autorId ? porAutor.get(p.autorId) : undefined, execucao: p.autorId ? pago.get(p.autorId) : undefined, lista: [] };
       l.pedidos++;
+      l.lista.push(p);
       m.set(chave, l);
     }
     if (mostrar === 'todos') {
-      for (const a of autores) if (!m.has(a.id)) m.set(a.id, { autorId: a.id, autor: a, pedidos: 0, emendas: porAutor.get(a.id), execucao: undefined });
+      for (const a of autores) if (!m.has(a.id)) m.set(a.id, { autorId: a.id, autor: a, pedidos: 0, emendas: porAutor.get(a.id), execucao: undefined, lista: [] });
+    }
+    for (const l of m.values()) {
+      if (l.lista.length) l.captacao = fatiasDaCaptacao(l.lista, gruposDosBeneficiarios, itens, precos);
     }
     // Quem tem mais em emendas primeiro; sem emenda do ano, pelo número de pedidos e o nome.
     return [...m.values()].sort(
       (a, b) => (b.emendas?.valor ?? 0) - (a.emendas?.valor ?? 0) || b.pedidos - a.pedidos || (a.autor?.nome ?? '').localeCompare(b.autor?.nome ?? '', 'pt-BR')
     );
-  }, [ativos, autorPorId, autores, mostrar, porAutor, pago]);
+  }, [ativos, autorPorId, autores, mostrar, porAutor, pago, gruposDosBeneficiarios, itens, precos]);
   const semPedido = useMemo(() => {
     const com = new Set(ativos.map((p) => p.autorId));
     return autores.filter((a) => !com.has(a.id)).length;
@@ -117,9 +137,10 @@ export const EmendasParlamentaresPage: React.FC = () => {
   const doTipo = linhas.filter((l) => tipo === 'todos' || l.autor?.tipo === tipo);
   const termo = semAcento(busca.trim());
   const naSituacao = (l: Linha) => !situacao || (situacao === 'sobra' ? (l.emendas?.sobra ?? 0) > 0 : l.emendas?.emendas.some((e) => e.situacao === 'conferir' || e.situacao === 'acima'));
-  const filtradas = doTipo.filter((l) => naSituacao(l) && (!uf || l.autor?.uf === uf) && (!termo || semAcento(`${l.autorId ? l.autor?.nome ?? '' : AUTOR_A_DEFINIR} ${l.autor?.partido ?? ''} ${l.autor?.uf ?? ''}`).includes(termo)));
+  const filtradas = doTipo.filter((l) => naSituacao(l) && (!uf || l.autor?.uf === uf) && passaFiltroGti(l.captacao, filtroCaptacao, modoCaptacao) && (!termo || semAcento(`${l.autorId ? l.autor?.nome ?? '' : AUTOR_A_DEFINIR} ${l.autor?.partido ?? ''} ${l.autor?.uf ?? ''}`).includes(termo)));
   const ufs = [...new Set(doTipo.map((l) => l.autor?.uf).filter((x): x is string => Boolean(x)))].sort().map((v) => ({ value: v, label: v, count: doTipo.filter((l) => l.autor?.uf === v).length }));
-  const filtrosAtivos = Boolean(termo || uf || mostrar || situacao);
+  const filtrosAtivos = Boolean(termo || uf || mostrar || situacao || filtroCaptacao !== 'TODOS');
+  const contagemCaptacao = contarPorGti(doTipo.map((l) => l.captacao), modoCaptacao, GRUPOS_CAPTACAO);
   const comSobra = emendas.filter((e) => e.situacao === 'sobra');
   const aConferir = emendas.filter((e) => e.situacao === 'conferir' || e.situacao === 'acima');
   const valorOu = (v: number | undefined) => (v == null ? vazio : <span style={carteiraNumero}>{formatCurrency(v)}</span>);
@@ -129,6 +150,11 @@ export const EmendasParlamentaresPage: React.FC = () => {
   const colunas: Column<Linha>[] = [
     { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, sortValue: ORDEM.autor.value, render: (l) => <AutorDoPedido autor={l.autor} autorId={l.autorId} destaque /> },
     { key: 'pedidos', header: 'Pedidos', align: 'right', nowrap: true, sortValue: ORDEM.pedidos.value, sortFirstDir: 'desc', render: (l) => <span style={carteiraNumero}>{formatNumber(l.pedidos)}</span> },
+    {
+      key: 'captacao',
+      header: 'Captação principal',
+      render: (l) => (l.captacao ? <CelulaCaptacao fatias={l.captacao} testId={`emendas-parlamentares-captacao-${chaveDaLinha(l)}`} /> : vazio)
+    },
     {
       key: 'emendas',
       header: `Emendas ${ano}`,
@@ -237,6 +263,7 @@ export const EmendasParlamentaresPage: React.FC = () => {
           onChange={(v) => mudar('mostrar', v)}
           testId="emendas-parlamentares-filtro-mostrar"
         />
+        <FiltroCaptacao gti={filtroCaptacao} modo={modoCaptacao} counts={contagemCaptacao} mudarUrl={mudarUrl} testIdPrefix="emendas-parlamentares" />
       </CarteiraFilterBar>
 
       <AdminListShell

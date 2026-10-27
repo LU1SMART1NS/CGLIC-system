@@ -87,15 +87,22 @@ export const GtiFatiaBar: React.FC<{ fatias: FatiasDaAta; legenda?: boolean; lar
  * Célula "GTI" das carteiras: o GTI principal em destaque, a maior outra fatia em cinza (se pesa) e a barra. Com um
  * grupo só não há divisão a mostrar: fica o nome com "único grupo" e sem barra.
  */
-export const GtiCelulaAta: React.FC<{ fatias?: FatiasDaAta; testId?: string; detalheAoPassar?: boolean }> = ({ fatias, testId, detalheAoPassar = true }) => {
+export const GtiCelulaAta: React.FC<{
+  fatias?: FatiasDaAta;
+  testId?: string;
+  detalheAoPassar?: boolean;
+  /** Texto sem fatias (Emendas: "Sem beneficiário") e título do quadro ao passar o mouse. */
+  semDados?: { texto: string; title: string };
+  tituloDetalhe?: string;
+}> = ({ fatias, testId, detalheAoPassar = true, semDados, tituloDetalhe = 'Interesse por GTI' }) => {
   const { destaque, secundaria } = resumirCelulaGti(fatias);
   const ancoraRef = React.useRef<HTMLDivElement>(null);
   const [ancora, setAncora] = React.useState<DOMRect | null>(null);
 
   if (!fatias || !destaque) {
     return (
-      <span style={pequeno} title="Os órgãos dos itens ainda não foram copiados do Compras.gov.br" data-testid={testId}>
-        Sem dados dos órgãos
+      <span style={pequeno} title={semDados?.title ?? 'Os órgãos dos itens ainda não foram copiados do Compras.gov.br'} data-testid={testId}>
+        {semDados?.texto ?? 'Sem dados dos órgãos'}
       </span>
     );
   }
@@ -133,11 +140,11 @@ export const GtiCelulaAta: React.FC<{ fatias?: FatiasDaAta; testId?: string; det
       </div>
       {!unico && <GtiFatiaBar fatias={fatias} largura={LARGURA_BARRA_CARTEIRA} altura={4} />}
       {ancora && (
-        <AnchoredPanel anchorRect={ancora} onClose={() => setAncora(null)} ariaLabel="Interesse por GTI" testId={testId ? `${testId}-detalhe` : undefined} width={300}
+        <AnchoredPanel anchorRect={ancora} onClose={() => setAncora(null)} ariaLabel={tituloDetalhe} testId={testId ? `${testId}-detalhe` : undefined} width={300}
           // Só leitura: o mouse e o clique passam pelo quadro e chegam às linhas de baixo (o clique da célula é o filtro).
           style={{ pointerEvents: 'none' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Interesse por GTI</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{tituloDetalhe}</div>
             {porTamanho.map((f) => (
               <div key={f.grupo} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.2rem 0.5rem', alignItems: 'center', fontSize: '0.8rem' }}>
                 <span style={{ justifySelf: 'start' }}><GtiTag grupo={f.grupo} /></span>

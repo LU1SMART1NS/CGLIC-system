@@ -13,11 +13,16 @@ export const GRUPOS_GTI = ['LIGABOM', 'CNCG', 'CNPC', 'CONDPCI', 'CONSESP'] as c
 export type GrupoGti = (typeof GRUPOS_GTI)[number];
 /** Grupo que o coordenador pode confirmar: os cinco GTIs ou "Outros" (fora deles). */
 export type GrupoConfirmavel = GrupoGti | 'OUTROS';
+/**
+ * Grupo que pode ser o principal de uma fatia: os cinco GTIs e, só nas Emendas, o CNGM (guardas e secretarias
+ * municipais de segurança, migration 218). As UASGs das atas nunca têm CNGM.
+ */
+export type GrupoPrincipal = GrupoGti | 'CNGM';
 /** Grupo de uma fatia: o confirmado ou "a confirmar". */
-export type GrupoDaFatia = GrupoConfirmavel | 'A_CONFIRMAR';
+export type GrupoDaFatia = GrupoConfirmavel | 'CNGM' | 'A_CONFIRMAR';
 
 export const GRUPOS_CONFIRMAVEIS: readonly GrupoConfirmavel[] = [...GRUPOS_GTI, 'OUTROS'];
-const ORDEM_FATIA: readonly GrupoDaFatia[] = [...GRUPOS_CONFIRMAVEIS, 'A_CONFIRMAR'];
+const ORDEM_FATIA: readonly GrupoDaFatia[] = [...GRUPOS_GTI, 'CNGM', 'OUTROS', 'A_CONFIRMAR'];
 
 export const GRUPO_GTI_INFO: Record<GrupoDaFatia, { rotulo: string; curto: string; descricao: string; cor: string }> = {
   LIGABOM: { rotulo: 'LIGABOM', curto: 'LIGABOM', descricao: 'Corpos de Bombeiros', cor: 'var(--gti-ligabom)' },
@@ -25,11 +30,12 @@ export const GRUPO_GTI_INFO: Record<GrupoDaFatia, { rotulo: string; curto: strin
   CNPC: { rotulo: 'CNPC', curto: 'CNPC', descricao: 'Polícias Civis', cor: 'var(--gti-cnpc)' },
   CONDPCI: { rotulo: 'CONDPCI', curto: 'CONDPCI', descricao: 'Polícias Científicas', cor: 'var(--gti-condpci)' },
   CONSESP: { rotulo: 'CONSESP', curto: 'CONSESP', descricao: 'Secretarias de Segurança Pública', cor: 'var(--gti-consesp)' },
+  CNGM: { rotulo: 'CNGM', curto: 'CNGM', descricao: 'Guardas e secretarias municipais', cor: 'var(--gti-cngm)' },
   OUTROS: { rotulo: 'Outros', curto: 'Outros', descricao: 'Fora dos cinco GTIs', cor: 'var(--gti-outros)' },
   A_CONFIRMAR: { rotulo: 'A confirmar', curto: 'A confirmar', descricao: 'Grupo da UASG ainda não confirmado', cor: 'var(--gti-a-confirmar)' }
 };
 
-const ehGti = (v: string): v is GrupoGti => (GRUPOS_GTI as readonly string[]).includes(v);
+const ehPrincipal = (v: string): v is GrupoPrincipal => v === 'CNGM' || (GRUPOS_GTI as readonly string[]).includes(v);
 
 export function ehGrupoConfirmavel(v: unknown): v is GrupoConfirmavel {
   return typeof v === 'string' && (GRUPOS_CONFIRMAVEIS as readonly string[]).includes(v);
@@ -116,8 +122,8 @@ export interface FatiasDaAta {
   total: number;
   /** Na ordem dos grupos (LIGABOM … CONSESP, Outros, A confirmar), só os que têm órgãos. */
   fatias: FatiaGti[];
-  /** GTI com a maior fatia (empate: o primeiro na ordem). Null sem quantidade em nenhum dos cinco. */
-  principal: (FatiaGti & { grupo: GrupoGti }) | null;
+  /** GTI (ou CNGM, nas Emendas) com a maior fatia (empate: o primeiro na ordem). Null sem quantidade em nenhum. */
+  principal: (FatiaGti & { grupo: GrupoPrincipal }) | null;
   /** Órgãos participantes ainda sem grupo confirmado. */
   orgaosAConfirmar: number;
   /** O que `quantidade` mede: unidades (item) ou valor em R$ (ata, migration 141). Ausente = unidades. */
@@ -189,7 +195,7 @@ export function resumirFatias(grupos: Array<{ grupo: GrupoDaFatia; quantidade: n
     .sort((a, b) => ORDEM_FATIA.indexOf(a.grupo) - ORDEM_FATIA.indexOf(b.grupo));
   let principal: FatiasDaAta['principal'] = null;
   for (const f of fatias) {
-    if (!ehGti(f.grupo) || f.quantidade <= 0) continue;
+    if (!ehPrincipal(f.grupo) || f.quantidade <= 0) continue;
     if (!principal || f.quantidade > principal.quantidade) principal = { ...f, grupo: f.grupo };
   }
   const orgaosAConfirmar = fatias.find((f) => f.grupo === 'A_CONFIRMAR')?.orgaos ?? 0;
@@ -200,7 +206,7 @@ export function resumirFatias(grupos: Array<{ grupo: GrupoDaFatia; quantidade: n
 // Filtro da carteira
 // ------------------------------------------------------------------------------
 
-export type FiltroGti = GrupoGti | 'TODOS';
+export type FiltroGti = GrupoPrincipal | 'TODOS';
 export const FILTRO_GTI_VALUES: readonly FiltroGti[] = ['TODOS', ...GRUPOS_GTI];
 
 /** Como contar o interesse do GTI na ata. */
@@ -224,9 +230,13 @@ export function passaFiltroGti(fatias: FatiasDaAta | undefined, gti: FiltroGti, 
 }
 
 /** Quantas atas cada GTI traria no modo escolhido (contagem no menu do filtro). */
-export function contarPorGti(fatiasDasAtas: Array<FatiasDaAta | undefined>, modo: ModoFiltroGti): Partial<Record<GrupoGti, number>> {
-  const contagem: Partial<Record<GrupoGti, number>> = {};
-  for (const grupo of GRUPOS_GTI) {
+export function contarPorGti(
+  fatiasDasAtas: Array<FatiasDaAta | undefined>,
+  modo: ModoFiltroGti,
+  grupos: readonly GrupoPrincipal[] = GRUPOS_GTI
+): Partial<Record<GrupoPrincipal, number>> {
+  const contagem: Partial<Record<GrupoPrincipal, number>> = {};
+  for (const grupo of grupos) {
     const n = fatiasDasAtas.filter((f) => passaFiltroGti(f, grupo, modo)).length;
     if (n > 0) contagem[grupo] = n;
   }
@@ -234,7 +244,7 @@ export function contarPorGti(fatiasDasAtas: Array<FatiasDaAta | undefined>, modo
 }
 
 /** Percentual do GTI na ata (0 sem fatia): ordena a lista quando o filtro está ligado. */
-export function pctDoGti(fatias: FatiasDaAta | undefined, gti: GrupoGti): number {
+export function pctDoGti(fatias: FatiasDaAta | undefined, gti: GrupoPrincipal): number {
   return fatias?.fatias.find((f) => f.grupo === gti)?.pct ?? 0;
 }
 

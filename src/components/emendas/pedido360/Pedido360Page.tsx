@@ -20,8 +20,11 @@ import {
   useNotasDasLinhas,
   usePedidosEmendas,
   usePodeGerirEmendas,
-  usePodeVerContratos
+  usePodeVerContratos,
+  useMapaGruposBeneficiarios
 } from '../../../hooks/useEmendas';
+import { fatiasDaCaptacao } from '../../../config/captacaoEmendas';
+import { CaptacaoBotao, CaptacaoNoTopo } from '../CaptacaoDoPedido';
 import { usePrecosParaEmenda } from '../../../hooks/useEmendasQuadro';
 import { avisosDoPedido, linhasAtivas, reservadoPorItem, ultimoContatoPorAutor, valorDoPedidoNaEtapa, AUTOR_A_DEFINIR } from '../../../utils/emendasPedidos';
 import { nomeDoPedido, rotaDoPedido } from '../../../utils/emendasNomeDoPedido';
@@ -80,6 +83,9 @@ export const Pedido360Page: React.FC = () => {
   const [editando, setEditando] = useState(false);
   const [anulando, setAnulando] = useState(false);
   const [janela, setJanela] = useState<{ acao: AcaoDaJanela; contexto?: ContextoDaJanela } | null>(null);
+  // Captação principal (migration 218): botão no cartão e gaveta entre o cartão e as abas, como na Ata 360.
+  const gruposDosBeneficiarios = useMapaGruposBeneficiarios();
+  const [captacaoAberta, setCaptacaoAberta] = useState(false);
 
   if (isLoading || carregandoItens) {
     return (
@@ -125,6 +131,7 @@ export const Pedido360Page: React.FC = () => {
   const nomeDoAutor = autor?.nome ?? (p.autorId ?? AUTOR_A_DEFINIR);
   const avisos = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id));
   const valor = valorDoPedidoNaEtapa(p, itens, precos);
+  const captacao = fatiasDaCaptacao([p], gruposDosBeneficiarios, itens, precos);
   const onAcao = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) => setJanela({ acao, contexto });
   const tabs = PEDIDO360_ABAS.map((a) => (a.id === 'itens' ? { ...a, label: `Itens (${linhasAtivas(p).length})` } : a));
 
@@ -147,7 +154,9 @@ export const Pedido360Page: React.FC = () => {
           onAnular={() => setAnulando(true)}
           onAba={irPara}
           onAbrirParlamentar={p.autorId ? () => navegar(`/emendas/parlamentares/${encodeURIComponent(p.autorId!)}`) : undefined}
+          verMais={<CaptacaoBotao fatias={captacao} aberto={captacaoAberta} onToggle={() => setCaptacaoAberta((v) => !v)} />}
         />
+        <CaptacaoNoTopo fatias={captacao} beneficiarios={beneficiarios} aberto={captacaoAberta} onFechar={() => setCaptacaoAberta(false)} />
         <Instrument360Tabs ref={tabsRef} tabs={tabs} active={activeTab} onSelect={irPara} idPrefix="pedido" ariaLabel={`Seções do ${nomeDoPedido(p).toLowerCase()}`} />
       </Instrument360Head>
 
