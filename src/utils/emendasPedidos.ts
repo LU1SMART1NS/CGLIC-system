@@ -3,7 +3,7 @@
  * linha ocupa e avisos (30 dias sem ofício, divergência com o SIOP, ata vencendo ou vencida antes do empenho).
  */
 import type { AcaoPedido, ConferenciaEmpenho, DocumentoSeiDoPedido, EtapaDoDocumento, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, MotivoSemNota, NotaDaLinha, PedidoEmenda, RegraDaNota } from '../services/emendasService';
-import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR, diasEntre, passouDoCorte } from './emendasKits';
+import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR, diasEntre, nomeDaLinhaDoPedido, passouDoCorte } from './emendasKits';
 import { chaveDoContrato, numeroDaChave } from './contractKeyUtils';
 import { formatCurrency } from './format';
 import { avisosDeEmpenho } from './emendasEmpenho';
@@ -1007,8 +1007,7 @@ export interface TarefaDoPedido {
     | { tipo: 'envio'; rotulo: string };
 }
 
-const nomeDaLinha = (l: LinhaPedido, itens: Map<string, ItemCaep>): string =>
-  l.tipo === 'KIT' ? `${l.quantidade} ${l.kitNome ?? 'kit'}` : `${l.quantidade} ${itens.get(l.itemKey ?? '')?.nomeCurto?.trim() || curto(itens.get(l.itemKey ?? '')?.descricao ?? l.itemKey ?? '', 28)}`;
+const nomeDaLinha = (l: LinhaPedido, itens: Map<string, ItemCaep>): string => nomeDaLinhaDoPedido(l, itens, 28);
 const plural = (n: number, uma: string, varias: string) => `${n} ${n === 1 ? uma : varias}`;
 
 /**

@@ -34,7 +34,7 @@ import {
   usePodeGerirEmendas
 } from '../../../hooks/useEmendas';
 import { formatCurrency } from '../../../utils/format';
-import { curto, dataBR } from '../../../utils/emendasKits';
+import { curto, dataBR, nomeDaLinhaDoPedido } from '../../../utils/emendasKits';
 import { linhasAtivas, reservadoPorItem, ultimoContatoPorAutor } from '../../../utils/emendasPedidos';
 import { emendasNaLista, NOME_ORGAO_ASPAR, numeroDaEmenda, orgaoDoBeneficiario, orgaosNaOrdem, ROTULO_MEIO, ROTULO_SITUACAO_EMENDA, semPedido } from '../../../utils/emendasSemPedido';
 import { ROTULO_SITUACAO_SOBRA, type SobraDaEmenda } from '../../../utils/emendasSobra';
@@ -172,7 +172,7 @@ export const Emenda360Page: React.FC = () => {
         chave: k,
         nota: n.nota!,
         fornecedor: item?.fornecedor ?? null,
-        itens: linhas.map((l) => `${l.quantidade} ${itens.get(l.itemKey ?? '')?.nomeCurto?.trim() || curto(itens.get(l.itemKey ?? '')?.descricao ?? l.kitNome ?? '', 30)}`).join(' · '),
+        itens: linhas.map((l) => nomeDaLinhaDoPedido(l, itens, 30)).join(' · '),
         empenhado: n.valorEmpenhado ?? 0,
         pago: n.valorPago,
         pedido: p

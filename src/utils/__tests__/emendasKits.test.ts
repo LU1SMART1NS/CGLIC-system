@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcularKit, sugestoesDeTroca, diasEntre, buscarItensCaep } from '../emendasKits';
+import { calcularKit, sugestoesDeTroca, diasEntre, buscarItensCaep, nomeDaLinhaDoPedido } from '../emendasKits';
 import type { ItemCaep } from '../../services/emendasService';
 
 const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
@@ -105,5 +105,21 @@ describe('prazo de indicação (migration 162)', () => {
     EMENDAS_RULES.corteIndicacaoAntesDias = 45;
     expect(calcularKit(kit, mapa(item('a', { vigenciaFinal: '2026-12-02' })), HOJE).situacao).toBe('indisponivel');
     EMENDAS_RULES.corteIndicacaoAntesDias = 35;
+  });
+});
+
+describe('nomeDaLinhaDoPedido: o item pelo nome da ata assinada nas listas de pedidos (27/10/2026)', () => {
+  const itens = new Map<string, ItemCaep>([
+    ['x1', item('x1', { descricao: 'Arma de fogo - empunhável - médio calibre, tipo pistola semiautomática', nomeCurto: 'Pistola 9 mm' })],
+    ['x2', item('x2', { descricao: 'Arma de fogo - empunhável - médio calibre, tipo pistola semiautomática', nomeCurto: '  ' })]
+  ]);
+  it('usa o nome da ata assinada inteiro, sem cortar', () => {
+    expect(nomeDaLinhaDoPedido({ tipo: 'ITEM', quantidade: 3, itemKey: 'x1', kitNome: null }, itens, 5)).toBe('3 Pistola 9 mm');
+  });
+  it('sem o nome da ata assinada, o começo da descrição do catálogo', () => {
+    expect(nomeDaLinhaDoPedido({ tipo: 'ITEM', quantidade: 2, itemKey: 'x2', kitNome: null }, itens, 20)).toMatch(/^2 Arma de fogo.*…$/);
+  });
+  it('o kit pelo nome do kit', () => {
+    expect(nomeDaLinhaDoPedido({ tipo: 'KIT', quantidade: 1, itemKey: null, kitNome: 'Kit perícia' }, itens)).toBe('1 Kit perícia');
   });
 });

@@ -4,7 +4,7 @@ import { StatusBadge } from '../../../design-system/components/StatusBadge';
 import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraValor } from '../../carteira/carteiraStyles';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import { formatCurrency } from '../../../utils/format';
-import { curto, dataBR } from '../../../utils/emendasKits';
+import { nomeDaLinhaDoPedido } from '../../../utils/emendasKits';
 import { avisoGrave, avisosDoPedido, contratosDoPedido, execucaoDoPedido, linhasAtivas, ROTULO_ETAPA, valorDoPedidoNaEtapa } from '../../../utils/emendasPedidos';
 import { numeroDaEmenda } from '../../../utils/emendasSemPedido';
 import { faltaAnoDaEmenda, numeroDoPedido, rotaDoPedido } from '../../../utils/emendasNomeDoPedido';
@@ -42,7 +42,7 @@ export const TabelaDePedidos: React.FC<Props> = ({ pedidos, itens, notas, precos
         ) : (
           <>
             <div style={carteiraValor}>{faltaAnoDaEmenda(p) ? `Emenda ${numeroDaEmenda(p.siopEmenda!)}` : 'Reserva'}</div>
-            <div style={carteiraDetalhe}>{faltaAnoDaEmenda(p) ? 'ano a informar' : p.origem === 'PLANILHA' ? 'da planilha' : `de ${dataBR(p.reservadoEm)}`}</div>
+            {faltaAnoDaEmenda(p) && <div style={{ ...carteiraDetalhe, color: 'var(--color-warning-text)' }}>ano a informar</div>}
           </>
         );
       }
@@ -53,7 +53,7 @@ export const TabelaDePedidos: React.FC<Props> = ({ pedidos, itens, notas, precos
       minWidth: '220px',
       render: (p) => {
         const ls = linhasAtivas(p);
-        const nomes = ls.slice(0, 2).map((l) => (l.tipo === 'KIT' ? `${l.quantidade} ${l.kitNome}` : `${l.quantidade} ${itens.get(l.itemKey ?? '')?.nomeCurto?.trim() || curto(itens.get(l.itemKey ?? '')?.descricao ?? l.itemKey ?? '', 30)}`));
+        const nomes = ls.slice(0, 2).map((l) => nomeDaLinhaDoPedido(l, itens, 30));
         return (
           <>
             <div style={carteiraValor}>{nomes.join(' · ') || '—'}</div>

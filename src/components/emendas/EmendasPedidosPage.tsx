@@ -38,7 +38,7 @@ import { CelulaCaptacao, FiltroCaptacao } from './CaptacaoDoPedido';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { contaEmendasSemPedido, diasSemContatoParaUrgente, emendasNaLista } from '../../utils/emendasSemPedido';
 import { formatCurrency } from '../../utils/format';
-import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
+import { avisoIndicacaoDias, corteIndicacaoDias, nomeDaLinhaDoPedido } from '../../utils/emendasKits';
 import { casaBusca, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import {
   avisoGrave,
@@ -273,12 +273,8 @@ export const EmendasPedidosPage: React.FC = () => {
               <div style={{ ...carteiraDetalhe, color: 'var(--color-warning-text)' }}>ano a informar</div>
             </>
           );
-        return (
-          <>
-            <div style={carteiraValor}>Reserva</div>
-            <div style={carteiraDetalhe}>{l.origem === 'PLANILHA' ? 'da planilha' : `de ${dataBR(l.reservadoEm)}`}</div>
-          </>
-        );
+        // Só "Reserva": o parlamentar ao lado já diferencia, e a data da reserva fica no Pedido 360 (decisão de 27/10/2026).
+        return <div style={carteiraValor}>Reserva</div>;
       }
     },
     {
@@ -298,7 +294,7 @@ export const EmendasPedidosPage: React.FC = () => {
         const ativas = linhasAtivas(l);
         const resumo = ativas
           .slice(0, 2)
-          .map((x) => (x.tipo === 'KIT' ? `${x.quantidade} ${x.kitNome}` : `${x.quantidade} ${curto(itens.get(x.itemKey ?? '')?.descricao ?? x.itemKey ?? '', 34)}`))
+          .map((x) => nomeDaLinhaDoPedido(x, itens))
           .join(' · ');
         return (
           <>
