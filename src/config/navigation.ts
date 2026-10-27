@@ -33,6 +33,8 @@ export interface NavItem {
   icon?: LucideIcon;
   route?: string;
   children?: NavItem[];
+  /** Aba em que a área abre ao clicar no menu, quando não é a primeira da barra (id de um filho). */
+  entradaId?: string;
   /** 'active' = funcionalidade real, navegável. 'planned' = item de roadmap, desabilitado ("Em breve"). */
   status: 'active' | 'planned';
   badge?: {
@@ -69,7 +71,7 @@ export interface NavItem {
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
  * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
  * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
- * - Emendas: Pedidos (/emendas/pedidos) · Parlamentares (/emendas/parlamentares) · Emendas (/emendas/emendas) · Itens
+ * - Emendas: Parlamentares (/emendas/parlamentares) · Emendas (/emendas/emendas) · Pedidos (/emendas/pedidos) · Itens
  *   (/emendas/itens: Por item · Por kit). Cada linha abre a tela 360 (Pedido, Parlamentar, Emenda), como na Carteira.
  * - Ajustes (no pé do menu), em três grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas), Emendas (Beneficiários) e Acesso (Usuários e Servidores · Perfis e Permissões)
@@ -255,16 +257,9 @@ export const navigationConfig: NavItem[] = [
     label: 'Emendas',
     icon: ScrollText,
     status: 'active',
+    // Abas na ordem da cadeia (Parlamentares → Emendas → Pedidos → Itens); o trabalho do dia a dia segue abrindo em Pedidos.
+    entradaId: 'emendas-pedidos',
     children: [
-      {
-        id: 'emendas-pedidos',
-        label: 'Pedidos',
-        icon: ClipboardList,
-        route: '/emendas/pedidos',
-        status: 'active',
-        matchPrefixes: ['/emendas/pedidos'],
-        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
-      },
       {
         // Parlamentares (protótipo aprovado em 27/10/2026): a linha abre o Parlamentar 360, que também acende Emendas.
         id: 'emendas-parlamentares',
@@ -283,6 +278,15 @@ export const navigationConfig: NavItem[] = [
         route: '/emendas/emendas',
         status: 'active',
         matchPrefixes: ['/emendas/emendas'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
+        id: 'emendas-pedidos',
+        label: 'Pedidos',
+        icon: ClipboardList,
+        route: '/emendas/pedidos',
+        status: 'active',
+        matchPrefixes: ['/emendas/pedidos'],
         allowedRoles: ['admin', 'gestor_emendas', 'leitor']
       },
       {

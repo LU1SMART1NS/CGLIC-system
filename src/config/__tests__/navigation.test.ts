@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { navigationConfig, getBreadcrumbs, filterNavigationByRole, findAreaForTabs, rotaInicialDoPerfil } from '../navigation';
-import { isExactChildActive, isItemActive } from '../../components/layout/Sidebar';
+import { areaTarget, isExactChildActive, isItemActive } from '../../components/layout/Sidebar';
 
 function flatLabels(items: ReturnType<typeof filterNavigationByRole>): string[] {
   return items.flatMap((item) => [item.label, ...(item.children?.map((c) => c.label) || [])]);
@@ -331,11 +331,13 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(visible.find((i) => i.id === 'visao-geral')?.children?.map((c) => [c.label, c.route])).toEqual([['Painel', '/emendas/inicio']]);
       expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Atas', 'Itens']);
       expect(visible.find((i) => i.id === 'emendas')?.children?.map((c) => [c.label, c.route])).toEqual([
-        ['Pedidos', '/emendas/pedidos'],
         ['Parlamentares', '/emendas/parlamentares'],
         ['Emendas', '/emendas/emendas'],
+        ['Pedidos', '/emendas/pedidos'],
         ['Itens', '/emendas/itens']
       ]);
+      // As abas seguem a cadeia, mas o menu abre a área em Pedidos (trabalho do dia a dia)
+      expect(areaTarget(visible.find((i) => i.id === 'emendas')!)).toBe('/emendas/pedidos');
       // Beneficiários é cadastro de apoio: fica em Ajustes, no grupo Emendas
       expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => [c.label, c.route, c.group])).toEqual([
         ['Beneficiários', '/emendas/beneficiarios', 'Emendas'],
