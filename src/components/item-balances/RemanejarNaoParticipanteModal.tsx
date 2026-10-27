@@ -6,11 +6,10 @@ import { useReservaDoItem } from '../../hooks/useReservaDoItem';
 import type { OrgaoQuantitativo, QuantitativosDoItem, RemanejamentoNaoParticipante } from '../../services/quantitativosService';
 import type { AdesaoItemRecord } from '../../types';
 import { documentoSeiValido } from '../../utils/quantitativos';
-import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { folgaDasUnidades, ROTULO_MOTIVO_DO_MINIMO } from '../../utils/alocacaoEdicao';
-import { adesoesNoLimite, livreNaOrigem, regrasDoRemanejamento, uasgDaAdesao, usadoNoLimite, type RegraDoLimite } from '../../utils/remanejamentoNaoParticipante';
+import { adesoesNoLimite, livreNaOrigem, regrasDoRemanejamento, usadoNoLimite, type RegraDoLimite } from '../../utils/remanejamentoNaoParticipante';
 import type { AllocationRow } from './AllocationsTab';
-import { DESTINO_VAZIO, EscolherOrgaoDestino, type DestinoEscolhido, type OrgaoSugerido } from './EscolherOrgaoDestino';
+import { DESTINO_VAZIO, EscolherOrgaoDestino, type DestinoEscolhido } from './EscolherOrgaoDestino';
 import { QuantidadeComMaximo } from './QuantidadeComMaximo';
 import { formatNumber } from './itemBalanceUtils';
 
@@ -101,22 +100,6 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
   const mudarDestino = (d: DestinoEscolhido) => { setDestino(d); setNomeDigitado(''); setErro(null); };
 
   const adesoes = React.useMemo(() => adesoesNoLimite(p.adesoes, q.remanejamentosNaoParticipante, q.adesoesConferidas), [p.adesoes, q.remanejamentosNaoParticipante, q.adesoesConferidas]);
-  // Órgãos que já receberam adesão ou remanejamento neste item: aparecem primeiro na busca.
-  const sugeridos = React.useMemo<OrgaoSugerido[]>(() => {
-    const mapa = new Map<string, OrgaoSugerido>();
-    for (const r of q.remanejamentosNaoParticipante) {
-      const atual = mapa.get(r.uasgDestino);
-      mapa.set(r.uasgDestino, { uasg: r.uasgDestino, nome: atual?.nome ?? r.nomeDestino, detalhe: `${atual ? `${atual.detalhe} · ` : ''}remanejado ${formatNumber(r.quantidade)}` });
-    }
-    for (const a of p.adesoes) {
-      const u = uasgDaAdesao(a);
-      if (!u) continue;
-      const nome = (a.unidadeNaoParticipante || '').replace(/^\s*\d{6}\s*-\s*/, '').trim() || `UASG ${u}`;
-      const atual = mapa.get(u);
-      mapa.set(u, { uasg: u, nome: atual?.nome ?? toSentenceCaseIfAllCaps(nome), detalhe: `${atual ? `${atual.detalhe} · ` : ''}adesão ${formatNumber(Number(a.quantidadeAprovadaAdesao) || 0)}` });
-    }
-    return [...mapa.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  }, [q.remanejamentosNaoParticipante, p.adesoes]);
 
   const livre = o ? livreNaOrigem({ orgao: o, baseSaldo: p.baseSaldo, alocado: p.alocado, contratado: p.origem?.contratado ?? 0 }) : 0;
   const contaOrigem = !o ? '' : senasp
@@ -140,7 +123,13 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
   const maximo = Math.min(...regras.map((r) => r.livre));
   const limita = regras.find((r) => r.livre === maximo)!;
   const quebradas = qtd > 0 ? regras.filter((r) => qtd > r.livre) : [];
-  const usadoUasg = destinoValido ? usadoNoLimite(adesoes, q.remanejamentosNaoParticipante, uasg).total : 0;
+  const daUasg = destinoValido ? usadoNoLimite(adesoes, q.remanejamentosNaoParticipante, uasg) : { adesoes: 0, remanejado: 0, total: 0 };
+  const usadoUasg = daUasg.total;
+  // O que o órgão escolhido já recebeu neste item, separado por origem.
+  const jaRecebeu = [
+    daUasg.remanejado > 0 ? `${formatNumber(daUasg.remanejado)} un remanejadas` : '',
+    daUasg.adesoes > 0 ? `${formatNumber(daUasg.adesoes)} un em adesões` : ''
+  ].filter(Boolean).join(' e ');
   const usadoTotal = usadoNoLimite(adesoes, q.remanejamentosNaoParticipante).total;
   const motivo = motivoDaRegra(limita, { senasp, homologado: p.homologado, usadoUasg, limiteAdesao: p.limiteAdesao });
 
@@ -204,9 +193,8 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
             onMudar={mudarDestino}
             uasgOrigem={p.origem.uasg}
             participantes={p.participantes}
-            sugeridos={sugeridos}
             ufInicial={cadastroOrigem?.siglaUf ?? null}
-            avisoDoEscolhido={usadoUasg > 0 ? `Já tem ${formatNumber(usadoUasg)} em adesões neste item.` : null}
+            avisoDoEscolhido={jaRecebeu ? `Já tem ${jaRecebeu} neste item.` : null}
           />
           {precisaDoNome && (
             <label style={campo}>
