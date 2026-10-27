@@ -10,6 +10,14 @@ describe('isDetailPath: só telas de detalhe recebem a origem', () => {
     expect(isDetailPath('/contratos/200331-00015-2026?aba=pagamentos')).toBe(true);
   });
 
+  it('reconhece o Pedido 360 das emendas, pelo número ou pelo identificador interno', () => {
+    expect(isDetailPath('/emendas/parlamentares/3166/pedidos/2026/1')).toBe(true);
+    expect(isDetailPath('/emendas/parlamentares/3166/pedidos/2026/1?aba=execucao')).toBe(true);
+    expect(isDetailPath('/emendas/pedidos/id/8a1b')).toBe(true);
+    expect(isDetailPath('/emendas/pedidos')).toBe(false);
+    expect(isDetailPath('/emendas/pedidos?ver=autor')).toBe(false);
+  });
+
   it('listas e demais páginas não recebem', () => {
     for (const path of ['/atas', '/contratos', '/contratos?busca=2024', '/itens', '/atas/distribuicao', '/pagamentos', '/empenhos', '/admin/usuarios']) {
       expect(isDetailPath(path)).toBe(false);
@@ -27,6 +35,13 @@ describe('originLabel: nome do destino do Voltar', () => {
     expect(originLabel('/itens')).toBe('Carteira');
     expect(originLabel('/itens?unidade=cglic')).toBe('Carteira');
     expect(originLabel('/instrumentos')).toBe('Início');
+  });
+
+  it('nomeia as páginas de Emendas e o Pedido 360', () => {
+    expect(originLabel('/emendas/pedidos?aviso=grave')).toBe('Pedidos');
+    expect(originLabel('/emendas/inicio?gaveta=notasSemPedido')).toBe('Início');
+    expect(originLabel('/emendas/parlamentares/3166/pedidos/2026/1')).toBe('o pedido');
+    expect(originLabel('/emendas/pedidos/id/8a1b?aba=itens')).toBe('o pedido');
   });
 
   it('nomeia as telas de detalhe de origem', () => {

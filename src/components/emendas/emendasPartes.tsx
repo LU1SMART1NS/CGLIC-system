@@ -17,6 +17,9 @@ import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqu
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
 
+/** "Deputado · PL · RJ": a segunda linha do parlamentar em todas as telas. */
+export const linhaDoAutor = (autor: AutorEmenda): string => [TIPO[autor.tipo], autor.partido, autor.uf].filter(Boolean).join(' · ');
+
 /**
  * Autor em duas linhas: nome e "Deputado · PL · RJ". Sem autor (reserva para um órgão, migration 163): "Parlamentar a
  * definir" e, embaixo, para qual órgão a CAEP separou.

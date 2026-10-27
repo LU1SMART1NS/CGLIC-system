@@ -36,6 +36,7 @@ import { AutorDoPedido, LARGURA_AUTOR } from './emendasPartes';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
 import { ContatoEmendaModal } from './ContatoEmendaModal';
 import { AsparModal } from './AsparModal';
+import { nomeDoPedido } from '../../utils/emendasNomeDoPedido';
 
 type Segmento = 'sem' | 'com' | 'todas';
 const POR_PAGINA = 25;
@@ -357,7 +358,7 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
             header: 'Pedidos',
             render: (l: EmendaNaLista) => {
               if (l.pedidos.length === 0) return <span style={carteiraDetalhe}>—</span>;
-              const etapas = l.pedidos.slice(0, 2).map((p) => `Pedido ${p.numero} · ${ROTULO_ETAPA[p.etapa]}`);
+              const etapas = l.pedidos.slice(0, 2).map((p) => `${nomeDoPedido(p)} · ${ROTULO_ETAPA[p.etapa]}`);
               return (
                 <>
                   {etapas.map((t) => (

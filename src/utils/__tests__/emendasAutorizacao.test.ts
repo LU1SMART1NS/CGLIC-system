@@ -27,7 +27,7 @@ const pedido = (numero: number, autorId: string, emenda: string, linhas: LinhaPe
   siopEmenda: emenda, siopEmendaAno: 2026, siopValor: null, siopGnd: 'GND-4', conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null,
   autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null, empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [],
   canceladoEm: null, canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas, devolucoes: [], documentos: [], pedidoOrigemId: null,
-  pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
+  pedidoOrigemNome: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
 });
 const autor = (id: string, nome: string, tipo: AutorEmenda['tipo'], uf: string, sexo: 'M' | 'F'): AutorEmenda => ({ id, tipo, nome, nomeCivil: null, partido: null, uf, emExercicio: true, legislatura: 57, lidoEm: null, sexo });
 const autores = new Map([autor('A1', 'Giovani Cherini', 'DEPUTADO', 'RS', 'M'), autor('A2', 'Chris Tonietto', 'DEPUTADO', 'RJ', 'F'), autor('A3', 'Romário', 'SENADOR', 'RJ', 'M')].map((a) => [a.id, a]));

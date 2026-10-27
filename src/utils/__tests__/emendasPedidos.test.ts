@@ -21,7 +21,7 @@ const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null, siopEmendaAno: null,
   siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
   empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNome: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
 });
 const itens = new Map([item('a'), item('b', { valorUnitario: 10, numeroAta: '00061/2024', vigenciaFinal: '2026-12-19' }), item('v', { ataEncerrada: true, numeroAta: '00020/2025', vigenciaFinal: '2026-05-28' })].map((i) => [i.itemKey, i]));
 const kit = linha({ tipo: 'KIT', itemKey: null, kitId: 'k', kitComposicao: [{ itemKey: 'a', quantidade: 1 }, { itemKey: 'b', quantidade: 2 }], quantidade: 10 });
@@ -377,7 +377,7 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
     const anulada = { ...l3, cancelada: true, canceladaMotivo: 'Empenho anulado em 28/09/2026: voltou à interlocução no pedido 607.' };
     const enviada = { ...doc('d1', '35938854', A, '2026-06-15', ['l1']), enviosCgofi: [{ numero: '35946757', data: '2026-06-19' }] };
     const semEnvio = doc('d3', '35939233', B, '2026-06-16', []);
-    const anulacao = { id: 'a1', total: false, destino: 'INTERLOCUCAO' as const, novoPedidoId: null, novoPedidoNumero: 607, notas: ['2026NE000250'], linhas: [{ linhaId: 'l3', novaLinhaId: null, itemKey: l3.itemKey, kitNome: null, quantidade: 5 }], documentoSei: '37079404', anuladoEm: '2026-09-28', motivo: 'x', criadoPorNome: null };
+    const anulacao = { id: 'a1', total: false, destino: 'INTERLOCUCAO' as const, novoPedidoId: null, novoPedidoNome: "pedido 2/2026", notas: ['2026NE000250'], linhas: [{ linhaId: 'l3', novaLinhaId: null, itemKey: l3.itemKey, kitNome: null, quantidade: 5 }], documentoSei: '37079404', anuladoEm: '2026-09-28', motivo: 'x', criadoPorNome: null };
     const p = pedido({ etapa: 'CONTRATACAO', linhas: [l1, anulada], documentos: [enviada, semEnvio], anulacoes: [anulacao] });
     expect(faltaEnvioCgofi(p)).toEqual([]);
     const r = rodadasDoPedido(p, semNotas);

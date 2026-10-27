@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { AlertTriangle, Boxes, Check, ClipboardList, LayoutDashboard } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
@@ -65,6 +65,8 @@ import type { AutorEmenda, EtapaPedido, ItemCaep, NotaDaLinha, NotaSemPedido } f
 import { AutorDoPedido, LARGURA_AUTOR, ItemDaAta } from './emendasPartes';
 import { DadosItemModal } from './DadosItemModal';
 import { contaEmendasSemPedido, diasSemContatoParaUrgente, emendasNaLista, haDias, numeroDaEmenda, semPedido as emendaSemPedido, textoDias, type EmendaNaLista } from '../../utils/emendasSemPedido';
+import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
+import { nomeDoPedido, pedidoEmTexto, rotaDoPedido } from '../../utils/emendasNomeDoPedido';
 
 /** Trilho das pendências: a pergunta principal é a gravidade; o tipo de aviso vira o filtro "+ Aviso". */
 type Segmento = 'graves' | 'atencao' | 'todas';
@@ -98,7 +100,8 @@ const plural = (n: number, um: string, varios: string) => `${formatNumber(n)} ${
  * gravidade com o filtro de aviso. Os avisos são os mesmos da lista de Pedidos.
  */
 export const EmendasInicioPage: React.FC = () => {
-  const navigate = useNavigate();
+  // Com origem: o Pedido 360 volta para o Início com a gaveta aberta (?gaveta=).
+  const navigate = useNavigateWithOrigin();
   // Para o gestor de emendas esta é o Início; o coordenador a abre na aba Emendas do Início dele.
   const { role } = useAuth();
   const { data: pedidos = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = usePedidosEmendas();
@@ -165,7 +168,7 @@ export const EmendasInicioPage: React.FC = () => {
   const colunasSobra: Column<SobraDaEmenda>[] = [
     { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, render: (e) => <AutorDoPedido autor={e.autorId ? autorPorId.get(e.autorId) : undefined} autorId={e.autorId} destaque /> },
     { key: 'emenda', header: 'Emenda', nowrap: true, render: (e) => <span style={carteiraNumero}>{`${numeroDaEmendaEmTexto(e.emenda)} / ${e.ano}`}</span> },
-    { key: 'pedidos', header: 'Pedidos', render: (e) => <span style={carteiraDetalhe}>{e.pedidos.map((p) => p.numero).join(', ')}</span> },
+    { key: 'pedidos', header: 'Pedidos', render: (e) => <span style={carteiraDetalhe}>{e.pedidos.map((p) => p.nome).join(', ')}</span> },
     { key: 'sobra', header: 'Sobra', align: 'right', nowrap: true, render: (e) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(e.sobra)}</span> },
     { key: 'prazo', header: 'Prazo', nowrap: true, render: (e) => <span style={carteiraDetalhe}>empenhar até 31/12/{e.ano}</span> }
   ];
@@ -435,7 +438,7 @@ export const EmendasInicioPage: React.FC = () => {
         return (
           <>
             <div style={carteiraValor}>
-              Pedido {s.pedidoNumero} · {s.autorId ? autorPorId.get(s.autorId)?.nome ?? s.autorId : 'parlamentar a definir'}
+              {pedidoPorId.get(s.pedidoId) ? nomeDoPedido(pedidoPorId.get(s.pedidoId)!) : 'Pedido'} · {s.autorId ? autorPorId.get(s.autorId)?.nome ?? s.autorId : 'parlamentar a definir'}
             </div>
             <div style={carteiraDetalhe}>
               {s.iguais} de {g.notas.length} {g.notas.length === 1 ? 'nota' : 'notas'} com fornecedor e valor iguais aos itens
@@ -661,7 +664,7 @@ export const EmendasInicioPage: React.FC = () => {
               data={aConferir}
               keyExtractor={(e) => e.emenda}
               columns={colunasAConferir}
-              rowOpen={(e) => () => navigate(`/emendas/pedidos?pedido=${e.pedidoIds[0]}`)}
+              rowOpen={(e) => () => navigate(`/emendas/pedidos/id/${encodeURIComponent(e.pedidoIds[0])}`)}
             />
           )}
         </PainelGaveta>
@@ -682,13 +685,13 @@ export const EmendasInicioPage: React.FC = () => {
               data={semPedidoPorEmenda}
               keyExtractor={(g) => g.chave}
               columns={colunasSemPedido}
-              rowOpen={(g) => (g.sugestao ? () => navigate(`/emendas/pedidos?pedido=${g.sugestao!.pedidoId}`) : undefined)}
+              rowOpen={(g) => (g.sugestao ? () => navigate(`/emendas/pedidos/id/${encodeURIComponent(g.sugestao!.pedidoId)}`) : undefined)}
               rowActions={
                 podeGerir
                   ? (g) => (
                       <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
                         <AppButton size="xs" variant="secondary" onClick={() => setLigando(g)} data-testid={`emendas-inicio-sem-pedido-ligar-${g.emenda}`}>
-                          {g.sugestao ? `Ligar ao ${g.sugestao.pedidoNumero}` : 'Escolher pedido'}
+                          {g.sugestao ? `Ligar ao ${pedidoPorId.get(g.sugestao.pedidoId) ? pedidoEmTexto(pedidoPorId.get(g.sugestao.pedidoId)!) : 'pedido'}` : 'Escolher pedido'}
                         </AppButton>
                         <BotaoResolvido
                           onClick={() =>
@@ -776,7 +779,7 @@ export const EmendasInicioPage: React.FC = () => {
           sort={{ key: sortKey, dir: sortDir }}
           onSort={toggle}
           columns={colunas}
-          rowOpen={(l) => () => navigate(`/emendas/pedidos?pedido=${l.pedido.id}`)}
+          rowOpen={(l) => () => navigate(rotaDoPedido(l.pedido))}
         />
         <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={lista.length} onChange={setPage} testIdPrefix="emendas-inicio" />
       </AdminListShell>

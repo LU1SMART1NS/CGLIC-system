@@ -7,6 +7,7 @@ import { dataBR } from '../../utils/emendasKits';
 import { carteiraDetalhe, carteiraSubtitle } from '../carteira/carteiraStyles';
 import type { PedidoEmenda } from '../../services/emendasService';
 import { LigarEmendaModal } from './LigarEmendaModal';
+import { pedidoEmTexto } from '../../utils/emendasNomeDoPedido';
 
 const linha: React.CSSProperties = { display: 'flex', gap: '0.5rem', alignItems: 'flex-start', justifyContent: 'space-between', padding: '0.4rem 0.55rem', borderRadius: 6, border: '1px solid var(--color-border, #e2e8f0)' };
 
@@ -24,7 +25,7 @@ export const EmendasDoPedido: React.FC<{ p: PedidoEmenda; podeGerir: boolean }> 
   const tirar = async (id: string, texto: string) => {
     try {
       await remover.mutateAsync({ id, versao: p.versao });
-      toast.success(`Emenda ${texto} tirada do pedido ${p.numero}.`);
+      toast.success(`Emenda ${texto} tirada do ${pedidoEmTexto(p)}.`);
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
