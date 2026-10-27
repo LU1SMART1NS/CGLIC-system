@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, ChevronDown, ChevronRight, Circle, CircleDashed, CircleDot, Minus, RotateCcw } from 'lucide-react';
+import { InfoHint } from '../../../design-system/components/InfoHint';
 import { AppButton } from '../../../design-system/components/AppButton';
 import { ActionButton } from '../../../design-system/components/ActionButton';
 import { NoticeBar } from '../../../design-system/components/NoticeBar';
@@ -395,7 +396,12 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, ho
           </section>
         );
       })}
-      {p.observacao && <div style={carteiraDetalhe}>Observação: {p.observacao}</div>}
+      {p.observacao && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <span style={carteiraDetalhe}>Observação</span>
+          <InfoHint label="Ver a observação do pedido" content={p.observacao} testId={`emendas-pedido-observacao-${p.id}`} />
+        </div>
+      )}
       {p.origem === 'PLANILHA' && (
         <div style={carteiraDetalhe}>Pedido trazido do controle anterior da CAEP: as etapas sem data não tinham data registrada lá.</div>
       )}

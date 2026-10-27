@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StatusBadge } from '../../../design-system/components/StatusBadge';
 import { ActionButton } from '../../../design-system/components/ActionButton';
+import { InfoHint } from '../../../design-system/components/InfoHint';
 import { AppButton } from '../../../design-system/components/AppButton';
 import { NoticeBar } from '../../../design-system/components/NoticeBar';
 import { ConfirmDialog } from '../../../design-system/components/ConfirmDialog';
@@ -81,8 +82,8 @@ export const DetalheDaEmenda: React.FC<DetalheProps> = ({ l, autor, beneficiario
         <span style={carteiraSubtitle}>
           {e?.objeto ? `Objeto no SIOP: ${e.objeto}` : e ? 'Sem objeto informado.' : 'Nº conferido no SIOP pelo pedido; a emenda não foi registrada.'}
           {beneficiario ? ` · Beneficiário: ${nomeESigla(beneficiario)}` : ''}
-          {e?.observacao ? ` · ${e.observacao}` : ''}
         </span>
+        {e?.observacao && <InfoHint label="Ver a observação da emenda" content={e.observacao} testId={`emendas-emenda-observacao-${l.chave}`} />}
         <span style={{ flex: 1 }} />
         {podeGerir && e && semPedido(l) && (
           <AppButton size="sm" variant="outline" onClick={() => setRegistrando(true)} data-testid={`emendas-emenda-registrar-contato-${l.chave}`}>

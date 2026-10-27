@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { InfoHint } from '../../design-system/components/InfoHint';
 import { AppButton } from '../../design-system/components/AppButton';
 import { useToast } from '../../design-system/components/Toast';
 import { useRemoverEmendaDoPedido } from '../../hooks/useEmendas';
@@ -63,8 +64,8 @@ export const EmendasDoPedido: React.FC<{ p: PedidoEmenda; podeGerir: boolean }> 
                 outra emenda · ligada {o.criadoPorNome ? `por ${o.criadoPorNome} ` : ''}em {dataBR(o.criadoEm.slice(0, 10))}
                 {o.documentoSei ? ` · SEI ${o.documentoSei}` : ''}
               </span>
-              {o.observacao && <span style={{ ...carteiraDetalhe, display: 'block' }}>{o.observacao}</span>}
             </span>
+            {o.observacao && <InfoHint label="Ver a observação da ligação" content={o.observacao} testId={`emendas-pedido-emenda-observacao-${o.numero}`} />}
             {podeGerir &&
               (tirando === o.id ? (
                 <span style={{ display: 'inline-flex', gap: '0.3rem', alignItems: 'center', whiteSpace: 'nowrap' }}>
