@@ -1,15 +1,17 @@
 import React from 'react';
-import { Check, X } from 'lucide-react';
 import { ActionButton, AppButton, AppInput, AppTextarea, Modal, NoticeBar, useToast } from '../../design-system';
 import { useAcoesQuantitativos } from '../../hooks/useQuantitativosDoItem';
 import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
-import { fetchNomeUasg } from '../../services/api';
-import { localDaUasg } from '../../services/cadastroUasgsSyncService';
+import { useReservadoDoItem } from '../../hooks/useEmendas';
 import type { OrgaoQuantitativo, QuantitativosDoItem, RemanejamentoNaoParticipante } from '../../services/quantitativosService';
 import type { AdesaoItemRecord } from '../../types';
 import { documentoSeiValido } from '../../utils/quantitativos';
 import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
-import { adesoesNoLimite, livreNaOrigem, regrasDoRemanejamento, usadoNoLimite, type RegraDoLimite } from '../../utils/remanejamentoNaoParticipante';
+import { folgaDasUnidades, ROTULO_MOTIVO_DO_MINIMO } from '../../utils/alocacaoEdicao';
+import { adesoesNoLimite, livreNaOrigem, regrasDoRemanejamento, uasgDaAdesao, usadoNoLimite, type RegraDoLimite } from '../../utils/remanejamentoNaoParticipante';
+import type { AllocationRow } from './AllocationsTab';
+import { DESTINO_VAZIO, EscolherOrgaoDestino, type DestinoEscolhido, type OrgaoSugerido } from './EscolherOrgaoDestino';
+import { QuantidadeComMaximo } from './QuantidadeComMaximo';
 import { formatNumber } from './itemBalanceUtils';
 
 export interface OrigemDoRemanejamento {
@@ -30,32 +32,41 @@ interface Props {
   /** Base do saldo da SENASP (cota própria) e o alocado às unidades internas. */
   baseSaldo: number;
   alocado: number;
+  /** Unidades internas do item com contratado e empenhado: "Onde dá para diminuir" na cota SENASP. */
+  unidadesAlocadas?: AllocationRow[];
   /** UASGs do item (gerenciadora e participantes): não podem ser destino. */
   participantes: Set<string>;
   onFechar: () => void;
 }
 
-type Busca = 'vazia' | 'buscando' | 'achou' | 'nao-encontrada' | 'falhou';
-
 const campo: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 };
 const texto: React.CSSProperties = { fontSize: '0.84rem', color: 'var(--text-secondary)', margin: 0 };
 const pequeno: React.CSSProperties = { fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 };
 const mono: React.CSSProperties = { fontFamily: 'monospace', fontWeight: 600 };
+const th: React.CSSProperties = { textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', padding: '0.3rem 0.5rem', borderBottom: '1px solid var(--border)' };
+const td: React.CSSProperties = { padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--border)', fontSize: '0.84rem' };
+const num: React.CSSProperties = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 
-const ROTULO: Record<RegraDoLimite['chave'], (livre: string, senasp: boolean) => string> = {
-  ORIGEM: (livre, senasp) => (senasp ? `Livre da cota própria: ${livre}` : `Livre no órgão que cede: ${livre}`),
-  POR_ORGAO: (livre) => `Até 50% do item para esta UASG: livre ${livre}`,
-  TOTAL: (livre) => `Limite de adesão do item: livre ${livre}`
+/** Nome curto de cada regra, na lista com ✓ e ✕. */
+const NOME_DA_REGRA: Record<RegraDoLimite['chave'], (senasp: boolean) => string> = {
+  ORIGEM: (senasp) => (senasp ? 'Livre na cota da SENASP' : 'Livre no órgão que cede'),
+  POR_ORGAO: () => 'Este órgão ainda pode receber (até 50% do item)',
+  TOTAL: () => 'Ainda cabe no limite de adesão do item'
 };
 
-function erroDaRegra(r: RegraDoLimite, q: number, senasp: boolean, alocado: number, baseSaldo: number): string {
+/** Por que o máximo é esse, numa frase, para a regra que limita. */
+function motivoDaRegra(r: RegraDoLimite, p: { senasp: boolean; homologado: number; usadoUasg: number; limiteAdesao: number }): string {
   if (r.chave === 'ORIGEM') {
-    return senasp
-      ? `A cota ficaria ${formatNumber(baseSaldo - q)}, abaixo dos ${formatNumber(alocado)} alocados. Diminua a alocação das unidades em ${formatNumber(q - r.livre)} antes de remanejar.`
-      : `O órgão só tem ${formatNumber(r.livre)} para ceder.`;
+    return p.senasp
+      ? `A cota da SENASP só tem ${formatNumber(r.livre)} livres. O resto está alocado às unidades internas.`
+      : `O órgão que cede só tem ${formatNumber(r.livre)} livres.`;
   }
-  if (r.chave === 'POR_ORGAO') return r.livre === 0 ? 'Esta UASG já chegou a 50% do item. Não pode receber mais.' : `Passa dos 50% do item para esta UASG. O máximo agora é ${formatNumber(r.livre)}.`;
-  return `Passa do limite de adesão do item. O máximo agora é ${formatNumber(r.livre)}.`;
+  if (r.chave === 'POR_ORGAO') {
+    return r.livre === 0
+      ? 'Este órgão já chegou a 50% do item e não pode receber mais.'
+      : `Cada órgão pode receber até 50% do item (${formatNumber(p.homologado / 2)}). Este já tem ${formatNumber(p.usadoUasg)}.`;
+  }
+  return `O item só aceita mais ${formatNumber(r.livre)} em adesões e remanejamentos (limite de ${formatNumber(p.limiteAdesao)}).`;
 }
 
 /**
@@ -68,42 +79,48 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
   const q = p.quantitativos;
   const o = p.origem?.orgao ?? null;
   const senasp = Boolean(o?.ehSenasp);
-  const [uasg, setUasg] = React.useState('');
-  const [nome, setNome] = React.useState('');
-  const [busca, setBusca] = React.useState<Busca>('vazia');
+  const [destino, setDestino] = React.useState<DestinoEscolhido>(DESTINO_VAZIO);
+  const [nomeDigitado, setNomeDigitado] = React.useState('');
   const [quantidade, setQuantidade] = React.useState('');
   const [documento, setDocumento] = React.useState('');
   const [justificativa, setJustificativa] = React.useState('');
   const [erro, setErro] = React.useState<string | null>(null);
-  // A UASG digitada por último: a busca de uma UASG antiga não sobrescreve a atual.
-  const ultimaUasg = React.useRef('');
 
   React.useEffect(() => {
-    setUasg(''); setNome(''); setBusca('vazia'); setQuantidade(''); setDocumento(''); setJustificativa(''); setErro(null);
+    setDestino(DESTINO_VAZIO); setNomeDigitado(''); setQuantidade(''); setDocumento(''); setJustificativa(''); setErro(null);
   }, [p.origem?.uasg]);
 
-  const cadastro = useCadastroUasgs(/^\d{6}$/.test(uasg) ? [uasg] : []).get(uasg);
-  const participante = /^\d{6}$/.test(uasg) && p.participantes.has(uasg);
-  const destinoValido = /^\d{6}$/.test(uasg) && !participante && uasg !== p.origem?.uasg;
-  const nomeDestino = cadastro?.nome ?? nome;
+  const cadastroOrigem = useCadastroUasgs(p.origem ? [p.origem.uasg] : []).get(p.origem?.uasg ?? '');
+  const reservado = useReservadoDoItem(p.itemKey, { enabled: Boolean(p.origem) && senasp });
+  const uasg = destino.uasg;
+  const participante = /^\d{6}$/.test(uasg) && (p.participantes.has(uasg) || uasg === p.origem?.uasg);
+  const destinoValido = /^\d{6}$/.test(uasg) && !participante && destino.busca !== 'buscando';
+  const precisaDoNome = destinoValido && (destino.busca === 'nao-encontrada' || destino.busca === 'falhou');
+  const nomeDestino = precisaDoNome ? nomeDigitado.trim() : destino.nome;
 
-  const mudarUasg = (digitado: string) => {
-    const u = digitado.replace(/\D/g, '').slice(0, 6);
-    ultimaUasg.current = u;
-    setUasg(u); setNome(''); setErro(null);
-    setBusca(u.length === 6 ? 'buscando' : 'vazia');
-    if (u.length !== 6) return;
-    void fetchNomeUasg(u).then((r) => {
-      if (ultimaUasg.current !== u) return;
-      setBusca(r.situacao);
-      if (r.situacao === 'achou') setNome(toSentenceCaseIfAllCaps(r.nome));
-    });
-  };
+  const mudarDestino = (d: DestinoEscolhido) => { setDestino(d); setNomeDigitado(''); setErro(null); };
 
   const adesoes = React.useMemo(() => adesoesNoLimite(p.adesoes, q.remanejamentosNaoParticipante, q.adesoesConferidas), [p.adesoes, q.remanejamentosNaoParticipante, q.adesoesConferidas]);
+  // Órgãos que já receberam adesão ou remanejamento neste item: aparecem primeiro na busca.
+  const sugeridos = React.useMemo<OrgaoSugerido[]>(() => {
+    const mapa = new Map<string, OrgaoSugerido>();
+    for (const r of q.remanejamentosNaoParticipante) {
+      const atual = mapa.get(r.uasgDestino);
+      mapa.set(r.uasgDestino, { uasg: r.uasgDestino, nome: atual?.nome ?? r.nomeDestino, detalhe: `${atual ? `${atual.detalhe} · ` : ''}remanejado ${formatNumber(r.quantidade)}` });
+    }
+    for (const a of p.adesoes) {
+      const u = uasgDaAdesao(a);
+      if (!u) continue;
+      const nome = (a.unidadeNaoParticipante || '').replace(/^\s*\d{6}\s*-\s*/, '').trim() || `UASG ${u}`;
+      const atual = mapa.get(u);
+      mapa.set(u, { uasg: u, nome: atual?.nome ?? toSentenceCaseIfAllCaps(nome), detalhe: `${atual ? `${atual.detalhe} · ` : ''}adesão ${formatNumber(Number(a.quantidadeAprovadaAdesao) || 0)}` });
+    }
+    return [...mapa.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }, [q.remanejamentosNaoParticipante, p.adesoes]);
+
   const livre = o ? livreNaOrigem({ orgao: o, baseSaldo: p.baseSaldo, alocado: p.alocado, contratado: p.origem?.contratado ?? 0 }) : 0;
   const contaOrigem = !o ? '' : senasp
-    ? `cota ${formatNumber(p.baseSaldo)} − alocado ${formatNumber(p.alocado)}`
+    ? `cota ${formatNumber(p.baseSaldo)} − alocado às unidades ${formatNumber(p.alocado)}`
     : [
         `registrado ${formatNumber(o.quantidadeRegistrada ?? 0)}`,
         o.resto > 0 ? `+ redução sem destino ${formatNumber(o.resto)}` : '',
@@ -121,20 +138,35 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
   });
   const qtd = /^\d+$/.test(quantidade) ? Number(quantidade) : 0;
   const maximo = Math.min(...regras.map((r) => r.livre));
+  const limita = regras.find((r) => r.livre === maximo)!;
   const quebradas = qtd > 0 ? regras.filter((r) => qtd > r.livre) : [];
   const usadoUasg = destinoValido ? usadoNoLimite(adesoes, q.remanejamentosNaoParticipante, uasg).total : 0;
   const usadoTotal = usadoNoLimite(adesoes, q.remanejamentosNaoParticipante).total;
+  const motivo = motivoDaRegra(limita, { senasp, homologado: p.homologado, usadoUasg, limiteAdesao: p.limiteAdesao });
+
+  // Cota SENASP sem livre para a quantidade: onde dá para diminuir a alocação das unidades (decisão D5).
+  const origemQuebrou = senasp && qtd > livre;
+  const folgas = React.useMemo(
+    () => (origemQuebrou && p.unidadesAlocadas && reservado.data != null ? folgaDasUnidades(p.unidadesAlocadas, reservado.data) : null),
+    [origemQuebrou, p.unidadesAlocadas, reservado.data]
+  );
+  const falta = qtd - livre;
+  const podeLiberar = folgas?.reduce((s, f) => s + f.podeDiminuir, 0) ?? 0;
+
+  const irParaAlocacao = () => {
+    p.onFechar();
+    window.setTimeout(() => document.querySelector('[data-testid="allocations-tab"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
 
   const gravar = async () => {
     if (!o || !p.origem) return;
     setErro(null);
-    if (!/^\d{6}$/.test(uasg)) return setErro('A UASG do órgão não participante tem 6 dígitos.');
+    if (!/^\d{6}$/.test(uasg)) return setErro('Escolha o órgão de destino.');
     if (participante) return setErro('Esta UASG é participante do item. Use o remanejamento entre participantes, na linha do órgão.');
-    if (uasg === p.origem.uasg) return setErro('O destino precisa ser outro órgão.');
-    if (busca === 'buscando') return setErro('Aguarde: buscando o nome da UASG no Compras.gov.br.');
-    if (!nomeDestino.trim()) return setErro('Escreva o nome do órgão (não veio do Compras.gov.br).');
-    if (qtd < 1) return setErro('Informe a quantidade (número inteiro).');
-    if (quebradas.length > 0) return setErro(erroDaRegra(quebradas[0], qtd, senasp, p.alocado, p.baseSaldo));
+    if (destino.busca === 'buscando') return setErro('Aguarde: buscando o nome da UASG no Compras.gov.br.');
+    if (!nomeDestino) return setErro('Escreva o nome do órgão (não veio do Compras.gov.br).');
+    if (qtd < 1) return setErro('Informe a quantidade.');
+    if (quebradas.length > 0) return setErro(maximo === 0 ? 'Não dá para remanejar agora.' : `Você pode remanejar no máximo ${formatNumber(maximo)}.`);
     if (!documentoSeiValido(documento)) return setErro('O número do documento SEI tem 8 dígitos (ex.: 12345678).');
     if (justificativa.trim().length < 15) return setErro('Escreva a justificativa (mínimo de 15 caracteres).');
     try {
@@ -164,49 +196,92 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
         </>
       }
     >
-      {o && (
+      {o && p.origem && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          <label style={campo}>
-            UASG do órgão não participante
-            <AppInput inputMode="numeric" value={uasg} style={{ width: 130 }} placeholder="000000" onChange={(e) => mudarUasg(e.target.value)} data-testid="remanejar-np-uasg" />
-          </label>
-          {participante && <NoticeBar tone="danger" testId="remanejar-np-participante">Esta UASG é participante do item. Use o remanejamento entre participantes, na linha do órgão.</NoticeBar>}
-          {destinoValido && (
-            cadastro || busca === 'achou' ? (
-              <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '0.55rem 0.75rem', display: 'flex', flexDirection: 'column', gap: 2 }} data-testid="remanejar-np-orgao">
-                <b>{nomeDestino}</b>
-                <span style={pequeno}>UASG {uasg}{cadastro && localDaUasg(cadastro) ? ` · ${localDaUasg(cadastro)}` : ''} · Compras.gov.br</span>
-                {usadoUasg > 0 && <span style={{ ...pequeno, color: 'var(--color-warning-text)' }}>Já tem {formatNumber(usadoUasg)} em adesões neste item.</span>}
-              </div>
-            ) : busca === 'buscando' ? (
-              <span style={pequeno}>Buscando o nome no Compras.gov.br…</span>
-            ) : (
-              <label style={campo}>
-                Nome do órgão
-                <span style={pequeno}>{busca === 'falhou' ? 'O Compras.gov.br não respondeu agora.' : 'A UASG não foi achada no cadastro do Compras.gov.br. Confira o número.'} Se estiver certo, escreva o nome.</span>
-                <AppInput value={nome} onChange={(e) => setNome(e.target.value)} data-testid="remanejar-np-nome" />
-              </label>
-            )
+          <EscolherOrgaoDestino
+            key={p.origem.uasg}
+            destino={destino}
+            onMudar={mudarDestino}
+            uasgOrigem={p.origem.uasg}
+            participantes={p.participantes}
+            sugeridos={sugeridos}
+            ufInicial={cadastroOrigem?.siglaUf ?? null}
+            avisoDoEscolhido={usadoUasg > 0 ? `Já tem ${formatNumber(usadoUasg)} em adesões neste item.` : null}
+          />
+          {precisaDoNome && (
+            <label style={campo}>
+              Nome do órgão · UASG {uasg}
+              <span style={pequeno}>{destino.busca === 'falhou' ? 'O Compras.gov.br não respondeu agora.' : 'A UASG não foi achada no cadastro do Compras.gov.br. Confira o número.'} Se estiver certo, escreva o nome.</span>
+              <AppInput value={nomeDigitado} onChange={(e) => setNomeDigitado(e.target.value)} data-testid="remanejar-np-nome" />
+            </label>
           )}
-          <label style={campo}>
-            Quantidade{destinoValido ? ` (até ${formatNumber(maximo)})` : ''}
-            <AppInput inputMode="numeric" value={quantidade} style={{ width: 150 }} onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ''))} data-testid="remanejar-np-quantidade" />
-          </label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }} aria-live="polite" data-testid="remanejar-np-regras">
+          <QuantidadeComMaximo
+            rotulo="Quantidade"
+            valor={quantidade}
+            onMudar={(v) => { setQuantidade(v); setErro(null); }}
+            maximo={maximo}
+            verbo="remanejar"
+            motivo={motivo}
+            testId="remanejar-np-quantidade"
+            disabled={remanejar.isPending}
+          />
+          {folgas && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }} data-testid="remanejar-np-folga">
+              <b style={{ fontSize: '0.88rem' }}>Onde dá para diminuir</b>
+              <span style={pequeno}>Preso é o maior entre contratado, empenhado e reservado a parlamentares: essa parte não sai da unidade.</span>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr><th style={th}>Unidade</th><th style={{ ...th, ...num }}>Alocado</th><th style={{ ...th, ...num }}>Preso</th><th style={{ ...th, ...num }}>Pode diminuir</th></tr>
+                  </thead>
+                  <tbody>
+                    {folgas.map((f) => (
+                      <tr key={f.unitName} data-testid={`folga-${f.unitName}`}>
+                        <td style={td}>{f.unitName}</td>
+                        <td style={{ ...td, ...num }}>{formatNumber(f.alocado)}</td>
+                        <td style={{ ...td, ...num }}>
+                          {formatNumber(f.preso)}
+                          {f.motivo && <span style={{ ...pequeno, display: 'block' }}>{ROTULO_MOTIVO_DO_MINIMO[f.motivo]}</span>}
+                        </td>
+                        <td style={{ ...td, ...num, fontWeight: 700, color: f.podeDiminuir > 0 ? 'var(--color-success-text)' : 'var(--text-muted)' }}>{formatNumber(f.podeDiminuir)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {podeLiberar >= falta ? (
+                <NoticeBar
+                  tone="warning"
+                  testId="remanejar-np-folga-da"
+                  action={<AppButton variant="secondary" size="sm" onClick={irParaAlocacao}>Ir para a alocação</AppButton>}
+                >
+                  Para remanejar {formatNumber(qtd)}, diminua {formatNumber(falta)} na alocação das unidades acima. Elas podem liberar até {formatNumber(podeLiberar)}.
+                </NoticeBar>
+              ) : (
+                <NoticeBar tone="danger" testId="remanejar-np-folga-nao-da">
+                  Mesmo diminuindo tudo o que está livre nas unidades ({formatNumber(podeLiberar)}), não chega aos {formatNumber(falta)} que faltam. O máximo para remanejar é {formatNumber(livre + podeLiberar)}.
+                </NoticeBar>
+              )}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }} aria-live="polite" data-testid="remanejar-np-regras">
             {regras.map((r) => {
               const quebrou = qtd > r.livre;
               return (
-                <div key={r.chave} style={{ display: 'grid', gridTemplateColumns: '20px 1fr', gap: '0.4rem', fontSize: '0.84rem', color: quebrou ? 'var(--color-danger-text)' : undefined }} data-testid={`regra-${r.chave}`}>
-                  {quebrou ? <X size={16} aria-label="não passa" /> : <Check size={16} color="var(--color-success-text)" aria-label="passa" />}
-                  <div>
-                    {ROTULO[r.chave](formatNumber(r.livre), senasp)}
-                    <div style={pequeno}>{r.conta}</div>
-                    {quebrou && <div>{erroDaRegra(r, qtd, senasp, p.alocado, p.baseSaldo)}</div>}
-                  </div>
+                <div key={r.chave} style={{ display: 'grid', gridTemplateColumns: '18px minmax(0,1fr) auto', gap: '0.4rem', fontSize: '0.84rem', color: quebrou ? 'var(--color-danger-text)' : undefined }} data-testid={`regra-${r.chave}`}>
+                  <span aria-label={quebrou ? 'não passa' : 'passa'} style={{ color: quebrou ? 'var(--color-danger-text)' : 'var(--color-success-text)', fontWeight: 700 }}>{quebrou ? '✕' : '✓'}</span>
+                  <span>{NOME_DA_REGRA[r.chave](senasp)}</span>
+                  <b style={{ fontVariantNumeric: 'tabular-nums' }}>{formatNumber(r.livre)}</b>
                 </div>
               );
             })}
-            {!destinoValido && <span style={pequeno}>Os limites de 50% por órgão e do total de adesões aparecem com a UASG de destino.</span>}
+            {!destinoValido && <span style={pequeno}>Os limites de 50% por órgão e de adesão aparecem quando você escolher o órgão de destino.</span>}
+            <details>
+              <summary style={{ ...pequeno, cursor: 'pointer' }}>Ver a conta</summary>
+              <div style={{ ...pequeno, display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }} data-testid="remanejar-np-contas">
+                {regras.map((r) => <span key={r.chave}>{NOME_DA_REGRA[r.chave](senasp)}: {r.conta} = {formatNumber(r.livre)}</span>)}
+              </div>
+            </details>
           </div>
           <label style={campo}>
             Documento SEI da autorização (8 dígitos)
@@ -227,7 +302,7 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
                 </>
               ) : (
                 <>
-                  <Linha rotulo={`Livre em ${p.origem?.nome}`} valor={`${formatNumber(livre)} → ${formatNumber(livre - qtd)}`} />
+                  <Linha rotulo={`Livre em ${p.origem.nome}`} valor={`${formatNumber(livre)} → ${formatNumber(livre - qtd)}`} />
                   <Linha rotulo="Cota própria da SENASP" valor={`não muda (${formatNumber(p.baseSaldo)})`} />
                 </>
               )}

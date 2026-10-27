@@ -38,6 +38,7 @@ import type { RegistradoAcima } from '../../utils/registradoAcima';
 import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
 import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import { ConfirmarRemanejamentoModal, ContinuaDoOrgaoModal } from './RemanejamentoModals';
+import type { AllocationRow } from './AllocationsTab';
 import { AdesoesAConferirAviso, DesfazerNaoParticipanteModal, RemanejarNaoParticipanteModal, type OrigemDoRemanejamento } from './RemanejarNaoParticipanteModal';
 import { useOrgaosRecolhidos } from './useOrgaosRecolhidos';
 import { useGruposDasUasgs } from '../../hooks/useGruposGti';
@@ -76,6 +77,8 @@ export interface QuantitativosTabProps {
   totalUnidadesInternas: number;
   /** Alocação às unidades internas: aparece ao abrir a linha da SENASP. */
   unidadesInternas: React.ReactNode;
+  /** Unidades internas com alocação (contratado e empenhado): "Onde dá para diminuir" no remanejamento da cota SENASP. */
+  unidadesAlocadas?: AllocationRow[];
   /** Adesões do item e o limite de adesão: base dos limites do remanejamento a não participante (migration 219). */
   adesoes: AdesaoItemRecord[];
   limiteAdesao: number;
@@ -614,6 +617,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         limiteAdesao={p.limiteAdesao}
         baseSaldo={p.baseSaldo}
         alocado={p.alocado ?? 0}
+        unidadesAlocadas={p.unidadesAlocadas}
         participantes={participantes}
         onFechar={() => setRemanejandoNp(null)}
       />
