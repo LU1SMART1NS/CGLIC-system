@@ -310,7 +310,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                           <td data-rotulo="Contratado" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.contratado)}</td>
                           <td data-rotulo="Empenhado" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.empenhado)}</td>
                           {comReserva && (
-                            <td data-rotulo="Reservado" data-testid={`alocar-unidade-reservado-${l.unitName}`} style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: l.reservado ? 700 : undefined, ...riscado }}>
+                            <td data-rotulo="Reservado" data-testid={`alocar-unidade-reservado-${l.unitName}`} style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>
                               {l.reservado ? formatNumber(l.reservado) : '—'}
                               {l.reservado && l.reservadoAEmpenhar ? <small style={{ display: 'block', fontWeight: 400, fontSize: '0.75rem', color: CINZA }}>{formatNumber(l.reservadoAEmpenhar)} sem empenho</small> : null}
                             </td>
