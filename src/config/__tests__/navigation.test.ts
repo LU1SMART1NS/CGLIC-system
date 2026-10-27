@@ -81,11 +81,12 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Grupos das UASGs', '/admin/grupos-uasgs'],
         ['Unidades Internas', '/admin/departamentos'],
         ['Beneficiários', '/emendas/beneficiarios'],
+        ['Grupos dos beneficiários', '/emendas/grupos-beneficiarios'],
         ['ASPAR dos órgãos', '/emendas/aspar'],
         ['Usuários e Servidores', '/admin/usuarios'],
         ['Perfis e Permissões', '/admin/perfis']
       ]);
-      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Emendas', 'Emendas', 'Acesso', 'Acesso']);
+      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Emendas', 'Emendas', 'Emendas', 'Acesso', 'Acesso']);
     });
 
     it('não deve conter itens legados isolados no menu (SEI, Exportar Excel, Prorrogações soltas)', () => {
@@ -336,6 +337,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       // Beneficiários é cadastro de apoio: fica em Ajustes, no grupo Emendas
       expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => [c.label, c.route, c.group])).toEqual([
         ['Beneficiários', '/emendas/beneficiarios', 'Emendas'],
+        ['Grupos dos beneficiários', '/emendas/grupos-beneficiarios', 'Emendas'],
         ['ASPAR dos órgãos', '/emendas/aspar', 'Emendas']
       ]);
       expect(findAreaForTabs(visible, '/emendas/beneficiarios')?.id).toBe('configuracoes');
@@ -390,8 +392,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(areas).toEqual(['visao-geral', 'carteira', 'execucao-financeira', 'emendas', 'configuracoes']);
 
       expect(labels).not.toContain('Modelos de Gestão');
-      // Ajustes aparece para o leitor só com as consultas dos grupos das UASGs, das unidades internas e dos beneficiários
-      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Grupos das UASGs', 'Unidades Internas', 'Beneficiários']);
+      // Ajustes aparece para o leitor só com as consultas dos grupos das UASGs, das unidades internas e dos beneficiários (e dos grupos deles)
+      expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.label)).toEqual(['Grupos das UASGs', 'Unidades Internas', 'Beneficiários', 'Grupos dos beneficiários']);
       expect(labels).not.toContain('Usuários e Servidores');
       expect(labels).not.toContain('Perfis e Permissões');
     });

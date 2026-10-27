@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { AppInput } from '../../design-system/components/FormFields';
+import { AppInput, AppSelect } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { useSalvarBeneficiario } from '../../hooks/useEmendas';
+import { useDefinirGruposBeneficiarios, useGruposBeneficiarios, useSalvarBeneficiario } from '../../hooks/useEmendas';
+import { GRUPO_GTI_INFO } from '../../config/gruposGti';
+import { GRUPOS_BENEFICIARIO, ehGrupoBeneficiario, sugerirGrupoBeneficiario } from '../../config/captacaoEmendas';
 import {
   cnpjValido,
   consultarCep,
@@ -94,6 +96,8 @@ const sugestao: React.CSSProperties = {
 
 export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbrir, onClose }) => {
   const salvar = useSalvarBeneficiario();
+  const grupos = useGruposBeneficiarios();
+  const definirGrupo = useDefinirGruposBeneficiarios();
   const toast = useToast();
   const [cnpj, setCnpj] = useState(formatarCnpj(beneficiario?.cnpj));
   const [receita, setReceita] = useState<DadosDaReceita | null>(beneficiario ? receitaDoCadastro(beneficiario) : null);
@@ -104,6 +108,8 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [msgCep, setMsgCep] = useState<{ tom: 'erro' | 'info'; texto: string } | null>(null);
   const [tentouSalvar, setTentouSalvar] = useState(false);
+  /** Grupo escolhido na janela; null = ainda não mexeu (vale o confirmado ou, sem ele, a sugestão). */
+  const [grupoEscolhido, setGrupoEscolhido] = useState<string | null>(null);
 
   const muda = <K extends keyof Formulario>(k: K, v: Formulario[K]) => setF((x) => ({ ...x, [k]: v }));
 
@@ -148,10 +154,17 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
   // CNPJ digitado e não buscado na Receita não grava: os dados da Receita vêm juntos.
   const cnpjSemBusca = Boolean(digitosCnpj) && receita?.cnpj !== digitosCnpj;
 
+  // Grupo do beneficiário (migration 218): obrigatório; vem com o confirmado ou, sem ele, com a sugestão.
+  const comGrupos = grupos.data != null;
+  const grupoConfirmado = beneficiario ? (grupos.data ?? []).find((g) => g.beneficiarioId === beneficiario.id)?.grupo ?? null : null;
+  const sugestaoGrupo = sugerirGrupoBeneficiario({ nome: f.nome, sigla: f.sigla, naturezaJuridica: receita?.naturezaJuridica ?? null });
+  const grupo = grupoEscolhido ?? grupoConfirmado ?? sugestaoGrupo ?? '';
+  const faltaGrupo = comGrupos && !ehGrupoBeneficiario(grupo);
+
   const enviar = async (ev: React.FormEvent) => {
     ev.preventDefault();
     setTentouSalvar(true);
-    if (pendencias.length || repetido || cnpjSemBusca) return;
+    if (pendencias.length || repetido || cnpjSemBusca || faltaGrupo) return;
     const dados: BeneficiarioParaSalvar = {
       id: beneficiario?.id,
       versao: beneficiario?.versao,
@@ -186,7 +199,14 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
       responsavelEmail: f.responsavelEmail.trim() || null
     };
     try {
-      await salvar.mutateAsync(dados);
+      const salvo = await salvar.mutateAsync(dados);
+      if (comGrupos && ehGrupoBeneficiario(grupo) && grupo !== grupoConfirmado) {
+        try {
+          await definirGrupo.mutateAsync([{ beneficiarioId: salvo.id, grupo }]);
+        } catch (err) {
+          toast.error(`O beneficiário foi salvo, mas o grupo não: ${(err as Error).message} Confirme em Ajustes › Grupos dos beneficiários.`);
+        }
+      }
       toast.success(beneficiario ? `${rotuloBeneficiario(dados)} atualizado.` : `${rotuloBeneficiario(dados)} cadastrado.`);
       onClose();
     } catch (err) {
@@ -330,6 +350,29 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
 
         <div style={grade('repeat(auto-fit, minmax(min(100%, 220px), 1fr))')}>
           <AppInput label="Sigla" hint="Como a unidade é chamada (ex.: 27º BPM/M, 16º GBM). Aparece ao lado do nome." value={f.sigla} maxLength={40} onChange={(e) => muda('sigla', e.target.value)} data-testid="emendas-beneficiario-sigla" />
+          {comGrupos && (
+            <AppSelect
+              label="Grupo"
+              hint={
+                grupoConfirmado
+                  ? 'Conselho da força: entra na coluna Captação principal dos pedidos.'
+                  : sugestaoGrupo
+                    ? `Sugerido pelo nome (${GRUPO_GTI_INFO[sugestaoGrupo].rotulo}). Confira antes de salvar.`
+                    : 'Conselho da força: entra na coluna Captação principal dos pedidos.'
+              }
+              error={tentouSalvar && faltaGrupo ? 'Escolha o grupo.' : undefined}
+              value={grupo}
+              onChange={(e) => setGrupoEscolhido(e.target.value)}
+              data-testid="emendas-beneficiario-grupo"
+            >
+              <option value="">Escolher…</option>
+              {GRUPOS_BENEFICIARIO.map((g) => (
+                <option key={g} value={g}>
+                  {g === 'OUTROS' ? 'Outros · Polícia Penal e fora dos conselhos' : `${GRUPO_GTI_INFO[g].rotulo} · ${GRUPO_GTI_INFO[g].descricao}`}
+                </option>
+              ))}
+            </AppSelect>
+          )}
         </div>
 
         <div style={secao}>

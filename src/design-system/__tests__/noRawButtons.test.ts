@@ -36,6 +36,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/instrumentos/PainelCartao.tsx': 1, // cartão de resumo do Início (filtra a lista ou abre a tela certa)
   'src/components/instrumentos/PainelGavetas.tsx': 1, // botão de área que abre a gaveta (chip com resumo)
   'src/components/gti/InteresseGti.tsx': 1, // botão de gaveta "Interesse por GTI" (mesmo padrão do Início)
+  'src/components/emendas/CaptacaoDoPedido.tsx': 1, // botão de gaveta "Captação principal" do Pedido 360 (mesmo padrão da Ata 360)
   'src/components/modals/ExportExcelModal.tsx': 7, // presets e chips de grupo
   'src/components/plan/modeloGestaoPlano.tsx': 1, // contadores do plano que filtram as tarefas (chips de filtro)
   'src/components/plan/TaskPlanSection.tsx': 1, // seletor de status

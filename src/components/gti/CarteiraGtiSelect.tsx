@@ -6,7 +6,7 @@ import {
   MODO_FILTRO_GTI_LABEL,
   MODO_FILTRO_GTI_VALUES,
   type FiltroGti,
-  type GrupoGti,
+  type GrupoPrincipal,
   type ModoFiltroGti
 } from '../../config/gruposGti';
 
@@ -19,15 +19,19 @@ export const CarteiraGtiSelect: React.FC<{
   modo: ModoFiltroGti;
   onChangeGti: (value: FiltroGti) => void;
   onChangeModo: (value: ModoFiltroGti) => void;
-  counts?: Partial<Record<GrupoGti, number>>;
+  counts?: Partial<Record<GrupoPrincipal, number>>;
   testIdPrefix: string;
-}> = ({ gti, modo, onChangeGti, onChangeModo, counts, testIdPrefix }) => (
+  /** Emendas: os grupos da captação (com CNGM), o rótulo "Captação" e o modo padrão "Captação principal". */
+  grupos?: readonly GrupoPrincipal[];
+  label?: string;
+  rotuloModo?: Record<ModoFiltroGti, string>;
+}> = ({ gti, modo, onChangeGti, onChangeModo, counts, testIdPrefix, grupos = GRUPOS_GTI, label = 'GTI', rotuloModo = MODO_FILTRO_GTI_LABEL }) => (
   <>
     <CarteiraFilterButton
-      label="GTI"
+      label={label}
       value={gti}
       emptyValue="TODOS"
-      options={GRUPOS_GTI.map((g) => ({ value: g, label: `${GRUPO_GTI_INFO[g].curto} · ${GRUPO_GTI_INFO[g].descricao}`, count: counts?.[g] }))}
+      options={grupos.map((g) => ({ value: g, label: `${GRUPO_GTI_INFO[g].curto} · ${GRUPO_GTI_INFO[g].descricao}`, count: counts?.[g] }))}
       onChange={(v) => onChangeGti(v as FiltroGti)}
       testId={`${testIdPrefix}-filter-gti`}
     />
@@ -37,7 +41,7 @@ export const CarteiraGtiSelect: React.FC<{
         value={modo}
         // Sempre mostra o modo em uso (o padrão também): "Contar: Interesse principal". O × volta ao padrão.
         emptyValue=""
-        options={MODO_FILTRO_GTI_VALUES.map((m) => ({ value: m, label: MODO_FILTRO_GTI_LABEL[m] }))}
+        options={MODO_FILTRO_GTI_VALUES.map((m) => ({ value: m, label: rotuloModo[m] }))}
         onChange={(v) => onChangeModo((MODO_FILTRO_GTI_VALUES as readonly string[]).includes(v) ? (v as ModoFiltroGti) : 'PRINCIPAL')}
         testId={`${testIdPrefix}-filter-gti-modo`}
       />

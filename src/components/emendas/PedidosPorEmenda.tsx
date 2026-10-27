@@ -14,7 +14,11 @@ import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
-import { useApagarEmendaSiop, useAsparDosOrgaos, useContatosDasEmendas, useEmendasSiop } from '../../hooks/useEmendas';
+import { useApagarEmendaSiop, useAsparDosOrgaos, useContatosDasEmendas, useEmendasSiop, useItensCaep, useMapaGruposBeneficiarios } from '../../hooks/useEmendas';
+import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
+import { contarPorGti, passaFiltroGti, resumirFatias, type FatiasDaAta } from '../../config/gruposGti';
+import { GRUPOS_CAPTACAO, fatiasDaCaptacao, lerFiltroCaptacao, lerModoCaptacao, type GrupoBeneficiario } from '../../config/captacaoEmendas';
+import { CelulaCaptacao, FiltroCaptacao } from './CaptacaoDoPedido';
 import { formatCurrency } from '../../utils/format';
 import { dataBR } from '../../utils/emendasKits';
 import { casaBusca } from '../../utils/emendasBeneficiarios';
@@ -286,15 +290,42 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
   const contatoDoAutor = useMemo(() => ultimoContatoPorAutor(pedidos), [pedidos]);
   const lista = useMemo(() => emendasNaLista(emendas.data ?? [], pedidos, contatos.data ?? [], hoje), [emendas.data, pedidos, contatos.data, hoje]);
 
+  // Captação principal (migration 218): pelos pedidos da emenda; sem pedido, pelo beneficiário indicado na emenda.
+  const { data: itensLista = [] } = useItensCaep();
+  const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
+  const { precos } = usePrecosParaEmenda();
+  const grupos = useMapaGruposBeneficiarios();
+  const captacao = useMemo(() => {
+    const m = new Map<string, FatiasDaAta>();
+    for (const l of lista) {
+      if (l.pedidos.length) m.set(l.chave, fatiasDaCaptacao(l.pedidos, grupos, itens, precos));
+      else if (l.emenda?.beneficiarioId) {
+        const grupo: GrupoBeneficiario | 'A_CONFIRMAR' = grupos.get(l.emenda.beneficiarioId) ?? 'A_CONFIRMAR';
+        m.set(l.chave, { ...resumirFatias([{ grupo, quantidade: l.valor ?? 1, orgaos: 1 }]), medida: 'VALOR' });
+      }
+    }
+    return m;
+  }, [lista, grupos, itens, precos]);
+  const filtroCaptacao = lerFiltroCaptacao(searchParams.get('captacao'));
+  const modoCaptacao = lerModoCaptacao(searchParams.get('captacaoConta'));
+  const mudarUrl = (mudar: (p: URLSearchParams) => void) =>
+    setSearchParams((atual) => {
+      const prox = new URLSearchParams(atual);
+      mudar(prox);
+      return prox;
+    });
+
   const conta = { sem: lista.filter(semPedido).length, com: lista.filter((l) => !semPedido(l)).length, todas: lista.length };
   const doSegmento = lista.filter((l) => segmento === 'todas' || (segmento === 'sem') === semPedido(l));
+  const contagemCaptacao = contarPorGti(doSegmento.map((l) => captacao.get(l.chave)), modoCaptacao, GRUPOS_CAPTACAO);
+  const doGrupo = doSegmento.filter((l) => passaFiltroGti(captacao.get(l.chave), filtroCaptacao, modoCaptacao));
   const termo = busca.trim();
   const filtradas = termo
-    ? doSegmento.filter((l) => {
+    ? doGrupo.filter((l) => {
         const a = l.autorId ? autorPorId.get(l.autorId) : undefined;
         return casaBusca(`${l.numero} ${numeroDaEmenda(l.numero)} ${a?.nome ?? ''} ${a?.uf ?? ''} ${l.emenda?.objeto ?? ''}`, termo);
       })
-    : doSegmento;
+    : doGrupo;
   const ordem = useMemo<Record<string, CarteiraSortColumn<EmendaNaLista>>>(
     () => ({ ...ORDEM, autor: { value: (l) => (l.autorId ? autorPorId.get(l.autorId)?.nome ?? l.autorId : null) } }),
     [autorPorId]
@@ -327,6 +358,14 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
       sortValue: ordem.valor.value,
       sortFirstDir: 'desc',
       render: (l) => (l.valor != null ? <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(l.valor)}</span> : <span style={carteiraDetalhe}>—</span>)
+    },
+    {
+      key: 'captacao',
+      header: 'Captação principal',
+      render: (l) => {
+        const f = captacao.get(l.chave);
+        return f ? <CelulaCaptacao fatias={f} testId={`emendas-por-emenda-captacao-${l.chave}`} /> : <span style={carteiraDetalhe}>—</span>;
+      }
     },
     { key: 'gnd', header: 'GND', nowrap: true, render: (l) => <span style={carteiraValor}>{l.gnd ?? '—'}</span> },
     // Com pedido, o que interessa é a etapa dos pedidos; o último contato só vale enquanto não há pedido.
@@ -414,11 +453,19 @@ export const PedidosPorEmenda: React.FC<Props> = ({ pedidos, autores, beneficiar
         busca={busca}
         searchPlaceholder="Buscar pelo nº, parlamentar, UF ou objeto..."
         onChangeBusca={setBusca}
-        hasActiveFilters={Boolean(termo)}
-        onResetFilters={() => setBusca('')}
-        counter={carteiraCounter(filtradas.length, doSegmento.length, Boolean(termo), 'emenda', 'emendas')}
+        hasActiveFilters={Boolean(termo) || filtroCaptacao !== 'TODOS'}
+        onResetFilters={() => {
+          setBusca('');
+          mudarUrl((p) => {
+            p.delete('captacao');
+            p.delete('captacaoConta');
+          });
+        }}
+        counter={carteiraCounter(filtradas.length, doSegmento.length, Boolean(termo) || filtroCaptacao !== 'TODOS', 'emenda', 'emendas')}
         testIdPrefix="emendas-por-emenda"
-      />
+      >
+        <FiltroCaptacao gti={filtroCaptacao} modo={modoCaptacao} counts={contagemCaptacao} mudarUrl={mudarUrl} testIdPrefix="emendas-por-emenda" />
+      </CarteiraFilterBar>
       <AdminListShell
         testId="emendas-por-emenda-lista"
         isLoading={carregando}

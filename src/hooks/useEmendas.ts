@@ -5,6 +5,8 @@ import { conferenciaPorItem, diferencasPorPedido } from '../utils/emendasEmpenho
 import { credorPorPedido } from '../utils/emendasConferenciaNota';
 import { useAuth } from '../context/AuthContext';
 import { semContratos } from '../types/rbac';
+import { definirGruposBeneficiarios, fetchGruposBeneficiarios } from '../services/captacaoEmendasService';
+import { mapaDeGrupos, type GrupoBeneficiario } from '../config/captacaoEmendas';
 import {
   fetchAutoresEmendas,
   fetchBeneficiariosEmendas,
@@ -80,6 +82,28 @@ export function useAutoresEmendas() {
 
 export function useBeneficiariosEmendas() {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'beneficiarios'], queryFn: fetchBeneficiariosEmendas });
+}
+
+/** Grupo confirmado de cada beneficiário (migration 218). `data` null: migration ainda não aplicada. */
+export function useGruposBeneficiarios() {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'grupos-beneficiarios'], queryFn: fetchGruposBeneficiarios, staleTime: 5 * 60_000 });
+}
+
+const SEM_GRUPOS = new Map<string, GrupoBeneficiario>();
+
+/** Mapa beneficiário → grupo confirmado (colunas de Captação principal); vazio enquanto carrega. */
+export function useMapaGruposBeneficiarios(): Map<string, GrupoBeneficiario> {
+  const { data } = useGruposBeneficiarios();
+  return useMemo(() => (data ? mapaDeGrupos(data) : SEM_GRUPOS), [data]);
+}
+
+export function useDefinirGruposBeneficiarios() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: definirGruposBeneficiarios,
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'grupos-beneficiarios'] })
+  });
 }
 
 export function useBeneficiariosDiferentes() {

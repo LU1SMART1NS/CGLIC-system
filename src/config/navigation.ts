@@ -347,6 +347,17 @@ export const navigationConfig: NavItem[] = [
         allowedRoles: ['admin', 'gestor_emendas', 'leitor']
       },
       {
+        // Conselho de cada beneficiário (migration 218): base da coluna Captação principal das telas de Pedidos.
+        id: 'emendas-grupos-beneficiarios',
+        label: 'Grupos dos beneficiários',
+        icon: Network,
+        route: '/emendas/grupos-beneficiarios',
+        status: 'active',
+        group: 'Emendas',
+        matchPrefixes: ['/emendas/grupos-beneficiarios'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
         // Assessoria parlamentar dos órgãos estaduais (migration 205): contatos para a emenda sem pedido.
         id: 'emendas-aspar',
         label: 'ASPAR dos órgãos',
