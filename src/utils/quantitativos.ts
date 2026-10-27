@@ -118,7 +118,8 @@ export function extratoDaCotaPropria(q: QuantitativosDoItem, registradoAcima?: E
   }
   const cedido = [...acima.entries()].filter(([, v]) => v > 0).map(([uasg, quantidade]) => ({ uasg, quantidade }));
   const soma = (l: Array<{ quantidade: number }>) => l.reduce((s, x) => s + x.quantidade, 0);
-  const paraNaoParticipantes = q.orgaos.filter((o) => o.ehSenasp).reduce((s, o) => s + o.saidaNaoParticipante, 0);
+  // Todo o remanejado pela SENASP, pendente ou já no Compras.gov.br: o extrato parte da ata assinada, que não muda.
+  const paraNaoParticipantes = q.orgaos.filter((o) => o.ehSenasp).reduce((s, o) => s + o.remanejadoNaoParticipante, 0);
   const cota = q.assinadaSenasp - soma(cedido) + soma(recebido) - paraNaoParticipantes;
   const doBanco = q.cotaPropria - (registradoAcima?.desconto ?? 0);
   return { assinadaSenasp: q.assinadaSenasp, cedido, recebido, entre, paraNaoParticipantes, semLastro, cota, confere: Math.abs(cota - doBanco) < 0.0001 };

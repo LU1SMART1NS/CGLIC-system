@@ -3,13 +3,97 @@
 -- 1) v_arp_item_saldo_detalhado: o desconto do registrado acima do homologado (migration 142) comparava a cota
 --    própria, que já tira o remanejado a não participantes (migration 219), com a ata assinada, que não tira.
 --    Com o remanejado, a parte da SENASP acima da ata assinada sumia. Agora compara o registrado da SENASP
---    (cota + remanejado) com a ata assinada. 00062/2024 item 3: registrado 106, ata assinada 103, 32 remanejados,
+--    antes dos remanejamentos a não participantes (cota + todo o remanejado pela SENASP, pendente ou já no
+--    Compras.gov.br) com a ata assinada. 00062/2024 item 3: registrado 106, ata assinada 103, 32 remanejados,
 --    excedente do item 14 → desconto 3 e base 71 (era 0 e 74).
+-- 1b) v_item_registrado_acima: a soma do registrado conta também o remanejado a não participantes que o
+--    Compras.gov.br já tirou do registrado de quem cedeu. A lista do Compras.gov.br só tem gerenciadora e
+--    participantes; sem isso, quando o remanejamento aparecesse lá, a soma cairia abaixo do homologado e o
+--    excedente sem lastro sumiria (00062/2024 item 3: 141 → 109 com o homologado 127).
 -- 2) v_uasgs_participantes_gti: os não participantes que receberam remanejamento entram na lista de Ajustes ›
 --    Grupo das UASGs.
 -- 3) uasgs_para_cadastrar: e no cadastro de UASGs (nome inteiro, cidade/UF e sigla do órgão para o GTI).
 -- Definições geradas a partir da produção (pg_get_viewdef/pg_get_functiondef); só as partes acima mudam.
 -- ==============================================================================
+
+CREATE OR REPLACE VIEW public.v_item_registrado_acima
+WITH (security_invoker = true)
+AS
+ WITH itens AS (
+         SELECT (((a.numero_ata::text || '-'::text) || a.codigo_uasg::text) || '-'::text) || lpad(i.numero_item::text, 5, '0'::text) AS item_key,
+            a.numero_ata,
+            a.codigo_uasg,
+            i.numero_item,
+                CASE
+                    WHEN btrim(i.numero_item::text) ~ '^\d+$'::text THEN btrim(i.numero_item::text)::bigint::text
+                    ELSE btrim(i.numero_item::text)
+                END AS item_canonico,
+            COALESCE(i.quantidade_homologada, 0::numeric) AS homologado,
+            COALESCE(i.quantidade_senasp, i.quantidade_homologada, 0::numeric) AS registrado_senasp
+           FROM itens_ata i
+             JOIN atas_registro_preco a ON a.id = i.ata_id
+          WHERE a.codigo_uasg::text = ANY (ARRAY['200330'::text, '200331'::text])
+        ), fim AS (
+         SELECT it.item_key,
+            it.numero_ata,
+            it.codigo_uasg,
+            it.numero_item,
+            it.item_canonico,
+            it.homologado,
+            it.registrado_senasp,
+            s.soma_registrado + COALESCE(np.refletido, 0::numeric) AS soma_registrado,
+            s.soma_registrado + COALESCE(np.refletido, 0::numeric) - it.homologado AS excedente,
+            (((((((('SALDO::'::text || it.numero_ata::text) || '-'::text) || it.codigo_uasg::text) || '::'::text) || it.item_canonico) || '::REGISTRADO-ACIMA-'::text) || round(s.soma_registrado + COALESCE(np.refletido, 0::numeric), 2)::text) || '-'::text) || round(it.homologado, 2)::text AS chave_aviso
+           FROM itens it
+             CROSS JOIN LATERAL ( SELECT sum(
+                        CASE
+                            WHEN btrim(u.value ->> 'quantidadeRegistrada'::text) ~ '^[0-9]+(\.[0-9]+)?$'::text THEN btrim(u.value ->> 'quantidadeRegistrada'::text)::numeric
+                            ELSE 0::numeric
+                        END) AS soma_registrado
+                   FROM itens_ata_unidades_copia c
+                     CROSS JOIN LATERAL jsonb_array_elements(
+                        CASE
+                            WHEN jsonb_typeof(c.unidades) = 'array'::text THEN c.unidades
+                            ELSE '[]'::jsonb
+                        END) u(value)
+                  WHERE c.item_key::text = it.item_key AND jsonb_typeof(u.value) = 'object'::text AND COALESCE(u.value ->> 'dataHoraExclusao'::text, ''::text) = ''::text AND regexp_replace(COALESCE(u.value ->> 'codigoUnidade'::text, ''::text), '\D'::text, ''::text, 'g'::text) ~ '^[0-9]{6}$'::text) s
+             -- Remanejado a não participantes que o Compras.gov.br já tirou do registrado de quem cedeu (a lista do
+             -- Compras.gov.br só tem gerenciadora e participantes): volta para a soma, senão o excedente sumiria.
+             -- Mesma conta de v_item_quantitativos_orgaos: a queda do registrado desde o primeiro remanejamento.
+             LEFT JOIN LATERAL ( SELECT sum(LEAST(o.total, GREATEST(o.primeiro - COALESCE(( SELECT sum(
+                                CASE
+                                    WHEN btrim(u.value ->> 'quantidadeRegistrada'::text) ~ '^[0-9]+(\.[0-9]+)?$'::text THEN btrim(u.value ->> 'quantidadeRegistrada'::text)::numeric
+                                    ELSE 0::numeric
+                                END)
+                           FROM itens_ata_unidades_copia c
+                             CROSS JOIN LATERAL jsonb_array_elements(
+                                CASE
+                                    WHEN jsonb_typeof(c.unidades) = 'array'::text THEN c.unidades
+                                    ELSE '[]'::jsonb
+                                END) u(value)
+                          WHERE c.item_key::text = it.item_key AND jsonb_typeof(u.value) = 'object'::text AND COALESCE(u.value ->> 'dataHoraExclusao'::text, ''::text) = ''::text AND regexp_replace(COALESCE(u.value ->> 'codigoUnidade'::text, ''::text), '\D'::text, ''::text, 'g'::text) = o.uasg_origem::text), 0::numeric), 0::numeric))) AS refletido
+                   FROM ( SELECT r.uasg_origem,
+                            sum(r.quantidade) AS total,
+                            (array_agg(r.registrado_origem ORDER BY r.registrado_em))[1] AS primeiro
+                           FROM ata_item_remanejamentos_nao_participante r
+                          WHERE r.item_key::text = it.item_key AND r.desfeito_em IS NULL
+                          GROUP BY r.uasg_origem) o) np ON true
+          WHERE it.homologado > 0::numeric AND (s.soma_registrado + COALESCE(np.refletido, 0::numeric) - it.homologado) >= 0.01
+        )
+ SELECT f.item_key,
+    f.numero_ata,
+    f.codigo_uasg,
+    f.numero_item,
+    f.homologado,
+    f.soma_registrado,
+    f.excedente,
+    f.registrado_senasp,
+    f.chave_aviso,
+    r.resolvido_em,
+    r.resolvido_por_nome,
+    r.justificativa AS resolvido_justificativa
+   FROM fim f
+     LEFT JOIN avisos_resolvidos r ON r.chave::text = f.chave_aviso;
 
 CREATE OR REPLACE VIEW public.v_arp_item_saldo_detalhado
 WITH (security_invoker = true)
@@ -38,6 +122,7 @@ AS
             o.quantidade_registrada,
             o.gerenciado,
             o.saida_nao_participante,
+            o.remanejado_nao_participante,
             o.situacao
            FROM v_item_quantitativos_orgaos o
         ), vq AS MATERIALIZED (
@@ -49,7 +134,7 @@ AS
             it.registrado_senasp - COALESCE(p.gerenciado_participantes, 0::numeric) - COALESCE(p.saida_nao_participante, 0::numeric) AS cota_propria,
             COALESCE(p.orgaos_fora_da_ata, 0::bigint) AS orgaos_fora_da_ata,
             COALESCE(ar.n, 0::bigint) AS orgaos_contratado_acima,
-            COALESCE(p.saida_nao_participante, 0::numeric) AS saida_nao_participante
+            COALESCE(p.remanejado_np_senasp, 0::numeric) AS remanejado_np_senasp
            FROM ( SELECT DISTINCT r.item_key
                    FROM ata_item_assinada_registros r) u
              JOIN ( SELECT (((a.numero_ata::text || '-'::text) || a.codigo_uasg::text) || '-'::text) || lpad(i.numero_item::text, 5, '0'::text) AS item_key,
@@ -63,6 +148,7 @@ AS
                     sum(o.quantidade_assinada) FILTER (WHERE o.eh_senasp) AS assinada_senasp,
                     sum(o.gerenciado) AS gerenciado_participantes,
                     sum(o.saida_nao_participante) AS saida_nao_participante,
+                    sum(o.remanejado_nao_participante) FILTER (WHERE o.eh_senasp) AS remanejado_np_senasp,
                     count(*) FILTER (WHERE o.situacao = 'FORA_DA_ATA'::text) AS orgaos_fora_da_ata
                    FROM orgaos o
                   GROUP BY o.item_key) p ON p.item_key::text = u.item_key::text
@@ -226,7 +312,7 @@ AS
                         END AS desconto
                    FROM ( SELECT
                                 CASE
-                                    WHEN vq.item_key IS NOT NULL THEN LEAST(GREATEST(vq.cota_propria + vq.saida_nao_participante - vq.assinada_senasp, 0::numeric), ra.excedente)
+                                    WHEN vq.item_key IS NOT NULL THEN LEAST(GREATEST(vq.cota_propria + vq.remanejado_np_senasp - vq.assinada_senasp, 0::numeric), ra.excedente)
                                     ELSE LEAST(ra.excedente, GREATEST(COALESCE(k.quantidade_senasp, k.quantidade_homologada, 0::numeric), 0::numeric))
                                 END AS excedente_senasp) e_1
                   WHERE ra.item_key IS NOT NULL) px ON true
