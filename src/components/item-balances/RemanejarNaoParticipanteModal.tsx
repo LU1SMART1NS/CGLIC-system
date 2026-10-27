@@ -224,6 +224,7 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
             motivo={motivo}
             testId="remanejar-np-quantidade"
             disabled={remanejar.isPending}
+            comBotaoMaximo={false}
           />
           {folgas && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }} data-testid="remanejar-np-folga">
