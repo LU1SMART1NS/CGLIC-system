@@ -143,7 +143,8 @@ describe('Pedidos: lista plana que abre o Pedido 360 (protótipo aprovado em 27/
     const html = render('/');
     expect(html).toContain('>1/2026<');
     expect(html).toContain('>Reserva<');
-    expect(html).toContain('de 20/10/2026');
+    // Sem a data nem "da planilha" na coluna (decisão de 27/10/2026): a data fica no Pedido 360.
+    expect(html).not.toContain('de 20/10/2026');
     expect(html).toContain('Emenda 4014 0004');
     expect(html).toContain('ano a informar');
   });

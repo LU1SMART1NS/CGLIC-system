@@ -4,7 +4,7 @@
  *
  * Entrega 1: saldo do item = alocado à CAEP. Na entrega 2 os pedidos dos parlamentares saem desse saldo.
  */
-import type { ItemCaep, KitEmenda } from '../services/emendasService';
+import type { ItemCaep, KitEmenda, LinhaPedido } from '../services/emendasService';
 import type { PrecoPrevisto } from '../services/emendasQuadroService';
 import { descricaoItemEmFrase } from './textCase';
 import { EMENDAS_RULES } from '../config/alertRules';
@@ -53,6 +53,16 @@ const UM_DIA = 86_400_000;
 export function curto(texto: string, n = 40): string {
   const t = descricaoItemEmFrase(texto);
   return t.length <= n ? t : t.slice(0, n).replace(/[\s,;.:-]+$/, '') + '…';
+}
+
+/**
+ * A linha do pedido nas listas ("2 Pistola 9 mm"): o item pelo nome da ata assinada (nome curto da CAEP, o mesmo do
+ * quadro do gabinete); sem ele, o começo da descrição do catálogo. O kit, pelo nome do kit.
+ */
+export function nomeDaLinhaDoPedido(l: Pick<LinhaPedido, 'tipo' | 'quantidade' | 'itemKey' | 'kitNome'>, itens: Map<string, ItemCaep>, limite = 34): string {
+  if (l.tipo === 'KIT') return `${l.quantidade} ${l.kitNome ?? 'kit'}`;
+  const item = itens.get(l.itemKey ?? '');
+  return `${l.quantidade} ${item?.nomeCurto?.trim() || curto(item?.descricao ?? l.itemKey ?? '', limite)}`;
 }
 
 export function diasEntre(hoje: string, fim: string): number {
