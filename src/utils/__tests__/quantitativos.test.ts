@@ -65,7 +65,7 @@ describe('extratoDaCotaPropria', () => {
     const q: QuantitativosDoItem = {
       ...vazioDoItem(), informado: true, assinadaSenasp: 103, registradoSenasp: 106, cotaPropria: 74, saidaNaoParticipante: 32,
       orgaos: [
-        org({ uasg: '200331', ehSenasp: true, situacao: 'SENASP', quantidadeAssinada: 103, quantidadeRegistrada: 106, saidaNaoParticipante: 32 }),
+        org({ uasg: '200331', ehSenasp: true, situacao: 'SENASP', quantidadeAssinada: 103, quantidadeRegistrada: 106, saidaNaoParticipante: 32, remanejadoNaoParticipante: 32 }),
         org({ uasg: '453079', situacao: 'ACIMA_DA_ATA', quantidadeAssinada: 1, quantidadeRegistrada: 11, acima: 10 }),
         org({ uasg: '926903', situacao: 'ACIMA_DA_ATA', quantidadeAssinada: 1, quantidadeRegistrada: 2, acima: 1 })
       ]
@@ -77,6 +77,10 @@ describe('extratoDaCotaPropria', () => {
     expect(e.confere).toBe(true);
     // Aviso resolvido pelo gestor da ata: volta a valer o remanejamento da SENASP para os órgãos.
     expect(extratoDaCotaPropria(q, { excedente: 14, excedenteSenasp: 3, desconto: 0, resolvido: true }).cota).toBe(60);
+    // Depois que o Compras.gov.br registra o remanejamento: SENASP 74 registrados, nada pendente; a cota segue 71.
+    const depois = { ...q, registradoSenasp: 74, saidaNaoParticipante: 0, orgaos: q.orgaos.map((o) => (o.ehSenasp ? { ...o, quantidadeRegistrada: 74, saidaNaoParticipante: 0 } : o)) };
+    const e2 = extratoDaCotaPropria(depois, { excedente: 14, excedenteSenasp: 3, desconto: 3, resolvido: false });
+    expect([e2.cota, e2.confere]).toEqual([71, true]);
   });
 });
 
