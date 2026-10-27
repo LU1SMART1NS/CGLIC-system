@@ -63,7 +63,8 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useExecucaoEmendas: () => ({ data: [] }),
   useRemoverEmendaDoPedido: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useLigarEmendaAoPedido: () => ({ isPending: false, mutateAsync: vi.fn() }),
-  useNotasSemPedido: () => ({ data: [] })
+  useNotasSemPedido: () => ({ data: [] }),
+  useMapaGruposBeneficiarios: () => new Map()
 }));
 vi.mock('../PedidoModal', () => ({ PedidoModal: () => null }));
 vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined, ipca: null, semPrevisao: false }) }));
@@ -79,6 +80,16 @@ describe('Pedidos: ver por pedido ou por autor', () => {
     expect(html).toContain('emendas-pedidos-tabela');
     expect(html).not.toContain('emendas-por-autor-tabela');
     expect(html).toContain('emendas-pedidos-filtro-autor');
+  });
+
+  it('coluna Captação principal e filtro Captação (migration 218) nas três visões', () => {
+    for (const url of ['/', '/?ver=autor', '/?ver=emenda']) {
+      const html = render(url);
+      expect(html).toContain('Captação principal');
+      expect(html).toMatch(/emendas-(pedidos|por-autor|por-emenda)-captacao-filter-gti/);
+    }
+    // Com o filtro de um grupo sem beneficiário confirmado, nenhum pedido passa.
+    expect(render('/?captacao=CNCG')).toContain('0 de 4 pedidos');
   });
 
   it('?autor= deixa só os pedidos daquele autor; a-definir são as reservas sem parlamentar', () => {

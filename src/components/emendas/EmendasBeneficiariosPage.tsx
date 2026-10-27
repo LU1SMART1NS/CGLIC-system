@@ -18,12 +18,14 @@ import { useToast } from '../../design-system/components/Toast';
 import {
   useBeneficiariosDiferentes,
   useBeneficiariosEmendas,
+  useMapaGruposBeneficiarios,
   useMarcarBeneficiariosDiferentes,
   usePedidosEmendas,
   usePodeGerirEmendas,
   useSalvarBeneficiario
 } from '../../hooks/useEmendas';
 import { formatarCep, localDoBeneficiario, rotuloBeneficiario, type BeneficiarioEmenda } from '../../services/emendasService';
+import { GtiTag } from '../gti/GtiVisual';
 import { casaBusca, faltasDoBeneficiario, paresParecidos, textoDeBuscaDoBeneficiario, type FaltaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import { BeneficiarioModal } from './BeneficiarioModal';
 import { ContatoDoResponsavel } from './ContatoDoResponsavel';
@@ -44,6 +46,8 @@ const ROTULO_FALTA: Record<FaltaDoBeneficiario, string> = { CNPJ: 'Falta CNPJ', 
  */
 export const EmendasBeneficiariosPage: React.FC = () => {
   const { data: lista = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = useBeneficiariosEmendas();
+  // Grupo confirmado (migration 218): etiqueta ao lado da razão social; confirma-se em Ajustes › Grupos dos beneficiários.
+  const grupos = useMapaGruposBeneficiarios();
   const { data: diferentes = [] } = useBeneficiariosDiferentes();
   const { data: pedidos = [] } = usePedidosEmendas();
   const podeGerir = usePodeGerirEmendas();
@@ -186,6 +190,11 @@ export const EmendasBeneficiariosPage: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
               <NomeComSigla b={b} destaque />
               {b.razaoSocial && <div style={carteiraFornecedor}>{b.razaoSocial}</div>}
+              {grupos.get(b.id) && (
+                <div>
+                  <GtiTag grupo={grupos.get(b.id)!} testId={`emendas-beneficiario-grupo-${b.id}`} />
+                </div>
+              )}
             </div>
             {parecido && (
               <div style={{ ...carteiraSubtitle, color: 'var(--color-info-text, #155bcb)' }}>

@@ -33,8 +33,12 @@ import {
   useDiferencasDeEmpenho,
   useCredorDiferente,
   useEmendasSiop,
-  useContatosDasEmendas
+  useContatosDasEmendas,
+  useMapaGruposBeneficiarios
 } from '../../hooks/useEmendas';
+import { contarPorGti, passaFiltroGti, pctDoGti } from '../../config/gruposGti';
+import { GRUPOS_CAPTACAO, fatiasDaCaptacao, lerFiltroCaptacao, lerModoCaptacao } from '../../config/captacaoEmendas';
+import { CelulaCaptacao, FiltroCaptacao, GavetaCaptacao } from './CaptacaoDoPedido';
 import { contaEmendasSemPedido, diasSemContatoParaUrgente, emendasNaLista } from '../../utils/emendasSemPedido';
 import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
@@ -100,7 +104,7 @@ import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqu
 type Segmento = 'todos' | FasePedido | 'CANCELADO';
 /** Filtro de etapa dentro da fase; na Contratação separa quem aguarda o contrato de quem já está contratado. */
 type FiltroEtapa = '' | Exclude<EtapaPedido, 'CANCELADO' | 'CONTRATACAO'> | 'AGUARDANDO_CONTRATO' | 'CONTRATADO';
-type Linha = PedidoEmenda & { valor: number; fonteDoValor: 'EMENDA' | 'PREVISTO'; avisos: AvisoPedido[] };
+type Linha = PedidoEmenda & { valor: number; fonteDoValor: 'EMENDA' | 'PREVISTO'; avisos: AvisoPedido[]; captacao: ReturnType<typeof fatiasDaCaptacao> };
 
 const POR_PAGINA = 25;
 /** Filtro de aviso da lista: um tipo, 'com' (qualquer aviso) ou 'grave' (só os vermelhos, como no cartão do Início). */
@@ -513,6 +517,7 @@ const DetalheDoPedido: React.FC<DetalheProps> = ({ p, itens, beneficiarios, nota
         {jaEmpenhado(p.etapa) && <EmpenhoDoPedido pedidoId={p.id} conferencia={conferencia} itens={itens} podeGerir={podeGerir} />}
         <CredorDoPedido pedidoId={p.id} grupos={credor} itens={itens} podeGerir={podeGerir} />
         <RodadasDoPedido p={p} notas={notas} podeGerir={podeGerir} onAcao={onAcao} />
+        <GavetaCaptacao fatias={p.captacao} beneficiarios={beneficiarios} testId={`emendas-pedido-captacao-detalhe-${p.id}`} />
         <LinhasPorAta
           p={p}
           itens={itens}
@@ -643,13 +648,23 @@ export const EmendasPedidosPage: React.FC = () => {
     return b ? rotuloBeneficiario(b) : undefined;
   };
   const { precos } = usePrecosParaEmenda();
+  const gruposDosBeneficiarios = useMapaGruposBeneficiarios();
+  // Captação principal (migration 218): fatia de cada grupo no valor das linhas; ?captacao= e ?captacaoConta= nas três visões.
+  const filtroCaptacao = lerFiltroCaptacao(searchParams.get('captacao'));
+  const modoCaptacao = lerModoCaptacao(searchParams.get('captacaoConta'));
   const linhas: Linha[] = useMemo(
     () =>
       pedidos.map((p) => {
         const v = valorDoPedidoNaEtapa(p, itens, precos);
-        return { ...p, valor: v.valor, fonteDoValor: v.fonte, avisos: avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id)) };
+        return {
+          ...p,
+          valor: v.valor,
+          fonteDoValor: v.fonte,
+          avisos: avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id)),
+          captacao: fatiasDaCaptacao([p], gruposDosBeneficiarios, itens, precos)
+        };
       }),
-    [pedidos, itens, hoje, notas, precos, diferencas, credorPendente]
+    [pedidos, itens, hoje, notas, precos, diferencas, credorPendente, gruposDosBeneficiarios]
   );
 
   const contagem = useMemo(() => {
@@ -695,6 +710,7 @@ export const EmendasPedidosPage: React.FC = () => {
       .filter((l) => !soPedido || l.id === soPedido)
       .filter((l) => !filtroAutor || (filtroAutor === AUTOR_A_DEFINIR_CHAVE ? !l.autorId : l.autorId === filtroAutor))
       .filter((l) => !filtroAviso || temAviso(l, filtroAviso))
+      .filter((l) => passaFiltroGti(l.captacao, filtroCaptacao, modoCaptacao))
       .filter((l) => {
         if (!termo) return true;
         const a = l.autorId ? autorPorId.get(l.autorId) : undefined;
@@ -704,21 +720,24 @@ export const EmendasPedidosPage: React.FC = () => {
         // O nome do contato da assessoria só entra na busca de quem o vê.
         return casaBusca(`${a?.nome ?? AUTOR_A_DEFINIR} ${podeGerir ? l.contatoNome ?? '' : ''} ${a?.uf ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${ETAPAS.flatMap((e) => seiDaEtapa(l, e.etapa)).join(' ')} ${textoLinhas}`, termo);
       });
-  }, [doSegmento, filtroEtapa, etapaDoFiltro, soPedido, filtroAutor, filtroAviso, busca, autorPorId, itens, beneficiarios, podeGerir]);
+  }, [doSegmento, filtroEtapa, etapaDoFiltro, soPedido, filtroAutor, filtroAviso, filtroCaptacao, modoCaptacao, busca, autorPorId, itens, beneficiarios, podeGerir]);
 
   // Como nas carteiras: ordena pelo cabeçalho (?ordem=) antes de paginar.
   const ordem = useMemo<Record<string, CarteiraSortColumn<Linha>>>(
     () => ({
       autor: { value: (l) => (l.autorId ? autorPorId.get(l.autorId)?.nome ?? l.autorId : null) },
       valor: { value: (l) => l.valor, firstDir: 'desc' },
+      // Com o filtro de captação: a fatia do grupo escolhido; sem ele, a fatia do grupo principal.
+      captacao: { value: (l) => (filtroCaptacao === 'TODOS' ? l.captacao.principal?.pct ?? null : pctDoGti(l.captacao, filtroCaptacao)), firstDir: 'desc' },
       etapa: { value: (l) => ORDEM_ETAPA[l.etapa] },
       aviso: { value: (l) => (l.avisos.length ? l.avisos.length + (l.avisos.some(avisoGrave) ? 100 : 0) : null), firstDir: 'desc' }
     }),
-    [autorPorId]
+    [autorPorId, filtroCaptacao]
   );
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ordem);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chaveDaLinha, POR_PAGINA);
-  const filtrosAtivos = Boolean(busca.trim() || filtroEtapa || filtroAviso || soPedido || filtroAutor);
+  const filtrosAtivos = Boolean(busca.trim() || filtroEtapa || filtroAviso || soPedido || filtroAutor || filtroCaptacao !== 'TODOS');
+  const contagemCaptacao = useMemo(() => contarPorGti(doSegmento.map((l) => l.captacao), modoCaptacao, GRUPOS_CAPTACAO), [doSegmento, modoCaptacao]);
   // Autores com pedido na etapa escolhida, os que têm mais pedidos primeiro; "Parlamentar a definir" no fim.
   const opcoesDeAutor = useMemo(() => {
     const conta = new Map<string, number>();
@@ -759,6 +778,13 @@ export const EmendasPedidosPage: React.FC = () => {
       }
     },
     { key: 'valor', header: 'Valor', align: 'right', nowrap: true, sortValue: ordem.valor.value, sortFirstDir: 'desc', render: (l) => <ValorDoPedido valor={l.valor} fonte={l.fonteDoValor} /> },
+    {
+      key: 'captacao',
+      header: 'Captação principal',
+      sortValue: ordem.captacao.value,
+      sortFirstDir: 'desc',
+      render: (l) => <CelulaCaptacao fatias={l.captacao} testId={`emendas-pedido-captacao-${l.id}`} />
+    },
     {
       key: 'etapa',
       header: 'Etapa',
@@ -999,6 +1025,7 @@ export const EmendasPedidosPage: React.FC = () => {
               onChange={setFiltroAviso}
               testId="emendas-pedidos-filtro-aviso"
             />
+            <FiltroCaptacao gti={filtroCaptacao} modo={modoCaptacao} counts={contagemCaptacao} mudarUrl={mudarUrl} testIdPrefix="emendas-pedidos" />
           </CarteiraFilterBar>
 
           <AdminListShell
