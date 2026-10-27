@@ -83,7 +83,7 @@ export function situacaoGrupoUasg(grupo: GrupoConfirmavel | null, sugestao: Grup
   return grupo ? 'CONFIRMADAS' : sugestao ? 'A_CONFIRMAR' : 'SEM_SUGESTAO';
 }
 
-/** UASGs ainda sem grupo confirmado, separadas em com sugestão (a confirmar) e sem sugestão (número do menu Ajustes). */
+/** UASGs ainda sem grupo confirmado, separadas em com sugestão (a confirmar) e sem sugestão (parte do número do menu Ajustes). */
 export function contarUasgsSemGrupo(
   uasgs: Array<{ nome: string | null; nomeNaAta: string | null; siglaOrgao: string | null; esferaOrgao: string | null; grupo: GrupoConfirmavel | null }>
 ): { aConfirmar: number; semSugestao: number } {

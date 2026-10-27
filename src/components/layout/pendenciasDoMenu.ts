@@ -14,6 +14,8 @@ export interface FontesDoMenu {
   extras: ContagensExtras;
   /** UASGs sem grupo (GTI) confirmado, com e sem sugestão; só o coordenador recebe número. */
   gruposUasgs?: { aConfirmar: number; semSugestao: number } | null;
+  /** Beneficiários de emenda sem grupo confirmado, com e sem sugestão; só o coordenador e o gestor de emendas recebem número. */
+  gruposBeneficiarios?: { aConfirmar: number; semSugestao: number } | null;
   /**
    * Pedidos de emenda com algum aviso mais as emendas sem pedido (migration 205) e, deles, os com aviso vermelho; só o
    * coordenador e o gestor de emendas recebem número. `semPedido` diz quantas do total são emendas sem pedido.
@@ -25,7 +27,7 @@ export interface FontesDoMenu {
  * Regras dos números do menu (só pendências que o perfil resolve; quem calcula cada parte já filtra pelo perfil). Com
  * número, a área abre direto na página e no segmento da pendência; sem número, o menu volta à última página usada.
  */
-export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, emendas }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
+export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
   const r: Record<string, PendenciaDaArea | undefined> = {};
 
   // Início (coordenador): as filas da Central de Distribuição.
@@ -61,13 +63,18 @@ export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, em
       destino: emendas.semPedido && emendas.semPedido === emendas.total ? '/emendas/emendas?situacao=sem' : '/emendas/pedidos?aviso=com'
     };
 
-  // Ajustes (coordenador): UASGs sem grupo confirmado; abre em "A confirmar" e, sem nenhuma lá, em "Sem sugestão".
-  const aConfirmar = gruposUasgs?.aConfirmar ?? 0;
-  const semSugestao = gruposUasgs?.semSugestao ?? 0;
-  if (aConfirmar + semSugestao > 0) {
+  // Ajustes: UASGs (coordenador) e beneficiários de emenda (coordenador e gestor de emendas) sem grupo confirmado. Abre
+  // na primeira tela com pendência, na ordem das abas (Grupos das UASGs antes de Grupos dos beneficiários), em "A
+  // confirmar" e, sem nenhum lá, em "Sem sugestão".
+  const uasgs = (gruposUasgs?.aConfirmar ?? 0) + (gruposUasgs?.semSugestao ?? 0);
+  const benef = (gruposBeneficiarios?.aConfirmar ?? 0) + (gruposBeneficiarios?.semSugestao ?? 0);
+  if (uasgs + benef > 0) {
     r.configuracoes = {
-      contagem: aConfirmar + semSugestao,
-      destino: `/admin/grupos-uasgs?situacao=${aConfirmar > 0 ? 'A_CONFIRMAR' : 'SEM_SUGESTAO'}`
+      contagem: uasgs + benef,
+      destino:
+        uasgs > 0
+          ? `/admin/grupos-uasgs?situacao=${gruposUasgs!.aConfirmar > 0 ? 'A_CONFIRMAR' : 'SEM_SUGESTAO'}`
+          : `/emendas/grupos-beneficiarios?situacao=${gruposBeneficiarios!.aConfirmar > 0 ? 'A_CONFIRMAR' : 'SEM_SUGESTAO'}`
     };
   }
 

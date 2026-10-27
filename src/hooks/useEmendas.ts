@@ -80,13 +80,13 @@ export function useAutoresEmendas() {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'autores'], queryFn: fetchAutoresEmendas, staleTime: 10 * 60_000 });
 }
 
-export function useBeneficiariosEmendas() {
-  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'beneficiarios'], queryFn: fetchBeneficiariosEmendas });
+export function useBeneficiariosEmendas({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'beneficiarios'], queryFn: fetchBeneficiariosEmendas, enabled });
 }
 
 /** Grupo confirmado de cada beneficiário (migration 218). `data` null: migration ainda não aplicada. */
-export function useGruposBeneficiarios() {
-  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'grupos-beneficiarios'], queryFn: fetchGruposBeneficiarios, staleTime: 5 * 60_000 });
+export function useGruposBeneficiarios({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'grupos-beneficiarios'], queryFn: fetchGruposBeneficiarios, staleTime: 5 * 60_000, enabled });
 }
 
 const SEM_GRUPOS = new Map<string, GrupoBeneficiario>();

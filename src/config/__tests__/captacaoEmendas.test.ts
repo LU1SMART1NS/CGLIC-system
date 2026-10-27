@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fatiasDaCaptacao, lerFiltroCaptacao, lerModoCaptacao, situacaoGrupoBeneficiario, sugerirGrupoBeneficiario, type GrupoBeneficiario } from '../captacaoEmendas';
+import { contarBeneficiariosSemGrupo, fatiasDaCaptacao, lerFiltroCaptacao, lerModoCaptacao, situacaoGrupoBeneficiario, sugerirGrupoBeneficiario, type GrupoBeneficiario } from '../captacaoEmendas';
 import type { ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
 
 const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
@@ -85,5 +85,14 @@ describe('fatias da captação', () => {
     expect(lerFiltroCaptacao('OUTROS')).toBe('TODOS');
     expect(lerModoCaptacao('50')).toBe('50');
     expect(lerModoCaptacao('x')).toBe('PRINCIPAL');
+  });
+});
+
+describe('contarBeneficiariosSemGrupo (número do menu Ajustes)', () => {
+  const b = (id: string, nome: string, ativo = true) => ({ id, ativo, nome, sigla: null, naturezaJuridica: null });
+  it('conta só os ativos sem grupo confirmado, separando com e sem sugestão', () => {
+    const lista = [b('1', '10º Batalhão de Polícia Militar'), b('2', 'Órgão qualquer'), b('3', 'Delegacia de Polícia'), b('4', 'Corpo de Bombeiros', false)];
+    const confirmados = [{ beneficiarioId: '3', grupo: 'CNPC' as const, confirmadoPorNome: null, confirmadoEm: null }];
+    expect(contarBeneficiariosSemGrupo(lista, confirmados)).toEqual({ aConfirmar: 1, semSugestao: 1 });
   });
 });
