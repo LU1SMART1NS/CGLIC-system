@@ -14,13 +14,15 @@ interface Props {
   motivo?: string | null;
   testId: string;
   disabled?: boolean;
+  /** Botão "Usar o máximo" (a janela de remanejar para não participante não tem: pedido do usuário em 27/10/2026). */
+  comBotaoMaximo?: boolean;
 }
 
 /**
  * Quantidade com o máximo à vista (decisão D6 de 27/10/2026): uma frase só quando passa ("Você pode remanejar no
  * máximo X."), o motivo em poucas palavras e o botão "Usar o máximo". Vale nas janelas de remanejamento.
  */
-export const QuantidadeComMaximo: React.FC<Props> = ({ rotulo, valor, onMudar, maximo, verbo, motivo, testId, disabled }) => {
+export const QuantidadeComMaximo: React.FC<Props> = ({ rotulo, valor, onMudar, maximo, verbo, motivo, testId, disabled, comBotaoMaximo = true }) => {
   const qtd = /^\d+$/.test(valor) ? Number(valor) : 0;
   const passou = maximo != null && qtd > maximo;
   return (
@@ -41,7 +43,7 @@ export const QuantidadeComMaximo: React.FC<Props> = ({ rotulo, valor, onMudar, m
             disabled={disabled}
             data-testid={testId}
           />
-          {maximo != null && maximo > 0 && qtd !== maximo && (
+          {comBotaoMaximo && maximo != null && maximo > 0 && qtd !== maximo && (
             <AppButton variant="secondary" size="sm" onClick={() => onMudar(String(maximo))} disabled={disabled} data-testid={`${testId}-maximo`}>
               Usar o máximo ({formatNumber(maximo)})
             </AppButton>

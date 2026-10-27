@@ -66,7 +66,7 @@ export const CatalogoVazioAviso: React.FC = () => (
 /**
  * Janela "Alocação do item", a mesma na fila Itens às unidades e na aba Alocação interna do Item 360: lista as
  * unidades já alocadas com o contratado, o empenhado e (na CAEP) o reservado a parlamentares, edita a quantidade na
- * linha (mínimo = o maior dos três), remove (só sem contrato, empenho vinculado nem reserva) e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
+ * linha (mínimo = contratado + reservado ainda sem contrato), remove (só sem contrato, empenho vinculado nem reserva) e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
  */
 export const AlocarUnidadeModal: React.FC<AlocarUnidadeModalProps> = ({ item, ...rest }) =>
   item ? <JanelaAlocacao key={`${item.numeroAta}-${item.uasg}-${item.numeroItem}`} item={item} {...rest} /> : null;
@@ -172,7 +172,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
 
   const base = Math.max(item.quantitativoSenasp, aval.totalAlocado, 1);
   // Coluna Reservado: só quando o item tem a CAEP na lista ou alguma reserva.
-  const comReserva = lista.some((l) => (l.reservado ?? 0) > 0 || normUnidade(l.unitName) === normUnidade(UNIDADE_DAS_EMENDAS));
+  const comReserva = lista.some((l) => (l.reservadoTotal ?? 0) > 0 || normUnidade(l.unitName) === normUnidade(UNIDADE_DAS_EMENDAS));
   const ativas = lista.filter((l) => !l.removida);
   const corDe = (id: string) => CORES[lista.findIndex((l) => l.id === id) % CORES.length];
 
@@ -283,7 +283,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                       <th style={thStyle}>Unidade interna</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Contratado</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Empenhado</th>
-                      {comReserva && <th style={{ ...thStyle, textAlign: 'right' }} title="Pedidos de emenda ativos deste item, no menu Emendas">Reservado</th>}
+                      {comReserva && <th style={{ ...thStyle, textAlign: 'right' }} title="Reservado a parlamentares que ainda não virou contrato no Contratos.gov.br (o que já virou está em Contratado)">Reservado</th>}
                       <th style={{ ...thStyle, textAlign: 'right' }}>Alocado</th>
                       <th style={thStyle} aria-label="Ações" />
                     </tr>
@@ -312,7 +312,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                           {comReserva && (
                             <td data-rotulo="Reservado" data-testid={`alocar-unidade-reservado-${l.unitName}`} style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>
                               {l.reservado ? formatNumber(l.reservado) : '—'}
-                              {l.reservado && l.reservadoAEmpenhar ? <small style={{ display: 'block', fontWeight: 400, fontSize: '0.75rem', color: CINZA }}>{formatNumber(l.reservadoAEmpenhar)} sem empenho</small> : null}
+                              {l.reservadoTotal && l.reservadoTotal > (l.reservado ?? 0) ? <small style={{ display: 'block', fontSize: '0.75rem', color: CINZA }}>+ {formatNumber(l.reservadoTotal - (l.reservado ?? 0))} já em contrato</small> : null}
                             </td>
                           )}
                           <td data-rotulo="Alocado" style={{ ...td, textAlign: 'right' }}>

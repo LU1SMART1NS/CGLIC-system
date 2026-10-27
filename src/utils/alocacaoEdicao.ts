@@ -6,8 +6,8 @@ import type { AllocationExecution } from './allocationExecution';
  * Tudo é editado em memória e gravado de uma vez; as regras ficam aqui para valerem nas duas telas:
  * - a soma não passa do quantitativo SENASP;
  * - a unidade não fica com menos do que já contratou nem do que já empenhou (migration 103), e a CAEP não fica com
- *   menos do que o contratado (ou empenhado) mais a reserva a parlamentares ainda sem empenho, nem menos que a
- *   reserva toda (a trava do banco é da migration 157);
+ *   menos do que o contratado mais o reservado a parlamentares ainda sem contrato (o já contratado está no
+ *   contratado); a trava do banco (migration 157) confere a reserva toda;
  * - a unidade com contrato, empenho vinculado ou reserva não pode ser removida (antes é preciso tirá-la das divisões dos
  *   contratos e desvincular os empenhos);
  * - a unidade desativada fica como está ou diminui, mas não aumenta (migration 108).
@@ -24,9 +24,9 @@ export interface LinhaAlocacao {
   contratado: number;
   /** Empenhos do item vinculados à unidade (confirmados ou não). */
   vinculados: number;
-  /** Reservado a parlamentares no menu Emendas (só a CAEP; 0 nas outras) e a parte ainda sem empenho. */
+  /** Reservado a parlamentares ainda sem contrato (só a CAEP; 0 nas outras) e a reserva toda. */
   reservado?: number;
-  reservadoAEmpenhar?: number;
+  reservadoTotal?: number;
   removida: boolean;
   adicionada: boolean;
   /** Unidade desativada no catálogo: só mantém ou diminui (migration 108). */
@@ -60,44 +60,45 @@ const fmt = (n: number) => n.toLocaleString('pt-BR');
 /** Unidade interna das emendas (unidade_das_emendas() no banco): a reserva a parlamentares fica nela. */
 export const UNIDADE_DAS_EMENDAS = 'CAEP';
 
-export type MotivoDoMinimo = 'reservado' | 'contratado' | 'empenhado' | 'contratado_e_reserva' | 'empenhado_e_reserva';
+export type MotivoDoMinimo = 'contratado' | 'empenhado' | 'reservado' | 'contratado_e_reserva';
 export const ROTULO_MOTIVO_DO_MINIMO: Record<MotivoDoMinimo, string> = {
-  reservado: 'reservado a parlamentares',
   contratado: 'contratado',
   empenhado: 'empenhado',
-  contratado_e_reserva: 'contratado + reservado sem empenho',
-  empenhado_e_reserva: 'empenhado + reservado sem empenho'
+  reservado: 'reservado a parlamentares',
+  contratado_e_reserva: 'contratado + reservado'
 };
 
-/** O que segura a alocação da unidade. Na CAEP, a reserva a parlamentares: o total e a parte ainda sem empenho. */
+/** O que segura a alocação da unidade. Na CAEP, também a reserva a parlamentares ainda sem contrato. */
 export interface ExecucaoDaUnidade {
   contratado: number;
   empenhado: number;
+  /** Reservado a parlamentares que ainda não virou contrato (o que já virou está no contratado). */
   reservado?: number;
-  reservadoAEmpenhar?: number;
+  /** Reserva toda, inclusive a já contratada: a trava do banco (migration 157) não deixa a CAEP abaixo dela. */
+  reservadoTotal?: number;
 }
 
 /**
- * Quanto da alocação está preso (não pode sair) e por quê. A reserva já empenhada ou contratada está dentro do
- * empenhado ou do contratado; só a reserva ainda sem empenho soma por cima deles. E nunca menos que a reserva toda
- * (a trava do banco, migration 157).
+ * Quanto da alocação está preso (não pode sair) e por quê: o contratado mais o reservado ainda sem contrato
+ * (decisão do usuário em 27/10/2026), e nunca menos que o empenhado nem que a reserva toda.
  */
 export function presoDaUnidade(u: ExecucaoDaUnidade): { preso: number; motivo: MotivoDoMinimo | null; explicacao: string | null } {
-  const reservado = u.reservado ?? 0;
-  const aEmpenhar = Math.min(u.reservadoAEmpenhar ?? 0, reservado);
-  const base = Math.max(0, u.contratado, u.empenhado);
-  const pelaBase: 'contratado' | 'empenhado' = u.contratado >= u.empenhado ? 'contratado' : 'empenhado';
-  const comReserva = base + aEmpenhar;
-  const preso = Math.max(comReserva, reservado);
+  const reservado = Math.max(0, u.reservado ?? 0);
+  const contratado = Math.max(0, u.contratado);
+  const comReserva = contratado + reservado;
+  const preso = Math.max(comReserva, u.empenhado, u.reservadoTotal ?? 0);
   if (preso === 0) return { preso, motivo: null, explicacao: null };
-  if (aEmpenhar > 0 && base > 0 && comReserva >= reservado) {
-    return { preso, motivo: `${pelaBase}_e_reserva`, explicacao: `${fmt(base)} ${pelaBase === 'contratado' ? 'contratados' : 'empenhados'} + ${fmt(aEmpenhar)} reservados a parlamentares ainda sem empenho` };
+  if (preso === comReserva && reservado > 0) {
+    return contratado > 0
+      ? { preso, motivo: 'contratado_e_reserva', explicacao: `${fmt(contratado)} contratados + ${fmt(reservado)} reservados a parlamentares ainda sem contrato` }
+      : { preso, motivo: 'reservado', explicacao: `${fmt(reservado)} reservados a parlamentares` };
   }
-  if (reservado > 0 && reservado >= comReserva) return { preso, motivo: 'reservado', explicacao: `${fmt(reservado)} reservados a parlamentares` };
-  return { preso, motivo: pelaBase, explicacao: `${fmt(base)} ${pelaBase === 'contratado' ? 'contratados' : 'empenhados'}` };
+  if (preso === comReserva) return { preso, motivo: 'contratado', explicacao: `${fmt(contratado)} contratados` };
+  if (preso === u.empenhado) return { preso, motivo: 'empenhado', explicacao: `${fmt(u.empenhado)} empenhados` };
+  return { preso, motivo: 'reservado', explicacao: `${fmt(preso)} reservados a parlamentares` };
 }
 
-const temReserva = (motivo: MotivoDoMinimo | null) => motivo === 'reservado' || motivo === 'contratado_e_reserva' || motivo === 'empenhado_e_reserva';
+const temReserva = (motivo: MotivoDoMinimo | null) => motivo === 'reservado' || motivo === 'contratado_e_reserva';
 
 export interface FolgaDaUnidade {
   unitName: string;
@@ -108,14 +109,14 @@ export interface FolgaDaUnidade {
   podeDiminuir: number;
 }
 
-/** Reserva a parlamentares do item: o total e a parte ainda sem empenho (vai para a linha da CAEP). */
+/** Reserva a parlamentares do item: o total e a parte ainda sem contrato (vai para a linha da CAEP). */
 export interface ReservaDasEmendas {
   total: number;
-  aEmpenhar: number;
+  semContrato: number;
 }
-const SEM_RESERVA: ReservaDasEmendas = { total: 0, aEmpenhar: 0 };
+const SEM_RESERVA: ReservaDasEmendas = { total: 0, semContrato: 0 };
 const reservaDaUnidade = (unitName: string, r: ReservaDasEmendas) =>
-  normUnidade(unitName) === normUnidade(UNIDADE_DAS_EMENDAS) ? { reservado: r.total, reservadoAEmpenhar: r.aEmpenhar } : { reservado: 0, reservadoAEmpenhar: 0 };
+  normUnidade(unitName) === normUnidade(UNIDADE_DAS_EMENDAS) ? { reservado: r.semContrato, reservadoTotal: r.total } : { reservado: 0, reservadoTotal: 0 };
 
 /** Onde dá para diminuir a alocação (remanejamento da cota SENASP sem livre): as unidades com folga primeiro. */
 export function folgaDasUnidades(

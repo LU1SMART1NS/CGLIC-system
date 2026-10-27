@@ -526,21 +526,20 @@ describe('empenho anulado (migration 203)', () => {
   });
 });
 
-describe('reservaDoItem (mínimo da CAEP na alocação)', () => {
-  it('só a reserva sem empenho fica "a empenhar"; linha com empenho SEI conta como empenhada mesmo sem solicitação ligada', () => {
+
+describe('reservaDoItem (reservado da CAEP na alocação)', () => {
+  it('só a linha sem contrato ligado fica no reservado; cancelada e pedido cancelado não contam', () => {
     const pedidos = [
       pedido({ etapa: 'CONTRATACAO', linhas: [linha({ id: 'c1', itemKey: 'a', quantidade: 3 })] }),
-      pedido({ etapa: 'CONFERIDO', linhas: [linha({ id: 'c2', itemKey: 'a', quantidade: 2, empenhoDocumentoSei: '36423104' })] }),
+      pedido({ etapa: 'EMPENHADO', linhas: [linha({ id: 'e1', itemKey: 'a', quantidade: 2 })] }),
       pedido({ etapa: 'RESERVADO', linhas: [linha({ id: 'r1', itemKey: 'a', quantidade: 5 }), linha({ id: 'r2', itemKey: 'a', quantidade: 9, cancelada: true })] }),
       pedido({ etapa: 'CANCELADO', linhas: [linha({ id: 'x', itemKey: 'a', quantidade: 50 })] }),
       pedido({ etapa: 'RESERVADO', linhas: [kit] })
     ];
-    expect(reservaDoItem(pedidos, 'a', new Map())).toEqual({ total: 20, aEmpenhar: 15 });
-  });
-
-  it('nota anulada no Tesouro volta a ser reserva a empenhar', () => {
-    const nota = { linhaId: 'c1', nota: '2026NE000123', valorEmpenhado: 0 } as NotaDaLinha;
-    const pedidos = [pedido({ etapa: 'CONTRATACAO', linhas: [linha({ id: 'c1', itemKey: 'a', quantidade: 3 })] })];
-    expect(reservaDoItem(pedidos, 'a', new Map([['c1', nota]]))).toEqual({ total: 3, aEmpenhar: 3 });
+    const notas = new Map([
+      ['c1', { linhaId: 'c1', nota: '2026NE000184', contractKey: '200331-00175-2026' } as NotaDaLinha],
+      ['e1', { linhaId: 'e1', nota: '2026NE000200', contractKey: null } as NotaDaLinha]
+    ]);
+    expect(reservaDoItem(pedidos, 'a', notas)).toEqual({ total: 20, semContrato: 17 });
   });
 });

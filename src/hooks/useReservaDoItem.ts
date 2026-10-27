@@ -4,7 +4,7 @@ import { reservaDoItem, type ReservaDoItem } from '../utils/emendasPedidos';
 
 /**
  * Reserva a parlamentares de um item, para o mínimo da CAEP: o total vem do banco (a mesma conta da trava da
- * migration 157) e a parte a empenhar vem da situação de cada linha dos pedidos.
+ * migration 157) e a parte ainda sem contrato vem das linhas dos pedidos e dos contratos ligados a elas.
  */
 export function useReservaDoItem(itemKey: string, { enabled = true }: { enabled?: boolean } = {}) {
   const total = useReservadoDoItem(itemKey, { enabled });
@@ -14,10 +14,10 @@ export function useReservaDoItem(itemKey: string, { enabled = true }: { enabled?
   const notas = useNotasDasLinhas({ enabled: comReserva });
   const data = useMemo<ReservaDoItem | undefined>(() => {
     if (total.data == null) return undefined;
-    if (total.data === 0) return { total: 0, aEmpenhar: 0 };
+    if (total.data === 0) return { total: 0, semContrato: 0 };
     if (!pedidos.data || !notas.data) return undefined;
     const r = reservaDoItem(pedidos.data, itemKey, notas.data);
-    return { total: total.data, aEmpenhar: Math.min(r.aEmpenhar, total.data) };
+    return { total: total.data, semContrato: Math.min(r.semContrato, total.data) };
   }, [total.data, pedidos.data, notas.data, itemKey]);
   const isError = total.isError || (comReserva && (pedidos.isError || notas.isError));
   return {

@@ -29,4 +29,10 @@ describe('QuantidadeComMaximo (decisão D6)', () => {
     const h = html('40', null);
     expect(h).not.toContain('máximo');
   });
+
+  it('sem o botão quando a janela pede', () => {
+    const h = renderToStaticMarkup(<QuantidadeComMaximo rotulo="Quantidade" valor="" onMudar={() => {}} maximo={13} verbo="remanejar" testId="q" comBotaoMaximo={false} />);
+    expect(h).toContain('máximo 13');
+    expect(h).not.toContain('Usar o máximo');
+  });
 });

@@ -224,11 +224,12 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
             motivo={motivo}
             testId="remanejar-np-quantidade"
             disabled={remanejar.isPending}
+            comBotaoMaximo={false}
           />
           {folgas && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }} data-testid="remanejar-np-folga">
               <b style={{ fontSize: '0.88rem' }}>Onde dá para diminuir</b>
-              <span style={pequeno}>Preso é o maior entre contratado, empenhado e reservado a parlamentares: essa parte não sai da unidade.</span>
+              <span style={pequeno}>Preso é o contratado mais o reservado a parlamentares ainda sem contrato: essa parte não sai da unidade.</span>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
