@@ -12,7 +12,7 @@ import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, calcularKit, curto, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta } from '../../utils/emendasKits';
-import { casaBusca, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
+import { casaBusca, daUfDoParlamentar, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import { identificacaoDoPedido, itensDaLinha, numeroDaEmendaEmTexto, orgaoDoPedido, precoParaEmenda, valorDaLinha, VOLTA_AO_OFICIO } from '../../utils/emendasPedidos';
 import { nomeDoItem, notaDoPreco } from '../../utils/emendasQuadro';
 import type { SobraDaEmenda } from '../../utils/emendasSobra';
@@ -193,6 +193,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const [lado, setLado] = useState<'itens' | 'pedido'>('itens');
   const [seletorAberto, setSeletorAberto] = useState<string | null>(null);
   const [buscaBeneficiario, setBuscaBeneficiario] = useState('');
+  const [todasUfs, setTodasUfs] = useState(false);
   const [abertas, setAbertas] = useState<ReadonlySet<string>>(new Set());
   const [recado, setRecado] = useState<{ texto: string; desfazer?: () => void } | null>(null);
   const [confirmarSaida, setConfirmarSaida] = useState(false);
@@ -276,7 +277,12 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const podeItem = (i: ItemCaep) => !foraDoPrazo(i) && livre(i.itemKey) > 0;
 
   const ativosBen = useMemo(() => beneficiarios.filter((b) => b.ativo).sort((a, b) => rotuloBeneficiario(a).localeCompare(rotuloBeneficiario(b), 'pt-BR')), [beneficiarios]);
-  const beneficiariosEncontrados = ativosBen.filter((b) => casaBusca(textoDeBuscaDoBeneficiario(b), buscaBeneficiario)).slice(0, MAX_BENEFICIARIOS);
+  const beneficiariosNaBusca = ativosBen.filter((b) => casaBusca(textoDeBuscaDoBeneficiario(b), buscaBeneficiario));
+  // Com o parlamentar escolhido, a lista mostra só os órgãos da UF dele; "Mostrar todas as UFs" abre o resto.
+  const ufDoAutor = autor?.uf ?? null;
+  const filtraUf = Boolean(ufDoAutor) && !todasUfs;
+  const beneficiariosEncontrados = (filtraUf ? beneficiariosNaBusca.filter((b) => daUfDoParlamentar(b, ufDoAutor)) : beneficiariosNaBusca).slice(0, MAX_BENEFICIARIOS);
+  const deOutraUf = (b: BeneficiarioEmenda) => !daUfDoParlamentar(b, ufDoAutor);
 
   const tel = soDigitos(contatoTelefone);
   const pendencias: Pendencia[] = [];
@@ -405,6 +411,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const abrirSeletor = (alvo: string | null) => {
     setSeletorAberto(alvo);
     setBuscaBeneficiario('');
+    setTodasUfs(false);
   };
   const escolherBeneficiario = (grupo: string, id: string | null) => {
     setGrupos((gs) => gs.map((g) => (g.chave === grupo ? { ...g, beneficiarioId: id } : g)));
@@ -519,7 +526,12 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
             {b ? (
               <>
                 <b>{nomeESigla(b)}</b>
-                {localDoBeneficiario(b) && <small>{localDoBeneficiario(b)}</small>}
+                {localDoBeneficiario(b) && (
+                  <small>
+                    {localDoBeneficiario(b)}
+                    {deOutraUf(b) && ' · outra UF'}
+                  </small>
+                )}
               </>
             ) : (
               <span className="reserva-mudo">{vazio}</span>
@@ -553,7 +565,11 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   {localDoBeneficiario(x) && <small>{localDoBeneficiario(x)}</small>}
                 </button>
               ))}
-              {opcoes.length === 0 && <div className="reserva-mudo reserva-lista__vazia">Nenhum órgão encontrado. Cadastre em Ajustes › Beneficiários.</div>}
+              {opcoes.length === 0 && (
+                <div className="reserva-mudo reserva-lista__vazia">
+                  {filtraUf ? `Nenhum órgão de ${ufDoAutor} encontrado.` : 'Nenhum órgão encontrado. Cadastre em Ajustes › Beneficiários.'}
+                </div>
+              )}
               {podeAInformar && (
                 <button type="button" role="option" aria-selected={!atual} onClick={() => escolherBeneficiario(alvo, null)}>
                   <b>A informar depois</b>
@@ -561,6 +577,14 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 </button>
               )}
             </div>
+            {ufDoAutor && (
+              <div className="reserva-seletor__uf" data-testid={`${testId}-uf`}>
+                <span className="reserva-mudo">{filtraUf ? `Só órgãos de ${ufDoAutor}, a UF do parlamentar.` : 'Órgãos de todas as UFs.'}</span>
+                <AppButton type="button" variant="link" size="xs" onClick={() => setTodasUfs((v) => !v)} data-testid={`${testId}-todas-ufs`}>
+                  {filtraUf ? 'Mostrar todas as UFs' : `Só ${ufDoAutor}`}
+                </AppButton>
+              </div>
+            )}
           </div>
         )}
       </div>

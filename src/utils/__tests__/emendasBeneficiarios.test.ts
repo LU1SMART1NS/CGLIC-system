@@ -7,6 +7,7 @@ import {
   casaBusca,
   chaveDaIdentidade,
   chaveDoNome,
+  daUfDoParlamentar,
   faltasDoBeneficiario,
   linkDoWhatsapp,
   naturezaNaoPublica,
@@ -46,10 +47,12 @@ describe('pendenciasDoBeneficiario', () => {
     expect(pendenciasDoBeneficiario(ok)).toEqual([]);
   });
 
-  it('só o nome é obrigatório', () => {
-    expect(pendenciasDoBeneficiario({ ...vazio, nome: 'Polícia Civil' })).toEqual([]);
-    expect(pendenciasDoBeneficiario(vazio)).toEqual(['nome da unidade']);
-    expect(pendenciasDoBeneficiario({ ...vazio, nome: ' - ' })).toEqual(['nome da unidade']);
+  it('só o nome e a UF são obrigatórios', () => {
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: 'Polícia Civil', entregaUf: 'BA' })).toEqual([]);
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: 'Polícia Civil' })).toEqual(['UF']);
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: 'Polícia Civil', entregaUf: '  ' })).toEqual(['UF']);
+    expect(pendenciasDoBeneficiario(vazio)).toEqual(['nome da unidade', 'UF']);
+    expect(pendenciasDoBeneficiario({ ...vazio, nome: ' - ', entregaUf: 'BA' })).toEqual(['nome da unidade']);
   });
 
   it('o que vier preenchido vem certo', () => {
@@ -59,6 +62,15 @@ describe('pendenciasDoBeneficiario', () => {
       'telefone com DDD (10 ou 11 números)',
       'e-mail válido'
     ]);
+  });
+});
+
+describe('daUfDoParlamentar', () => {
+  it('só os órgãos da UF do parlamentar; sem UF de um dos lados, entra', () => {
+    expect(daUfDoParlamentar(ben('1', 'PM', 'Salvador', 'BA'), 'BA')).toBe(true);
+    expect(daUfDoParlamentar(ben('1', 'PM', 'São Paulo', 'SP'), 'BA')).toBe(false);
+    expect(daUfDoParlamentar(ben('1', 'PM', null, null), 'BA')).toBe(true);
+    expect(daUfDoParlamentar(ben('1', 'PM', 'São Paulo', 'SP'), null)).toBe(true);
   });
 });
 
