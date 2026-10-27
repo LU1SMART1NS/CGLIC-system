@@ -12,7 +12,7 @@ import {
   BellRing,
   CalendarOff,
   UsersRound,
-  Briefcase,
+  Files,
   ListChecks,
   Building2,
   Link2,
@@ -130,8 +130,8 @@ export const navigationConfig: NavItem[] = [
   },
   {
     id: 'carteira',
-    label: 'Carteira',
-    icon: Briefcase,
+    label: 'Atas e Contratos',
+    icon: Files,
     status: 'active',
     children: [
       {
