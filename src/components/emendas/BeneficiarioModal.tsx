@@ -5,7 +5,7 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppSelect } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { useDefinirGruposBeneficiarios, useGruposBeneficiarios, useSalvarBeneficiario } from '../../hooks/useEmendas';
-import { GRUPO_GTI_INFO } from '../../config/gruposGti';
+import { GRUPO_GTI_INFO, rotuloDoGrupo } from '../../config/gruposGti';
 import { GRUPOS_BENEFICIARIO, ehGrupoBeneficiario, sugerirGrupoBeneficiario } from '../../config/captacaoEmendas';
 import {
   cnpjValido,
@@ -368,7 +368,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
               <option value="">Escolher…</option>
               {GRUPOS_BENEFICIARIO.map((g) => (
                 <option key={g} value={g}>
-                  {g === 'OUTROS' ? 'Outros · Polícia Penal e fora dos conselhos' : `${GRUPO_GTI_INFO[g].rotulo} · ${GRUPO_GTI_INFO[g].descricao}`}
+                  {rotuloDoGrupo(g)}
                 </option>
               ))}
             </AppSelect>

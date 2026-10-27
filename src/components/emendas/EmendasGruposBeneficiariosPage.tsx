@@ -22,7 +22,7 @@ import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { GtiTag } from '../gti/GtiVisual';
 import { NomeComSigla } from './emendasPartes';
 import { useBeneficiariosEmendas, useDefinirGruposBeneficiarios, useGruposBeneficiarios, usePedidosEmendas, usePodeGerirEmendas } from '../../hooks/useEmendas';
-import { GRUPO_GTI_INFO } from '../../config/gruposGti';
+import { GRUPO_GTI_INFO, rotuloDoGrupo } from '../../config/gruposGti';
 import {
   GRUPOS_BENEFICIARIO,
   ehGrupoBeneficiario,
@@ -53,7 +53,6 @@ const SITUACOES: readonly Situacao[] = ['A_CONFIRMAR', 'SEM_SUGESTAO', 'CONFIRMA
 const chaveDaLinha = (l: Linha) => l.b.id;
 const pequeno: React.CSSProperties = { fontSize: '0.75rem', color: 'var(--text-muted)' };
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const rotuloGrupo = (g: GrupoBeneficiario) => (g === 'OUTROS' ? 'Outros · Polícia Penal e fora dos conselhos' : `${GRUPO_GTI_INFO[g].rotulo} · ${GRUPO_GTI_INFO[g].descricao}`);
 
 /**
  * Ajustes › Grupos dos beneficiários (migration 218): de qual conselho é cada beneficiário das emendas, base da coluna
@@ -260,7 +259,7 @@ export const EmendasGruposBeneficiariosPage: React.FC = () => {
             <option value="">{l.sugestao ? `A confirmar (sugestão: ${GRUPO_GTI_INFO[l.sugestao].rotulo})` : 'A confirmar'}</option>
             {GRUPOS_BENEFICIARIO.map((g) => (
               <option key={g} value={g}>
-                {rotuloGrupo(g)}
+                {rotuloDoGrupo(g)}
               </option>
             ))}
           </AppSelect>
@@ -326,7 +325,7 @@ export const EmendasGruposBeneficiariosPage: React.FC = () => {
               label="Grupo"
               value={filtroGrupo}
               emptyValue=""
-              options={GRUPOS_BENEFICIARIO.map((g) => ({ value: g, label: rotuloGrupo(g), count: contagemPorGrupo[g] ?? 0 }))}
+              options={GRUPOS_BENEFICIARIO.map((g) => ({ value: g, label: rotuloDoGrupo(g), count: contagemPorGrupo[g] ?? 0 }))}
               onChange={setFiltroGrupo}
               testId="grupos-beneficiarios-filtro-grupo"
             />
