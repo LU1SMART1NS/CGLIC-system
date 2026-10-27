@@ -240,6 +240,8 @@ describe('sincronizarReajusteAtas', () => {
           sei_citado: '29255776',
           sei_citado_conformidade: false
         }],
+        // Apostilamento de reajuste não é termo de prorrogação (migration 222).
+        termos_prorrogacao: [],
         homologados: [{ numero_item: '00001', valor: 14695 }],
         homologados_completos: true
       }]

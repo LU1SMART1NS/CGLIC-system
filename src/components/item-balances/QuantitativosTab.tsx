@@ -68,6 +68,9 @@ export interface QuantitativosTabProps {
   registradoAcima?: RegistradoAcima | null;
   /** PDF da ata no PNCP, para conferir o aviso de registrado acima do homologado. */
   pdfDaAta?: string;
+  /** Ata do item: o aviso "registrado acima" mostra o termo de prorrogação dela (migration 222). */
+  numeroAta?: string;
+  uasgAta?: string;
   /** "Pregão 90023/2024 · item 5". */
   pregaoItem?: string;
   podeInformar: boolean;
@@ -548,6 +551,8 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
           baseSemDesconto={p.baseSaldo + desconto}
           contratado={p.contratadoSenasp}
           nomeDe={nomeDe}
+          numeroAta={p.numeroAta}
+          uasg={p.uasgAta}
         />
       )}
       {verRegistros && q.registros.length > 0 && (

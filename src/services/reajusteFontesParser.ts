@@ -258,3 +258,36 @@ export function resolverEfeito(
   }
   return ctx.dataAssinatura ?? ctx.publicadoEm;
 }
+
+// ------------------------------------------------------------------------------
+// Termo aditivo de prorrogação: o que ele diz sobre o saldo (migration 222)
+// ------------------------------------------------------------------------------
+
+/**
+ * SALDO: o 2º ano usa só o saldo não contratado ("abrange apenas o saldo remanescente", "restabelece o saldo
+ * remanescente"; 84 de 99 termos da CGLIC lidos em 27/10/2026). RENOVA: o termo renova os quantitativos registrados.
+ * A_CONFERIR: é um termo de prorrogação, mas o texto não diz (ou não deu para ler).
+ */
+export type CoberturaDaProrrogacao = 'SALDO' | 'RENOVA' | 'A_CONFERIR';
+
+export interface TermoDeProrrogacao {
+  cobertura: CoberturaDaProrrogacao;
+  /** A frase do termo que diz isso (até 300 letras). */
+  trecho: string | null;
+}
+
+/** Lê um documento da ata; nulo quando ele não é um termo de prorrogação. */
+export function lerTermoDeProrrogacao(textoBruto: string, titulo = ''): TermoDeProrrogacao | null {
+  const texto = normalizarTexto(textoBruto);
+  const ehProrrogacao = /prorroga/i.test(texto) && (/termo\s+aditivo/i.test(texto) || /aditivo|prorroga/i.test(titulo));
+  if (!ehProrrogacao) return null;
+  const frase = (re: RegExp) => {
+    const m = texto.match(re);
+    return m ? m[0].trim().replace(/^(\d+\.)+\s*/, '').slice(0, 300) : null;
+  };
+  const renova = frase(/[^.;]*renova\w*\s+(?:d?os\s+)?quantitativ[^.;]*[.;]?|[^.;]*quantitativ\w*\s+(?:originalmente|inicialmente)\s+registrad[^.;]*[.;]?/i);
+  if (renova) return { cobertura: 'RENOVA', trecho: renova };
+  const saldo = frase(/[^.;]*saldo\s+remanescente[^.;]*[.;]?/i);
+  if (saldo) return { cobertura: 'SALDO', trecho: saldo };
+  return { cobertura: 'A_CONFERIR', trecho: null };
+}

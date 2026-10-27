@@ -26,6 +26,7 @@ import {
 import {
   lerClausulaDoEdital,
   lerReajustesDoDocumento,
+  lerTermoDeProrrogacao,
   resolverEfeito,
   type ClausulaDoEdital
 } from './reajusteFontesParser';
@@ -357,11 +358,20 @@ interface ReajusteParaGravar {
   sei_citado_conformidade: boolean;
 }
 
+/** Termo aditivo de prorrogação lido (ata_termos_prorrogacao, migration 222). */
+interface TermoParaGravar {
+  documento_pncp_sequencial: number;
+  documento_titulo: string;
+  documento_publicado_em: string | null;
+  cobertura: string;
+  trecho: string | null;
+}
+
 async function lerDocumentosDaAta(
   ata: AtaDaFila,
   p: { cnpj: string; ano: string; sequencial: number; sequencialAta: number },
   ctx: { leitor: LeitorDeArquivos; fetcher: typeof fetch; esperar: (ms: number) => Promise<void>; restaMs: () => number }
-): Promise<{ lidos: number[]; reajustes: ReajusteParaGravar[]; pendentes: number }> {
+): Promise<{ lidos: number[]; reajustes: ReajusteParaGravar[]; termos: TermoParaGravar[]; pendentes: number }> {
   const arquivos = await pedirLista<ArquivoPncp>(
     `${URL_PNCP}/${p.cnpj}/compras/${p.ano}/${p.sequencial}/atas/${p.sequencialAta}/arquivos`,
     ctx.fetcher,
@@ -370,6 +380,7 @@ async function lerDocumentosDaAta(
   const jaLidos = new Set(ata.documentos_pncp_lidos ?? []);
   const lidos: number[] = [];
   const reajustes: ReajusteParaGravar[] = [];
+  const termos: TermoParaGravar[] = [];
   let pendentes = 0;
   for (const a of arquivos.sort((x, y) => x.sequencialDocumento - y.sequencialDocumento)) {
     if (jaLidos.has(a.sequencialDocumento)) continue;
@@ -393,6 +404,11 @@ async function lerDocumentosDaAta(
     const leitura = lerReajustesDoDocumento(texto);
     const publicado = a.dataPublicacaoPncp ? a.dataPublicacaoPncp.slice(0, 10) : null;
     const titulo = String(a.titulo ?? a.tipoDocumentoNome ?? '').slice(0, 300);
+    // Termo aditivo de prorrogação: o que ele diz sobre o saldo vai para o aviso "registrado acima" (migration 222).
+    const termo = lerTermoDeProrrogacao(texto, titulo);
+    if (termo) {
+      termos.push({ documento_pncp_sequencial: a.sequencialDocumento, documento_titulo: titulo, documento_publicado_em: publicado, cobertura: termo.cobertura, trecho: termo.trecho });
+    }
     const contexto = {
       inicioVigencia: ata.data_vigencia_inicial,
       publicadoEm: publicado,
@@ -444,7 +460,7 @@ async function lerDocumentosDaAta(
     vistos.add(chave);
     return true;
   });
-  return { lidos, reajustes: unicos, pendentes };
+  return { lidos, reajustes: unicos, termos, pendentes };
 }
 
 const digitos = (s: unknown) => String(s ?? '').replace(/\D/g, '');
@@ -694,6 +710,7 @@ export async function sincronizarReajusteAtas(opts: OpcoesReajuste): Promise<Res
         const docs = await lerDocumentosDaAta(ata, p, ctx);
         payload.documentos_lidos = docs.lidos;
         payload.reajustes = docs.reajustes;
+        payload.termos_prorrogacao = docs.termos;
         if (docs.pendentes > 0) pendentes++;
         if (ata.itens_sem_homologado > 0 && restaMs() > 15_000) {
           const h = await lerHomologados(ata, p, ctx, await loteDaUasg(ata.codigo_uasg));
