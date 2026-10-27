@@ -1155,38 +1155,3 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
   return t.sort((a, b) => ordem[a.tom] - ordem[b.tom]);
 }
 
-/** Reservado de um item: o total e a parte que ainda não tem empenho (a que não está no empenhado nem no contratado). */
-export interface ReservaDoItem {
-  total: number;
-  aEmpenhar: number;
-}
-
-/**
- * A linha já tem empenho: o pedido passou do empenho, a nota está ligada ou o documento SEI do empenho foi informado
- * (há linha empenhada sem a solicitação ligada, então a situação da linha não serve aqui). Nota anulada no Tesouro
- * não conta.
- */
-export function linhaEmpenhada(p: PedidoEmenda, l: LinhaPedido, notas: Map<string, NotaDaLinha>): boolean {
-  const nota = notas.get(l.id);
-  if (notaZerada(nota)) return false;
-  return ORDEM_ETAPA[p.etapa] >= ORDEM_ETAPA.EMPENHADO || Boolean(nota?.nota) || Boolean(l.empenhoDocumentoSei);
-}
-
-/**
- * Reserva de um item nos pedidos ativos. Linha empenhada ou contratada já está no empenhado ou no contratado da CAEP;
- * só a que ainda não tem empenho soma por cima deles no mínimo da alocação.
- */
-export function reservaDoItem(pedidos: PedidoEmenda[], itemKey: string, notas: Map<string, NotaDaLinha>): ReservaDoItem {
-  let total = 0;
-  let aEmpenhar = 0;
-  for (const p of pedidos) {
-    if (p.etapa === 'CANCELADO') continue;
-    for (const l of linhasAtivas(p)) {
-      const q = itensDaLinha(l).filter((x) => x.itemKey === itemKey).reduce((s, x) => s + x.quantidade, 0);
-      if (!q) continue;
-      total += q;
-      if (!linhaEmpenhada(p, l, notas)) aEmpenhar += q;
-    }
-  }
-  return { total, aEmpenhar };
-}

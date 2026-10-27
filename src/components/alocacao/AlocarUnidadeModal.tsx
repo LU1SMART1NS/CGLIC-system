@@ -10,7 +10,7 @@ import { useSaveEmpenhoLinks } from '../../hooks/useSaveEmpenhoLinks';
 import { useContratadoDoItem } from '../../hooks/useContratadoDoItem';
 import { alocacoesPorContrato, contratadoPorNomeDaUnidade } from '../../utils/contratadoPorUnidade';
 import { summarizeAllocationExecution } from '../../utils/allocationExecution';
-import { useReservaDoItem } from '../../hooks/useReservaDoItem';
+import { useReservadoDoItem } from '../../hooks/useEmendas';
 import { avaliarEdicao, linhasIniciais, listaParaGravar, normUnidade, ROTULO_MOTIVO_DO_MINIMO, UNIDADE_DAS_EMENDAS, vinculosSemRemovidas, type LinhaAlocacao } from '../../utils/alocacaoEdicao';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
 import { MENSAGEM_CONFLITO_EDICAO } from '../../utils/conflitoEdicao';
@@ -66,7 +66,7 @@ export const CatalogoVazioAviso: React.FC = () => (
 /**
  * Janela "Alocação do item", a mesma na fila Itens às unidades e na aba Alocação interna do Item 360: lista as
  * unidades já alocadas com o contratado, o empenhado e (na CAEP) o reservado a parlamentares, edita a quantidade na
- * linha (mínimo = o maior dos três), remove (só sem contrato, empenho vinculado nem reserva) e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
+ * linha (mínimo = o maior entre contratado e empenhado, mais o reservado), remove (só sem contrato, empenho vinculado nem reserva) e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
  */
 export const AlocarUnidadeModal: React.FC<AlocarUnidadeModalProps> = ({ item, ...rest }) =>
   item ? <JanelaAlocacao key={`${item.numeroAta}-${item.uasg}-${item.numeroItem}`} item={item} {...rest} /> : null;
@@ -79,7 +79,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   const { data: estado, isLoading: alocacoesLoading } = alocacoesQuery;
   const { data: linksState, isLoading: linksLoading } = linksQuery;
   // Sem o reservado, a janela não edita: a CAEP poderia ficar abaixo da reserva sem aviso (o banco recusaria ao gravar).
-  const reservadoQuery = useReservaDoItem(itemKey);
+  const reservadoQuery = useReservadoDoItem(itemKey);
   // Sem as alocações ou os vínculos lidos do banco, a janela não edita: gravar a partir de uma lista que não chegou
   // apagaria o que está salvo.
   const naoCarregou = alocacoesQuery.isError || linksQuery.isError || reservadoQuery.isError;
@@ -102,7 +102,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
     const gravadas = estado?.allocations ?? [];
     const exec = summarizeAllocationExecution(gravadas, empenhoDoItem, linksState?.links ?? {}, alocacoesPorContrato(contratado.contratos, gravadas));
     const inativas = new Set(departments.filter((d) => !d.ativo).map((d) => normUnidade(d.sigla)));
-    return linhasIniciais(gravadas, exec.porAlocacao, contratadoPorNomeDaUnidade(contratado.unidades), reservadoQuery.data).map((l) => {
+    return linhasIniciais(gravadas, exec.porAlocacao, contratadoPorNomeDaUnidade(contratado.unidades), reservadoQuery.data ?? 0).map((l) => {
       const linha = inativas.has(normUnidade(l.unitName)) ? { ...l, inativa: true } : l;
       return linha.id === removerId && linha.vinculados === 0 && linha.contratado === 0 && !(linha.reservado ?? 0) ? { ...linha, removida: true } : linha;
     });
@@ -312,7 +312,6 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                           {comReserva && (
                             <td data-rotulo="Reservado" data-testid={`alocar-unidade-reservado-${l.unitName}`} style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>
                               {l.reservado ? formatNumber(l.reservado) : '—'}
-                              {l.reservado && l.reservadoAEmpenhar ? <small style={{ display: 'block', fontWeight: 400, fontSize: '0.75rem', color: CINZA }}>{formatNumber(l.reservadoAEmpenhar)} sem empenho</small> : null}
                             </td>
                           )}
                           <td data-rotulo="Alocado" style={{ ...td, textAlign: 'right' }}>

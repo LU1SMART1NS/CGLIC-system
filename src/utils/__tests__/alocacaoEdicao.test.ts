@@ -111,25 +111,20 @@ describe('alocacaoEdicao', () => {
   });
 });
 
-describe('reservado a parlamentares na CAEP (decisões D3 e D4 de 27/10/2026)', () => {
-  const comReserva = (aEmpenhar = 15000) => linhasIniciais(gravadas, new Map(), undefined, { total: 15000, aEmpenhar });
+describe('reservado a parlamentares na CAEP (decisão do usuário em 27/10/2026: contratado + reservado)', () => {
+  const comReserva = () => linhasIniciais(gravadas, new Map(), undefined, 15000);
 
-  it('a reserva vai só para a linha da CAEP; sem execução, o mínimo é a reserva toda', () => {
+  it('o reservado vai só para a linha da CAEP; sem execução, o mínimo é o reservado', () => {
     const ls = comReserva();
-    expect(ls.map((l) => [l.unitName, l.reservado, l.reservadoAEmpenhar])).toEqual([['FNSP', 0, 0], ['DIOPI', 0, 0], ['CAEP', 15000, 15000]]);
+    expect(ls.map((l) => [l.unitName, l.reservado])).toEqual([['FNSP', 0], ['DIOPI', 0], ['CAEP', 15000]]);
     const caep = avaliarEdicao(ls, TOTAL).porLinha.get('a3')!;
     expect(caep).toMatchObject({ minimo: 15000, motivoDoMinimo: 'reservado', abaixoDoMinimo: false, podeRemover: false });
   });
 
   it('abaixo do mínimo: não salva e diz o que fazer', () => {
     const a = avaliarEdicao(com(comReserva(), 'a3', { qtd: 10000 }), TOTAL);
-    expect(a.porLinha.get('a3')!.abaixoDoMinimo).toBe(true);
     expect(a.podeSalvar).toBe(false);
     expect(a.erros).toEqual(['A CAEP não pode ficar com menos de 15.000: 15.000 reservados a parlamentares. Para diminuir, peça à CAEP para liberar a reserva em Emendas › Pedidos.']);
-  });
-
-  it('no mínimo ou acima, salva', () => {
-    expect(avaliarEdicao(com(comReserva(), 'a3', { qtd: 15000 }), TOTAL).podeSalvar).toBe(true);
   });
 
   it('a CAEP com reserva não pode ser removida', () => {
@@ -137,37 +132,36 @@ describe('reservado a parlamentares na CAEP (decisões D3 e D4 de 27/10/2026)', 
     expect(a.erros).toContain('A unidade com reserva a parlamentares não pode ser removida. A reserva precisa ser liberada antes, em Emendas › Pedidos.');
   });
 
-  it('caso real 00062/2024 item 3: contratado 36 + 9 reservados sem empenho = mínimo 45 (os 19 em contratação já estão no contratado)', () => {
-    const caep: LinhaAlocacao = { id: 'c', unitName: 'CAEP', original: 60, qtd: 30, empenhado: 26.95, contratado: 36, vinculados: 0, reservado: 28, reservadoAEmpenhar: 9, removida: false, adicionada: false };
-    const a = avaliarEdicao([caep], 106);
-    expect(a.porLinha.get('c')).toMatchObject({ minimo: 45, motivoDoMinimo: 'contratado_e_reserva', abaixoDoMinimo: true });
-    expect(a.erros).toEqual(['A CAEP não pode ficar com menos de 45: 36 contratados + 9 reservados a parlamentares ainda sem empenho. Para diminuir, peça à CAEP para liberar a reserva em Emendas › Pedidos.']);
-    expect(avaliarEdicao([{ ...caep, qtd: 45 }], 106).podeSalvar).toBe(true);
+  it('caso real 00062/2024 item 3: contratado 36 + reservado 28 = mínimo 64', () => {
+    const caep: LinhaAlocacao = { id: 'c', unitName: 'CAEP', original: 70, qtd: 61, empenhado: 26.95, contratado: 36, vinculados: 0, reservado: 28, removida: false, adicionada: false };
+    const a = avaliarEdicao([caep], 74);
+    expect(a.porLinha.get('c')).toMatchObject({ minimo: 64, motivoDoMinimo: 'contratado_e_reserva', abaixoDoMinimo: true });
+    expect(a.erros).toEqual(['A CAEP não pode ficar com menos de 64: 36 contratados + 28 reservados a parlamentares. Para diminuir, peça à CAEP para liberar a reserva em Emendas › Pedidos.']);
+    expect(avaliarEdicao([{ ...caep, qtd: 64 }], 74).podeSalvar).toBe(true);
   });
 
-  it('o mínimo: maior entre contratado e empenhado, mais a reserva sem empenho, e nunca menos que a reserva toda', () => {
+  it('o mínimo: maior entre contratado e empenhado, mais o reservado', () => {
     expect(presoDaUnidade({ contratado: 900, empenhado: 900 })).toMatchObject({ preso: 900, motivo: 'contratado' });
     expect(presoDaUnidade({ contratado: 120, empenhado: 300 })).toMatchObject({ preso: 300, motivo: 'empenhado' });
-    expect(presoDaUnidade({ contratado: 150, empenhado: 150, reservado: 620, reservadoAEmpenhar: 100 })).toMatchObject({ preso: 620, motivo: 'reservado' });
-    expect(presoDaUnidade({ contratado: 150, empenhado: 150, reservado: 620, reservadoAEmpenhar: 500 })).toMatchObject({ preso: 650, motivo: 'contratado_e_reserva' });
+    expect(presoDaUnidade({ contratado: 150, empenhado: 200, reservado: 620 })).toMatchObject({ preso: 820, motivo: 'empenhado_e_reserva' });
     expect(presoDaUnidade({ contratado: 0, empenhado: 0 })).toEqual({ preso: 0, motivo: null, explicacao: null });
   });
 });
 
 describe('folgaDasUnidades (decisão D5)', () => {
-  it('pode diminuir = alocado − preso, com a reserva na CAEP; as de mais folga primeiro', () => {
+  it('pode diminuir = alocado − preso, com o reservado na CAEP; as de mais folga primeiro', () => {
     const f = folgaDasUnidades(
       [
         { unitName: 'FNSP', allocatedQty: 1200, contratado: 900, empenhado: 900 },
         { unitName: 'DIOPI', allocatedQty: 300, contratado: 120, empenhado: 80 },
         { unitName: 'CAEP', allocatedQty: 800, contratado: 150, empenhado: 150 }
       ],
-      { total: 620, aEmpenhar: 0 }
+      600
     );
     expect(f.map((x) => [x.unitName, x.preso, x.motivo, x.podeDiminuir])).toEqual([
       ['FNSP', 900, 'contratado', 300],
-      ['CAEP', 620, 'reservado', 180],
-      ['DIOPI', 120, 'contratado', 180]
+      ['DIOPI', 120, 'contratado', 180],
+      ['CAEP', 750, 'contratado_e_reserva', 50]
     ]);
   });
 });

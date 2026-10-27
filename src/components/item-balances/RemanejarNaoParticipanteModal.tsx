@@ -2,7 +2,7 @@ import React from 'react';
 import { ActionButton, AppButton, AppInput, AppTextarea, Modal, NoticeBar, useToast } from '../../design-system';
 import { useAcoesQuantitativos } from '../../hooks/useQuantitativosDoItem';
 import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
-import { useReservaDoItem } from '../../hooks/useReservaDoItem';
+import { useReservadoDoItem } from '../../hooks/useEmendas';
 import type { OrgaoQuantitativo, QuantitativosDoItem, RemanejamentoNaoParticipante } from '../../services/quantitativosService';
 import type { AdesaoItemRecord } from '../../types';
 import { documentoSeiValido } from '../../utils/quantitativos';
@@ -91,7 +91,7 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
   }, [p.origem?.uasg]);
 
   const cadastroOrigem = useCadastroUasgs(p.origem ? [p.origem.uasg] : []).get(p.origem?.uasg ?? '');
-  const reservado = useReservaDoItem(p.itemKey, { enabled: Boolean(p.origem) && senasp });
+  const reservado = useReservadoDoItem(p.itemKey, { enabled: Boolean(p.origem) && senasp });
   const uasg = destino.uasg;
   const participante = /^\d{6}$/.test(uasg) && (p.participantes.has(uasg) || uasg === p.origem?.uasg);
   const destinoValido = /^\d{6}$/.test(uasg) && !participante && destino.busca !== 'buscando';
@@ -228,7 +228,7 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
           {folgas && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }} data-testid="remanejar-np-folga">
               <b style={{ fontSize: '0.88rem' }}>Onde dá para diminuir</b>
-              <span style={pequeno}>Preso é o maior entre contratado, empenhado e reservado a parlamentares: essa parte não sai da unidade.</span>
+              <span style={pequeno}>Preso é o maior entre contratado e empenhado, mais o reservado a parlamentares: essa parte não sai da unidade.</span>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
