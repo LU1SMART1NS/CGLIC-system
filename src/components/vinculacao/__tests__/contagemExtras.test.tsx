@@ -97,11 +97,11 @@ describe('números novos: Financeiro e Início', () => {
     vi.mocked(useContagemEmendas).mockReturnValue(null);
   });
 
-  it('Emendas: pedidos com aviso, vermelho quando há urgente, e o clique abre Pedidos em "Com algum aviso"', () => {
+  it('Emendas: pedidos com aviso, vermelho quando há urgente, e o clique abre Pedidos sem filtro', () => {
     vi.mocked(useContagemEmendas).mockReturnValue({ total: 67, urgentes: 8, semPedido: 2 });
     const html = menu();
     expect(html).toMatch(/class="app-rail-count app-rail-count--urgente"[^>]*data-testid="rail-count-emendas"[^>]*>67</);
-    expect(html).toContain('href="/emendas/pedidos?aviso=com"');
+    expect(html).toContain('href="/emendas/pedidos"');
     vi.mocked(useContagemEmendas).mockReturnValue({ total: 59, urgentes: 0, semPedido: 0 });
     expect(menu()).toMatch(/class="app-rail-count"[^>]*data-testid="rail-count-emendas"[^>]*>59</);
   });

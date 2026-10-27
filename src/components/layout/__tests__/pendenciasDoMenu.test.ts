@@ -39,16 +39,16 @@ describe('pendenciasDoMenu: Ajustes', () => {
 });
 
 describe('pendenciasDoMenu: Emendas', () => {
-  it('padrão do Financeiro: todos os pedidos com aviso, vermelho quando há urgente, e abre Pedidos em "Com algum aviso"', () => {
+  it('padrão do Financeiro: todos os pedidos com aviso, vermelho quando há urgente, e abre Pedidos sem filtro', () => {
     expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, emendas: { total: 67, urgentes: 8 } }).emendas).toEqual({
       contagem: 67,
       vermelho: true,
-      destino: '/emendas/pedidos?aviso=com'
+      destino: '/emendas/pedidos'
     });
     expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, emendas: { total: 59, urgentes: 0 } }).emendas).toEqual({
       contagem: 59,
       vermelho: false,
-      destino: '/emendas/pedidos?aviso=com'
+      destino: '/emendas/pedidos'
     });
   });
   it('sem pedido com aviso (ou sem a contagem, como na consulta), Emendas fica sem número', () => {

@@ -58,7 +58,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
   const { data: pedidos = [], refetch: recarregarPedidos } = usePedidosEmendas();
   const hoje = hojeEmBrasilia();
   const { precos, ipca } = usePrecosParaEmenda();
-  const [segmento, setSegmento] = useState<Segmento>('com');
+  const [segmento, setSegmento] = useState<Segmento>('todos');
   // Vindo do Início (saldo livre perto do fim): ?busca= já filtra o item.
   const [searchParams] = useSearchParams();
   const [busca, setBusca] = useState(() => searchParams.get('busca') ?? '');
