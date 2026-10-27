@@ -12,10 +12,9 @@ import { HealthTile, HealthTileGrid } from '../../instrument360/HealthStripParts
 import { useInstrumentTab } from '../../instrument360/useInstrumentTab';
 import { ActionButton } from '../../../design-system/components/ActionButton';
 import { AppButton } from '../../../design-system/components/AppButton';
-import { DataTable, type Column } from '../../../design-system/components/DataTable';
 import { StatusBadge } from '../../../design-system/components/StatusBadge';
 import { NoticeBar } from '../../../design-system/components/NoticeBar';
-import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraValor } from '../../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraNumero } from '../../carteira/carteiraStyles';
 import { useBackTarget, useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import {
   hojeEmBrasilia,
@@ -33,29 +32,20 @@ import {
   usePodeGerirEmendas
 } from '../../../hooks/useEmendas';
 import { formatCurrency } from '../../../utils/format';
-import { curto, dataBR } from '../../../utils/emendasKits';
-import {
-  avisoGrave,
-  avisosDoPedido,
-  contratosDoPedido,
-  execucaoDoPedido,
-  linhasAtivas,
-  reservadoPorItem,
-  ROTULO_ETAPA,
-  ultimoContatoPorAutor,
-  valorDoPedidoNaEtapa
-} from '../../../utils/emendasPedidos';
+import { dataBR } from '../../../utils/emendasKits';
+import { linhasAtivas, reservadoPorItem, ultimoContatoPorAutor } from '../../../utils/emendasPedidos';
 import { emendasNaLista, NOME_ORGAO_ASPAR, numeroDaEmenda, orgaosNaOrdem, ROTULO_MEIO, ROTULO_SITUACAO_EMENDA, type EmendaNaLista } from '../../../utils/emendasSemPedido';
 import { ROTULO_SITUACAO_SOBRA, type SobraDaEmenda } from '../../../utils/emendasSobra';
 import { execucaoDosPedidos, pedidosDoParlamentar } from '../../../utils/emendasParlamentar';
-import { faltaAnoDaEmenda, numeroDoPedido, rotaDoPedido } from '../../../utils/emendasNomeDoPedido';
-import { rotuloBeneficiario, type EmendaSiop, type NotaDaLinha, type OrgaoAspar, type PedidoEmenda } from '../../../services/emendasService';
+import { rotuloBeneficiario, type EmendaSiop, type NotaDaLinha, type OrgaoAspar } from '../../../services/emendasService';
 import { linhaDoAutor } from '../emendasPartes';
-import { CartaoDeContato, DetalheDaEmenda } from '../PedidosPorEmenda';
+import { CartaoDeContato, DetalheDaEmenda } from '../emendas360/DetalheDaEmenda';
 import { PedidoModal } from '../PedidoModal';
 import { EmendaSiopModal } from '../EmendaSiopModal';
 import { AsparModal } from '../AsparModal';
 import { SobraDaEmendaCartao } from './SobraDaEmendaCartao';
+import { TabelaDePedidos } from './TabelaDePedidos';
+import { rotaDaEmenda } from '../emendas360/rotaDaEmenda';
 import { useSobraDasEmendas } from './useSobraDasEmendas';
 
 type Aba = 'emendas' | 'pedidos' | 'contatos';
@@ -154,76 +144,6 @@ export const Parlamentar360Page: React.FC = () => {
     .filter(Boolean)
     .join(' · ');
 
-  const colunasPedidos: Column<PedidoEmenda>[] = [
-    {
-      key: 'pedido',
-      header: 'Pedido',
-      priority: 'primary',
-      nowrap: true,
-      render: (p) => {
-        const numero = numeroDoPedido(p);
-        return numero ? (
-          <span style={carteiraIdentificacao}>{numero}</span>
-        ) : (
-          <>
-            <div style={carteiraValor}>{faltaAnoDaEmenda(p) ? `Emenda ${numeroDaEmenda(p.siopEmenda!)}` : 'Reserva'}</div>
-            <div style={carteiraDetalhe}>{faltaAnoDaEmenda(p) ? 'ano a informar' : p.origem === 'PLANILHA' ? 'da planilha' : `de ${dataBR(p.reservadoEm)}`}</div>
-          </>
-        );
-      }
-    },
-    {
-      key: 'itens',
-      header: 'Itens',
-      minWidth: '220px',
-      render: (p) => {
-        const ls = linhasAtivas(p);
-        const nomes = ls.slice(0, 2).map((l) => (l.tipo === 'KIT' ? `${l.quantidade} ${l.kitNome}` : `${l.quantidade} ${itens.get(l.itemKey ?? '')?.nomeCurto?.trim() || curto(itens.get(l.itemKey ?? '')?.descricao ?? l.itemKey ?? '', 30)}`));
-        return (
-          <>
-            <div style={carteiraValor}>{nomes.join(' · ') || '—'}</div>
-            {ls.length > 2 && <div style={carteiraDetalhe}>+{ls.length - 2} {ls.length - 2 === 1 ? 'item' : 'itens'}</div>}
-          </>
-        );
-      }
-    },
-    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (p) => <span style={carteiraNumero}>{formatCurrency(valorDoPedidoNaEtapa(p, itens, precos).valor)}</span> },
-    {
-      key: 'pago',
-      header: 'Pago',
-      align: 'right',
-      nowrap: true,
-      render: (p) => {
-        const e = execucaoDoPedido(p, notas);
-        return e.notas > 0 ? <span style={carteiraNumero}>{formatCurrency(e.pago)}</span> : <span style={carteiraDetalhe}>—</span>;
-      }
-    },
-    {
-      key: 'etapa',
-      header: 'Etapa',
-      nowrap: true,
-      render: (p) => {
-        const contratado = p.etapa === 'CONTRATACAO' && contratosDoPedido(p, notas).contratado;
-        return <StatusBadge label={contratado ? 'Contratado' : ROTULO_ETAPA[p.etapa]} variant={p.etapa === 'CANCELADO' ? 'neutral' : contratado || p.etapa === 'EMPENHADO' || p.etapa === 'CONTRATACAO' ? 'success' : 'info'} size="sm" dot={false} />;
-      }
-    },
-    {
-      key: 'aviso',
-      header: 'Aviso',
-      nowrap: true,
-      render: (p) => {
-        const [a, ...outros] = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id));
-        if (!a) return <span style={carteiraDetalhe}>—</span>;
-        return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <StatusBadge label={a.curto} variant={avisoGrave(a) ? 'danger' : 'warning'} size="sm" dot={false} />
-            {outros.length > 0 && <span style={{ ...carteiraDetalhe, fontWeight: 700 }}>+{outros.length}</span>}
-          </span>
-        );
-      }
-    }
-  ];
-
   const cabecalhoDaEmenda = (e: EmendaNaLista) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
       <b style={{ fontSize: '0.95rem' }}>
@@ -233,6 +153,10 @@ export const Parlamentar360Page: React.FC = () => {
       {e.valor != null && <span style={carteiraNumero}>{formatCurrency(e.valor)}</span>}
       {e.gnd && <span style={carteiraDetalhe}>{e.gnd}</span>}
       <StatusBadge label={ROTULO_SITUACAO_EMENDA[e.situacao]} variant={e.situacao === 'COM_PEDIDO' ? 'success' : 'warning'} size="sm" dot={false} />
+      <span style={{ flex: 1 }} />
+      <AppButton size="xs" variant="link" onClick={() => navegar(rotaDaEmenda(e))} data-testid={`parlamentar-360-abrir-emenda-${e.chave}`}>
+        Abrir a emenda
+      </AppButton>
     </div>
   );
 
@@ -355,15 +279,7 @@ export const Parlamentar360Page: React.FC = () => {
                 Nenhum pedido ainda.{podeGerir ? ' Use "Nova reserva" quando combinar itens com o gabinete.' : ''}
               </NoticeBar>
             ) : (
-              <DataTable<PedidoEmenda>
-                testId="parlamentar-360-pedidos"
-                className="data-table-container--flush"
-                data={doParlamentar}
-                keyExtractor={(p) => p.id}
-                columns={colunasPedidos}
-                rowStyle={(p) => (p.etapa === 'CANCELADO' ? { opacity: 0.6 } : undefined)}
-                rowOpen={(p) => () => navegar(rotaDoPedido(p))}
-              />
+              <TabelaDePedidos pedidos={doParlamentar} itens={itens} notas={notas} precos={precos} hoje={hoje} diferencas={diferencas} credor={credorPendente} testId="parlamentar-360-pedidos" />
             )}
           </InstrumentSection>
         )}

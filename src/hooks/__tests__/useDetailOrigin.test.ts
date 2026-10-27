@@ -17,6 +17,8 @@ describe('isDetailPath: só telas de detalhe recebem a origem', () => {
     expect(isDetailPath('/emendas/parlamentares/3166')).toBe(true);
     expect(isDetailPath('/emendas/parlamentares/3166?aba=pedidos')).toBe(true);
     expect(isDetailPath('/emendas/parlamentares')).toBe(false);
+    expect(isDetailPath('/emendas/emendas/2026/31660008')).toBe(true);
+    expect(isDetailPath('/emendas/emendas?situacao=sem')).toBe(false);
     expect(isDetailPath('/emendas/parlamentares?tipo=SENADOR')).toBe(false);
     expect(isDetailPath('/emendas/pedidos')).toBe(false);
     expect(isDetailPath('/emendas/pedidos?ver=autor')).toBe(false);
@@ -48,6 +50,8 @@ describe('originLabel: nome do destino do Voltar', () => {
     expect(originLabel('/emendas/pedidos/id/8a1b?aba=itens')).toBe('o pedido');
     expect(originLabel('/emendas/parlamentares?tipo=SENADOR')).toBe('Parlamentares');
     expect(originLabel('/emendas/parlamentares/3166?aba=emendas')).toBe('o parlamentar');
+    expect(originLabel('/emendas/emendas?situacao=sem')).toBe('Emendas');
+    expect(originLabel('/emendas/emendas/2026/31660008?aba=execucao')).toBe('a emenda');
   });
 
   it('nomeia as telas de detalhe de origem', () => {

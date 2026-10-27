@@ -52,6 +52,8 @@ const EmendasAsparPage = lazyComRecarga(() => import('./components/emendas/Emend
 const Pedido360Page = lazyComRecarga(() => import('./components/emendas/pedido360/Pedido360Page').then((m) => ({ default: m.Pedido360Page })));
 const EmendasParlamentaresPage = lazyComRecarga(() => import('./components/emendas/parlamentares/EmendasParlamentaresPage').then((m) => ({ default: m.EmendasParlamentaresPage })));
 const Parlamentar360Page = lazyComRecarga(() => import('./components/emendas/parlamentares/Parlamentar360Page').then((m) => ({ default: m.Parlamentar360Page })));
+const EmendasListaPage = lazyComRecarga(() => import('./components/emendas/emendas360/EmendasListaPage').then((m) => ({ default: m.EmendasListaPage })));
+const Emenda360Page = lazyComRecarga(() => import('./components/emendas/emendas360/Emenda360Page').then((m) => ({ default: m.Emenda360Page })));
 const GruposUasgsRoute = lazyComRecarga(() => import('./routes/GruposUasgsRoute').then((m) => ({ default: m.GruposUasgsRoute })));
 const ExportExcelModal = lazyComRecarga(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
 
@@ -418,6 +420,23 @@ const AppContent: React.FC = () => {
               element={
                 <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
                   <EmendasPedidosPage />
+                </RequireRole>
+              }
+            />
+            {/* Emendas (aba) e Emenda 360 (protótipo aprovado em 27/10/2026): substituem Pedidos › Por emenda. */}
+            <Route
+              path="/emendas/emendas"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasListaPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/emendas/emendas/:ano/:numero"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <Emenda360Page />
                 </RequireRole>
               }
             />
