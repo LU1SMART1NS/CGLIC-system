@@ -2,7 +2,7 @@ import React from 'react';
 import { ActionButton, AppButton, AppInput, AppTextarea, Modal, NoticeBar, useToast } from '../../design-system';
 import { useAcoesQuantitativos } from '../../hooks/useQuantitativosDoItem';
 import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
-import { useReservadoDoItem } from '../../hooks/useEmendas';
+import { useReservaDoItem } from '../../hooks/useReservaDoItem';
 import type { OrgaoQuantitativo, QuantitativosDoItem, RemanejamentoNaoParticipante } from '../../services/quantitativosService';
 import type { AdesaoItemRecord } from '../../types';
 import { documentoSeiValido } from '../../utils/quantitativos';
@@ -91,7 +91,7 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
   }, [p.origem?.uasg]);
 
   const cadastroOrigem = useCadastroUasgs(p.origem ? [p.origem.uasg] : []).get(p.origem?.uasg ?? '');
-  const reservado = useReservadoDoItem(p.itemKey, { enabled: Boolean(p.origem) && senasp });
+  const reservado = useReservaDoItem(p.itemKey, { enabled: Boolean(p.origem) && senasp });
   const uasg = destino.uasg;
   const participante = /^\d{6}$/.test(uasg) && (p.participantes.has(uasg) || uasg === p.origem?.uasg);
   const destinoValido = /^\d{6}$/.test(uasg) && !participante && destino.busca !== 'buscando';
