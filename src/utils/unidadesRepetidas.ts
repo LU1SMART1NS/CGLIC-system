@@ -9,6 +9,10 @@ import type { UnidadeItemRecord } from '../types';
  *
  * A chave inclui o fornecedor: no item com dois fornecedores cada órgão tem uma linha por fornecedor (uma
  * delas costuma vir com 0), e essas linhas são de verdade e se somam.
+ *
+ * Desde 24/10/2026 a fonte também devolve, em alguns itens, cada órgão uma vez com o fornecedor e outra com o
+ * fornecedor em branco (" - "), com a mesma quantidade e as mesmas datas (ex.: 00055/2025 da 200331, item 1:
+ * SENASP 306 virava 612). A linha em branco que repete a de um fornecedor com nome é cópia e sai.
  */
 
 const digitos = (v: unknown) => String(v ?? '').replace(/\D/g, '');
@@ -17,6 +21,9 @@ const texto = (v: unknown) => String(v ?? '').trim();
 export function chaveDaUnidade(u: Partial<UnidadeItemRecord>): string {
   return [digitos(u.codigoUnidade), digitos(u.numeroItem), texto(u.numeroAta), texto(u.fornecedor)].join('|');
 }
+
+/** Fornecedor em branco: sem letras nem números (a fonte manda " - "). */
+export const fornecedorEmBranco = (v: unknown) => !/[0-9A-Za-zÀ-ÿ]/.test(String(v ?? ''));
 
 /** Campos que precisam ser iguais nas cópias; codigoPdm e descricaoItem vêm do catálogo e podem variar. */
 const CAMPOS_CONFERIDOS: ReadonlyArray<keyof UnidadeItemRecord> = [
@@ -50,5 +57,17 @@ export function juntarUnidadesRepetidas<T extends Partial<UnidadeItemRecord>>(li
     repetidas++;
     if (CAMPOS_CONFERIDOS.some((c) => valorConferido(anterior[c]) !== valorConferido(linha[c]))) divergentes.add(chave);
   }
-  return { unidades: [...primeira.values()], repetidas, divergentes: [...divergentes] };
+  // Linha com o fornecedor em branco igual à de um fornecedor com nome (mesmo órgão, item, ata, quantidade e datas):
+  // é cópia. Se a quantidade ou as datas forem outras, fica (o banco e a tela somam, como antes).
+  const comNome = [...primeira.values()].filter((l) => !fornecedorEmBranco(l.fornecedor));
+  const igual = (a: T, b: T) => CAMPOS_CONFERIDOS.every((c) => valorConferido(a[c]) === valorConferido(b[c]));
+  const unidades = [...primeira.values()].filter((l) => {
+    if (!fornecedorEmBranco(l.fornecedor)) return true;
+    const copia = comNome.some(
+      (n) => digitos(n.codigoUnidade) === digitos(l.codigoUnidade) && digitos(n.numeroItem) === digitos(l.numeroItem) && texto(n.numeroAta) === texto(l.numeroAta) && igual(n, l)
+    );
+    if (copia) repetidas++;
+    return !copia;
+  });
+  return { unidades, repetidas, divergentes: [...divergentes] };
 }

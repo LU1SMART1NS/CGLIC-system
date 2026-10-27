@@ -21,6 +21,20 @@ describe('juntarUnidadesRepetidas', () => {
     expect(juntarUnidadesRepetidas(linhas)).toEqual({ unidades: linhas, repetidas: 0, divergentes: [] });
   });
 
+  it('tira a linha com o fornecedor em branco igual à de um fornecedor com nome (00055/2025, desde 24/10/2026)', () => {
+    const flir = { fornecedor: '07204578000109 - TELEDYNE FLIR BRASIL' };
+    const linhas = [orgao('200331', 306, flir), orgao('170394', 60, flir), orgao('200331', 306, { fornecedor: ' - ' }), orgao('170394', 60, { fornecedor: '' })];
+    const r = juntarUnidadesRepetidas(linhas);
+    expect(r.unidades).toEqual([linhas[0], linhas[1]]);
+    expect(r.repetidas).toBe(2);
+    expect(r.divergentes).toEqual([]);
+  });
+
+  it('a linha em branco com outra quantidade (ou sem par com nome) fica', () => {
+    const linhas = [orgao('200331', 306, { fornecedor: 'A' }), orgao('200331', 5, { fornecedor: ' - ' }), orgao('450955', 2, { fornecedor: ' - ' })];
+    expect(juntarUnidadesRepetidas(linhas)).toEqual({ unidades: linhas, repetidas: 0, divergentes: [] });
+  });
+
   it('acusa cópias com quantidade ou datas diferentes', () => {
     const r = juntarUnidadesRepetidas([orgao('200331', 30), orgao('200331', 31), orgao('450955', 2), orgao('450955', 2, { dataHoraExclusao: '2026-01-01T00:00:00' })]);
     expect(r.divergentes).toEqual([chaveDaUnidade(orgao('200331', 30)), chaveDaUnidade(orgao('450955', 2))]);

@@ -13,6 +13,7 @@
  * que o coordenador force. Um item por vez e dentro de um orçamento de tempo: o que não couber fica para a
  * próxima execução (PARCIAL).
  */
+import { juntarUnidadesRepetidas } from '../utils/unidadesRepetidas';
 import { supabase } from './supabaseClient';
 import { fetchAdesoesItem, fetchUnidadesItem, UnidadesItemIncompletasError } from './api';
 import {
@@ -299,7 +300,8 @@ export async function lerCopiaUnidadesItem(itemKey: string): Promise<CopiaUnidad
     .maybeSingle();
   if (error) throw error;
   if (!data?.copiado_em || !Array.isArray(data.unidades) || data.unidades.length === 0) return null;
-  return { unidades: data.unidades as UnidadeItemRecord[], copiadoEm: data.copiado_em };
+  // Cópias gravadas antes de 28/10/2026 podem ter a linha do fornecedor em branco repetida (utils/unidadesRepetidas).
+  return { unidades: juntarUnidadesRepetidas(data.unidades as UnidadeItemRecord[]).unidades, copiadoEm: data.copiado_em };
 }
 
 export interface CopiaAdesoesItem {
