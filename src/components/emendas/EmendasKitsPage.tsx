@@ -83,7 +83,7 @@ const ComposicaoDoKit: React.FC<{ linha: Linha; onAbrirItem?: (itemKey: string) 
 };
 
 interface Props {
-  /** Seletor Por item · Por kit da aba Itens e kits, no cabeçalho. */
+  /** Seletor Por item · Por kit da aba Itens de Emendas, no cabeçalho. */
   seletor?: React.ReactNode;
   /** Kit que já chega aberto (vindo de um item). */
   abrir?: string | null;
@@ -91,7 +91,7 @@ interface Props {
 }
 
 /**
- * Itens e kits › Por kit (migration 155): conjunto de itens montado pela CAEP com o que ela tem alocado. A situação é
+ * Emendas › Itens › Por kit (migration 155): conjunto de itens montado pela CAEP com o que ela tem alocado. A situação é
  * calculada todo dia pelas atas e pelo saldo; quem desativa é só a CAEP.
  */
 export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }) => {
@@ -208,7 +208,7 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
-        title="Itens e kits"
+        title="Itens"
         subtitle="Conjuntos de itens que a CAEP oferece aos parlamentares, e quantos ainda cabem no saldo."
         hint={`O kit não guarda quantidade: pedir N kits tira de cada item N vezes a quantidade por kit. Vence em breve = alguma ata do kit acaba em até ${avisoIndicacaoDias()} dias; Indisponível = ata encerrada, a menos de ${corteIndicacaoDias()} dias do fim ou sem saldo (prazos em Ajustes › Regras de Alertas).`}
         icon={<PackageOpen size={26} color="var(--primary)" aria-hidden="true" />}

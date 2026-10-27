@@ -67,6 +67,7 @@ import { DadosItemModal } from './DadosItemModal';
 import { contaEmendasSemPedido, diasSemContatoParaUrgente, emendasNaLista, haDias, numeroDaEmenda, semPedido as emendaSemPedido, textoDias, type EmendaNaLista } from '../../utils/emendasSemPedido';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { nomeDoPedido, pedidoEmTexto, rotaDoPedido } from '../../utils/emendasNomeDoPedido';
+import { rotaDaEmenda } from './emendas360/rotaDaEmenda';
 
 /** Trilho das pendências: a pergunta principal é a gravidade; o tipo de aviso vira o filtro "+ Aviso". */
 type Segmento = 'graves' | 'atencao' | 'todas';
@@ -562,7 +563,7 @@ export const EmendasInicioPage: React.FC = () => {
       {gavetaAberta === 'emendasSemPedido' && (
         <PainelGaveta
           id="emendasSemPedido"
-          subtitulo="Clique na linha para ver os contatos da emenda."
+          subtitulo="Clique na linha para abrir a emenda."
           hint={`Emendas que a CAEP viu no SIOP e que ainda não viraram pedido. Avisam desde o dia do registro e ficam urgentes com ${diasSemContatoParaUrgente()} dias sem contato registrado com a assessoria do parlamentar ou com a ASPAR dos órgãos (Ajustes › Regras de Alertas).`}
           onFechar={fecharGaveta}
         >
@@ -575,7 +576,7 @@ export const EmendasInicioPage: React.FC = () => {
               data={emendasSemPedido}
               keyExtractor={(l) => l.chave}
               columns={colunasEmendasSemPedido}
-              rowOpen={() => () => navigate('/emendas/emendas?situacao=sem')}
+              rowOpen={(e) => () => navigate(rotaDaEmenda(e))}
             />
           )}
         </PainelGaveta>
@@ -604,7 +605,7 @@ export const EmendasInicioPage: React.FC = () => {
       {gavetaAberta === 'sobraEmenda' && (
         <PainelGaveta
           id="sobraEmenda"
-          subtitulo="Clique na linha para abrir a emenda em Pedidos › Por parlamentar."
+          subtitulo="Clique na linha para abrir o parlamentar."
           hint="Emendas do ano com sobra que compra pelo menos o item mais barato que a CAEP ainda oferece: valor no SIOP menos o empenhado pela SENASP (notas da emenda no Portal da Transparência, ou as ligadas no sistema) e o que está em andamento. O que não for empenhado até o fim do ano perde o crédito."
           onFechar={fecharGaveta}
         >

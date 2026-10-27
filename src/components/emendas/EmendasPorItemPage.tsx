@@ -42,14 +42,14 @@ const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
 };
 
 interface Props {
-  /** Seletor Por item · Por kit da aba Itens e kits, no cabeçalho. */
+  /** Seletor Por item · Por kit da aba Itens de Emendas, no cabeçalho. */
   seletor?: React.ReactNode;
   /** Item que chega filtrado (vindo da composição de um kit). */
   abrir?: string | null;
 }
 
 /**
- * Itens e kits › Por item (migration 157): todos os itens com alocação para a CAEP, quanto já está reservado nos pedidos
+ * Emendas › Itens › Por item (migration 157): todos os itens com alocação para a CAEP, quanto já está reservado nos pedidos
  * (kits abertos) e o saldo a oferecer. A linha inteira abre o Item 360 na aba Emendas, que mostra quem reservou, em que
  * fase está cada pedido e em quais kits o item entra (decisão de 24/10/2026: a lista é só o saldo).
  */
@@ -173,7 +173,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
-        title="Itens e kits"
+        title="Itens"
         subtitle="Quanto de cada item alocado à CAEP já foi reservado a parlamentares."
         hint="Saldo = alocado à CAEP − reservado nos pedidos não cancelados (kits abertos nos itens). O valor é o previsto para a emenda, com o reajuste da ata (o mesmo do quadro do parlamentar); o reservado soma pelo preço previsto e o alocado pelo preço de hoje."
         icon={<Boxes size={26} color="var(--primary)" aria-hidden="true" />}

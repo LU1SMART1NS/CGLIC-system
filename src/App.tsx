@@ -482,7 +482,7 @@ const AppContent: React.FC = () => {
                 </RequireRole>
               }
             />
-            {/* Kits virou a visão Por kit de Itens e kits */}
+            {/* Kits virou a visão Por kit de Emendas › Itens */}
             <Route path="/emendas/kits" element={<Navigate to="/emendas/itens?ver=kit" replace />} />
             <Route
               path="/emendas/beneficiarios"

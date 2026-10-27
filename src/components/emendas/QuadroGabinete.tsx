@@ -120,12 +120,12 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
       )}
       {quadro.semNomeCurto > 0 && (
         <div style={aviso} role="status" data-testid={`${testId}-sem-nome`}>
-          {quadro.semNomeCurto === 1 ? '1 item está' : `${quadro.semNomeCurto} itens estão`} sem o nome da ata assinada e sai com o começo da descrição do catálogo: informe em Itens e kits.
+          {quadro.semNomeCurto === 1 ? '1 item está' : `${quadro.semNomeCurto} itens estão`} sem o nome da ata assinada e sai com o começo da descrição do catálogo: informe em Emendas › Itens.
         </div>
       )}
       {semGndMisturado && (
         <div style={aviso} role="status" data-testid={`${testId}-sem-gnd`}>
-          {quadro.semGnd === 1 ? '1 item está' : `${quadro.semGnd} itens estão`} sem GND: informe em Itens e kits para o quadro separar investimento e custeio.
+          {quadro.semGnd === 1 ? '1 item está' : `${quadro.semGnd} itens estão`} sem GND: informe em Emendas › Itens para o quadro separar investimento e custeio.
         </div>
       )}
 

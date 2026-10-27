@@ -8,7 +8,7 @@ import { EmendasKitsPage } from './EmendasKitsPage';
 type Ver = 'item' | 'kit';
 
 /**
- * Itens e kits: as antigas abas Itens da CAEP e Kits numa só, com Por item · Por kit no cabeçalho (como Por ata · Por item
+ * Emendas › Itens (antes "Itens e kits"): as antigas abas Itens da CAEP e Kits numa só, com Por item · Por kit no cabeçalho (como Por ata · Por item
  * da Alocação). A visão fica em ?ver=kit e a linha que chega aberta em ?abrir=; o item dentro do kit leva ao item e o
  * item abre o Item 360 na aba Emendas (que lista os kits em que ele entra).
  */
