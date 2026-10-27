@@ -46,6 +46,8 @@ export interface ExtratoDaCota {
   recebido: FluxoDaCota[];
   /** Entre participantes: não mexe na cota. */
   entre: FluxoDaCota[];
+  /** Remanejado da cota própria para não participantes (migration 219). */
+  paraNaoParticipantes: number;
   cota: number;
   /** O extrato bate com a conta do banco (registrado − gerenciado). Não bate quando as somas não fecham. */
   confere: boolean;
@@ -91,8 +93,9 @@ export function extratoDaCotaPropria(q: QuantitativosDoItem): ExtratoDaCota {
 
   const cedido = [...acima.entries()].filter(([, v]) => v > 0).map(([uasg, quantidade]) => ({ uasg, quantidade }));
   const soma = (l: Array<{ quantidade: number }>) => l.reduce((s, x) => s + x.quantidade, 0);
-  const cota = q.assinadaSenasp - soma(cedido) + soma(recebido);
-  return { assinadaSenasp: q.assinadaSenasp, cedido, recebido, entre, cota, confere: Math.abs(cota - q.cotaPropria) < 0.0001 };
+  const paraNaoParticipantes = q.orgaos.filter((o) => o.ehSenasp).reduce((s, o) => s + o.saidaNaoParticipante, 0);
+  const cota = q.assinadaSenasp - soma(cedido) + soma(recebido) - paraNaoParticipantes;
+  return { assinadaSenasp: q.assinadaSenasp, cedido, recebido, entre, paraNaoParticipantes, cota, confere: Math.abs(cota - q.cotaPropria) < 0.0001 };
 }
 
 export type EstadoContratado =

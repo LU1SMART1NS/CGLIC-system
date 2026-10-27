@@ -11,7 +11,8 @@ import type { UnidadeItemRecord } from '../../../types';
 const org = (p: Partial<OrgaoQuantitativo> & { uasg: string }): OrgaoQuantitativo => ({
   nomeOrgao: null, tipoUnidade: 'PARTICIPANTE', ehSenasp: false, quantidadeAssinada: 0, quantidadeRegistrada: 0, semRegistro: false,
   situacao: 'IGUAL', falta: 0, acima: 0, remanejadoConfirmado: 0, resto: 0, continuaDoOrgao: null, gerenciado: 0, mudou: false,
-  mudouEm: null, atualizadoEm: null, ataDaSenasp: true, ...p
+  mudouEm: null, atualizadoEm: null, ataDaSenasp: true,
+  remanejadoNaoParticipante: 0, saidaNaoParticipante: 0, naoParticipanteAguardaFonte: 0, ...p
 });
 const unidade = (codigoUnidade: string, nomeUnidade: string, quantidadeRegistrada: number, tipoUnidade = 'PARTICIPANTE') =>
   ({ codigoUnidade, nomeUnidade, quantidadeRegistrada, tipoUnidade } as UnidadeItemRecord);
@@ -55,7 +56,9 @@ const base: React.ComponentProps<typeof QuantitativosTab> = {
   podeRemanejar: true,
   alocado: 690,
   totalUnidadesInternas: 2,
-  unidadesInternas: <div data-testid="unidades-internas-stub">DIOPI e CAEP</div>
+  unidadesInternas: <div data-testid="unidades-internas-stub">DIOPI e CAEP</div>,
+  adesoes: [],
+  limiteAdesao: 9726
 };
 
 const html = (over: Partial<typeof base> = {}) =>
@@ -203,5 +206,66 @@ describe('QuantitativosTab', () => {
     expect(h).toContain('POLICIA RODOVIARIA FEDERAL');
     expect(h).toContain('UASG 200109<');
   });
-});
 
+  describe('remanejamento para não participante (migration 219)', () => {
+    const REM = {
+      id: 'np1', uasgOrigem: '200109', uasgDestino: '933027', nomeDestino: 'Polícia Penal de SP', quantidade: 10, documentoSei: '30203768',
+      justificativa: 'ofício do órgão pedindo o remanejamento', adesoesConhecidas: [], registradoPorNome: 'Maria Souza', registradoEm: '2026-10-27T12:00:00Z'
+    };
+    const comRemanejamento: QuantitativosDoItem = {
+      ...INFORMADO,
+      orgaos: INFORMADO.orgaos.map((o) => (o.uasg === '200109' ? { ...o, remanejadoNaoParticipante: 10, naoParticipanteAguardaFonte: 10 } : o)),
+      remanejamentosNaoParticipante: [REM]
+    };
+
+    it('cada linha que pode ceder tem o botão só com ícone, com o nome ao parar o mouse', () => {
+      const h = html();
+      expect(h).toContain('data-testid="remanejar-np-200331"');
+      expect(h).toContain('data-testid="remanejar-np-200109"');
+      expect(h).toContain('aria-label="Remanejar para não participante"');
+      expect(h).toContain('title="Remanejar para não participante"');
+    });
+
+    it('sem permissão de remanejar, não aparece o botão', () => {
+      expect(html({ podeRemanejar: false })).not.toContain('remanejar-np-');
+    });
+
+    it('o não participante entra na tabela com a quantidade e o botão de desfazer', () => {
+      const h = html({ quantitativos: comRemanejamento });
+      expect(h).toContain('Polícia Penal de SP');
+      expect(h).toContain('Não participante · remanejamento');
+      expect(h).toContain('data-testid="desfazer-np-np1"');
+      expect(h).toContain('aria-label="Desfazer remanejamento"');
+    });
+
+    it('o órgão que cedeu mostra o remanejamento e o que ainda não aparece no Compras.gov.br', () => {
+      const h = html({ quantitativos: comRemanejamento });
+      expect(h).toContain('Remanejado a não participante · 10');
+      expect(h).toContain('10 para Polícia Penal de SP');
+      expect(h).toContain('ainda não aparecem no Compras.gov.br');
+      expect(h).toContain('− 10 a não participante');
+    });
+
+    it('a cota que cedeu aparece no extrato e na conferência pelo Compras.gov.br', () => {
+      const daSenasp: QuantitativosDoItem = {
+        ...INFORMADO,
+        saidaNaoParticipante: 30,
+        cotaPropria: 705,
+        orgaos: INFORMADO.orgaos.map((o) => (o.ehSenasp ? { ...o, remanejadoNaoParticipante: 30, saidaNaoParticipante: 30, naoParticipanteAguardaFonte: 30 } : o)),
+        remanejamentosNaoParticipante: [{ ...REM, id: 'np2', uasgOrigem: '200331', quantidade: 30 }]
+      };
+      const h = html({ quantitativos: daSenasp, baseSaldo: 705 });
+      expect(h).toContain('Remanejado pela SENASP para não participantes');
+      expect(h).toContain('− remanejado a não participantes 30');
+      expect(h).toContain('registrado − gerenciado − 30 a não participantes');
+    });
+
+    it('adesão nova da mesma UASG pede conferência', () => {
+      const adesoes = [{ numeroAta: '00059/2025', unidadeGerenciadora: '200331', unidadeNaoParticipante: '933027 - POLICIA PENAL', dataAprovacaoAnalise: '2026-11-02T10:00:00', quantidadeAprovadaAdesao: 10 }];
+      const h = html({ quantitativos: comRemanejamento, adesoes });
+      expect(h).toContain('data-testid="adesao-a-conferir-933027"');
+      expect(h).toContain('É o mesmo remanejamento');
+      expect(h).toContain('São operações diferentes');
+    });
+  });
+});

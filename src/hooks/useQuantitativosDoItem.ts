@@ -1,12 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   confirmarRemanejamento,
+  decidirAdesaoDoRemanejamento,
   desfazerContinuaDoOrgao,
+  desfazerRemanejamentoNaoParticipante,
   desfazerRemanejamentos,
   fetchQuantitativosDoItem,
   informarQuantidadeAdesao,
   informarQuantidadesAtaAssinada,
   marcarContinuaDoOrgao,
+  remanejarParaNaoParticipante,
   vazioDoItem,
   type QuantitativosDoItem
 } from '../services/quantitativosService';
@@ -72,5 +75,20 @@ export function useAcoesQuantitativos(itemKey: string) {
     retry: 0,
     onSettled: aoTerminar
   });
-  return { informar, confirmar, desfazerRemanejamento, marcarContinua, desfazerContinua, informarAdesao };
+  const remanejarNaoParticipante = useMutation({
+    mutationFn: (p: Omit<Parameters<typeof remanejarParaNaoParticipante>[0], 'itemKey'>) => remanejarParaNaoParticipante({ ...p, itemKey }),
+    retry: 0,
+    onSettled: aoTerminar
+  });
+  const desfazerNaoParticipante = useMutation({
+    mutationFn: (p: Parameters<typeof desfazerRemanejamentoNaoParticipante>[0]) => desfazerRemanejamentoNaoParticipante(p),
+    retry: 0,
+    onSettled: aoTerminar
+  });
+  const decidirAdesao = useMutation({
+    mutationFn: (p: Omit<Parameters<typeof decidirAdesaoDoRemanejamento>[0], 'itemKey'>) => decidirAdesaoDoRemanejamento({ ...p, itemKey }),
+    retry: 0,
+    onSettled: aoTerminar
+  });
+  return { informar, confirmar, desfazerRemanejamento, marcarContinua, desfazerContinua, informarAdesao, remanejarNaoParticipante, desfazerNaoParticipante, decidirAdesao };
 }

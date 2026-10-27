@@ -87,6 +87,7 @@ import { EXPLICACAO_GTI, InteresseGtiBotao, InteresseGtiNoTopo } from './gti/Int
 import { QuantitativosOutroOrgaoTab } from './item-balances/QuantitativosOutroOrgaoTab';
 import { adesoesDaSenasp, papelDoItem } from '../utils/quantitativosOutroOrgao';
 import { useQuantitativosDoItem } from '../hooks/useQuantitativosDoItem';
+import { adesoesNoLimite, usadoNoLimite } from '../utils/remanejamentoNaoParticipante';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { EmendasDoItemTab } from './item-balances/EmendasDoItemTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
@@ -508,7 +509,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const totalRegistrado = unidades.reduce((acc, curr) => acc + curr.quantidadeRegistrada, 0);
   const gerenciadoraUnit = unidades.find(u => u.tipoUnidade === 'GERENCIADORA' || isGerenciadoraUasg(u.codigoUnidade));
 
-  const totalAdesaoAprovada = adesoes.reduce((acc, a) => acc + (Number(a.quantidadeAprovadaAdesao) || 0), 0);
+  // Limite de adesão usado (migration 219): adesões que contam + remanejamentos a não participantes. Adesão que
+  // apareceu depois de um remanejamento para a mesma UASG fica a conferir e não conta até o gestor decidir.
+  const adesoesDoLimite = React.useMemo(
+    () => adesoesNoLimite(adesoes, quantitativos.remanejamentosNaoParticipante, quantitativos.adesoesConferidas),
+    [adesoes, quantitativos.remanejamentosNaoParticipante, quantitativos.adesoesConferidas]
+  );
+  const totalAdesaoAprovada = usadoNoLimite(adesoesDoLimite, quantitativos.remanejamentosNaoParticipante).total;
 
   // Fórmula Oficial do Saldo: Saldo = QuantidadeRegistrada - ∑ Empenhos
 
@@ -819,6 +826,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               alocado={alocacoesComErro ? null : totalAllocatedSum}
               totalUnidadesInternas={allocations.length}
               unidadesInternas={unidadesInternasDoItem}
+              adesoes={adesoes}
+              limiteAdesao={totalLimiteAdesao}
             />
           ) : (
             <QuantitativosOutroOrgaoTab
@@ -1232,6 +1241,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
             item={item}
             totalAdesaoAprovada={totalAdesaoAprovada}
             limiteAdesao={totalLimiteAdesao}
+            itemKey={canonicalItemKey}
+            quantitativos={quantitativos}
+            adesoesNoLimite={adesoesDoLimite}
+            podeDecidir={canManageAllocations && !quantitativosNaoCarregaram}
           />
         )}
       </Instrument360TabPanel>
