@@ -43,7 +43,8 @@ import {
   type BeneficiarioEmenda,
   type BeneficiarioParaSalvar,
   type ConferenciaEmpenho,
-  type KitParaSalvar
+  type KitParaSalvar,
+  type PedidoEmenda
 } from '../services/emendasService';
 
 /** Mesma regra do banco (emendas.manage): coordenador e gestor de emendas alteram; a consulta só lê. */
@@ -200,10 +201,24 @@ export function useRemoverEmendaDoPedido() {
   });
 }
 
-/** Pedido mexe no saldo: recarrega pedidos, reservado e kits (kits possíveis). */
+/**
+ * Pedido mexe no saldo: recarrega pedidos, reservado e kits (kits possíveis). Os pedidos vêm primeiro e sozinhos (a
+ * janela espera só por eles); o resto das Emendas recarrega depois, sem segurar a janela. Recarregar tudo junto
+ * disparava umas 25 consultas de uma vez e, com o banco lento, a lista de pedidos podia ficar com a etapa antiga.
+ */
 function useInvalidarPedidos() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS] });
+  return async () => {
+    await qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'pedidos'], exact: true });
+    void qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS], predicate: (q) => q.queryKey[1] !== 'pedidos' });
+  };
+}
+
+/** Se a lista de pedidos na tela já tem a versão que o banco devolveu ao gravar (senão, a tela ficou para trás). */
+export function usePedidoEmDiaNaTela() {
+  const qc = useQueryClient();
+  return (id: string, versao: number): boolean =>
+    (qc.getQueryData<PedidoEmenda[]>([...CHAVE_EMENDAS, 'pedidos'])?.find((p) => p.id === id)?.versao ?? 0) >= versao;
 }
 
 export function useSalvarPedido() {

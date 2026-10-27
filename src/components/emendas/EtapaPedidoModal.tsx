@@ -4,7 +4,7 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppSelect, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useEmendasSiop, useInformarSolicitacaoDaAta, usePedidosEmendas, useRegistrarEnvioCgofi } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useEmendasSiop, useInformarSolicitacaoDaAta, usePedidoEmDiaNaTela, usePedidosEmendas, useRegistrarEnvioCgofi } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import {
@@ -145,6 +145,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const cancelar = useCancelarPedido();
   const informar = useInformarSolicitacaoDaAta();
   const registrarEnvio = useRegistrarEnvioCgofi();
+  const emDiaNaTela = usePedidoEmDiaNaTela();
   const atas = atasDoPedido(pedido, itens);
   // Envio à CGOFI (migration 193): as solicitações assinadas que ainda não foram, todas marcadas de início.
   const semEnvio = solicitacoesAssinadasSemEnvio(pedido);
@@ -330,7 +331,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
                     : VARIOS.has(modo)
                       ? { data, documentos_sei: numeros }
                       : { data, documento_sei: numeros[0] };
-        await avancar.mutateAsync({ id: pedido.id, versao: pedido.versao, acao, dados });
+        const gravado = await avancar.mutateAsync({ id: pedido.id, versao: pedido.versao, acao, dados });
         toast.success(
           modo === 'DIVERGENCIA'
             ? `Ofício devolvido. O pedido voltou para a minuta (${rodada + 1}ª). A reserva continua.`
@@ -338,6 +339,8 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
               ? 'Número SEI acrescentado.'
               : `${nomeDoAutor}: ${TITULO[modo].replace('Registrar ', '').replace('Conferir com o SIOP', 'conferido no SIOP')}.`
         );
+        // Gravou, mas a lista não recarregou (banco lento ou fora do ar): avisa em vez de deixar a etapa antiga na tela.
+        if (!emDiaNaTela(gravado.id, gravado.versao)) toast.show('Registrado, mas a lista ainda não mostra a mudança. Clique em "Atualizar" no alto da tela.', 'warning');
       }
       onClose();
     } catch (err) {
