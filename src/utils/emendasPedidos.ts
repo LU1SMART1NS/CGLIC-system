@@ -1155,3 +1155,28 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
   return t.sort((a, b) => ordem[a.tom] - ordem[b.tom]);
 }
 
+
+/** Reserva de um item: o total nos pedidos ativos e a parte que ainda não virou contrato. */
+export interface ReservaDoItem {
+  total: number;
+  semContrato: number;
+}
+
+/**
+ * Reserva de um item nos pedidos ativos. A linha que já tem contrato (nota ligada a um contrato do Contratos.gov.br)
+ * está na coluna Contratado da CAEP; o reservado da alocação é só o que ainda não virou contrato.
+ */
+export function reservaDoItem(pedidos: PedidoEmenda[], itemKey: string, notas: Map<string, NotaDaLinha>): ReservaDoItem {
+  let total = 0;
+  let semContrato = 0;
+  for (const p of pedidos) {
+    if (p.etapa === 'CANCELADO') continue;
+    for (const l of linhasAtivas(p)) {
+      const q = itensDaLinha(l).filter((x) => x.itemKey === itemKey).reduce((s, x) => s + x.quantidade, 0);
+      if (!q) continue;
+      total += q;
+      if (!notas.get(l.id)?.contractKey) semContrato += q;
+    }
+  }
+  return { total, semContrato };
+}

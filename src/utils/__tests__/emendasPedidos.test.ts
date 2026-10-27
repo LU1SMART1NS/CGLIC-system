@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { avisosDeEmpenho } from '../emendasEmpenho';
-import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notasEmitidasDepoisDaAnulacao, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notasEmitidasDepoisDaAnulacao, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, reservaDoItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { ConferenciaEmpenho, NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
@@ -526,3 +526,20 @@ describe('empenho anulado (migration 203)', () => {
   });
 });
 
+
+describe('reservaDoItem (reservado da CAEP na alocação)', () => {
+  it('só a linha sem contrato ligado fica no reservado; cancelada e pedido cancelado não contam', () => {
+    const pedidos = [
+      pedido({ etapa: 'CONTRATACAO', linhas: [linha({ id: 'c1', itemKey: 'a', quantidade: 3 })] }),
+      pedido({ etapa: 'EMPENHADO', linhas: [linha({ id: 'e1', itemKey: 'a', quantidade: 2 })] }),
+      pedido({ etapa: 'RESERVADO', linhas: [linha({ id: 'r1', itemKey: 'a', quantidade: 5 }), linha({ id: 'r2', itemKey: 'a', quantidade: 9, cancelada: true })] }),
+      pedido({ etapa: 'CANCELADO', linhas: [linha({ id: 'x', itemKey: 'a', quantidade: 50 })] }),
+      pedido({ etapa: 'RESERVADO', linhas: [kit] })
+    ];
+    const notas = new Map([
+      ['c1', { linhaId: 'c1', nota: '2026NE000184', contractKey: '200331-00175-2026' } as NotaDaLinha],
+      ['e1', { linhaId: 'e1', nota: '2026NE000200', contractKey: null } as NotaDaLinha]
+    ]);
+    expect(reservaDoItem(pedidos, 'a', notas)).toEqual({ total: 20, semContrato: 17 });
+  });
+});
