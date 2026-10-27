@@ -9,6 +9,7 @@ import { toSentenceCaseIfAllCaps } from '../utils/textCase';
 import { chaveAvisoLembrete, chaveAvisoSaldo, chaveAvisoVinculo } from './avisosResolvidosService';
 import { numeroDoContrato, textoDoMotivoVinculo, trabalhoDoGestor, type VinculoAConferir } from './vinculosAConferirService';
 import type { RegistroFornecedorPncp } from './fornecedorAtaPncpService';
+import { prazoEfetivo } from '../utils/modeloGestao';
 
 /** CADASTRO: a ata veio do PNCP sem fornecedor e precisa da indicação do coordenador (atas_fornecedor_pncp).
  *  VINCULO: vínculo automático desmentido pela fonte, com trabalho do gestor, a conferir (migration 112). */
@@ -196,7 +197,9 @@ export function buildAtaActionQueue(params: {
   for (const macro of plan?.macrotarefas || []) {
     for (const task of macro.tarefas) {
       if (!isTaskOpen(task.status)) continue;
-      const prazo = task.prazo ? parseDateBRT(task.prazo) : null;
+      // Orientar com pedido enviado: conta pela resposta esperada (migration 210).
+      const prazoTarefa = prazoEfetivo(task);
+      const prazo = prazoTarefa ? parseDateBRT(prazoTarefa) : null;
       if (!prazo) {
         tarefasSemPrazo++;
         continue;
@@ -212,7 +215,7 @@ export function buildAtaActionQueue(params: {
         title: task.nome,
         badgeLabel: dias < 0 ? `Vencida há ${Math.abs(dias)} ${Math.abs(dias) === 1 ? 'dia útil' : 'dias úteis'}` : dias === 0 ? 'Vence hoje' : `${dias} ${dias === 1 ? 'dia útil' : 'dias úteis'}`,
         diasRelevantes: dias,
-        dataAlvo: task.prazo,
+        dataAlvo: prazoTarefa,
         taskId: task.id,
         macrotaskName: macro.nome
       });

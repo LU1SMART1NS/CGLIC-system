@@ -6,6 +6,10 @@ import { addBusinessDays as addDays, formatDateISO } from '../../../services/tem
 
 const { idle } = vi.hoisted(() => ({ idle: () => ({ mutate: () => {}, isPending: false, error: null }) }));
 
+vi.mock('../../../hooks/useModeloGestao', () => {
+  const parado = () => ({ mutate: () => undefined, isPending: false, error: null });
+  return { useMarcarPedidoTarefa: parado, useRegistrarRespostaTarefa: parado, useAjustarPrazoTarefa: parado, useAtualizarModulo: parado };
+});
 vi.mock('../../../hooks/useUpdateContractTask', () => ({ useUpdateContractTask: idle }));
 vi.mock('../../../hooks/useApplyContractTaskTemplate', () => ({ useApplyContractTaskTemplate: idle }));
 vi.mock('../../../hooks/useContractTaskTemplates', () => ({

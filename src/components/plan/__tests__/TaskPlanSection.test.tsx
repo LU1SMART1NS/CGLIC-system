@@ -18,6 +18,10 @@ const controller = (somenteLeitura: boolean): TaskPlanController => ({
   },
   useUpdateTask: mutacao as unknown as TaskPlanController['useUpdateTask'],
   useDeleteTask: mutacao as unknown as TaskPlanController['useDeleteTask'],
+  useMarcarPedido: mutacao as unknown as TaskPlanController['useMarcarPedido'],
+  useRegistrarResposta: mutacao as unknown as TaskPlanController['useRegistrarResposta'],
+  useAjustarPrazo: mutacao as unknown as TaskPlanController['useAjustarPrazo'],
+  useAtualizarModulo: mutacao as unknown as TaskPlanController['useAtualizarModulo'],
   templates: [{ id: 't1', nome: 'Modelo padrão' }],
   loadingTemplates: false,
   applyTemplate: acao,
@@ -93,5 +97,101 @@ describe('Plano de gestão: consulta só lê (decisão de 25/10/2026)', () => {
     expect(html).toContain('O gestor do contrato ainda não aplicou um Modelo de Gestão.');
     expect(html).not.toContain('Aplicar Modelo');
     expect(html).not.toContain('Começar do zero');
+  });
+});
+
+describe('Plano do gestor: ação, marcas do orientar e contadores (modelo de gestão da CCGA)', () => {
+  const planoCcga: ContractTaskPlan = {
+    ...plano,
+    progresso: { total: 3, concluidas: 0, pendentes: 2, emAndamento: 1, naoAplicaveis: 0, atrasadas: 0, percentual: 0 },
+    macrotarefas: [
+      {
+        id: 'm1',
+        planId: 'p1',
+        nome: 'Prorrogação',
+        ordem: 1,
+        modulo: { id: 'mod1', nome: 'Prorrogação do contrato', processoTipo: 'Processo do pregão', ancoraData: '2026-10-13' },
+        tarefas: [
+          {
+            id: 'a',
+            macrotaskId: 'm1',
+            nome: 'Pedir à requisitante a manifestação',
+            ordem: 1,
+            status: 'PENDENTE',
+            acao: 'ORIENTAR',
+            comQuem: 'Requisitante',
+            lista: ['Interesse na prorrogação', 'Justificativa'],
+            prazo: '2028-01-02',
+            prazoAncora: 'VIGENCIA_FIM',
+            prazoDias: -180,
+            prazoTexto: 'D−180',
+            criadoEm: 'x',
+            atualizadoEm: 'x'
+          },
+          {
+            id: 'b',
+            macrotaskId: 'm1',
+            nome: 'Pedir ao ComprasSusp a pesquisa',
+            ordem: 2,
+            status: 'EM_ANDAMENTO',
+            acao: 'ORIENTAR',
+            prazo: '2028-01-10',
+            pedidoEnviadoEm: '2028-01-05',
+            prazoResposta: '2028-02-20',
+            criadoEm: 'x',
+            atualizadoEm: 'x'
+          },
+          {
+            id: 'c',
+            macrotaskId: 'm1',
+            nome: 'Acompanhar a nota de empenho',
+            ordem: 3,
+            status: 'PENDENTE',
+            acao: 'ACOMPANHAR',
+            comQuem: 'CGOFI',
+            criadoEm: 'x',
+            atualizadoEm: 'x'
+          }
+        ]
+      }
+    ]
+  };
+
+  it('mostra a ação, o com quem, a regra, a lista e os botões do orientar', () => {
+    const html = render(planoCcga, false);
+    expect(html).toContain('data-testid="plan-acao"');
+    expect(html).toContain('Orientar');
+    expect(html).toContain('Requisitante');
+    expect(html).toContain('Acompanhar');
+    expect(html).toContain('· D−180');
+    expect(html).toContain('O que pedir (2)');
+    expect(html).toContain('Pedido enviado');
+    expect(html).toContain('Resposta recebida');
+    expect(html).toContain('Resposta até 20/02/2028');
+  });
+
+  it('conta comigo agora, aguardando e fecha sozinha', () => {
+    const html = render(planoCcga, false);
+    expect(html).toContain('data-testid="plan-contadores"');
+    expect(html).toMatch(/>1<\/span><span[^>]*>Comigo agora/);
+    expect(html).toMatch(/>1<\/span><span[^>]*>Aguardando resposta/);
+    expect(html).toMatch(/>1<\/span><span[^>]*>Fecha sozinha/);
+    expect(html).toMatch(/>0<\/span><span[^>]*>Cobrar resposta/);
+  });
+
+  it('mostra o processo SEI do módulo e a data de partida', () => {
+    const html = render(planoCcga, false);
+    expect(html).toContain('data-testid="plan-modulo-dados"');
+    expect(html).toContain('Processo do pregão');
+    expect(html).toContain('Partida: 13/10/2026');
+    expect(html).toContain('Informar processo');
+  });
+
+  it('consulta vê a ação e a lista, sem as marcas do orientar nem alterar o módulo', () => {
+    const html = render(planoCcga, true);
+    expect(html).toContain('Orientar');
+    expect(html).toContain('O que pedir (2)');
+    expect(html).not.toContain('Pedido enviado');
+    expect(html).not.toContain('Informar processo');
   });
 });

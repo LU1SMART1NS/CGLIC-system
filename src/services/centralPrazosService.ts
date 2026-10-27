@@ -35,6 +35,7 @@ import {
 } from './temporalEngineService';
 import { classifyArpItemSaldo } from './balanceService';
 import { SALDO_RULES, TAREFA_RULES, VIGENCIA_RULES } from '../config/alertRules';
+import { prazoEfetivo } from '../utils/modeloGestao';
 
 /**
  * Gera chave lógica determinística e canônica de idempotência.
@@ -134,9 +135,11 @@ export function buildCentralPrazosItems(
     if (plan && plan.macrotarefas) {
       for (const macro of plan.macrotarefas) {
         for (const task of macro.tarefas) {
-          if (!task.prazo) continue; // Tarefas sem prazo definido não entram como itens de agenda temporal direta
+          // Orientar com pedido enviado: conta pela resposta esperada (migration 210).
+          const prazoTarefa = prazoEfetivo(task);
+          if (!prazoTarefa) continue; // Tarefas sem prazo definido não entram como itens de agenda temporal direta
 
-          const targetDate = parseDateBRT(task.prazo);
+          const targetDate = parseDateBRT(prazoTarefa);
           if (!targetDate) continue;
 
           const isConcluido = task.status === 'CONCLUIDA' || task.status === 'NAO_APLICAVEL';
@@ -150,7 +153,7 @@ export function buildCentralPrazosItems(
             idEntidade: contractKey,
             eventoId: 'TAREFA_PLANO',
             regraId: `TASK_${task.id}`,
-            cicloRef: task.prazo.replace(/\D/g, '')
+            cicloRef: prazoTarefa.replace(/\D/g, '')
           });
 
           if (!processedKeys.has(taskItemId)) {
@@ -168,11 +171,11 @@ export function buildCentralPrazosItems(
               processoNumero: contract.processo,
 
               marcoEvento: macro.nome || 'Gestão Contratual',
-              dataBase: task.criadoEm ? task.criadoEm.split('T')[0] : (contract.dataAssinatura || task.prazo),
+              dataBase: task.criadoEm ? task.criadoEm.split('T')[0] : (contract.dataAssinatura || prazoTarefa),
               fonteDataBase: 'SaldoARP (Plano de Trabalho)',
               regraNome: 'Deadline Operacional de Tarefa',
               regraTipo: 'INTERNA',
-              dataAlvo: task.prazo,
+              dataAlvo: prazoTarefa,
               diasRestantes,
               estadoTemporal,
               nivelAtencao,
@@ -186,17 +189,17 @@ export function buildCentralPrazosItems(
               observacoes: task.observacao,
 
               explicabilidade: {
-                dataBase: task.criadoEm ? task.criadoEm.split('T')[0] : (contract.dataAssinatura || task.prazo),
+                dataBase: task.criadoEm ? task.criadoEm.split('T')[0] : (contract.dataAssinatura || prazoTarefa),
                 fonteDataBase: 'SaldoARP (Plano de Trabalho)',
                 regraNome: 'Deadline Operacional de Tarefa',
                 regraTipo: 'INTERNA',
                 unidadeContagem: 'DIAS_UTEIS',
                 offsetDias: 0,
-                dataCalculada: task.prazo,
+                dataCalculada: prazoTarefa,
                 diasRestantes,
                 statusTemporal: estadoTemporal,
                 nivelAtencao,
-                descricaoRegra: `Tarefa operacional "${task.nome}" com deadline estipulado em ${task.prazo}.`
+                descricaoRegra: `Tarefa operacional "${task.nome}" com deadline estipulado em ${prazoTarefa}.`
               }
             });
           }

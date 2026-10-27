@@ -10,6 +10,7 @@ import { useSaveAtaTaskTemplateTask } from '../../hooks/useSaveAtaTaskTemplateTa
 import { useDeleteAtaTaskTemplateTask } from '../../hooks/useDeleteAtaTaskTemplateTask';
 
 const kit: TaskTemplatesKit = {
+  tipo: 'ata',
   hooks: {
     useTemplates: useAtaTaskTemplates,
     useSaveTemplate: useSaveAtaTaskTemplate,

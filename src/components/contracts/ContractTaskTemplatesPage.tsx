@@ -10,6 +10,7 @@ import { useSaveContractTaskTemplateTask } from '../../hooks/useSaveContractTask
 import { useDeleteContractTaskTemplateTask } from '../../hooks/useDeleteContractTaskTemplateTask';
 
 const kit: TaskTemplatesKit = {
+  tipo: 'contrato',
   hooks: {
     useTemplates: useContractTaskTemplates,
     useSaveTemplate: useSaveContractTaskTemplate,

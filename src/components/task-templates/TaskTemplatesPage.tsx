@@ -21,7 +21,45 @@ import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { useConfirm } from '../../design-system/components/ConfirmDialog';
 import { useToast } from '../../design-system/components/Toast';
 import { useAuth } from '../../context/AuthContext';
-import { TaskTemplatesKitContext, useTaskTemplatesKit, type TaskTemplatesKit, type TaskTemplate, type TaskTemplateMacrotask } from './taskTemplatesKit';
+import { TaskTemplatesKitContext, useTaskTemplatesKit, type TaskTemplatesKit, type TaskTemplate, type TaskTemplateMacrotask, type TaskTemplateTask } from './taskTemplatesKit';
+import { RegraTarefaModal } from './RegraTarefaModal';
+import { AcaoEtiqueta, PregaoEtiqueta, RegraDetalhes } from '../plan/modeloGestaoPlano';
+import { formatarEsforco, rotuloLista, textoRegraPrazo, textoRegraResposta } from '../../utils/modeloGestao';
+import { useSalvarDetalhesModelo } from '../../hooks/useModeloGestao';
+
+/** Linha de baixo da tarefa no modelo: ação, regra do prazo, esforço; e a lista ao abrir. */
+const TarefaModeloRegra: React.FC<{ task: TaskTemplateTask; podeEditar: boolean; onEditar: () => void }> = ({ task, podeEditar, onEditar }) => {
+  const [aberta, setAberta] = useState(false);
+  const regra = textoRegraPrazo(task);
+  const resposta = textoRegraResposta(task);
+  const esforco = formatarEsforco(task.esforcoMin);
+  const temDetalhes = !!(task.lista?.length || task.nota || task.modeloSei);
+  if (!task.acao && !regra && !esforco && !temDetalhes && !podeEditar) return null;
+  return (
+    <div style={{ marginTop: '0.2rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.75rem', color: '#64748b' }}>
+        {task.acao && <AcaoEtiqueta acao={task.acao} comQuem={task.comQuem} />}
+        {task.doPregao && <PregaoEtiqueta />}
+        {regra && <span>Prazo: {regra}</span>}
+        {resposta && <span>· {resposta}</span>}
+        {esforco && <span>· esforço {esforco}</span>}
+        {temDetalhes && (
+          <AppButton type="button" variant="link" size="sm" aria-expanded={aberta} onClick={() => setAberta(!aberta)}>
+            {task.lista?.length ? `${rotuloLista(task.acao)} (${task.lista.length})` : 'Detalhes'}
+          </AppButton>
+        )}
+        {podeEditar && (
+          <AppButton type="button" variant="link" size="sm" onClick={onEditar}>
+            {task.acao || regra ? 'Editar regra' : 'Definir ação e prazo'}
+          </AppButton>
+        )}
+      </div>
+      {aberta && temDetalhes && (
+        <RegraDetalhes rotulo={rotuloLista(task.acao)} lista={task.lista} nota={task.nota} modeloSei={task.modeloSei} />
+      )}
+    </div>
+  );
+};
 
 const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrotask }> = ({ templateId, macro }) => {
   const [open, setOpen] = useState(true);
@@ -30,7 +68,8 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskNome, setEditingTaskNome] = useState('');
 
-  const { hooks, somenteLeitura } = useTaskTemplatesKit();
+  const { tipo, hooks, somenteLeitura } = useTaskTemplatesKit();
+  const [regraDe, setRegraDe] = useState<TaskTemplateTask | null>(null);
   const saveMacrotask = hooks.useSaveMacrotask();
   const deleteMacrotask = hooks.useDeleteMacrotask();
   const saveTask = hooks.useSaveTask();
@@ -156,7 +195,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                   key={task.id}
                   style={{
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: 'flex-start',
                     gap: '0.5rem',
                     padding: '0.4rem 0.6rem',
                     background: '#f8fafc',
@@ -191,7 +230,10 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
                     </>
                   ) : (
                     <>
-                      <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: '0.82rem', color: '#334155' }}>{task.nome}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ overflowWrap: 'anywhere', fontSize: '0.82rem', color: '#334155' }}>{task.nome}</span>
+                        <TarefaModeloRegra task={task} podeEditar={!somenteLeitura} onEditar={() => setRegraDe(task)} />
+                      </div>
                       {!somenteLeitura && (
                       <ActionButton
                         action="renomear"
@@ -265,6 +307,7 @@ const MacrotaskEditor: React.FC<{ templateId: string; macro: TaskTemplateMacrota
         </div>
       )}
     </div>
+    {regraDe && <RegraTarefaModal tipo={tipo} tarefa={regraDe} onClose={() => setRegraDe(null)} />}
     {dialog}
     </>
   );
@@ -297,6 +340,8 @@ const TemplateFormModal: React.FC<{
   const clearError = () => {
     if (saveTemplate.isError) saveTemplate.reset();
   };
+
+  if (template) return <EditarModeloModal template={template} onClose={onClose} />;
 
   return (
     <Modal
@@ -346,8 +391,115 @@ const TemplateFormModal: React.FC<{
   );
 };
 
-const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
-  const [expanded, setExpanded] = useState(true);
+const linhas = (texto: string) =>
+  texto
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+/** Editar um modelo: nome, descrição e os detalhes do módulo (quando entra, processo SEI, base, variantes). */
+const EditarModeloModal: React.FC<{ template: TaskTemplate; onClose: () => void }> = ({ template, onClose }) => {
+  const { tipo, hooks } = useTaskTemplatesKit();
+  const saveTemplate = hooks.useSaveTemplate();
+  const salvarDetalhes = useSalvarDetalhesModelo(tipo);
+  const [nome, setNome] = useState(template.nome);
+  const [descricao, setDescricao] = useState(template.descricao ?? '');
+  const [quando, setQuando] = useState(template.quando ?? '');
+  const [processoTipo, setProcessoTipo] = useState(template.processoTipo ?? '');
+  const [base, setBase] = useState(template.base ?? '');
+  const [variantes, setVariantes] = useState((template.variantes ?? []).join('\n'));
+  const pendente = saveTemplate.isPending || salvarDetalhes.isPending;
+  const erro = (saveTemplate.isError && saveTemplate.error?.message) || (salvarDetalhes.error as { message?: string } | null)?.message;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nome.trim()) return;
+    const gravarDetalhes = () =>
+      salvarDetalhes.mutate(
+        { id: template.id, quando: quando.trim() || null, base: base.trim() || null, processoTipo: processoTipo.trim() || null, variantes: linhas(variantes) },
+        { onSuccess: onClose }
+      );
+    const mudouNome = nome.trim() !== template.nome || (descricao.trim() || undefined) !== template.descricao;
+    if (!mudouNome) {
+      gravarDetalhes();
+      return;
+    }
+    saveTemplate.mutate(
+      { id: template.id, nome: nome.trim(), descricao: descricao.trim() || undefined, ativo: template.ativo },
+      { onSuccess: gravarDetalhes }
+    );
+  };
+
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      dismissible={!pendente}
+      size="lg"
+      testId="template-modal"
+      title="Editar modelo"
+      footer={
+        <>
+          <ActionButton action="cancelar" type="button" onClick={onClose} disabled={pendente} />
+          <AppButton type="submit" form="template-form" disabled={!nome.trim() || pendente} isLoading={pendente}>
+            Salvar alterações
+          </AppButton>
+        </>
+      }
+    >
+      <form id="template-form" onSubmit={handleSubmit} style={{ display: 'grid', gap: '0.9rem', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))' }}>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <AppInput label="Nome do modelo *" required value={nome} onChange={(e) => setNome(e.target.value)} />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <AppTextarea label="Descrição operacional (opcional)" rows={2} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+        </div>
+        <AppInput label="Quando entra" value={quando} onChange={(e) => setQuando(e.target.value)} placeholder="Ex.: 180 dias antes do fim da vigência" maxLength={300} />
+        <AppInput
+          label="Processo SEI em que corre"
+          value={processoTipo}
+          onChange={(e) => setProcessoTipo(e.target.value)}
+          placeholder="Ex.: Processo do pregão, Fiscalização, Pagamento"
+          maxLength={60}
+        />
+        <div style={{ gridColumn: '1 / -1' }}>
+          <AppInput label="Base normativa" value={base} onChange={(e) => setBase(e.target.value)} placeholder="Ex.: Lei 14.133/2021, art. 107 · NT 67" maxLength={500} />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <AppTextarea label="Variantes (uma por linha, opcional)" rows={2} value={variantes} onChange={(e) => setVariantes(e.target.value)} />
+        </div>
+        {erro && (
+          <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: 'var(--color-danger-bg)', color: 'var(--color-danger)', borderRadius: '6px', fontSize: '0.82rem' }}>
+            <AlertCircle size={16} /> {erro}
+          </div>
+        )}
+      </form>
+    </Modal>
+  );
+};
+
+/** Quando entra, processo SEI, base e variantes do módulo, abaixo do nome do modelo. */
+const DetalhesModeloLinha: React.FC<{ template: TaskTemplate }> = ({ template }) => {
+  const itens = [
+    template.quando && { rotulo: 'Quando', valor: template.quando },
+    template.processoTipo && { rotulo: 'Corre no', valor: template.processoTipo },
+    template.base && { rotulo: 'Base', valor: template.base },
+    template.variantes?.length && { rotulo: 'Variantes', valor: template.variantes.join(' · ') }
+  ].filter(Boolean) as { rotulo: string; valor: string }[];
+  if (itens.length === 0) return null;
+  return (
+    <div data-testid="template-detalhes" style={{ display: 'grid', gap: '0.1rem', fontSize: '0.78rem', color: '#475569', marginTop: '0.35rem' }}>
+      {itens.map((i) => (
+        <div key={i.rotulo}>
+          <span style={{ fontWeight: 700 }}>{i.rotulo}:</span> {i.valor}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const TemplateCard: React.FC<{ template: TaskTemplate; inicialAberto?: boolean }> = ({ template, inicialAberto = true }) => {
+  const [expanded, setExpanded] = useState(inicialAberto);
   const [newMacroNome, setNewMacroNome] = useState('');
   const [editing, setEditing] = useState(false);
   const { hooks, copy, somenteLeitura } = useTaskTemplatesKit();
@@ -393,12 +545,14 @@ const TemplateCard: React.FC<{ template: TaskTemplate }> = ({ template }) => {
                 variant={template.ativo ? 'success' : 'neutral'}
                 label={template.ativo ? 'Ativo' : 'Inativo'}
               />
+              {template.origemModelo === 'CCGA' && <StatusBadge variant="info" label="Padrão CCGA" />}
             </div>
             {template.descricao && (
               <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
                 {template.descricao}
               </p>
             )}
+            <DetalhesModeloLinha template={template} />
             <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
               {template.macrotarefas.length} macrotarefa{template.macrotarefas.length !== 1 ? 's' : ''} • {totalTarefas} tarefa{totalTarefas !== 1 ? 's' : ''} no total
             </div>
@@ -546,8 +700,9 @@ const TaskTemplatesContent: React.FC<{ embedded?: boolean }> = ({ embedded = fal
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {templates.map(t => (
-              <TemplateCard key={t.id} template={t} />
+            {/* Ativos primeiro; com muitos modelos (19 da CCGA), cada um começa recolhido. */}
+            {[...templates.filter((t) => t.ativo), ...templates.filter((t) => !t.ativo)].map((t) => (
+              <TemplateCard key={t.id} template={t} inicialAberto={templates.length <= 3} />
             ))}
           </div>
         )}
