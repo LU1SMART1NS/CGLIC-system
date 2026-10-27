@@ -1,10 +1,10 @@
 import React from 'react';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import {
-  GRUPO_GTI_INFO,
   GRUPOS_GTI,
   MODO_FILTRO_GTI_LABEL,
   MODO_FILTRO_GTI_VALUES,
+  rotuloDoGrupo,
   type FiltroGti,
   type GrupoPrincipal,
   type ModoFiltroGti
@@ -31,7 +31,7 @@ export const CarteiraGtiSelect: React.FC<{
       label={label}
       value={gti}
       emptyValue="TODOS"
-      options={grupos.map((g) => ({ value: g, label: `${GRUPO_GTI_INFO[g].curto} · ${GRUPO_GTI_INFO[g].descricao}`, count: counts?.[g] }))}
+      options={grupos.map((g) => ({ value: g, label: rotuloDoGrupo(g), count: counts?.[g] }))}
       onChange={(v) => onChangeGti(v as FiltroGti)}
       testId={`${testIdPrefix}-filter-gti`}
     />
