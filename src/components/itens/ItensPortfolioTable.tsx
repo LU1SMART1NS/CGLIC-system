@@ -148,7 +148,7 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                 </span>
               </th>
               <CarteiraSortHeader label="Consumo" sortKey="consumo" {...sortProps} />
-              <th style={carteiraTh} title="Interesse principal e fatia de cada Grupo de Trabalho Integrado na quantidade registrada dos participantes">GTI</th>
+              <th style={carteiraTh} title="GTI com a maior fatia e a fatia de cada Grupo de Trabalho Integrado na quantidade registrada dos participantes">Interesse principal</th>
               <CarteiraSortHeader label="Gestor" sortKey="gestor" {...sortProps} />
             </tr>
           </thead>
