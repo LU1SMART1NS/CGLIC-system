@@ -18,7 +18,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         'emendas',
         'configuracoes'
       ]);
-      expect(navigationConfig.map((item) => item.label)).toEqual(['Início', 'Carteira', 'Alocação', 'Vínculos', 'Financeiro', 'Emendas', 'Ajustes']);
+      expect(navigationConfig.map((item) => item.label)).toEqual(['Início', 'Atas e Contratos', 'Alocação', 'Vínculos', 'Financeiro', 'Emendas', 'Ajustes']);
       expect(navigationConfig.find((i) => i.id === 'configuracoes')?.placement).toBe('bottom');
       expect(navigationConfig.every((i) => (i.children?.length ?? 0) > 0)).toBe(true);
     });
@@ -321,7 +321,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
 
       // Financeiro some do menu: Empenhos e Pagamentos ficam fechados para ele
       expect(labels).not.toContain('Financeiro');
-      expect(labels).toContain('Carteira');
+      expect(labels).toContain('Atas e Contratos');
     });
 
     it('Gestor de Emendas (CAEP) vê o Início dele, Emendas, a Carteira só com Atas e Itens e Ajustes só com Beneficiários — sem Contratos, Alocação, Vínculos ou Financeiro', () => {
