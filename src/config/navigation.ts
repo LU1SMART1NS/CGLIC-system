@@ -275,6 +275,16 @@ export const navigationConfig: NavItem[] = [
         allowedRoles: ['admin', 'gestor_emendas', 'leitor']
       },
       {
+        // Emendas (protótipo aprovado em 27/10/2026): a linha abre a Emenda 360, que também acende Emendas.
+        id: 'emendas-emendas',
+        label: 'Emendas',
+        icon: FileText,
+        route: '/emendas/emendas',
+        status: 'active',
+        matchPrefixes: ['/emendas/emendas'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
         id: 'emendas-itens',
         label: 'Itens e kits',
         icon: Boxes,

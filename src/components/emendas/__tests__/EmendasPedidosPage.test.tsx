@@ -80,12 +80,10 @@ describe('Pedidos: ver por pedido ou por emenda', () => {
     expect(html).toContain('emendas-pedidos-filtro-autor');
   });
 
-  it('coluna Captação principal e filtro Captação (migration 218) nas duas visões (a de parlamentar virou a aba Parlamentares)', () => {
-    for (const url of ['/', '/?ver=emenda']) {
-      const html = render(url);
-      expect(html).toContain('Captação principal');
-      expect(html).toMatch(/emendas-(pedidos|por-emenda)-captacao-filter-gti/);
-    }
+  it('coluna Captação principal e filtro Captação (migration 218); as visões de parlamentar e de emenda viraram abas', () => {
+    const html = render('/');
+    expect(html).toContain('Captação principal');
+    expect(html).toContain('emendas-pedidos-captacao-filter-gti');
     // Com o filtro de um grupo sem beneficiário confirmado, nenhum pedido passa.
     expect(render('/?captacao=CNCG')).toContain('0 de 4 pedidos');
   });
@@ -101,11 +99,11 @@ describe('Pedidos: ver por pedido ou por emenda', () => {
     expect(html).not.toContain('emendas-por-autor-tabela');
   });
 
-  it('o seletor de visão tem só Por pedido e Por emenda', () => {
+  it('sem seletor de visão: Por parlamentar e Por emenda viraram as abas Parlamentares e Emendas', () => {
     const html = render('/');
-    expect(html).toContain('Por pedido');
-    expect(html).toContain('Por emenda');
+    expect(html).not.toContain('emendas-pedidos-ver');
     expect(html).not.toContain('Por parlamentar');
+    expect(render('/?ver=emenda&situacao=sem')).not.toContain('emendas-pedidos-tabela');
   });
 
   it('abas por fase; ?etapa= abre a fase com o filtro da etapa', () => {
@@ -119,51 +117,7 @@ describe('Pedidos: ver por pedido ou por emenda', () => {
   });
 });
 
-describe('Pedidos: por emenda e a faixa das emendas sem pedido', () => {
-  it('?ver=emenda: emendas vistas no SIOP sem pedido, a mais antiga sem contato urgente (decisão de 26/10/2026)', () => {
-    perfil.gerir = true;
-    const html = render('/?ver=emenda&situacao=sem');
-    expect(html).toContain('emendas-por-emenda-tabela');
-    expect(html).not.toContain('emendas-pedidos-tabela');
-    expect(html).toContain('Registrar emenda do SIOP');
-    expect(html).toContain('4268 0021');
-    expect(html).toContain('Sem pedido · sem contato');
-    expect(html).toContain('13 dias sem contato');
-    expect(html).toContain('Sem pedido · em conversa');
-    expect(html).toContain('ASPAR · PM · SP');
-  });
-
-  it('?ver=emenda para a consulta: sem o botão de registrar e sem a coluna dos contatos', () => {
-    perfil.gerir = false;
-    const html = render('/?ver=emenda');
-    expect(html).toContain('4268 0021');
-    expect(html).not.toContain('Registrar emenda do SIOP');
-    expect(html).not.toContain('Último contato');
-    perfil.gerir = true;
-  });
-
-  it('?ver=emenda: sem a coluna da data de registro (decisão de 26/10/2026), cabeçalho que ordena e sem a faixa vermelha na linha', () => {
-    perfil.gerir = true;
-    const html = render('/?ver=emenda');
-    expect(html).not.toContain('Registrada em');
-    expect(html).not.toContain('Vista no SIOP');
-    expect(html).not.toContain('pelo pedido');
-    expect(html).not.toContain('inset 3px 0 0');
-    expect(html).toContain('aria-sort');
-  });
-
-  it('?ver=emenda abre em Todas, como as outras telas; ?situacao=com mostra a coluna Pedidos', () => {
-    perfil.gerir = true;
-    const marcado = (html: string, id: string) => new RegExp(`aria-pressed="true"[^>]*data-testid="emendas-por-emenda-situacao-${id}"`).test(html);
-    const html = render('/?ver=emenda');
-    expect(marcado(html, 'todas')).toBe(true);
-    expect(marcado(html, 'sem')).toBe(false);
-    expect(marcado(render('/?ver=emenda&situacao=sem'), 'sem')).toBe(true);
-    const comPedido = render('/?ver=emenda&situacao=com');
-    expect(comPedido).not.toContain('Registrada em');
-    expect(comPedido).not.toContain('Último contato');
-  });
-
+describe('Pedidos: a faixa das emendas sem pedido', () => {
   it('por pedido: faixa acima do trilho com as emendas sem pedido, fora da contagem das fases (decisão de 26/10/2026)', () => {
     perfil.gerir = true;
     const html = render('/');

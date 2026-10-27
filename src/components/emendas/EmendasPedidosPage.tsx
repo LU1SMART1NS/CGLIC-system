@@ -64,12 +64,10 @@ import {
   type AvisoPedido
 } from '../../utils/emendasPedidos';
 import { faltaAnoDaEmenda, numeroDoPedido, rotaDoPedido } from '../../utils/emendasNomeDoPedido';
-import { rotuloBeneficiario, type AutorEmenda, type EmendaSiop, type EtapaPedido, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
+import { rotuloBeneficiario, type AutorEmenda, type EtapaPedido, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 import { AutorDoPedido, LARGURA_AUTOR, ValorDoPedido } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { PedidoModal } from './PedidoModal';
-import { PedidosPorEmenda } from './PedidosPorEmenda';
-import { EmendaSiopModal } from './EmendaSiopModal';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 
@@ -130,11 +128,9 @@ export const EmendasPedidosPage: React.FC = () => {
   const itemDoEnderecoAntigo = searchParams.get('item');
   const [busca, setBusca] = useState('');
   const navegar = useNavigateWithOrigin();
-  // Ver por emenda e filtro de parlamentar ficam no endereço (?ver=emenda, ?autor=), para o Voltar do navegador funcionar.
-  // "Por parlamentar" virou a aba Parlamentares (protótipo aprovado em 27/10/2026): ?ver=autor vai para lá.
-  const ver = searchParams.get('ver') === 'emenda' ? 'emenda' : 'pedido';
-  const paraParlamentares = searchParams.get('ver') === 'autor';
-  const porEmenda = ver === 'emenda';
+  // "Por parlamentar" e "Por emenda" viraram as abas Parlamentares e Emendas (protótipo aprovado em 27/10/2026):
+  // ?ver=autor e ?ver=emenda vão para lá. O filtro de parlamentar fica no endereço (?autor=).
+  const verAntigo = searchParams.get('ver');
   const filtroAutor = searchParams.get('autor') ?? '';
   const mudarUrl = (mudar: (p: URLSearchParams) => void) =>
     setSearchParams((atual) => {
@@ -145,8 +141,6 @@ export const EmendasPedidosPage: React.FC = () => {
   const [editando, setEditando] = useState<PedidoEmenda | 'novo' | null>(null);
   // Emendas vistas no SIOP (migration 205): registrar ou alterar, e o pedido novo criado a partir de uma delas.
   const { data: emendasSiop = [] } = useEmendasSiop();
-  const [editandoEmenda, setEditandoEmenda] = useState<EmendaSiop | 'nova' | null>(null);
-  const [pedidoDaEmenda, setPedidoDaEmenda] = useState<EmendaSiop | null>(null);
   // Faixa acima do trilho: as emendas sem pedido não são pedidos (não entram nas fases), mas precisam ser vistas daqui.
   const { data: contatosDasEmendas = [] } = useContatosDasEmendas();
   const semPedido = useMemo(() => contaEmendasSemPedido(emendasNaLista(emendasSiop, pedidos, contatosDasEmendas, hoje)), [emendasSiop, pedidos, contatosDasEmendas, hoje]);
@@ -367,7 +361,8 @@ export const EmendasPedidosPage: React.FC = () => {
     }
   ];
 
-  if (paraParlamentares) return <Navigate to="/emendas/parlamentares" replace />;
+  if (verAntigo === 'autor') return <Navigate to="/emendas/parlamentares" replace />;
+  if (verAntigo === 'emenda') return <Navigate to={`/emendas/emendas${searchParams.get('situacao') ? `?situacao=${searchParams.get('situacao')}` : ''}`} replace />;
   // Endereço antigo do pedido: espera a lista e vai para o Pedido 360 (sem o pedido, fica na lista).
   if (pedidoDoEnderecoAntigo && !isLoading) {
     const alvo = pedidos.find((x) => x.id === pedidoDoEnderecoAntigo);
@@ -379,46 +374,23 @@ export const EmendasPedidosPage: React.FC = () => {
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Pedidos"
-        subtitle={
-          porEmenda
-              ? 'Emendas vistas no SIOP: as que ainda não viraram pedido avisam até a CAEP falar com o parlamentar.'
-              : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'
-        }
+        subtitle="Reservas e ofícios dos parlamentares, da reserva ao empenho." 
         hint={`A reserva já ocupa o saldo da CAEP e cancelar devolve o saldo. O contrato precisa ser assinado antes do fim da ata: a ${avisoIndicacaoDias()} dias do fim o pedido avisa e a menos de ${corteIndicacaoDias()} dias não entra reserva nem ofício com itens da ata (prazos em Ajustes › Regras de Alertas).`}
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
-        viewToggle={
-          <CarteiraSegmentTabs<'pedido' | 'emenda'>
-            testIdPrefix="emendas-pedidos-ver"
-            ariaLabel="Ver por"
-            active={ver}
-            onSelect={(v) =>
-              mudarUrl((p) => {
-                p.delete('situacao');
-                if (v === 'pedido') p.delete('ver');
-                else p.set('ver', v);
-              })
-            }
-            segments={[
-              { id: 'pedido', label: 'Por pedido', title: 'Uma linha por pedido, com as etapas e os botões' },
-              { id: 'emenda', label: 'Por emenda', title: 'Uma linha por emenda vista no SIOP, com ou sem pedido' }
-            ]}
-          />
-        }
         actions={
           <>
-            {podeGerir && porEmenda && <ActionButton action="novo" label="Registrar emenda do SIOP" onClick={() => setEditandoEmenda('nova')} data-testid="emendas-emenda-siop-nova" />}
-            {podeGerir && !porEmenda && <ActionButton action="novo" label="Nova reserva" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-pedidos-novo" />}
+            {podeGerir && <ActionButton action="novo" label="Nova reserva" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-pedidos-novo" />}
             <HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-pedidos-atualizar" tooltipTitle="Recarregar os pedidos" />
           </>
         }
       />
 
-      {!porEmenda && semPedido.total > 0 && (
+      {semPedido.total > 0 && (
         <NoticeBar
           tone={podeGerir && semPedido.urgentes > 0 ? 'danger' : 'warning'}
           testId="emendas-pedidos-faixa-sem-pedido"
           action={
-            <AppButton variant="outline" size="sm" onClick={() => mudarUrl((p) => (p.set('ver', 'emenda'), p.set('situacao', 'sem')))} data-testid="emendas-pedidos-faixa-sem-pedido-ver">
+            <AppButton variant="outline" size="sm" onClick={() => navegar('/emendas/emendas?situacao=sem')} data-testid="emendas-pedidos-faixa-sem-pedido-ver">
               Ver emendas
             </AppButton>
           }
@@ -432,7 +404,6 @@ export const EmendasPedidosPage: React.FC = () => {
         </NoticeBar>
       )}
 
-      {!porEmenda && (
         <CarteiraSegmentTabs<Segmento>
           testIdPrefix="emendas-pedidos-etapa"
           ariaLabel="Fase dos pedidos"
@@ -444,24 +415,7 @@ export const EmendasPedidosPage: React.FC = () => {
             { id: 'CANCELADO', label: 'Cancelados', count: contagem.CANCELADO ?? 0 }
           ]}
         />
-      )}
 
-      {porEmenda ? (
-        <PedidosPorEmenda
-          pedidos={pedidos}
-          autores={autores}
-          beneficiarios={beneficiariosLista}
-          podeGerir={podeGerir}
-          hoje={hoje}
-          carregandoPedidos={isLoading}
-          erroPedidos={isError}
-          onRetry={() => refetch()}
-          onCriarPedido={setPedidoDaEmenda}
-          onAlterar={setEditandoEmenda}
-          onAbrirPedido={(id) => navegar(`/emendas/pedidos/id/${encodeURIComponent(id)}`)}
-        />
-      ) : (
-        <>
           <CarteiraFilterBar
             busca={busca}
             searchPlaceholder={podeGerir ? 'Buscar por parlamentar, contato, ofício, SEI, emenda ou item...' : 'Buscar por parlamentar, ofício, SEI, emenda ou item...'}
@@ -539,8 +493,6 @@ export const EmendasPedidosPage: React.FC = () => {
             />
             <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={sorted.length} onChange={setPage} testIdPrefix="emendas-pedidos" />
           </AdminListShell>
-        </>
-      )}
 
       {editando && (
         <PedidoModal
@@ -553,30 +505,6 @@ export const EmendasPedidosPage: React.FC = () => {
           ultimoContato={ultimoContatoPorAutor(pedidos)}
           hoje={hoje}
           onClose={() => setEditando(null)}
-        />
-      )}
-      {pedidoDaEmenda && (
-        <PedidoModal
-          pedido={null}
-          emenda={pedidoDaEmenda}
-          autores={autores}
-          itens={itensLista}
-          kits={kits}
-          beneficiarios={beneficiariosLista}
-          reservadoFora={reservadoPorItem(pedidos)}
-          ultimoContato={ultimoContatoPorAutor(pedidos)}
-          hoje={hoje}
-          onClose={() => setPedidoDaEmenda(null)}
-        />
-      )}
-      {editandoEmenda && (
-        <EmendaSiopModal
-          emenda={editandoEmenda === 'nova' ? null : editandoEmenda}
-          emendas={emendasSiop}
-          pedidos={pedidos}
-          autores={autores}
-          beneficiarios={beneficiariosLista}
-          onClose={() => setEditandoEmenda(null)}
         />
       )}
     </PageContainer>

@@ -109,7 +109,7 @@ describe('números novos: Financeiro e Início', () => {
     vi.mocked(useContagemEmendas).mockReturnValue({ total: 3, urgentes: 1, semPedido: 3 });
     const html = menu();
     expect(html).toMatch(/data-testid="rail-count-emendas"[^>]*>3</);
-    expect(html).toContain('href="/emendas/pedidos?ver=emenda&amp;situacao=sem"');
+    expect(html).toContain('href="/emendas/emendas?situacao=sem"');
   });
 
   it('Ajustes (coordenador): UASGs sem grupo confirmado, e o clique abre Grupos das UASGs em "A confirmar"', () => {
