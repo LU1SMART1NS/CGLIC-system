@@ -145,7 +145,8 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
     const naoParticipantes: Linha[] = q.informado
       ? q.remanejamentosNaoParticipante.map((r) => ({
           uasg: r.uasgDestino,
-          ...identidade(r.uasgDestino, r.nomeDestino),
+          // Nome em maiúsculas como os dos participantes (até o cadastro de UASGs trazer o nome do Compras.gov.br).
+          ...identidade(r.uasgDestino, r.nomeDestino.toLocaleUpperCase('pt-BR')),
           ehSenasp: false,
           gerenciadora: false,
           registrado: r.quantidade,
@@ -183,7 +184,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
   const grupoDaLinha = (l: Linha): GrupoDaFatia => gruposGti.get(l.uasg) ?? 'A_CONFIRMAR';
 
   const estado = (l: Linha): EstadoContratado => contratadoDoOrgao(l.uasg, l.ehSenasp, q, p.contratadoSenasp);
-  const extrato = q.informado ? extratoDaCotaPropria(q) : null;
+  const extrato = q.informado ? extratoDaCotaPropria(q, p.registradoAcima) : null;
   const saldoSenasp = p.baseSaldo - p.contratadoSenasp;
   const livreParaAlocar = p.baseSaldo - (p.alocado ?? 0);
   const contratouAcima = linhas.filter((l) => !l.ehSenasp && l.registrado != null && estado(l).tipo === 'CONTRATOS' && (estado(l) as any).quantidade > l.registrado).length;
@@ -340,7 +341,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
     {
       key: 'gti',
       header: 'GTI',
-      render: (l: Linha) => (contaNoGti(l) && !l.np ? <GtiTag grupo={grupoDaLinha(l)} testId={`gti-${l.uasg}`} /> : <span style={{ color: 'var(--text-muted)' }}>—</span>)
+      render: (l: Linha) => (contaNoGti(l) ? <GtiTag grupo={grupoDaLinha(l)} testId={`gti-${l.uasg}`} /> : <span style={{ color: 'var(--text-muted)' }}>—</span>)
     },
     ...(q.informado ? [{ key: 'assinada', header: 'Qtd. na ata assinada', align: 'right' as const, render: (l: Linha) => (l.np ? <span style={{ color: 'var(--text-muted)' }}>—</span> : <span style={mono}>{formatNumber(l.orgao?.quantidadeAssinada ?? 0)}</span>) }] : []),
     {
@@ -445,6 +446,15 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
                   <td style={{ ...mono, textAlign: 'right', whiteSpace: 'nowrap' }}>{sinal}{formatNumber(Number(valor))}</td>
                 </tr>
               ))}
+              {extrato.semLastro.length > 0 && (
+                <tr style={{ borderTop: '1px solid var(--border)' }} data-testid="extrato-sem-lastro">
+                  <td style={{ padding: '0.35rem 0' }}>
+                    Órgãos acima da ata assinada sem lastro (registrado acima do homologado)
+                    <div style={pequeno}>{extrato.semLastro.map((x) => `${nomeDe(x.uasg)} ${formatNumber(x.quantidade)}`).join(' · ')} · não saiu da SENASP</div>
+                  </td>
+                  <td style={{ ...mono, textAlign: 'right', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>não conta</td>
+                </tr>
+              )}
               <tr style={{ borderTop: '1px solid var(--border)', fontWeight: 800 }}>
                 <td style={{ padding: '0.35rem 0' }}>Cota própria da SENASP</td>
                 <td style={{ ...mono, textAlign: 'right' }}>{formatNumber(extrato.cota)}</td>
@@ -462,7 +472,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
             </div>
           )}
           <div style={{ ...pequeno, marginTop: '0.35rem' }}>
-            Conferência pelo Compras.gov.br: registrado da SENASP {formatNumber(p.registradoSenasp)} − gerenciado para participantes {formatNumber(q.gerenciadoParticipantes)}{q.saidaNaoParticipante > 0 ? ` − remanejado a não participantes ${formatNumber(q.saidaNaoParticipante)}` : ''} = {formatNumber(p.baseSaldo)}.{' '}
+            Conferência pelo Compras.gov.br: registrado da SENASP {formatNumber(p.registradoSenasp)} − gerenciado para participantes {formatNumber(q.gerenciadoParticipantes)}{q.saidaNaoParticipante > 0 ? ` − remanejado a não participantes ${formatNumber(q.saidaNaoParticipante)}` : ''}{(p.registradoAcima?.desconto ?? 0) > 0 ? ` − acima da ata assinada sem lastro ${formatNumber(p.registradoAcima!.desconto)}` : ''} = {formatNumber(p.baseSaldo)}.{' '}
             {extrato.confere ? 'Confere com o extrato.' : 'Não confere com o extrato: a soma da ata assinada ou a do registrado não fecha com o homologado.'}
           </div>
         </details>
@@ -503,7 +513,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
     ? [
         { label: 'Registrado', value: formatNumber(p.registradoSenasp), hint: `no Compras.gov.br · ata assinada ${formatNumber(q.assinadaSenasp)}`, testId: 'metrica-registrado' },
         { label: 'Gerenciado p/ participantes', value: formatNumber(q.gerenciadoParticipantes), hint: 'dos órgãos, dentro do registrado', tone: 'warning', testId: 'metrica-gerenciado' },
-        { label: 'Cota própria', value: formatNumber(p.baseSaldo), hint: desconto > 0 ? `menor entre registrado (${formatNumber(p.registradoSenasp - q.gerenciadoParticipantes - q.saidaNaoParticipante)}) e ata assinada (${formatNumber(q.assinadaSenasp)})` : q.saidaNaoParticipante > 0 ? `registrado − gerenciado − ${formatNumber(q.saidaNaoParticipante)} a não participantes` : 'registrado − gerenciado', tone: p.baseSaldo < 0 ? 'danger' : 'default', testId: 'metrica-cota' },
+        { label: 'Cota própria', value: formatNumber(p.baseSaldo), hint: desconto > 0 ? `menor entre registrado (${formatNumber(p.registradoSenasp - q.gerenciadoParticipantes - q.saidaNaoParticipante)}) e ata assinada (${q.saidaNaoParticipante > 0 ? `${formatNumber(q.assinadaSenasp)} − ${formatNumber(q.saidaNaoParticipante)} = ${formatNumber(q.assinadaSenasp - q.saidaNaoParticipante)}` : formatNumber(q.assinadaSenasp)})` : q.saidaNaoParticipante > 0 ? `registrado − gerenciado − ${formatNumber(q.saidaNaoParticipante)} a não participantes` : 'registrado − gerenciado', tone: p.baseSaldo < 0 ? 'danger' : 'default', testId: 'metrica-cota' },
         { label: 'Alocado às unidades', value: p.alocado === null ? '—' : formatNumber(p.alocado), hint: p.alocado === null ? 'não carregou' : livreParaAlocar >= 0 ? `livre para alocar ${formatNumber(livreParaAlocar)}` : `${formatNumber(-livreParaAlocar)} acima do limite`, tone: p.alocado !== null && livreParaAlocar < 0 ? 'danger' : 'default', testId: 'metrica-alocado' },
         { label: 'Contratado', value: formatNumber(p.contratadoSenasp), hint: 'contratos vinculados', testId: 'metrica-contratado' },
         { label: 'Saldo da cota própria', value: formatNumber(saldoSenasp), hint: desconto > 0 ? `${formatNumber(desconto)} acima da ata assinada fora do saldo` : `registrado − contratado: ${formatNumber(p.registradoSenasp - p.contratadoSenasp)}`, tone: saldoSenasp <= 0.2 * Math.max(p.baseSaldo, 0) ? 'danger' : 'default', testId: 'metrica-saldo' }

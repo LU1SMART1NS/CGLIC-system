@@ -5,7 +5,6 @@ import { useUasgsDaUf } from '../../hooks/useUasgsDaUf';
 import { fetchNomeUasg } from '../../services/api';
 import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import { casaBusca, UFS } from '../../utils/emendasBeneficiarios';
-import { toSentenceCaseIfAllCaps } from '../../utils/textCase';
 import { formatNumber } from './itemBalanceUtils';
 
 export type BuscaDoNome = 'vazia' | 'buscando' | 'achou' | 'nao-encontrada' | 'falhou';
@@ -68,14 +67,15 @@ export const EscolherOrgaoDestino: React.FC<Props> = ({ destino, onMudar, uasgOr
     onMudar({ uasg: u, nome: '', local: null, busca: 'buscando' });
     void fetchNomeUasg(u).then((r) => {
       if (ultimaUasg.current !== u) return;
-      onMudar(r.situacao === 'achou' ? { uasg: u, nome: toSentenceCaseIfAllCaps(r.nome), local: r.uf, busca: 'achou' } : { uasg: u, nome: '', local: null, busca: r.situacao });
+      onMudar(r.situacao === 'achou' ? { uasg: u, nome: r.nome, local: r.uf, busca: 'achou' } : { uasg: u, nome: '', local: null, busca: r.situacao });
     });
   };
 
   const escolher = (uasg: string, nome: string, local: string | null) => {
     if (motivoDeFora(uasg)) return;
     ultimaUasg.current = '';
-    onMudar({ uasg, nome: toSentenceCaseIfAllCaps(nome), local, busca: 'achou' });
+    // O nome como o Compras.gov.br escreve, igual aos outros órgãos da tabela.
+    onMudar({ uasg, nome, local, busca: 'achou' });
   };
 
   const trocar = () => {
@@ -116,7 +116,7 @@ export const EscolherOrgaoDestino: React.FC<Props> = ({ destino, onMudar, uasgOr
         className="remanejar-np-opcao"
       >
         <span style={{ minWidth: 0 }}>
-          <b style={{ fontWeight: 600, textDecoration: fora ? 'line-through' : undefined }}>{toSentenceCaseIfAllCaps(nome)}</b>
+          <b style={{ fontWeight: 600, textDecoration: fora ? 'line-through' : undefined }}>{nome}</b>
           <span style={{ ...pequeno, display: 'block' }}>{[local, detalhe, fora].filter(Boolean).join(' · ')}</span>
         </span>
         <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)', alignSelf: 'center' }}>{uasg}</span>

@@ -60,6 +60,24 @@ describe('extratoDaCotaPropria', () => {
   it('soma que não fecha: o extrato avisa que não confere', () => {
     expect(extratoDaCotaPropria({ ...ITEM, cotaPropria: 700 }).confere).toBe(false);
   });
+
+  it('00062/2024 item 3: os +11 do PR e de GO são registrado acima do homologado, não saíram da SENASP (cota 71)', () => {
+    const q: QuantitativosDoItem = {
+      ...vazioDoItem(), informado: true, assinadaSenasp: 103, registradoSenasp: 106, cotaPropria: 74, saidaNaoParticipante: 32,
+      orgaos: [
+        org({ uasg: '200331', ehSenasp: true, situacao: 'SENASP', quantidadeAssinada: 103, quantidadeRegistrada: 106, saidaNaoParticipante: 32 }),
+        org({ uasg: '453079', situacao: 'ACIMA_DA_ATA', quantidadeAssinada: 1, quantidadeRegistrada: 11, acima: 10 }),
+        org({ uasg: '926903', situacao: 'ACIMA_DA_ATA', quantidadeAssinada: 1, quantidadeRegistrada: 2, acima: 1 })
+      ]
+    };
+    const e = extratoDaCotaPropria(q, { excedente: 14, excedenteSenasp: 3, desconto: 3, resolvido: false });
+    expect(e.semLastro).toEqual([{ uasg: '453079', quantidade: 10 }, { uasg: '926903', quantidade: 1 }]);
+    expect(e.cedido).toEqual([]);
+    expect(e.cota).toBe(71);
+    expect(e.confere).toBe(true);
+    // Aviso resolvido pelo gestor da ata: volta a valer o remanejamento da SENASP para os órgãos.
+    expect(extratoDaCotaPropria(q, { excedente: 14, excedenteSenasp: 3, desconto: 0, resolvido: true }).cota).toBe(60);
+  });
 });
 
 describe('textoDaSituacao', () => {
