@@ -11,6 +11,7 @@ import { dataBR } from '../../utils/emendasKits';
 import { formatNumber } from '../../utils/format';
 import type { ItemCaep, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
 import { LinhaDoPedido } from './emendasPartes';
+import { nomeDoPedido, pedidoEmTexto } from '../../utils/emendasNomeDoPedido';
 
 interface Props {
   pedido: PedidoEmenda;
@@ -57,11 +58,11 @@ export const AnulacaoModal: React.FC<Props> = ({ pedido, itens, notas, nomeDoAut
       toast.success(
         destino === 'CANCELAR'
           ? r.total
-            ? `Anulação registrada: o pedido ${pedido.numero} foi cancelado.`
+            ? `Anulação registrada: o ${pedidoEmTexto(pedido)} foi cancelado.`
             : 'Anulação registrada: os itens foram cancelados, sem volta à interlocução.'
           : r.total
-            ? `Anulação registrada: o pedido ${pedido.numero} voltou a "Itens reservados".`
-            : `Anulação registrada: os itens foram para o pedido ${r.novoNumero}, em "Itens reservados".`
+            ? `Anulação registrada: o ${pedidoEmTexto(pedido)} voltou a "Itens reservados".`
+            : 'Anulação registrada: os itens foram para um pedido novo, em "Itens reservados". Ele ganha número quando a emenda for informada.'
       );
       onClose();
     } catch (err) {
@@ -76,7 +77,7 @@ export const AnulacaoModal: React.FC<Props> = ({ pedido, itens, notas, nomeDoAut
       dismissible={!registrar.isPending}
       size="md"
       testId="emendas-anulacao-modal"
-      title={`Registrar anulação do empenho · Pedido ${pedido.numero}`}
+      title={`Registrar anulação do empenho · ${nomeDoPedido(pedido)}`}
       footer={
         <>
           <ActionButton action="cancelar" type="button" onClick={onClose} disabled={registrar.isPending} />
@@ -177,16 +178,16 @@ export const AnulacaoModal: React.FC<Props> = ({ pedido, itens, notas, nomeDoAut
         {marcadas.size > 0 && destino === 'CANCELAR' && (
           <NoticeBar tone="info" testId="emendas-anulacao-resumo">
             {total
-              ? `Todos os itens do pedido: o pedido ${pedido.numero} é cancelado. As etapas e os documentos SEI ficam nele.`
-              : `${marcadas.size} de ${ativas.length} itens são cancelados no pedido ${pedido.numero}, sem pedido novo.`}{' '}
+              ? `Todos os itens do pedido: o ${pedidoEmTexto(pedido)} é cancelado. As etapas e os documentos SEI ficam nele.`
+              : `${marcadas.size} de ${ativas.length} itens são cancelados no ${pedidoEmTexto(pedido)}, sem pedido novo.`}{' '}
             A quantidade volta ao saldo da CAEP.
           </NoticeBar>
         )}
         {marcadas.size > 0 && destino === 'INTERLOCUCAO' && (
           <NoticeBar tone="info" testId="emendas-anulacao-resumo">
             {total
-              ? `Todos os itens do pedido: o pedido ${pedido.numero} volta para "Itens reservados" (interlocução com o parlamentar). As datas e os documentos das etapas seguintes ficam guardados no registro da anulação.`
-              : `${marcadas.size} de ${ativas.length} itens voltam à interlocução: como o pedido ${pedido.numero} continua com ${ativas.length - marcadas.size} ${ativas.length - marcadas.size === 1 ? 'item empenhado' : 'itens empenhados'}, os marcados vão para um pedido novo em "Itens reservados", ligado a este.`}{' '}
+              ? `Todos os itens do pedido: o ${pedidoEmTexto(pedido)} volta para "Itens reservados" (interlocução com o parlamentar). As datas e os documentos das etapas seguintes ficam guardados no registro da anulação.`
+              : `${marcadas.size} de ${ativas.length} itens voltam à interlocução: como o ${pedidoEmTexto(pedido)} continua com ${ativas.length - marcadas.size} ${ativas.length - marcadas.size === 1 ? 'item empenhado' : 'itens empenhados'}, os marcados vão para um pedido novo em "Itens reservados", ligado a este.`}{' '}
             O saldo da CAEP não muda: a quantidade continua reservada até a troca com o parlamentar.
           </NoticeBar>
         )}

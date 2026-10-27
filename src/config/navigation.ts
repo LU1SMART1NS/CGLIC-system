@@ -261,7 +261,8 @@ export const navigationConfig: NavItem[] = [
         icon: ClipboardList,
         route: '/emendas/pedidos',
         status: 'active',
-        matchPrefixes: ['/emendas/pedidos'],
+        // O Pedido 360 (/emendas/parlamentares/.../pedidos/...) acende Emendas no menu, sem as abas da área.
+        matchPrefixes: ['/emendas/pedidos', '/emendas/parlamentares'],
         allowedRoles: ['admin', 'gestor_emendas', 'leitor']
       },
       {

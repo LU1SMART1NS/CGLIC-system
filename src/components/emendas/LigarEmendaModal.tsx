@@ -10,6 +10,7 @@ import { documentoSeiDaEtapaValido, lerNumeroDaEmenda, numeroDaEmendaEmTexto } f
 import { pedidoDaNota, valorIgual, type EmendaSemPedido } from '../../utils/emendasConferenciaNota';
 import { formatCurrency } from '../../utils/format';
 import type { ModoLigarEmenda, NotaSemPedido, PedidoEmenda } from '../../services/emendasService';
+import { nomeDoPedido, pedidoEmTexto } from '../../utils/emendasNomeDoPedido';
 
 interface Props {
   /** Aberta pela gaveta "Notas sem pedido": a emenda vem pronta e o gestor escolhe o pedido. */
@@ -104,7 +105,7 @@ export const LigarEmendaModal: React.FC<Props> = ({ emenda, pedido: pedidoFixo, 
         observacao: observacao.trim() || null
       });
       toast.success(
-        `Emenda ${emendaEmTexto(alvo.ano, alvo.numero)} ${modo === 'TROCA' ? 'passou a ser a conferida do' : 'ligada ao'} pedido ${pedido.numero}.` +
+        `Emenda ${emendaEmTexto(alvo.ano, alvo.numero)} ${modo === 'TROCA' ? 'passou a ser a conferida do' : 'ligada ao'} ${pedidoEmTexto(pedido)}.` +
           (r.linhasComNotaDaEmenda ? ` ${r.linhasComNotaDaEmenda === 1 ? '1 item recebeu nota' : `${r.linhasComNotaDaEmenda} itens receberam nota`} desta emenda.` : '')
       );
       onClose();
@@ -120,7 +121,7 @@ export const LigarEmendaModal: React.FC<Props> = ({ emenda, pedido: pedidoFixo, 
       dismissible={!ligar.isPending}
       size="lg"
       testId="emendas-ligar-emenda-modal"
-      title={pedidoFixo ? `Adicionar emenda ao pedido ${pedidoFixo.numero}` : `Ligar a emenda ${emendaEmTexto(emenda?.ano ?? null, emenda?.emenda ?? '')} a um pedido`}
+      title={pedidoFixo ? `Adicionar emenda ao ${pedidoEmTexto(pedidoFixo)}` : `Ligar a emenda ${emendaEmTexto(emenda?.ano ?? null, emenda?.emenda ?? '')} a um pedido`}
       footer={
         <>
           <ActionButton action="cancelar" type="button" onClick={onClose} disabled={ligar.isPending} />
@@ -166,7 +167,7 @@ export const LigarEmendaModal: React.FC<Props> = ({ emenda, pedido: pedidoFixo, 
               <optgroup label="Com itens de mesmo fornecedor e valor">
                 {opcoes.sugeridos.map(({ p, iguais: n }) => (
                   <option key={p.id} value={p.id}>
-                    Pedido {p.numero} · {nomeDe(p.autorId)} · emenda {emendaEmTexto(p.siopEmendaAno, p.siopEmenda ?? '')} · {n} de {emenda?.notas.length} {n === 1 ? 'nota igual' : 'notas iguais'}
+                    {nomeDoPedido(p)} · {nomeDe(p.autorId)} · emenda {emendaEmTexto(p.siopEmendaAno, p.siopEmenda ?? '')} · {n} de {emenda?.notas.length} {n === 1 ? 'nota igual' : 'notas iguais'}
                   </option>
                 ))}
               </optgroup>
@@ -174,7 +175,7 @@ export const LigarEmendaModal: React.FC<Props> = ({ emenda, pedido: pedidoFixo, 
             <optgroup label="Outros pedidos com emenda conferida">
               {opcoes.outros.map((p) => (
                 <option key={p.id} value={p.id}>
-                  Pedido {p.numero} · {nomeDe(p.autorId)} · emenda {emendaEmTexto(p.siopEmendaAno, p.siopEmenda ?? '')}
+                  {nomeDoPedido(p)} · {nomeDe(p.autorId)} · emenda {emendaEmTexto(p.siopEmendaAno, p.siopEmenda ?? '')}
                 </option>
               ))}
             </optgroup>
@@ -184,8 +185,8 @@ export const LigarEmendaModal: React.FC<Props> = ({ emenda, pedido: pedidoFixo, 
         {pedido && alvo && (
           <NoticeBar tone={outroCodigo ? 'warning' : 'info'} testId="emendas-ligar-emenda-autor">
             {outroCodigo
-              ? `A emenda tem o código de autor ${alvo.numero.slice(0, 4)} e a do pedido ${pedido.numero} (${nomeDe(pedido.autorId)}) tem ${pedido.siopEmenda!.slice(0, 4)}: são de parlamentares diferentes nos pedidos. Confira no SEI antes de ligar.`
-              : `Mesmo código de autor (${alvo.numero.slice(0, 4)}) da emenda conferida do pedido ${pedido.numero}, ${emendaEmTexto(pedido.siopEmendaAno, pedido.siopEmenda ?? '')}.`}
+              ? `A emenda tem o código de autor ${alvo.numero.slice(0, 4)} e a do ${pedidoEmTexto(pedido)} (${nomeDe(pedido.autorId)}) tem ${pedido.siopEmenda!.slice(0, 4)}: são de parlamentares diferentes nos pedidos. Confira no SEI antes de ligar.`
+              : `Mesmo código de autor (${alvo.numero.slice(0, 4)}) da emenda conferida do ${pedidoEmTexto(pedido)}, ${emendaEmTexto(pedido.siopEmendaAno, pedido.siopEmenda ?? '')}.`}
           </NoticeBar>
         )}
 
@@ -224,7 +225,7 @@ export const LigarEmendaModal: React.FC<Props> = ({ emenda, pedido: pedidoFixo, 
             <legend style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>O que é esta emenda no pedido</legend>
             {(
               [
-                ['OUTRA', 'Outra emenda do pedido', `O pedido ${pedido.numero} fica com ${emendaEmTexto(pedido.siopEmendaAno, pedido.siopEmenda ?? '')} e ${emendaEmTexto(alvo.ano, alvo.numero)}. As notas das duas entram nos itens.`],
+                ['OUTRA', 'Outra emenda do pedido', `O ${pedidoEmTexto(pedido)} fica com ${emendaEmTexto(pedido.siopEmendaAno, pedido.siopEmenda ?? '')} e ${emendaEmTexto(alvo.ano, alvo.numero)}. As notas das duas entram nos itens.`],
                 ['TROCA', 'O nº do pedido está errado', `${emendaEmTexto(alvo.ano, alvo.numero)} passa a ser a emenda conferida no lugar de ${emendaEmTexto(pedido.siopEmendaAno, pedido.siopEmenda ?? '')}. Use quando o número foi digitado errado na conferência.`]
               ] as const
             ).map(([valor, titulo, texto]) => (

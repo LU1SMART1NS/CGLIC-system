@@ -48,6 +48,7 @@ const EmendasPedidosPage = lazyComRecarga(() => import('./components/emendas/Eme
 const EmendasItensEKitsPage = lazyComRecarga(() => import('./components/emendas/EmendasItensEKitsPage').then((m) => ({ default: m.EmendasItensEKitsPage })));
 const EmendasBeneficiariosPage = lazyComRecarga(() => import('./components/emendas/EmendasBeneficiariosPage').then((m) => ({ default: m.EmendasBeneficiariosPage })));
 const EmendasAsparPage = lazyComRecarga(() => import('./components/emendas/EmendasAsparPage').then((m) => ({ default: m.EmendasAsparPage })));
+const Pedido360Page = lazyComRecarga(() => import('./components/emendas/pedido360/Pedido360Page').then((m) => ({ default: m.Pedido360Page })));
 const GruposUasgsRoute = lazyComRecarga(() => import('./routes/GruposUasgsRoute').then((m) => ({ default: m.GruposUasgsRoute })));
 const ExportExcelModal = lazyComRecarga(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
 
@@ -414,6 +415,23 @@ const AppContent: React.FC = () => {
               element={
                 <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
                   <EmendasPedidosPage />
+                </RequireRole>
+              }
+            />
+            {/* Pedido 360 (protótipo aprovado em 27/10/2026): pelo número no parlamentar e no ano (1/2026); sem número, pelo identificador interno. */}
+            <Route
+              path="/emendas/parlamentares/:autorId/pedidos/:ano/:ordem"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <Pedido360Page />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/emendas/pedidos/id/:id"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <Pedido360Page />
                 </RequireRole>
               }
             />
