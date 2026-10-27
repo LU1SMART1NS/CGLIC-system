@@ -8,7 +8,7 @@ import { Instrument360TabPanel } from '../../instrument360/Instrument360TabPanel
 import { InstrumentPageState } from '../../instrument360/InstrumentPageState';
 import { InstrumentSection } from '../../instrument360/InstrumentSection';
 import { useInstrumentTab } from '../../instrument360/useInstrumentTab';
-import { useBackTarget } from '../../../hooks/useDetailOrigin';
+import { useBackTarget, useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import {
   hojeEmBrasilia,
   useAutoresEmendas,
@@ -56,6 +56,7 @@ export const Pedido360Page: React.FC = () => {
   const params = useParams<{ autorId?: string; ano?: string; ordem?: string; id?: string }>();
   const location = useLocation();
   const back = useBackTarget({ path: '/emendas/pedidos', label: 'Voltar para Pedidos' });
+  const navegar = useNavigateWithOrigin();
   const { data: pedidos = [], isLoading, isError, error, refetch } = usePedidosEmendas();
   const { data: notas = SEM_NOTAS } = useNotasDasLinhas();
   const { conferencia, diferencas, porItem: conferenciaPorItem, resolvidos } = useDiferencasDeEmpenho();
@@ -152,6 +153,7 @@ export const Pedido360Page: React.FC = () => {
           onCancelar={() => onAcao('CANCELAR')}
           onAnular={() => setAnulando(true)}
           onAba={irPara}
+          onAbrirParlamentar={p.autorId ? () => navegar(`/emendas/parlamentares/${encodeURIComponent(p.autorId!)}`) : undefined}
           verMais={<CaptacaoBotao fatias={captacao} aberto={captacaoAberta} onToggle={() => setCaptacaoAberta((v) => !v)} />}
         />
         <CaptacaoNoTopo fatias={captacao} beneficiarios={beneficiarios} aberto={captacaoAberta} onFechar={() => setCaptacaoAberta(false)} />

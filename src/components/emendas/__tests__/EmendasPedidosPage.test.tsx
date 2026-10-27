@@ -72,7 +72,7 @@ import { EmendasPedidosPage } from '../EmendasPedidosPage';
 
 const render = (url: string) => renderToStaticMarkup(<MemoryRouter initialEntries={[url]}>{<EmendasPedidosPage />}</MemoryRouter>);
 
-describe('Pedidos: ver por pedido ou por autor', () => {
+describe('Pedidos: ver por pedido ou por emenda', () => {
   it('por pedido (padrão): lista os pedidos com o filtro de autor', () => {
     const html = render('/');
     expect(html).toContain('emendas-pedidos-tabela');
@@ -80,11 +80,11 @@ describe('Pedidos: ver por pedido ou por autor', () => {
     expect(html).toContain('emendas-pedidos-filtro-autor');
   });
 
-  it('coluna Captação principal e filtro Captação (migration 218) nas três visões', () => {
-    for (const url of ['/', '/?ver=autor', '/?ver=emenda']) {
+  it('coluna Captação principal e filtro Captação (migration 218) nas duas visões (a de parlamentar virou a aba Parlamentares)', () => {
+    for (const url of ['/', '/?ver=emenda']) {
       const html = render(url);
       expect(html).toContain('Captação principal');
-      expect(html).toMatch(/emendas-(pedidos|por-autor|por-emenda)-captacao-filter-gti/);
+      expect(html).toMatch(/emendas-(pedidos|por-emenda)-captacao-filter-gti/);
     }
     // Com o filtro de um grupo sem beneficiário confirmado, nenhum pedido passa.
     expect(render('/?captacao=CNCG')).toContain('0 de 4 pedidos');
@@ -95,26 +95,17 @@ describe('Pedidos: ver por pedido ou por autor', () => {
     expect(render('/?autor=a-definir')).toContain('1 de 4 pedidos');
   });
 
-  it('?ver=autor soma os pedidos por autor, com as emendas do ano e a sobra', () => {
+  it('?ver=autor virou a aba Parlamentares: a lista não aparece e o endereço vai para lá', () => {
     const html = render('/?ver=autor');
-    expect(html).toContain('emendas-por-autor-tabela');
     expect(html).not.toContain('emendas-pedidos-tabela');
-    expect(html).toContain('Valor reservado');
-    expect(html).toContain('Emendas 2026');
-    expect(html).toContain('Sobra');
-    expect(html).toContain('emendas-sobra-faixa');
-    // A1 (2 pedidos, R$ 500), A2 e "Parlamentar a definir"; A3 não tem pedido
-    expect(html).toContain('Deputado Um');
-    expect(html).toContain('Parlamentar a definir');
-    expect(html).not.toContain('Bancada Três');
+    expect(html).not.toContain('emendas-por-autor-tabela');
   });
 
-  it('por autor respeita a fase escolhida no valor reservado', () => {
-    // ?etapa=RESERVADO abre a fase Interlocução (Reservado, Minuta e Ofício).
-    const html = render('/?ver=autor&etapa=RESERVADO');
-    expect(html).toContain('Valor nesta fase');
-    expect(html).toContain('Senadora Dois');
-    expect(html).toContain('Deputado Um');
+  it('o seletor de visão tem só Por pedido e Por emenda', () => {
+    const html = render('/');
+    expect(html).toContain('Por pedido');
+    expect(html).toContain('Por emenda');
+    expect(html).not.toContain('Por parlamentar');
   });
 
   it('abas por fase; ?etapa= abre a fase com o filtro da etapa', () => {

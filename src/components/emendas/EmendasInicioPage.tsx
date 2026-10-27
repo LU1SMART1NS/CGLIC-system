@@ -617,7 +617,7 @@ export const EmendasInicioPage: React.FC = () => {
               data={sobras}
               keyExtractor={(e) => e.codigo}
               columns={colunasSobra}
-              rowOpen={(e) => () => navigate(`/emendas/pedidos?ver=autor&emenda=${e.codigo}`)}
+              rowOpen={(e) => () => navigate(e.autorId ? `/emendas/parlamentares/${encodeURIComponent(e.autorId)}` : '/emendas/parlamentares')}
             />
           )}
         </PainelGaveta>

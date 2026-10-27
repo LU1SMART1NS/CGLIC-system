@@ -44,6 +44,8 @@ interface Props {
   onCancelar: () => void;
   onAnular: () => void;
   onAba: (aba: Pedido360Aba) => void;
+  /** Abre o Parlamentar 360 (com origem: o Voltar de lá traz de volta a este pedido). */
+  onAbrirParlamentar?: () => void;
   /** Botão "Captação principal:" abaixo dos indicadores (migration 218), como o "Interesse por GTI:" da Ata 360. */
   verMais?: React.ReactNode;
 }
@@ -55,7 +57,7 @@ const emendaEmTexto = (numero: string) => (/^\d{8}$/.test(numero) ? `${numero.sl
  * situação e o aviso mais grave em selo, o contato da assessoria e as datas ao lado, quatro indicadores e, no pé, o
  * processo SEI, a emenda e o GND. A próxima tarefa é o botão principal.
  */
-export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onProxima, onAlterar, onCancelar, onAnular, onAba, verMais }) => {
+export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onProxima, onAlterar, onCancelar, onAnular, onAba, onAbrirParlamentar, verMais }) => {
   const cancelado = p.etapa === 'CANCELADO';
   const ativas = linhasAtivas(p);
   const atas = atasDoPedido(p, itens);
@@ -137,6 +139,18 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
             </div>
           </div>
         ) : undefined
+      }
+      origin={
+        autor && onAbrirParlamentar
+          ? {
+              label: 'Parlamentar',
+              value: (
+                <AppButton size="xs" variant="link" onClick={onAbrirParlamentar} data-testid="pedido-360-abrir-parlamentar">
+                  {autor.nome}
+                </AppButton>
+              )
+            }
+          : undefined
       }
       dates={datas}
       identifiersTestId="pedido-360-identificadores"

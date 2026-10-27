@@ -50,6 +50,8 @@ const EmendasBeneficiariosPage = lazyComRecarga(() => import('./components/emend
 const EmendasGruposBeneficiariosPage = lazyComRecarga(() => import('./components/emendas/EmendasGruposBeneficiariosPage').then((m) => ({ default: m.EmendasGruposBeneficiariosPage })));
 const EmendasAsparPage = lazyComRecarga(() => import('./components/emendas/EmendasAsparPage').then((m) => ({ default: m.EmendasAsparPage })));
 const Pedido360Page = lazyComRecarga(() => import('./components/emendas/pedido360/Pedido360Page').then((m) => ({ default: m.Pedido360Page })));
+const EmendasParlamentaresPage = lazyComRecarga(() => import('./components/emendas/parlamentares/EmendasParlamentaresPage').then((m) => ({ default: m.EmendasParlamentaresPage })));
+const Parlamentar360Page = lazyComRecarga(() => import('./components/emendas/parlamentares/Parlamentar360Page').then((m) => ({ default: m.Parlamentar360Page })));
 const GruposUasgsRoute = lazyComRecarga(() => import('./routes/GruposUasgsRoute').then((m) => ({ default: m.GruposUasgsRoute })));
 const ExportExcelModal = lazyComRecarga(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
 
@@ -419,6 +421,23 @@ const AppContent: React.FC = () => {
                 </RequireRole>
               }
             />
+            {/* Parlamentares (aba) e Parlamentar 360 (protótipo aprovado em 27/10/2026): substituem Pedidos › Por parlamentar. */}
+            <Route
+              path="/emendas/parlamentares"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasParlamentaresPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/emendas/parlamentares/:autorId"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <Parlamentar360Page />
+                </RequireRole>
+              }
+            />
             {/* Pedido 360 (protótipo aprovado em 27/10/2026): pelo número no parlamentar e no ano (1/2026); sem número, pelo identificador interno. */}
             <Route
               path="/emendas/parlamentares/:autorId/pedidos/:ano/:ordem"
@@ -472,9 +491,9 @@ const AppContent: React.FC = () => {
                 </RequireRole>
               }
             />
-            {/* As abas Autores e Por autor saíram do menu: viraram Pedidos › Ver por autor (com "Mostrar" para quem não tem pedido). */}
-            <Route path="/emendas/autores" element={<Navigate to="/emendas/pedidos?ver=autor" replace />} />
-            <Route path="/emendas/por-autor" element={<Navigate to="/emendas/pedidos?ver=autor" replace />} />
+            {/* As abas Autores e Por autor viraram a aba Parlamentares (com "Mostrar" para quem não tem pedido). */}
+            <Route path="/emendas/autores" element={<Navigate to="/emendas/parlamentares" replace />} />
+            <Route path="/emendas/por-autor" element={<Navigate to="/emendas/parlamentares" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

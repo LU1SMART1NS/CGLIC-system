@@ -213,6 +213,8 @@ export function ultimoContatoPorAutor(pedidos: PedidoEmenda[]): Map<string, Pick
 }
 
 /** Nome mostrado no lugar do autor na reserva para um órgão (migration 163). */
+/** Chave do filtro de parlamentar para as reservas sem parlamentar (migration 163), nos endereços (?autor=a-definir). */
+export const AUTOR_A_DEFINIR_CHAVE = 'a-definir';
 export const AUTOR_A_DEFINIR = 'Parlamentar a definir';
 
 /** Reserva feita a pedido de um órgão (o beneficiário final), ainda sem parlamentar. */

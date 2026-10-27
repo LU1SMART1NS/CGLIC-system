@@ -17,7 +17,8 @@ interface OriginState {
 }
 
 // Pedido 360 (Emendas): pelo número (parlamentar, ano e ordem) ou, sem número, pelo identificador interno.
-const DETAIL_PATH = /^\/(atas\/detalhe\/|contratos\/[^/]|emendas\/parlamentares\/[^/]+\/pedidos\/|emendas\/pedidos\/id\/)/;
+// Parlamentar 360 (e o Pedido 360 abaixo dele) e o Pedido 360 sem número, pelo identificador interno.
+const DETAIL_PATH = /^\/(atas\/detalhe\/|contratos\/[^/]|emendas\/parlamentares\/[^/?#]|emendas\/pedidos\/id\/)/;
 
 /** Telas de detalhe: só elas recebem a origem. */
 export function isDetailPath(to: string): boolean {
@@ -37,12 +38,14 @@ export function originLabel(path: string): string | null {
     case '/empenhos': return 'Empenhos';
     case '/emendas/inicio': return 'Início';
     case '/emendas/pedidos': return 'Pedidos';
+    case '/emendas/parlamentares': return 'Parlamentares';
     default: break;
   }
   if (/^\/atas\/detalhe\/[^/]+\/itens\/[^/]+/.test(pathname)) return 'o item';
   if (/^\/atas\/detalhe\/[^/]+/.test(pathname)) return 'a ata';
   if (/^\/contratos\/[^/]+/.test(pathname)) return 'o contrato';
   if (/^\/emendas\/(parlamentares\/[^/]+\/pedidos|pedidos\/id)\/[^/]+/.test(pathname)) return 'o pedido';
+  if (/^\/emendas\/parlamentares\/[^/]+/.test(pathname)) return 'o parlamentar';
   return null;
 }
 
