@@ -78,7 +78,7 @@ describe('QuantitativosTab', () => {
     expect(h).toContain('Cota própria');
     expect(h).toContain('livre para alocar 45');
     expect(h).toContain('Saldo da cota própria');
-    expect(h).toContain('registrado − contratado: 111');
+    expect(h).toContain('cota própria 735 − contratado 690');
     expect(h).toContain('data-testid="ata-assinada-sei"');
     expect(h).toContain('12345678');
   });
