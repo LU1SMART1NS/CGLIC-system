@@ -153,7 +153,11 @@ export function valorDoPedidoNaEtapa(p: PedidoEmenda, itens: Map<string, ItemCae
  * 174); senão, pelo número da emenda; antes disso, pela data da reserva. A reserva é uma conversa com a assessoria, não
  * um documento: o número interno do banco não aparece nas telas. A reserva da planilha não tem data.
  */
-export function identificacaoDoPedido(p: Pick<PedidoEmenda, 'reservadoEm'> & Partial<Pick<PedidoEmenda, 'oficioProcessoSei' | 'siopEmenda' | 'origem'>>): string {
+export function identificacaoDoPedido(
+  p: Pick<PedidoEmenda, 'reservadoEm'> & Partial<Pick<PedidoEmenda, 'oficioProcessoSei' | 'siopEmenda' | 'origem' | 'numeroNoAno' | 'anoDoNumero'>>
+): string {
+  // Com número (migration 217), ele vem primeiro: "Pedido 1/2026 · Processo 08027...".
+  if (p.numeroNoAno && p.anoDoNumero) return `Pedido ${p.numeroNoAno}/${p.anoDoNumero}${p.oficioProcessoSei ? ` · Processo ${p.oficioProcessoSei}` : ''}`;
   if (p.oficioProcessoSei) return `Processo ${p.oficioProcessoSei}`;
   if (p.siopEmenda) return `Emenda ${p.siopEmenda}`;
   return p.origem === 'PLANILHA' ? 'Reserva da planilha' : `Reserva de ${dataBR(p.reservadoEm)}`;

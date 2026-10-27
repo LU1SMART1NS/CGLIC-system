@@ -1,0 +1,210 @@
+import React from 'react';
+import { Instrument360Hero } from '../../instrument360/Instrument360Hero';
+import { HealthTile, HealthTileGrid } from '../../instrument360/HealthStripParts';
+import { ActionButton } from '../../../design-system/components/ActionButton';
+import { AppButton } from '../../../design-system/components/AppButton';
+import { ProgressBar } from '../../../design-system/components/ProgressBar';
+import { formatCurrency } from '../../../utils/format';
+import { curto, dataBR } from '../../../utils/emendasKits';
+import {
+  AUTOR_A_DEFINIR,
+  avisoGrave,
+  contratosDoPedido,
+  execucaoDoPedido,
+  jaEmpenhado,
+  linhasAtivas,
+  ORDEM_ETAPA,
+  PODE_ANULAR_EMPENHO,
+  proximaAcao,
+  resumoDasLinhas,
+  rodadaDoPedido,
+  ROTULO_ETAPA,
+  TOTAL_ETAPAS_PEDIDO,
+  atasDoPedido,
+  type AvisoPedido
+} from '../../../utils/emendasPedidos';
+import { faltaAnoDaEmenda, nomeDoPedido } from '../../../utils/emendasNomeDoPedido';
+import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type NotaDaLinha, type PedidoEmenda } from '../../../services/emendasService';
+import { ContatoDoResponsavel } from '../ContatoDoResponsavel';
+import { linhaDoAutor } from '../emendasPartes';
+import type { Pedido360Aba } from './pedido360Abas';
+
+interface Props {
+  p: PedidoEmenda;
+  autor: AutorEmenda | undefined;
+  itens: Map<string, ItemCaep>;
+  beneficiarios: Map<string, BeneficiarioEmenda>;
+  notas: Map<string, NotaDaLinha>;
+  avisos: AvisoPedido[];
+  valor: { valor: number; fonte: 'EMENDA' | 'PREVISTO' };
+  podeGerir: boolean;
+  back: { label: string; back: () => void };
+  onProxima: () => void;
+  onAlterar: () => void;
+  onCancelar: () => void;
+  onAnular: () => void;
+  onAba: (aba: Pedido360Aba) => void;
+  /** Botão "Captação principal:" abaixo dos indicadores (migration 218), como o "Interesse por GTI:" da Ata 360. */
+  verMais?: React.ReactNode;
+}
+
+const emendaEmTexto = (numero: string) => (/^\d{8}$/.test(numero) ? `${numero.slice(0, 4)} ${numero.slice(4)}` : numero);
+
+/**
+ * Cartão do topo do Pedido 360, no desenho das telas 360 (Instrument360Hero): parlamentar como título, a etapa como
+ * situação e o aviso mais grave em selo, o contato da assessoria e as datas ao lado, quatro indicadores e, no pé, o
+ * processo SEI, a emenda e o GND. A próxima tarefa é o botão principal.
+ */
+export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onProxima, onAlterar, onCancelar, onAnular, onAba, verMais }) => {
+  const cancelado = p.etapa === 'CANCELADO';
+  const ativas = linhasAtivas(p);
+  const atas = atasDoPedido(p, itens);
+  const contratos = p.etapa === 'CONTRATACAO' ? contratosDoPedido(p, notas) : null;
+  const contratado = Boolean(contratos?.contratado);
+  const execucao = jaEmpenhado(p.etapa) ? execucaoDoPedido(p, notas) : null;
+  const posicao = contratado ? TOTAL_ETAPAS_PEDIDO : ORDEM_ETAPA[p.etapa] + 1;
+  const situacao = cancelado ? 'Cancelado' : contratado ? 'Contratado' : ROTULO_ETAPA[p.etapa];
+  const grave = avisos.find(avisoGrave) ?? null;
+  const prox = podeGerir && !cancelado && p.autorId ? proximaAcao(p.etapa, rodadaDoPedido(p)) : null;
+
+  const beneficiariosDoPedido = [
+    ...new Set(ativas.map((l) => (l.beneficiarioId ? beneficiarios.get(l.beneficiarioId) : undefined)).filter((b): b is BeneficiarioEmenda => Boolean(b)).map((b) => rotuloBeneficiario(b)))
+  ];
+  const para = beneficiariosDoPedido.length
+    ? `para ${beneficiariosDoPedido.slice(0, 2).join(' e ')}${beneficiariosDoPedido.length > 2 ? ` e mais ${beneficiariosDoPedido.length - 2}` : ''}`
+    : null;
+  const subtitulo = [autor ? linhaDoAutor(autor) : null, para].filter(Boolean).join(' · ');
+  const nomes = ativas.map((l) => {
+    if (l.tipo === 'KIT') return `${l.quantidade} ${l.kitNome ?? 'kit'}`;
+    const item = l.itemKey ? itens.get(l.itemKey) : undefined;
+    return `${l.quantidade} ${item?.nomeCurto?.trim() || curto(item?.descricao ?? l.itemKey ?? '', 40)}`;
+  });
+  const objeto = ativas.length
+    ? `${ativas.length === 1 ? '1 item' : `${ativas.length} itens`}${atas.length > 1 ? ` em ${atas.length} atas` : ''}: ${nomes.join(', ')}.`
+    : 'Sem itens.';
+
+  const emenda = p.siopEmenda ? `Emenda ${emendaEmTexto(p.siopEmenda)}${p.siopEmendaAno ? ` / ${p.siopEmendaAno}` : ' · ano a informar'}` : 'Emenda a informar';
+  const eyebrow = [nomeDoPedido(p), emenda, p.siopGnd].filter(Boolean).join(' · ');
+
+  const datas = [
+    { label: 'Reservado em', value: p.origem === 'PLANILHA' ? 'carga da planilha' : dataBR(p.reservadoEm) },
+    ...(p.oficioEm ? [{ label: 'Ofício recebido', value: dataBR(p.oficioEm) }] : []),
+    ...(p.empenhadoEm ? [{ label: 'Empenhado em', value: dataBR(p.empenhadoEm) }] : []),
+    ...(p.contratacaoEm ? [{ label: 'Enviado à CCGA', value: dataBR(p.contratacaoEm) }] : []),
+    ...(cancelado && p.canceladoEm ? [{ label: 'Cancelado em', value: dataBR(p.canceladoEm) }] : [])
+  ];
+
+  return (
+    <Instrument360Hero
+      backLabel={back.label}
+      onBack={back.back}
+      backTestId="pedido-360-back-btn"
+      actions={
+        <>
+          {podeGerir && PODE_ANULAR_EMPENHO.has(p.etapa) && (
+            <AppButton size="sm" variant="link" onClick={onAnular} data-testid={`emendas-pedido-anular-${p.id}`}>
+              Registrar anulação de empenho
+            </AppButton>
+          )}
+          {podeGerir && !cancelado && !jaEmpenhado(p.etapa) && (
+            <>
+              <ActionButton action="cancelarCiclo" size="sm" label="Cancelar pedido" onClick={onCancelar} data-testid={`emendas-pedido-cancelar-${p.id}`} />
+              <ActionButton action="editar" size="sm" label={p.autorId ? 'Alterar itens' : 'Indicar o parlamentar'} onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
+            </>
+          )}
+          {prox && p.etapa !== 'CONTRATACAO' && (
+            <AppButton size="sm" onClick={onProxima} data-testid={`pedido360-proxima-${p.id}`}>
+              {prox.rotulo}
+            </AppButton>
+          )}
+        </>
+      }
+      title={autor?.nome ?? (p.autorId ? p.autorId : AUTOR_A_DEFINIR)}
+      eyebrow={eyebrow}
+      status={{ faixa: cancelado ? 'EXPIRADO' : 'REGULAR', label: situacao, neutral: true }}
+      statusAlert={grave ? grave.curto : undefined}
+      dockAlert={grave ? grave.curto : undefined}
+      dockSubtitle={`${situacao} · ${ativas.length === 1 ? '1 item' : `${ativas.length} itens`} · ${formatCurrency(valor.valor)}`}
+      subtitle={subtitulo || undefined}
+      objeto={objeto}
+      manager={
+        podeGerir && (p.contatoNome || p.contatoTelefone || p.contatoEmail) ? (
+          <div data-testid={`emendas-pedido-contato-${p.id}`}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Contato na assessoria</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
+              <span style={{ fontWeight: 700 }}>{p.contatoNome ?? 'assessoria'}</span>
+              <ContatoDoResponsavel nome={p.contatoNome ?? 'assessoria'} telefone={p.contatoTelefone} email={p.contatoEmail} />
+            </div>
+          </div>
+        ) : undefined
+      }
+      dates={datas}
+      identifiersTestId="pedido-360-identificadores"
+      identifiers={[
+        { label: 'Processo SEI', value: p.oficioProcessoSei ?? undefined },
+        { label: 'Emenda', value: p.siopEmenda ? `${p.siopEmendaAno ?? ''}${p.siopEmenda}` || undefined : undefined },
+        { label: 'GND', value: p.siopGnd ?? undefined }
+      ]}
+    >
+      <div data-testid="pedido-360-indicadores">
+        <HealthTileGrid columns={4}>
+          <HealthTile
+            label="Etapa"
+            value={cancelado ? 'Cancelado' : `${posicao} de ${TOTAL_ETAPAS_PEDIDO}`}
+            hint={
+              contratos && !contratado
+                ? `${contratos.comContrato} de ${contratos.notas} ${contratos.notas === 1 ? 'nota' : 'notas'} com contrato`
+                : resumoDasLinhas(p, notas).divergem
+                  ? resumoDasLinhas(p, notas).texto
+                  : situacao
+            }
+            onClick={() => onAba('andamento')}
+            testId="pedido-360-etapa"
+          >
+            {!cancelado && <ProgressBar value={posicao} max={TOTAL_ETAPAS_PEDIDO} showPercent={false} height="4px" colorScheme={contratado ? 'success' : 'primary'} />}
+          </HealthTile>
+          <HealthTile
+            label="Valor do pedido"
+            value={formatCurrency(valor.valor)}
+            hint={valor.fonte === 'EMENDA' ? 'pela emenda no SIOP' : 'previsto pelos itens'}
+            compact
+            onClick={() => onAba('itens')}
+            testId="pedido-360-valor"
+          />
+          <HealthTile
+            label="Empenhado"
+            value={execucao && execucao.notas > 0 ? formatCurrency(execucao.empenhado) : '—'}
+            hint={execucao ? (execucao.notas > 0 ? `${execucao.notas} ${execucao.notas === 1 ? 'nota' : 'notas'}${execucao.linhasSemNota ? ` · ${execucao.linhasSemNota} sem nota` : ''}` : 'nenhuma nota achada ainda') : 'antes do empenho'}
+            tone={execucao && execucao.linhasSemNota > 0 ? 'ATENCAO' : undefined}
+            compact
+            onClick={() => onAba('execucao')}
+            testId="pedido-360-empenhado"
+          />
+          <HealthTile
+            label="Pago"
+            value={execucao && execucao.notas > 0 ? formatCurrency(execucao.pago) : '—'}
+            hint={
+              execucao && execucao.notas > 0
+                ? execucao.liquidado - execucao.pago > 0.01
+                  ? `${formatCurrency(execucao.liquidado - execucao.pago)} liquidado a pagar`
+                  : execucao.pago >= execucao.empenhado - 0.01
+                    ? 'tudo pago'
+                    : 'nada liquidado ainda'
+                : 'depois do empenho'
+            }
+            positive={Boolean(execucao && execucao.notas > 0 && execucao.pago >= execucao.empenhado - 0.01)}
+            compact
+            onClick={() => onAba('execucao')}
+            testId="pedido-360-pago"
+          />
+        </HealthTileGrid>
+        {faltaAnoDaEmenda(p) && (
+          <div style={{ fontSize: '0.8rem', color: 'var(--color-warning-text)', marginTop: '0.5rem' }} data-testid="pedido-360-sem-ano">
+            Sem número: o pedido tem a emenda {emendaEmTexto(p.siopEmenda!)}, mas não o ano. Ele ganha o número quando o ano for informado.
+          </div>
+        )}
+        {verMais}
+      </div>
+    </Instrument360Hero>
+  );
+};

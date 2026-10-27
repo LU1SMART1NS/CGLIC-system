@@ -12,6 +12,7 @@
 import type { ItemCaep, NotaDaLinha, PedidoEmenda } from '../services/emendasService';
 import type { PrecoPrevisto } from '../services/emendasQuadroService';
 import { jaEmpenhado, linhasAtivas, precoParaEmenda, valorDaLinha } from './emendasPedidos';
+import { nomeDoPedido } from './emendasNomeDoPedido';
 
 /** O que o Portal diz da emenda (emenda_execucao_portal). */
 export interface ExecucaoNoPortal {
@@ -37,7 +38,8 @@ export interface SobraDaEmenda {
   ano: number;
   autorId: string | null;
   /** Pedidos não cancelados com a emenda, do mais antigo ao mais novo. */
-  pedidos: Array<{ id: string; numero: number; etapa: PedidoEmenda['etapa'] }>;
+  /** `nome` é o que a tela mostra ("Pedido 1/2026"); `numero` é o sequencial interno, só para ordenar. */
+  pedidos: Array<{ id: string; numero: number; nome: string; etapa: PedidoEmenda['etapa'] }>;
   valor: number | null;
   empenhado: number;
   fonteDoEmpenhado: 'PORTAL' | 'NOTAS';
@@ -124,7 +126,7 @@ export function sobraDasEmendas(opts: {
       emenda: codigo.slice(4),
       ano,
       autorId: ps[0].autorId,
-      pedidos: ps.map((p) => ({ id: p.id, numero: p.numero, etapa: p.etapa })),
+      pedidos: ps.map((p) => ({ id: p.id, numero: p.numero, nome: nomeDoPedido(p), etapa: p.etapa })),
       valor,
       empenhado,
       fonteDoEmpenhado: peloPortal ? 'PORTAL' : 'NOTAS',

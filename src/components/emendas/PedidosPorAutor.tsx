@@ -225,7 +225,7 @@ export const PedidosPorAutor: React.FC<Props> = ({ pedidos, todasAsEtapas, autor
             <b>
               Emenda {numeroDaEmendaEmTexto(e.emenda)} / {e.ano}
             </b>
-            <span style={{ ...carteiraDetalhe, marginTop: 0 }}>pedidos {e.pedidos.map((p) => p.numero).join(', ')}</span>
+            <span style={{ ...carteiraDetalhe, marginTop: 0 }}>{e.pedidos.map((p) => p.nome).join(', ')}</span>
             <StatusBadge label={ROTULO_SITUACAO_SOBRA[e.situacao]} variant={VARIANTE_SOBRA[e.situacao]} size="sm" dot={false} />
             <span style={{ flex: 1 }} />
             {podeGerir && (

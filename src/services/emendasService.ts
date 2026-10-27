@@ -8,6 +8,7 @@
  * reserva do CEP). Nada disso é sincronização: o que a pessoa confere é o que grava.
  */
 import type { ExecucaoNoPortal } from '../utils/emendasSobra';
+import { pedidoEmTexto } from '../utils/emendasNomeDoPedido';
 import { supabase } from './supabaseClient';
 import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { mensagemDeErro } from './sincronizacaoFontesService';
@@ -550,7 +551,8 @@ export interface AnulacaoPedido {
    */
   destino: 'INTERLOCUCAO' | 'CANCELAR';
   novoPedidoId: string | null;
-  novoPedidoNumero: number | null;
+  /** O pedido novo no meio da frase ("pedido 1/2026", "pedido reservado em ..."): o sequencial do banco não aparece. */
+  novoPedidoNome: string | null;
   notas: string[];
   linhas: Array<{ linhaId: string; novaLinhaId: string | null; itemKey: string | null; kitNome: string | null; quantidade: number }>;
   documentoSei: string;
@@ -561,7 +563,11 @@ export interface AnulacaoPedido {
 
 export interface PedidoEmenda {
   id: string;
+  /** Sequencial do banco: controle interno, não aparece nas telas (use nomeDoPedido). */
   numero: number;
+  /** Número nas telas: ordem no parlamentar dentro do ano da emenda (1/2026, migration 217). Nulo até a emenda ser informada. */
+  numeroNoAno?: number | null;
+  anoDoNumero?: number | null;
   /** Vazio = reserva para um órgão (o beneficiário final), com o parlamentar a definir (migration 163). */
   autorId: string | null;
   etapa: EtapaPedido;
@@ -619,7 +625,8 @@ export interface PedidoEmenda {
   documentos: DocumentoSeiDoPedido[];
   /** Pedido de onde vieram os itens, quando este foi aberto por uma anulação parcial de empenho (migration 203). */
   pedidoOrigemId: string | null;
-  pedidoOrigemNumero: number | null;
+  /** O pedido de origem no meio da frase ("pedido 1/2026", "pedido reservado em ..."). */
+  pedidoOrigemNome: string | null;
   /** Anulações de empenho registradas neste pedido, da mais antiga à mais nova (migration 203). */
   anulacoes: AnulacaoPedido[];
   /** Emenda registrada de onde o pedido nasceu, ou a do nº conferido no SIOP (migration 205). */
@@ -661,7 +668,26 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
     // Outras emendas dos pedidos (migration 211). Antes da migration a tabela não existe: segue sem ela.
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_emendas').select('*').order('id').range(de, ate)).catch(() => [])
   ]);
-  const numeroPorId = new Map(pedidos.map((p) => [p.id as string, p.numero as number]));
+  // O pedido de origem e o pedido novo da anulação aparecem pelo nome (o sequencial do banco não vai para a tela).
+  const identidade = (p: Record<string, any>) => ({
+    numeroNoAno: p.numero_no_ano ?? null,
+    anoDoNumero: p.ano_do_numero ?? null,
+    siopEmenda: p.siop_emenda ?? null,
+    reservadoEm: p.reservado_em,
+    origem: p.origem
+  });
+  const emTextoPorId = new Map(pedidos.map((p) => [p.id as string, pedidoEmTexto(identidade(p))]));
+  // Textos que o banco grava com o sequencial (anulação: "voltou à interlocução no pedido 418", "Itens do pedido 418..."):
+  // na leitura, o número vira o nome do pedido.
+  const emTextoPorNumero = new Map(pedidos.map((p) => [Number(p.numero), pedidoEmTexto(identidade(p))]));
+  const semNumeroInterno = (texto: string | null): string | null =>
+    texto
+      ? texto.replace(/\b([Pp])edido (\d+)\b/g, (todo, inicial: string, n: string) => {
+          const emTexto = emTextoPorNumero.get(Number(n));
+          if (!emTexto) return todo;
+          return inicial === 'P' ? emTexto.charAt(0).toUpperCase() + emTexto.slice(1) : emTexto;
+        })
+      : texto;
   const anulacoesPorPedido = new Map<string, AnulacaoPedido[]>();
   for (const a of anulacoes) {
     const lista = anulacoesPorPedido.get(a.pedido_id) ?? [];
@@ -670,7 +696,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       total: Boolean(a.total),
       destino: a.destino === 'CANCELAR' ? 'CANCELAR' : 'INTERLOCUCAO',
       novoPedidoId: a.novo_pedido_id ?? null,
-      novoPedidoNumero: a.novo_pedido_id ? numeroPorId.get(a.novo_pedido_id) ?? null : null,
+      novoPedidoNome: a.novo_pedido_id ? emTextoPorId.get(a.novo_pedido_id) ?? null : null,
       notas: Array.isArray(a.notas) ? a.notas : [],
       linhas: (Array.isArray(a.linhas) ? a.linhas : []).map((l: any) => ({
         linhaId: l.linha_id,
@@ -681,7 +707,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       })),
       documentoSei: a.documento_sei,
       anuladoEm: a.anulado_em,
-      motivo: a.motivo,
+      motivo: semNumeroInterno(a.motivo) ?? a.motivo,
       criadoPorNome: a.criado_por_nome ?? null
     });
     anulacoesPorPedido.set(a.pedido_id, lista);
@@ -764,7 +790,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       beneficiarioId: l.beneficiario_id ?? null,
       beneficiarioNome: l.beneficiario_nome ?? null,
       cancelada: Boolean(l.cancelada),
-      canceladaMotivo: l.cancelada_motivo ?? null,
+      canceladaMotivo: semNumeroInterno(l.cancelada_motivo ?? null),
       empenhoDocumentoSei: l.empenho_documento_sei ?? null,
       contratoNumero: l.contrato_numero ?? null,
       despachoDocumentoSei: l.despacho_documento_sei ?? null
@@ -775,10 +801,12 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
     .map((p) => ({
       id: p.id,
       numero: p.numero,
+      numeroNoAno: p.numero_no_ano ?? null,
+      anoDoNumero: p.ano_do_numero ?? null,
       autorId: p.autor_id ?? null,
       etapa: p.etapa,
       origem: p.origem,
-      observacao: p.observacao ?? null,
+      observacao: semNumeroInterno(p.observacao ?? null),
       contatoNome: p.contato_nome ?? null,
       contatoTelefone: p.contato_telefone ?? null,
       contatoEmail: p.contato_email ?? null,
@@ -815,7 +843,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       devolucoes: (devolucoesPorPedido.get(p.id) ?? []).sort((a, b) => a.rodada - b.rodada),
       documentos: (documentosPorPedido.get(p.id) ?? []).sort((a, b) => (a.data ?? '').localeCompare(b.data ?? '') || a.numero.localeCompare(b.numero)),
       pedidoOrigemId: p.pedido_origem_id ?? null,
-      pedidoOrigemNumero: p.pedido_origem_id ? numeroPorId.get(p.pedido_origem_id) ?? null : null,
+      pedidoOrigemNome: p.pedido_origem_id ? emTextoPorId.get(p.pedido_origem_id) ?? null : null,
       anulacoes: (anulacoesPorPedido.get(p.id) ?? []).sort((a, b) => a.anuladoEm.localeCompare(b.anuladoEm)),
       emendaId: p.emenda_id ?? null,
       outrasEmendas: (outrasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))

@@ -34,6 +34,7 @@ import type { PrecoPrevisto } from '../../services/emendasQuadroService';
 import { BeneficiarioDaLinha, LinhaDoPedido, SituacaoDaLinhaEtiqueta, ValorPrevisto } from './emendasPartes';
 import type { AcaoDaJanela, ContextoDaJanela } from './EtapaPedidoModal';
 import { podeMontarQuadros } from '../../utils/emendasAutorizacao';
+import { proximaAcaoDaJanela } from './proximaAcaoDaJanela';
 
 export type AoAgir = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) => void;
 
@@ -288,35 +289,38 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
   );
 };
 
+/** O botão de uma pendência de "O que falta": a janela de hoje (próximo passo, solicitação da ata, envio ou alterar). */
+export const BotaoDaPendencia: React.FC<{ p: PedidoEmenda; t: TarefaDoPedido; onAcao: AoAgir; onAlterar: () => void }> = ({ p, t, onAcao, onAlterar }) => {
+  const b = t.botao;
+  if (!b) return null;
+  if (b.tipo === 'proxima') {
+    return (
+      <AppButton size="sm" onClick={() => onAcao(proximaAcaoDaJanela(p))} data-testid={`emendas-pedido-proximo-${p.id}`}>
+        {b.rotulo}
+      </AppButton>
+    );
+  }
+  if (b.tipo === 'solicitacao') {
+    return (
+      <AppButton size="sm" variant="outline" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: b.ataKey, numero: b.numero, troca: b.troca })} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
+        {b.rotulo}
+      </AppButton>
+    );
+  }
+  if (b.tipo === 'envio') {
+    return (
+      <AppButton size="sm" onClick={() => onAcao('CGOFI')} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
+        {b.rotulo}
+      </AppButton>
+    );
+  }
+  return <ActionButton action="editar" size="sm" label={b.rotulo} onClick={onAlterar} data-testid={`emendas-pedido-tarefa-${t.chave}`} />;
+};
+
 /** A lista "O que falta" do pedido: cada tarefa com o botão da janela de hoje, ou só o aviso. */
 export const OQueFalta: React.FC<{ p: PedidoEmenda; tarefas: TarefaDoPedido[]; onAcao: AoAgir; onAlterar: () => void }> = ({ p, tarefas, onAcao, onAlterar }) => {
   if (tarefas.length === 0) return null;
-  const botao = (t: TarefaDoPedido) => {
-    const b = t.botao;
-    if (!b) return null;
-    if (b.tipo === 'proxima') {
-      return (
-        <AppButton size="sm" onClick={() => onAcao(proximaAcaoDaJanela(p))} data-testid={`emendas-pedido-proximo-${p.id}`}>
-          {b.rotulo}
-        </AppButton>
-      );
-    }
-    if (b.tipo === 'solicitacao') {
-      return (
-        <AppButton size="sm" variant="outline" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: b.ataKey, numero: b.numero, troca: b.troca })} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
-          {b.rotulo}
-        </AppButton>
-      );
-    }
-    if (b.tipo === 'envio') {
-      return (
-        <AppButton size="sm" onClick={() => onAcao('CGOFI')} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
-          {b.rotulo}
-        </AppButton>
-      );
-    }
-    return <ActionButton action="editar" size="sm" label={b.rotulo} onClick={onAlterar} data-testid={`emendas-pedido-tarefa-${t.chave}`} />;
-  };
+  const botao = (t: TarefaDoPedido) => <BotaoDaPendencia p={p} t={t} onAcao={onAcao} onAlterar={onAlterar} />;
   return (
     <div className="emendas-falta" data-testid={`emendas-pedido-falta-${p.id}`}>
       <div className="emendas-falta__topo">
@@ -432,25 +436,3 @@ export const RodadasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, Not
     </div>
   );
 };
-
-/** A ação da janela do próximo passo do pedido (as mesmas regras de proximaAcao). */
-function proximaAcaoDaJanela(p: PedidoEmenda): AcaoDaJanela {
-  switch (p.etapa) {
-    case 'RESERVADO':
-      return 'MINUTA';
-    case 'MINUTA':
-      return 'OFICIO';
-    case 'OFICIO':
-      return 'CONFERIDO';
-    case 'CONFERIDO':
-      return 'SOLICITADO';
-    case 'SOLICITADO':
-      return 'AUTORIZADO';
-    case 'AUTORIZADO':
-      return 'CGOFI';
-    case 'CGOFI':
-      return 'EMPENHADO';
-    default:
-      return 'CONTRATACAO';
-  }
-}
