@@ -71,7 +71,7 @@ import { EmendasPedidosPage } from '../EmendasPedidosPage';
 
 const render = (url: string) => renderToStaticMarkup(<MemoryRouter initialEntries={[url]}>{<EmendasPedidosPage />}</MemoryRouter>);
 
-describe('Pedidos: ver por pedido ou por autor', () => {
+describe('Pedidos: ver por pedido ou por emenda', () => {
   it('por pedido (padrão): lista os pedidos com o filtro de autor', () => {
     const html = render('/');
     expect(html).toContain('emendas-pedidos-tabela');
@@ -84,26 +84,17 @@ describe('Pedidos: ver por pedido ou por autor', () => {
     expect(render('/?autor=a-definir')).toContain('1 de 4 pedidos');
   });
 
-  it('?ver=autor soma os pedidos por autor, com as emendas do ano e a sobra', () => {
+  it('?ver=autor virou a aba Parlamentares: a lista não aparece e o endereço vai para lá', () => {
     const html = render('/?ver=autor');
-    expect(html).toContain('emendas-por-autor-tabela');
     expect(html).not.toContain('emendas-pedidos-tabela');
-    expect(html).toContain('Valor reservado');
-    expect(html).toContain('Emendas 2026');
-    expect(html).toContain('Sobra');
-    expect(html).toContain('emendas-sobra-faixa');
-    // A1 (2 pedidos, R$ 500), A2 e "Parlamentar a definir"; A3 não tem pedido
-    expect(html).toContain('Deputado Um');
-    expect(html).toContain('Parlamentar a definir');
-    expect(html).not.toContain('Bancada Três');
+    expect(html).not.toContain('emendas-por-autor-tabela');
   });
 
-  it('por autor respeita a fase escolhida no valor reservado', () => {
-    // ?etapa=RESERVADO abre a fase Interlocução (Reservado, Minuta e Ofício).
-    const html = render('/?ver=autor&etapa=RESERVADO');
-    expect(html).toContain('Valor nesta fase');
-    expect(html).toContain('Senadora Dois');
-    expect(html).toContain('Deputado Um');
+  it('o seletor de visão tem só Por pedido e Por emenda', () => {
+    const html = render('/');
+    expect(html).toContain('Por pedido');
+    expect(html).toContain('Por emenda');
+    expect(html).not.toContain('Por parlamentar');
   });
 
   it('abas por fase; ?etapa= abre a fase com o filtro da etapa', () => {

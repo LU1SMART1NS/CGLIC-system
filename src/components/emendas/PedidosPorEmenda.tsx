@@ -54,7 +54,7 @@ const ORDEM: Record<string, CarteiraSortColumn<EmendaNaLista>> = {
 };
 
 /** Um contato (assessoria ou ASPAR) em cartão: nome, telefone e e-mail para copiar, e os ícones de WhatsApp e e-mail. */
-const CartaoDeContato: React.FC<{
+export const CartaoDeContato: React.FC<{
   titulo: string;
   nome: string | null;
   telefone: string | null;
@@ -99,7 +99,7 @@ interface DetalheProps {
   onAbrirPedido: (id: string) => void;
 }
 
-const DetalheDaEmenda: React.FC<DetalheProps> = ({ l, autor, beneficiarios, aspar, contatoDoAutor, podeGerir, onCriarPedido, onAlterar, onAbrirPedido }) => {
+export const DetalheDaEmenda: React.FC<DetalheProps> = ({ l, autor, beneficiarios, aspar, contatoDoAutor, podeGerir, onCriarPedido, onAlterar, onAbrirPedido }) => {
   const toast = useToast();
   const apagar = useApagarEmendaSiop();
   const [registrando, setRegistrando] = useState(false);
@@ -229,7 +229,8 @@ const DetalheDaEmenda: React.FC<DetalheProps> = ({ l, autor, beneficiarios, aspa
           {l.pedidos.map((p) => (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <AppButton size="xs" variant="link" onClick={() => onAbrirPedido(p.id)} data-testid={`emendas-emenda-abrir-pedido-${p.id}`}>
-                {p.oficioProcessoSei ? `Processo ${p.oficioProcessoSei}` : `Reserva de ${dataBR(p.reservadoEm)}`}
+                {nomeDoPedido(p)}
+                {p.oficioProcessoSei ? ` · Processo ${p.oficioProcessoSei}` : ''}
               </AppButton>
               <StatusBadge label={ROTULO_ETAPA[p.etapa]} variant="info" size="sm" dot={false} />
             </div>

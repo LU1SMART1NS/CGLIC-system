@@ -37,6 +37,8 @@ interface Props {
   emenda?: EmendaSiop | null;
   /** "Novo pedido com a sobra" (migration 204): o parlamentar e a emenda já escolhidos, e o disponível dela no topo. */
   sobra?: SobraDaEmenda | null;
+  /** Nova reserva aberta pelo Parlamentar 360: o parlamentar já vem escolhido e não troca. */
+  autorInicial?: string | null;
   onClose: () => void;
 }
 
@@ -148,7 +150,7 @@ function guardarRascunho(r: Rascunho | null) {
  * beneficiários, Mover para leva a linha inteira, e a visão Por item mostra a grade item × beneficiário. Os valores são
  * os previstos para a emenda, os mesmos do quadro do parlamentar. A trava de saldo é conferida aqui e de novo no banco.
  */
-export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, beneficiarios, reservadoFora, ultimoContato, hoje, emenda = null, sobra, onClose }) => {
+export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, beneficiarios, reservadoFora, ultimoContato, hoje, emenda = null, sobra, autorInicial = null, onClose }) => {
   const salvar = useSalvarPedido();
   const toast = useToast();
   const { precos, ipca, semPrevisao } = usePrecosParaEmenda();
@@ -164,10 +166,11 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // O pedido da emenda e o da sobra não usam o rascunho da reserva comum: abrem já com o parlamentar.
-  const [rascunhoAntigo] = useState(() => (pedido || emenda || sobra ? null : lerRascunho()));
-  const contatoDaEmenda = emenda ? ultimoContato.get(emenda.autorId) : undefined;
+  const [rascunhoAntigo] = useState(() => (pedido || emenda || sobra || autorInicial ? null : lerRascunho()));
+  // Pedido da emenda ou do Parlamentar 360: o contato da assessoria vem do último pedido do parlamentar.
+  const contatoDaEmenda = emenda ? ultimoContato.get(emenda.autorId) : autorInicial ? ultimoContato.get(autorInicial) : undefined;
 
-  const [autorId, setAutorId] = useState(pedido?.autorId ?? emenda?.autorId ?? sobra?.autorId ?? '');
+  const [autorId, setAutorId] = useState(pedido?.autorId ?? emenda?.autorId ?? sobra?.autorId ?? autorInicial ?? '');
   // Reserva para um órgão (migration 163): nova reserva sem parlamentar.
   const [paraOrgao, setParaOrgao] = useState(false);
   const [buscaAutor, setBuscaAutor] = useState('');
@@ -303,12 +306,12 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
 
   // Rascunho só da reserva nova: some ao reservar ou descartar.
   useEffect(() => {
-    if (pedido || emenda || rascunhoAntigo || sobra) return;
+    if (pedido || emenda || rascunhoAntigo || sobra || autorInicial) return;
     if (!temConteudo) return guardarRascunho(null);
     const salvoEm = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     guardarRascunho({ autorId, paraOrgao, contato: { nome: contatoNome, telefone: contatoTelefone, email: contatoEmail }, grupos, ativo, linhas, observacao, salvoEm });
     setRascunhoEm(salvoEm);
-  }, [pedido, emenda, rascunhoAntigo, sobra, temConteudo, autorId, paraOrgao, contatoNome, contatoTelefone, contatoEmail, grupos, ativo, linhas, observacao]);
+  }, [pedido, emenda, rascunhoAntigo, sobra, autorInicial, temConteudo, autorId, paraOrgao, contatoNome, contatoTelefone, contatoEmail, grupos, ativo, linhas, observacao]);
   const [rascunhoPendente, setRascunhoPendente] = useState(Boolean(rascunhoAntigo));
   const recuperarRascunho = () => {
     const r = rascunhoAntigo!;
@@ -501,7 +504,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         emendaDaSobra: sobra ? { numero: sobra.emenda, ano: sobra.ano } : null,
         linhas: linhas.map((l) => ({ id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, quantidade: l.quantidade, beneficiarioId: beneficiarioDaLinha(l, grupos) }))
       });
-      if (!pedido && !emenda && !sobra) guardarRascunho(null);
+      if (!pedido && !emenda && !sobra && !autorInicial) guardarRascunho(null);
       const primeiro = grupos.find((g) => g.beneficiarioId)?.beneficiarioId;
       const para = autor?.nome ?? (pedido ? orgaoDoPedido(pedido, nomeDoBeneficiario) : primeiro ? nomeDoBeneficiario(primeiro) : null) ?? 'o órgão';
       toast.success(semAutorGravado && autorId ? `Parlamentar indicado: ${autor?.nome ?? ''}.` : pedido ? `Pedido de ${para} atualizado.` : `Reserva para ${para} registrada.`);
@@ -1082,7 +1085,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 Pedido da emenda {numeroDaEmenda(emenda.numero)} / {emenda.ano} · {formatCurrency(emenda.valor)} · {emenda.gnd}, vista no SIOP.
               </p>
             )}
-            {!pedido && !emenda && !sobra && (
+            {!pedido && !emenda && !sobra && !autorInicial && (
               <div className="reserva-segmentos" role="group" aria-label="Tipo de reserva">
                 <button
                   type="button"
@@ -1116,7 +1119,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   <b>{autor.nome}</b>
                   <small>{metaDoAutor(autor)}</small>
                 </span>
-                {((!pedido && !emenda && !sobra) || semAutorGravado) && (
+                {((!pedido && !emenda && !sobra && !autorInicial) || semAutorGravado) && (
                   <ActionButton action="editar" type="button" size="sm" label="Trocar" onClick={() => setAutorId('')} />
                 )}
               </div>

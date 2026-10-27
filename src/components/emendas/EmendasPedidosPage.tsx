@@ -39,6 +39,7 @@ import { casaBusca, textoDeBuscaDoBeneficiario } from '../../utils/emendasBenefi
 import {
   avisoGrave,
   AUTOR_A_DEFINIR,
+  AUTOR_A_DEFINIR_CHAVE,
   avisosDoPedido,
   ETAPAS,
   FASES_PEDIDO,
@@ -62,11 +63,9 @@ import { faltaAnoDaEmenda, numeroDoPedido, rotaDoPedido } from '../../utils/emen
 import { rotuloBeneficiario, type AutorEmenda, type EmendaSiop, type EtapaPedido, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 import { AutorDoPedido, LARGURA_AUTOR, ValorDoPedido } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
-import { AUTOR_A_DEFINIR_CHAVE, PedidosPorAutor } from './PedidosPorAutor';
 import { PedidoModal } from './PedidoModal';
 import { PedidosPorEmenda } from './PedidosPorEmenda';
 import { EmendaSiopModal } from './EmendaSiopModal';
-import type { SobraDaEmenda } from '../../utils/emendasSobra';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 
@@ -127,9 +126,10 @@ export const EmendasPedidosPage: React.FC = () => {
   const itemDoEnderecoAntigo = searchParams.get('item');
   const [busca, setBusca] = useState('');
   const navegar = useNavigateWithOrigin();
-  // Ver por autor ou por emenda e filtro de autor ficam no endereço (?ver=autor|emenda, ?autor=), para o Voltar do navegador funcionar.
-  const ver = searchParams.get('ver') === 'autor' ? 'autor' : searchParams.get('ver') === 'emenda' ? 'emenda' : 'pedido';
-  const porAutor = ver === 'autor';
+  // Ver por emenda e filtro de parlamentar ficam no endereço (?ver=emenda, ?autor=), para o Voltar do navegador funcionar.
+  // "Por parlamentar" virou a aba Parlamentares (protótipo aprovado em 27/10/2026): ?ver=autor vai para lá.
+  const ver = searchParams.get('ver') === 'emenda' ? 'emenda' : 'pedido';
+  const paraParlamentares = searchParams.get('ver') === 'autor';
   const porEmenda = ver === 'emenda';
   const filtroAutor = searchParams.get('autor') ?? '';
   const mudarUrl = (mudar: (p: URLSearchParams) => void) =>
@@ -139,8 +139,6 @@ export const EmendasPedidosPage: React.FC = () => {
       return prox;
     });
   const [editando, setEditando] = useState<PedidoEmenda | 'novo' | null>(null);
-  // Reserva nova aberta por "Novo pedido com a sobra" (migration 204): o parlamentar e a emenda já vêm escolhidos.
-  const [sobraDoNovo, setSobraDoNovo] = useState<SobraDaEmenda | null>(null);
   // Emendas vistas no SIOP (migration 205): registrar ou alterar, e o pedido novo criado a partir de uma delas.
   const { data: emendasSiop = [] } = useEmendasSiop();
   const [editandoEmenda, setEditandoEmenda] = useState<EmendaSiop | 'nova' | null>(null);
@@ -344,6 +342,7 @@ export const EmendasPedidosPage: React.FC = () => {
     }
   ];
 
+  if (paraParlamentares) return <Navigate to="/emendas/parlamentares" replace />;
   // Endereço antigo do pedido: espera a lista e vai para o Pedido 360 (sem o pedido, fica na lista).
   if (pedidoDoEnderecoAntigo && !isLoading) {
     const alvo = pedidos.find((x) => x.id === pedidoDoEnderecoAntigo);
@@ -356,16 +355,14 @@ export const EmendasPedidosPage: React.FC = () => {
       <PageHeader
         title="Pedidos"
         subtitle={
-          porAutor
-            ? 'Quanto cada parlamentar ou bancada tem na fase escolhida.'
-            : porEmenda
+          porEmenda
               ? 'Emendas vistas no SIOP: as que ainda não viraram pedido avisam até a CAEP falar com o parlamentar.'
               : 'Reservas e ofícios dos parlamentares, da reserva ao empenho.'
         }
         hint={`A reserva já ocupa o saldo da CAEP e cancelar devolve o saldo. O contrato precisa ser assinado antes do fim da ata: a ${avisoIndicacaoDias()} dias do fim o pedido avisa e a menos de ${corteIndicacaoDias()} dias não entra reserva nem ofício com itens da ata (prazos em Ajustes › Regras de Alertas).`}
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={
-          <CarteiraSegmentTabs<'pedido' | 'autor' | 'emenda'>
+          <CarteiraSegmentTabs<'pedido' | 'emenda'>
             testIdPrefix="emendas-pedidos-ver"
             ariaLabel="Ver por"
             active={ver}
@@ -378,7 +375,6 @@ export const EmendasPedidosPage: React.FC = () => {
             }
             segments={[
               { id: 'pedido', label: 'Por pedido', title: 'Uma linha por pedido, com as etapas e os botões' },
-              { id: 'autor', label: 'Por parlamentar', title: 'Uma linha por parlamentar ou bancada, com os totais' },
               { id: 'emenda', label: 'Por emenda', title: 'Uma linha por emenda vista no SIOP, com ou sem pedido' }
             ]}
           />
@@ -438,33 +434,6 @@ export const EmendasPedidosPage: React.FC = () => {
           onCriarPedido={setPedidoDaEmenda}
           onAlterar={setEditandoEmenda}
           onAbrirPedido={(id) => navegar(`/emendas/pedidos/id/${encodeURIComponent(id)}`)}
-        />
-      ) : porAutor ? (
-        <PedidosPorAutor
-          pedidos={doSegmento}
-          todasAsEtapas={segmento === 'todos'}
-          autores={autores}
-          itens={itens}
-          isLoading={isLoading || carregandoItens}
-          isError={isError}
-          errorMessage={(error as Error | null)?.message || 'Falha ao consultar os pedidos.'}
-          onRetry={() => refetch()}
-          onAbrirAutor={(chave) =>
-            mudarUrl((p) => {
-              p.delete('ver');
-              p.delete('emenda');
-              p.set('autor', chave);
-            })
-          }
-          todosOsPedidos={pedidos}
-          notas={notas}
-          ano={Number(hoje.slice(0, 4))}
-          podeGerir={podeGerir}
-          emendaInicial={searchParams.get('emenda')}
-          onNovoComSobra={(e) => {
-            setSobraDoNovo(e);
-            setEditando('novo');
-          }}
         />
       ) : (
         <>
@@ -557,11 +526,7 @@ export const EmendasPedidosPage: React.FC = () => {
           reservadoFora={reservadoPorItem(pedidos, editando === 'novo' ? undefined : editando.id)}
           ultimoContato={ultimoContatoPorAutor(pedidos)}
           hoje={hoje}
-          sobra={editando === 'novo' ? sobraDoNovo : null}
-          onClose={() => {
-            setEditando(null);
-            setSobraDoNovo(null);
-          }}
+          onClose={() => setEditando(null)}
         />
       )}
       {pedidoDaEmenda && (
