@@ -11,6 +11,7 @@ const mutation = (): TemplateMutation => ({ mutate: vi.fn(), reset: vi.fn(), isP
 
 function makeKit(templates: any[], label: string): TaskTemplatesKit {
   return {
+    tipo: 'ata',
     hooks: {
       useTemplates: () => ({ data: templates, isLoading: false, error: null }),
       useSaveTemplate: mutation,
@@ -97,5 +98,52 @@ describe('TaskTemplatesPage genérica (Atas e Contratos)', () => {
     expect(html).not.toContain('Excluir tarefa');
     expect(html).not.toContain('Adicionar Macrotarefa');
     expect(html).not.toContain('Desativar');
+  });
+});
+
+describe('Modelos da CCGA: ação, regra de prazo e detalhes do módulo', () => {
+  const ccga = [
+    {
+      id: 'ccga-ct-aditivo',
+      nome: 'Prorrogação do contrato',
+      ativo: true,
+      origemModelo: 'CCGA',
+      quando: '180 dias antes do fim da vigência',
+      processoTipo: 'Processo do pregão',
+      macrotarefas: [
+        {
+          id: 'm1',
+          templateId: 'ccga-ct-aditivo',
+          nome: 'Manifestações',
+          ordem: 0,
+          tarefas: [
+            { id: 'k1', nome: 'Pedir à requisitante a manifestação', ordem: 0, acao: 'ORIENTAR', comQuem: 'Requisitante', prazoTexto: 'D−180', lista: ['Interesse', 'Justificativa'], esforcoMin: 30 }
+          ]
+        }
+      ]
+    }
+  ];
+
+  beforeEach(() => {
+    auth.role = 'admin';
+  });
+
+  it('coordenador vê o selo CCGA, quando entra, a ação, a regra e edita a regra', () => {
+    const html = render(makeKit(ccga, 'Contrato'));
+    expect(html).toContain('Padrão CCGA');
+    expect(html).toContain('180 dias antes do fim da vigência');
+    expect(html).toContain('Processo do pregão');
+    expect(html).toContain('Orientar');
+    expect(html).toContain('Prazo: D−180');
+    expect(html).toContain('esforço 30 min');
+    expect(html).toContain('O que pedir (2)');
+    expect(html).toContain('Editar regra');
+  });
+
+  it('gestor vê a regra sem poder editar', () => {
+    auth.role = 'gestor';
+    const html = render(makeKit(ccga, 'Contrato'));
+    expect(html).toContain('Prazo: D−180');
+    expect(html).not.toContain('Editar regra');
   });
 });

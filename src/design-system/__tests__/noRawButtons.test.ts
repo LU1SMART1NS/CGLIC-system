@@ -37,6 +37,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/instrumentos/PainelGavetas.tsx': 1, // botão de área que abre a gaveta (chip com resumo)
   'src/components/gti/InteresseGti.tsx': 1, // botão de gaveta "Interesse por GTI" (mesmo padrão do Início)
   'src/components/modals/ExportExcelModal.tsx': 7, // presets e chips de grupo
+  'src/components/plan/modeloGestaoPlano.tsx': 1, // contadores do plano que filtram as tarefas (chips de filtro)
   'src/components/plan/TaskPlanSection.tsx': 1, // seletor de status
   'src/design-system/components/AppButton.tsx': 2, // o próprio componente (e a menção no comentário)
   'src/design-system/components/Modal.tsx': 1, // fechar

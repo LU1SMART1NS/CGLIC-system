@@ -15,6 +15,7 @@ import {
 } from '../../hooks/useAtaTaskPlanEditing';
 import { TaskPlanSection, type TaskPlanController, type TaskPlanLabels } from '../plan/TaskPlanSection';
 import { useAuth } from '../../context/AuthContext';
+import { useAjustarPrazoTarefa, useAtualizarModulo, useMarcarPedidoTarefa, useRegistrarRespostaTarefa } from '../../hooks/useModeloGestao';
 import { podeConcluirTarefas } from '../../hooks/useAvisosResolvidos';
 
 interface AtaTasksSectionProps {
@@ -51,8 +52,15 @@ function useAtaPlanController(ataKey: string): TaskPlanController {
     gestorNome: manager?.gestorNome || undefined,
     labels: ATA_LABELS,
     useUpdateTask: useUpdateAtaTask,
+    useMarcarPedido: (key) => useMarcarPedidoTarefa('ata', key),
+    useRegistrarResposta: (key) => useRegistrarRespostaTarefa('ata', key),
+    useAjustarPrazo: (key) => useAjustarPrazoTarefa('ata', key),
+    useAtualizarModulo: (key) => useAtualizarModulo('ata', key),
     useDeleteTask: useDeleteAtaTask,
-    templates,
+    // Só os modelos ativos entram no "Aplicar modelo" (os 7 genéricos ficaram inativos na migration 210).
+    templates: templates
+      .filter((tpl) => tpl.ativo !== false)
+      .map((tpl) => ({ id: tpl.id, nome: tpl.nome, quando: tpl.quando, processoTipo: tpl.processoTipo })),
     loadingTemplates,
     applyTemplate: {
       run: (templateId, onSuccess, moduloNome) => applyMutation.mutate({ ataKey, templateId, moduloNome }, { onSuccess }),

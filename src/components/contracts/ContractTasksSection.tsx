@@ -16,6 +16,7 @@ import {
 import { getContractManagementKey } from '../../services/contractManagementService';
 import { TaskPlanSection, type TaskPlanController, type TaskPlanLabels } from '../plan/TaskPlanSection';
 import { useAuth } from '../../context/AuthContext';
+import { useAjustarPrazoTarefa, useAtualizarModulo, useMarcarPedidoTarefa, useRegistrarRespostaTarefa } from '../../hooks/useModeloGestao';
 import { podeConcluirTarefas } from '../../hooks/useAvisosResolvidos';
 
 interface ContractTasksSectionProps {
@@ -56,8 +57,15 @@ function useContractPlanController(contract: ContractDashboardRecord): TaskPlanC
     gestorNome: manager?.gestorNome || undefined,
     labels: CONTRACT_LABELS,
     useUpdateTask: useUpdateContractTask,
+    useMarcarPedido: (key) => useMarcarPedidoTarefa('contrato', key),
+    useRegistrarResposta: (key) => useRegistrarRespostaTarefa('contrato', key),
+    useAjustarPrazo: (key) => useAjustarPrazoTarefa('contrato', key),
+    useAtualizarModulo: (key) => useAtualizarModulo('contrato', key),
     useDeleteTask: useDeleteContractTask,
-    templates,
+    // Só os modelos ativos entram no "Aplicar modelo" (os 7 genéricos ficaram inativos na migration 210).
+    templates: templates
+      .filter((tpl) => tpl.ativo !== false)
+      .map((tpl) => ({ id: tpl.id, nome: tpl.nome, quando: tpl.quando, processoTipo: tpl.processoTipo })),
     loadingTemplates,
     applyTemplate: {
       run: (templateId, onSuccess, moduloNome) =>
