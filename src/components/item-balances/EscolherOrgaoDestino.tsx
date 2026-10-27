@@ -20,20 +20,12 @@ export interface DestinoEscolhido {
 
 export const DESTINO_VAZIO: DestinoEscolhido = { uasg: '', nome: '', local: null, busca: 'vazia' };
 
-/** Órgão que já recebeu adesão ou remanejamento neste item: aparece primeiro, sem precisar de UF. */
-export interface OrgaoSugerido {
-  uasg: string;
-  nome: string;
-  detalhe: string;
-}
-
 interface Props {
   destino: DestinoEscolhido;
   onMudar: (d: DestinoEscolhido) => void;
   uasgOrigem: string;
   /** UASGs do item (gerenciadora e participantes): aparecem riscadas e não podem ser escolhidas. */
   participantes: Set<string>;
-  sugeridos: OrgaoSugerido[];
   /** UF da busca ao abrir (a do órgão que cede, quando o cadastro tem). */
   ufInicial: string | null;
   /** Linha extra no cartão do órgão escolhido (ex.: adesões que ele já tem). */
@@ -49,7 +41,7 @@ const grupo: React.CSSProperties = { fontSize: '0.75rem', fontWeight: 700, lette
  * Órgão de destino pelo nome ou pelos 6 números da UASG. O Compras.gov.br não busca por nome: a lista vem da UF
  * inteira (useUasgsDaUf) e o filtro é feito aqui, por palavras, sem acento.
  */
-export const EscolherOrgaoDestino: React.FC<Props> = ({ destino, onMudar, uasgOrigem, participantes, sugeridos, ufInicial, avisoDoEscolhido }) => {
+export const EscolherOrgaoDestino: React.FC<Props> = ({ destino, onMudar, uasgOrigem, participantes, ufInicial, avisoDoEscolhido }) => {
   const [texto, setTexto] = React.useState('');
   const [ufEscolhida, setUf] = React.useState('');
   const uf = ufEscolhida || ufInicial || '';
@@ -106,10 +98,7 @@ export const EscolherOrgaoDestino: React.FC<Props> = ({ destino, onMudar, uasgOr
     );
   }
 
-  const casa = (nome: string, extra: string) => !texto.trim() || porCodigo || casaBusca(`${nome} ${extra}`, texto);
-  const sugeridosVisiveis = sugeridos.filter((s) => (porCodigo ? s.uasg.startsWith(texto.trim()) : casa(s.nome, s.uasg)));
-  const jaSugeridos = new Set(sugeridos.map((s) => s.uasg));
-  const achados = procurandoNome && daUf.data ? daUf.data.filter((u) => !jaSugeridos.has(u.uasg) && casaBusca(`${u.nome} ${u.municipio ?? ''}`, texto)) : [];
+  const achados = procurandoNome && daUf.data ? daUf.data.filter((u) => casaBusca(`${u.nome} ${u.municipio ?? ''}`, texto)) : [];
 
   const linha = (uasg: string, nome: string, detalhe: string | null, local: string | null) => {
     const fora = motivoDeFora(uasg);
@@ -143,7 +132,7 @@ export const EscolherOrgaoDestino: React.FC<Props> = ({ destino, onMudar, uasgOr
     : !uf ? 'Escolha a UF para procurar pelo nome.'
     : daUf.isLoading ? `Lendo as UASGs de ${uf} no Compras.gov.br…`
     : daUf.isError ? (daUf.error as Error)?.message ?? 'O Compras.gov.br não respondeu agora.'
-    : daUf.data ? `${formatNumber(daUf.data.length)} UASGs ativas de ${uf} · ${formatNumber(achados.length + sugeridosVisiveis.length)} com “${texto.trim()}”`
+    : daUf.data ? `${formatNumber(daUf.data.length)} UASGs ativas de ${uf} · ${formatNumber(achados.length)} com “${texto.trim()}”`
     : null;
 
   return (
@@ -163,14 +152,8 @@ export const EscolherOrgaoDestino: React.FC<Props> = ({ destino, onMudar, uasgOr
         {daUf.isError && <AppButton variant="secondary" size="sm" onClick={() => void daUf.refetch()}>Tentar de novo</AppButton>}
       </div>
       {situacao && <span style={pequeno} aria-live="polite" data-testid="remanejar-np-situacao-busca">{situacao}</span>}
-      {(sugeridosVisiveis.length > 0 || achados.length > 0 || (porCodigo && destino.uasg.length === 6 && motivoDeFora(destino.uasg))) && (
+      {(achados.length > 0 || (porCodigo && destino.uasg.length === 6 && motivoDeFora(destino.uasg))) && (
         <div role="listbox" aria-label="Órgãos encontrados" style={{ border: '1px solid var(--border)', borderRadius: 8, maxHeight: 280, overflowY: 'auto' }} data-testid="remanejar-np-lista">
-          {sugeridosVisiveis.length > 0 && (
-            <>
-              <div style={grupo}>Já neste item</div>
-              {sugeridosVisiveis.map((s) => linha(s.uasg, s.nome, s.detalhe, null))}
-            </>
-          )}
           {achados.length > 0 && (
             <>
               <div style={grupo}>Compras.gov.br · {uf}</div>
@@ -178,10 +161,10 @@ export const EscolherOrgaoDestino: React.FC<Props> = ({ destino, onMudar, uasgOr
               {achados.length > MAXIMO_NA_LISTA && <div style={{ ...pequeno, padding: '0.5rem 0.75rem' }}>Mostrando {MAXIMO_NA_LISTA} de {formatNumber(achados.length)}. Escreva mais uma palavra para afinar.</div>}
             </>
           )}
-          {porCodigo && destino.uasg.length === 6 && motivoDeFora(destino.uasg) && !sugeridosVisiveis.length && linha(destino.uasg, cadastro?.nome ?? `UASG ${destino.uasg}`, null, null)}
+          {porCodigo && destino.uasg.length === 6 && motivoDeFora(destino.uasg) && linha(destino.uasg, cadastro?.nome ?? `UASG ${destino.uasg}`, null, null)}
         </div>
       )}
-      {procurandoNome && uf && daUf.data && achados.length === 0 && sugeridosVisiveis.length === 0 && (
+      {procurandoNome && uf && daUf.data && achados.length === 0 && (
         <span style={pequeno}>Nenhum órgão ativo com esse nome em {uf}. Confira a UF ou procure pelos 6 números da UASG.</span>
       )}
     </div>
