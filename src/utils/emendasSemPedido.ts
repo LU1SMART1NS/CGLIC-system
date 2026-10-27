@@ -1,6 +1,6 @@
 /**
  * Emendas sem pedido (protótipo aprovado em 26/10/2026, migration 205): a emenda que a CAEP viu no SIOP antes de o
- * parlamentar falar com ela. A lista Por emenda junta as emendas registradas e os números que só existem nos pedidos
+ * parlamentar falar com ela. A aba Emendas junta as emendas registradas e os números que só existem nos pedidos
  * (conferência com o SIOP); a emenda registrada sem pedido avisa desde o primeiro dia e fica urgente depois de N dias
  * sem contato registrado (Ajustes › Regras de Alertas).
  */

@@ -69,7 +69,8 @@ export interface NavItem {
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
  * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
  * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
- * - Emendas: Pedidos (Ver por pedido ou por autor) · Itens e kits (Por item · Por kit) (CAEP reparte a sua alocação entre parlamentares; migration 155)
+ * - Emendas: Pedidos (/emendas/pedidos) · Parlamentares (/emendas/parlamentares) · Emendas (/emendas/emendas) · Itens
+ *   (/emendas/itens: Por item · Por kit). Cada linha abre a tela 360 (Pedido, Parlamentar, Emenda), como na Carteira.
  * - Ajustes (no pé do menu), em três grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas), Emendas (Beneficiários) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
@@ -116,7 +117,7 @@ export const navigationConfig: NavItem[] = [
       },
       {
         // O coordenador vê o mesmo resumo das emendas numa aba do Início dele (decisão de 23/10/2026); a consulta
-        // também, só leitura, porque já lê Pedidos e Itens e kits (decisão de 25/10/2026).
+        // também, só leitura, porque já lê Pedidos e Itens (decisão de 25/10/2026).
         id: 'emendas-inicio-coordenador',
         label: 'Emendas',
         icon: ScrollText,
@@ -286,7 +287,7 @@ export const navigationConfig: NavItem[] = [
       },
       {
         id: 'emendas-itens',
-        label: 'Itens e kits',
+        label: 'Itens',
         icon: Boxes,
         route: '/emendas/itens',
         status: 'active',

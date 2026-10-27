@@ -334,7 +334,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Pedidos', '/emendas/pedidos'],
         ['Parlamentares', '/emendas/parlamentares'],
         ['Emendas', '/emendas/emendas'],
-        ['Itens e kits', '/emendas/itens']
+        ['Itens', '/emendas/itens']
       ]);
       // Beneficiários é cadastro de apoio: fica em Ajustes, no grupo Emendas
       expect(visible.find((i) => i.id === 'configuracoes')?.children?.map((c) => [c.label, c.route, c.group])).toEqual([
