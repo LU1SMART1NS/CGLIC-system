@@ -16,6 +16,26 @@ describe('pendenciasDoMenu: Ajustes', () => {
     expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, gruposUasgs: { aConfirmar: 0, semSugestao: 0 } }).configuracoes).toBeUndefined();
     expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, gruposUasgs: null }).configuracoes).toBeUndefined();
   });
+  it('soma UASGs e beneficiários de emenda; abre primeiro nas UASGs', () => {
+    const r = pendenciasDoMenu({
+      empenhos: null,
+      financeiro: null,
+      extras,
+      gruposUasgs: { aConfirmar: 0, semSugestao: 1 },
+      gruposBeneficiarios: { aConfirmar: 540, semSugestao: 7 }
+    });
+    expect(r.configuracoes).toEqual({ contagem: 548, destino: '/admin/grupos-uasgs?situacao=SEM_SUGESTAO' });
+  });
+  it('só beneficiários (gestor de emendas ou UASGs em dia): abre Grupos dos beneficiários', () => {
+    const base = { empenhos: null, financeiro: null, extras, gruposUasgs: null };
+    expect(pendenciasDoMenu({ ...base, gruposBeneficiarios: { aConfirmar: 2, semSugestao: 3 } }).configuracoes).toEqual({
+      contagem: 5,
+      destino: '/emendas/grupos-beneficiarios?situacao=A_CONFIRMAR'
+    });
+    expect(pendenciasDoMenu({ ...base, gruposBeneficiarios: { aConfirmar: 0, semSugestao: 3 } }).configuracoes?.destino).toBe(
+      '/emendas/grupos-beneficiarios?situacao=SEM_SUGESTAO'
+    );
+  });
 });
 
 describe('pendenciasDoMenu: Emendas', () => {

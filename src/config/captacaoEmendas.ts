@@ -80,6 +80,21 @@ export type SituacaoGrupoBeneficiario = 'A_CONFIRMAR' | 'SEM_SUGESTAO' | 'CONFIR
 export const situacaoGrupoBeneficiario = (grupo: GrupoBeneficiario | null, sugestao: GrupoBeneficiario | null): SituacaoGrupoBeneficiario =>
   grupo ? 'CONFIRMADOS' : sugestao ? 'A_CONFIRMAR' : 'SEM_SUGESTAO';
 
+/** Beneficiários ativos sem grupo confirmado, com e sem sugestão (as abas da tela Grupos dos beneficiários). */
+export function contarBeneficiariosSemGrupo(
+  beneficiarios: Array<Pick<BeneficiarioEmenda, 'id' | 'ativo' | 'nome' | 'sigla' | 'naturezaJuridica'>>,
+  confirmados: GrupoConfirmadoBeneficiario[]
+): { aConfirmar: number; semSugestao: number } {
+  const comGrupo = new Set(confirmados.map((g) => g.beneficiarioId));
+  const c = { aConfirmar: 0, semSugestao: 0 };
+  for (const b of beneficiarios) {
+    if (!b.ativo || comGrupo.has(b.id)) continue;
+    if (sugerirGrupoBeneficiario(b)) c.aConfirmar++;
+    else c.semSugestao++;
+  }
+  return c;
+}
+
 // ------------------------------------------------------------------------------
 // Fatias
 // ------------------------------------------------------------------------------

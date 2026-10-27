@@ -8,6 +8,7 @@ import { ContagensDaCarteira } from '../vinculacao/ContagensDaCarteira';
 import { useContagemFinanceiro } from '../financeiro/useContagemFinanceiro';
 import { useContagemGruposUasgs } from '../admin/useContagemGruposUasgs';
 import { useContagemEmendas } from '../emendas/useContagemEmendas';
+import { useContagemGruposBeneficiarios } from '../emendas/useContagemGruposBeneficiarios';
 import { pendenciasDoMenu, type PendenciaDaArea } from './pendenciasDoMenu';
 
 interface SidebarProps {
@@ -102,8 +103,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
   const financeiro = useContagemFinanceiro();
   const extras = useContagensExtras();
   const gruposUasgs = useContagemGruposUasgs();
+  const gruposBeneficiarios = useContagemGruposBeneficiarios();
   const emendas = useContagemEmendas();
-  const pendencias = useMemo(() => pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, emendas }), [empenhos, financeiro, extras, gruposUasgs, emendas]);
+  const pendencias = useMemo(
+    () => pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas }),
+    [empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas]
+  );
 
   // Registra antes de montar os links, para o da área atual já apontar para a página aberta (idempotente).
   rememberAreaVisit(areas, pathname, search);
