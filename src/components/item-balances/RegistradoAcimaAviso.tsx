@@ -6,6 +6,8 @@ import { formatNumber } from './itemBalanceUtils';
 import { formatDataHoraBR } from '../../utils/format';
 import type { QuantitativosDoItem } from '../../services/quantitativosService';
 import { orgaosAcimaDaAtaAssinada, type RegistradoAcima } from '../../utils/registradoAcima';
+import { useTermosDeProrrogacao } from '../../hooks/useTermosDeProrrogacao';
+import type { TermoDeProrrogacao } from '../../services/termosProrrogacaoService';
 
 export interface RegistradoAcimaAvisoProps {
   aviso: RegistradoAcima;
@@ -20,7 +22,33 @@ export interface RegistradoAcimaAvisoProps {
   baseSemDesconto: number;
   contratado: number;
   nomeDe: (uasg: string) => string;
+  /** Ata do item, para achar o termo aditivo de prorrogação no PNCP (migration 222). */
+  numeroAta?: string;
+  uasg?: string;
 }
+
+const dataBR = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '');
+
+/**
+ * O que o termo de prorrogação publicado no PNCP diz sobre o saldo. Em 27/10/2026 quase todo aviso aberto era de ata
+ * prorrogada, e os termos dizem que o 2º ano cobre só o saldo não contratado.
+ */
+export const TermoDaProrrogacao: React.FC<{ termo: TermoDeProrrogacao }> = ({ termo: t }) => (
+  <div data-testid="registrado-acima-termo" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.5rem 0.7rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+    <span>
+      <b>Ata prorrogada.</b> Termo aditivo publicado no PNCP{t.publicadoEm ? ` em ${dataBR(t.publicadoEm)}` : ''}
+      {t.url && <> · <a href={t.url} target="_blank" rel="noopener noreferrer" data-testid="registrado-acima-termo-link">abrir o termo ↗</a></>}
+    </span>
+    {t.trecho && <span style={{ fontStyle: 'italic' }}>“{t.trecho}”</span>}
+    <span>
+      {t.cobertura === 'SALDO'
+        ? 'A prorrogação cobre só o saldo não contratado. O aumento que o Compras.gov.br mostra depois da prorrogação não tem lastro: peça ao MGI a correção do cadastro.'
+        : t.cobertura === 'RENOVA'
+          ? 'O termo renova os quantitativos. Se o aumento no Compras.gov.br for essa renovação, resolva o aviso com a justificativa.'
+          : 'Não deu para ler o que o termo diz sobre o saldo. Abra o termo para conferir.'}
+    </span>
+  </div>
+);
 
 const caixa: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0.8rem 0.95rem', borderRadius: '8px',
@@ -41,6 +69,7 @@ export const RegistradoAcimaAviso: React.FC<RegistradoAcimaAvisoProps> = (p) => 
   const resolucao = useResolverAviso();
   const info = resolucao.porChave.get(a.chave);
   const resolvido = a.resolvido || Boolean(info);
+  const termos = useTermosDeProrrogacao(p.numeroAta ?? '', p.uasg ?? '', !resolvido);
 
   if (resolvido) {
     const reexibir = async () => {
@@ -65,6 +94,7 @@ export const RegistradoAcimaAviso: React.FC<RegistradoAcimaAvisoProps> = (p) => 
   }
 
   const acima = a.ataAssinadaInformada ? orgaosAcimaDaAtaAssinada(q.orgaos, q.gerenciadoParticipantes) : [];
+  const termo = termos.data?.[0] ?? null;
   const participantes = a.excedente - a.excedenteSenasp;
   const baseComDesconto = p.baseSemDesconto - a.desconto;
 
@@ -129,6 +159,8 @@ export const RegistradoAcimaAviso: React.FC<RegistradoAcimaAvisoProps> = (p) => 
           'O excedente está só nos participantes: o saldo da SENASP não muda.'
         )}
       </div>
+
+      {termo && <TermoDaProrrogacao termo={termo} />}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem 1rem', alignItems: 'center' }}>
         <b>Confira a IRP e o cadastro da ata no Compras.gov.br.</b>

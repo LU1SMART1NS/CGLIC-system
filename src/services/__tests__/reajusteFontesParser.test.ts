@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lerClausulaDoEdital, lerReajustesDoDocumento, normalizarTexto, resolverEfeito } from '../reajusteFontesParser';
+import { lerClausulaDoEdital, lerReajustesDoDocumento, lerTermoDeProrrogacao, normalizarTexto, resolverEfeito } from '../reajusteFontesParser';
 
 // Trechos reais dos documentos publicados no PNCP (23/10/2026), só a parte da cláusula.
 const TERMO_ADITIVO_COM_CICLO =
@@ -167,5 +167,26 @@ describe('resolverEfeito', () => {
 describe('normalizarTexto', () => {
   it('junta linhas e corrige a ligadura', () => {
     expect(normalizarTexto('orçamento es!mado\n de 10/2024')).toBe('orçamento estimado de 10/2024');
+  });
+});
+
+describe('lerTermoDeProrrogacao (migration 222)', () => {
+  it('termo da 00064/2024: "abrange apenas o saldo remanescente" (frase quebrada em duas linhas no PDF)', () => {
+    const texto = 'PRIMEIRO TERMO ADITIVO DA ATA DE REGISTRO DE PREÇOS Nº 64/2024\nRESOLVE prorrogar a Ata ... 1.1. A prorrogação do prazo de vigência por mais 1 ano;\n1.2. A presente prorrogação abrange apenas o saldo\nremanescente dos itens registrados.\n2. CLÁUSULA SEGUNDA';
+    expect(lerTermoDeProrrogacao(texto)).toEqual({ cobertura: 'SALDO', trecho: 'A presente prorrogação abrange apenas o saldo remanescente dos itens registrados.' });
+  });
+
+  it('termo da 00059/2025: "restabelece o saldo remanescente" também é só o saldo não contratado', () => {
+    const texto = 'TERMO ADITIVO ... RESOLVE prorrogar a Ata de Registro de Preços nº 59/2025 ... 1.1.2. A presente prorrogação restabelece o saldo remanescente dos itens registrados, com fulcro nas regras editalícias. 2. CLÁUSULA';
+    expect(lerTermoDeProrrogacao(texto)).toEqual({ cobertura: 'SALDO', trecho: 'A presente prorrogação restabelece o saldo remanescente dos itens registrados, com fulcro nas regras editalícias.' });
+  });
+
+  it('renovação dos quantitativos (Parecer 75/2024/DECOR) e prorrogação sem dizer nada', () => {
+    expect(lerTermoDeProrrogacao('TERMO ADITIVO de prorrogação da ata. 1.2. Ficam renovados os quantitativos originalmente registrados.')).toMatchObject({ cobertura: 'RENOVA' });
+    expect(lerTermoDeProrrogacao('TERMO ADITIVO. Fica prorrogada a vigência da ata por mais um ano.')).toEqual({ cobertura: 'A_CONFERIR', trecho: null });
+  });
+
+  it('apostilamento de reajuste não é termo de prorrogação', () => {
+    expect(lerTermoDeProrrogacao('APOSTILAMENTO. REAJUSTAR o valor unitário dos itens da Ata pelo IPCA.', 'REAJUSTAR o valor unitário')).toBeNull();
   });
 });
