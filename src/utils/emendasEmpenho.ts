@@ -76,12 +76,13 @@ export interface EtiquetaConferencia {
 /** Até 3 números de nota e "e mais N": a lista inteira está no SEI do pedido. */
 const algumas = (notas: string[]) => (notas.length <= 3 ? notas.join(', ') : `${notas.slice(0, 3).join(', ')} e mais ${notas.length - 3}`);
 
-export function motivoAConferir(c: Pick<ConferenciaEmpenho, 'notasFora' | 'notasNaoLidas' | 'notasPorValor' | 'notasComItemSemAta'>): string {
+export function motivoAConferir(c: Pick<ConferenciaEmpenho, 'notasFora' | 'notasNaoLidas' | 'notasPorValor' | 'notasComItemSemAta' | 'notasAnuladas'>): string {
   const partes: string[] = [];
   if (c.notasFora.length) partes.push(`${c.notasFora.length === 1 ? 'falta a nota' : `faltam ${c.notasFora.length} notas`} do SEI no sistema (${algumas(c.notasFora)})`);
   if (c.notasNaoLidas.length) partes.push(`${c.notasNaoLidas.length === 1 ? 'nota ainda não lida' : `${c.notasNaoLidas.length} notas ainda não lidas`} no Portal (${algumas(c.notasNaoLidas)})`);
   if (c.notasPorValor.length) partes.push(`nota em reais, sem quantidade (${algumas(c.notasPorValor)})`);
   if (c.notasComItemSemAta.length) partes.push(`item da nota sem ata conhecida (${algumas(c.notasComItemSemAta)})`);
+  if (c.notasAnuladas.length) partes.push(`${c.notasAnuladas.length === 1 ? 'nota anulada' : `${c.notasAnuladas.length} notas anuladas`} no Tesouro (${algumas(c.notasAnuladas)}): registre a anulação no pedido`);
   return partes.join('; ');
 }
 
