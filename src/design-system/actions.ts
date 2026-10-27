@@ -71,6 +71,8 @@ export const ACTIONS = {
   juntar: { label: 'Juntar', icon: Merge, variant: 'outline' },
   saoDiferentes: { label: 'São diferentes', icon: SplitSquareHorizontal, variant: 'outline' },
   transferir: { label: 'Transferir', icon: ArrowLeftRight, variant: 'outline' },
+  /** Remanejar quantidade do item para órgão não participante (migration 219). */
+  remanejar: { label: 'Remanejar', icon: ArrowLeftRight, variant: 'outline' },
   anterior: { label: 'Anterior', icon: ChevronLeft, variant: 'outline' },
   proximo: { label: 'Próximo', icon: ChevronRight, variant: 'outline' },
   recolher: { label: 'Recolher', icon: ChevronDown, variant: 'outline' },
