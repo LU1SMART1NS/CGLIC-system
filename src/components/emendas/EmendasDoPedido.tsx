@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { InfoHint } from '../../design-system/components/InfoHint';
 import { AppButton } from '../../design-system/components/AppButton';
+import { ActionButton } from '../../design-system/components/ActionButton';
 import { useToast } from '../../design-system/components/Toast';
 import { useRemoverEmendaDoPedido, useSalvarValorOficio } from '../../hooks/useEmendas';
 import { AppInput } from '../../design-system/components/FormFields';
@@ -144,12 +145,8 @@ const ValorDoOficio: React.FC<{ p: PedidoEmenda; onClose: () => void }> = ({ p, 
         <input type="checkbox" checked={retificador} onChange={(e) => setRetificador(e.target.checked)} /> Retificador
       </label>
       <span style={{ display: 'inline-flex', gap: '0.3rem' }}>
-        <AppButton size="xs" variant="link" type="button" onClick={onClose} disabled={salvar.isPending}>
-          Cancelar
-        </AppButton>
-        <AppButton size="xs" type="submit" disabled={!ok} isLoading={salvar.isPending} data-testid="emendas-pedido-oficio-salvar">
-          Salvar
-        </AppButton>
+        <ActionButton action="cancelar" size="xs" type="button" onClick={onClose} disabled={salvar.isPending} />
+        <ActionButton action="salvar" size="xs" type="submit" disabled={!ok} isLoading={salvar.isPending} data-testid="emendas-pedido-oficio-salvar" />
       </span>
     </form>
   );
