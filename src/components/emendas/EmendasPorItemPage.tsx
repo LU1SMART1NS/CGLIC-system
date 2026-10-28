@@ -21,19 +21,17 @@ import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, rotuloItemDaAta } from '../../utils/emendasKits';
 import { ItemDaAta, ValorPrevisto, VigenciaDaAta } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
-import { notaDoPreco } from '../../utils/emendasQuadro';
 import { DadosItemModal } from './DadosItemModal';
-import { itensDaLinha, linhasAtivas, precoParaEmenda } from '../../utils/emendasPedidos';
+import { itemComSaldo, montarLinhasItensCaep, type LinhaItemCaep } from '../../utils/emendasItensSaldo';
 import type { ItemCaep } from '../../services/emendasService';
 import { GtiCelulaAta } from '../gti/GtiVisual';
 import { ROTULO_GTI_ITENS, useFatiasItensGtiLeitura } from '../../hooks/useGruposGti';
-import { chaveItemGti, GRUPO_GTI_INFO, type FatiasDaAta } from '../../config/gruposGti';
+import { GRUPO_GTI_INFO } from '../../config/gruposGti';
 import { useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
 import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
 
 type Segmento = 'com' | 'sem' | 'encerrada' | 'todos';
-/** previsto/hoje: preço unitário para a emenda (o do quadro do parlamentar) e o de hoje; nota: por que mudou. pedidos: quantos pedidos reservam o item. fatias: interesse de cada GTI no item (o mesmo da Carteira › Itens). */
-type Linha = ItemCaep & { reservado: number; saldo: number; pedidos: number; previsto: number; hoje: number; nota: string | null; fatias: FatiasDaAta | undefined };
+type Linha = LinhaItemCaep;
 
 // Ordenação pelo cabeçalho, como nas carteiras (?ordem=); sem escolha, pela descrição do item.
 const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
@@ -52,6 +50,8 @@ interface Props {
   seletor?: React.ReactNode;
   /** Item que chega filtrado (vindo da composição de um kit). */
   abrir?: string | null;
+  /** Botão Exportar da aba Itens (itens e kits com saldo), ao lado de Atualizar. */
+  exportar?: React.ReactNode;
 }
 
 /**
@@ -59,7 +59,7 @@ interface Props {
  * (kits abertos) e o saldo a oferecer. A linha inteira abre o Item 360 na aba Emendas, que mostra quem reservou, em que
  * fase está cada pedido e em quais kits o item entra (decisão de 24/10/2026: a lista é só o saldo).
  */
-export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
+export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, exportar }) => {
   const { data: itens = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = useItensCaep();
   const { data: pedidos = [], refetch: recarregarPedidos } = usePedidosEmendas();
   const hoje = hojeEmBrasilia();
@@ -75,36 +75,9 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
   const [editando, setEditando] = useState<ItemCaep | null>(null);
   const navigate = useNavigateWithOrigin();
 
-  const linhas: Linha[] = useMemo(() => {
-    const reservado = new Map<string, number>();
-    const pedidosDoItem = new Map<string, Set<string>>();
-    for (const p of pedidos) {
-      if (p.etapa === 'CANCELADO') continue;
-      for (const l of linhasAtivas(p)) {
-        for (const x of itensDaLinha(l)) {
-          reservado.set(x.itemKey, (reservado.get(x.itemKey) ?? 0) + x.quantidade);
-          pedidosDoItem.set(x.itemKey, (pedidosDoItem.get(x.itemKey) ?? new Set()).add(p.id));
-        }
-      }
-    }
-    const porChave = new Map(itens.map((i) => [i.itemKey, i]));
-    return itens.map((i) => {
-      const r = reservado.get(i.itemKey) ?? 0;
-      const preco = precoParaEmenda(i.itemKey, porChave, precos);
-      return {
-        ...i,
-        reservado: r,
-        saldo: i.alocado - r,
-        pedidos: pedidosDoItem.get(i.itemKey)?.size ?? 0,
-        previsto: preco.previsto,
-        hoje: preco.hoje,
-        nota: notaDoPreco(preco.preco, ipca),
-        fatias: fatiasItens.get(chaveItemGti(i.numeroAta, i.codigoUasg, i.numeroItem))
-      };
-    });
-  }, [itens, pedidos, precos, ipca, fatiasItens]);
+  const linhas: Linha[] = useMemo(() => montarLinhasItensCaep(itens, pedidos, precos, ipca, fatiasItens), [itens, pedidos, precos, ipca, fatiasItens]);
 
-  const situacao = (l: Linha): Segmento => (l.ataEncerrada ? 'encerrada' : l.saldo > 0 ? 'com' : 'sem');
+  const situacao = (l: Linha): Segmento => (l.ataEncerrada ? 'encerrada' : itemComSaldo(l) ? 'com' : 'sem');
   const contagem = useMemo(() => {
     const c: Record<Segmento, number> = { com: 0, sem: 0, encerrada: 0, todos: linhas.length };
     for (const l of linhas) c[situacao(l)]++;
@@ -203,7 +176,12 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
         hint="Saldo = alocado à CAEP − reservado nos pedidos não cancelados (kits abertos nos itens). O valor é o previsto para a emenda, com o reajuste da ata (o mesmo do quadro do parlamentar); o reservado soma pelo preço previsto e o alocado pelo preço de hoje."
         icon={<Boxes size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={seletor}
-        actions={<HeaderRefreshAction onRefresh={() => Promise.all([refetch(), recarregarPedidos()])} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-itens-atualizar" tooltipTitle="Recarregar os itens e os pedidos" />}
+        actions={
+          <>
+            {exportar}
+            <HeaderRefreshAction onRefresh={() => Promise.all([refetch(), recarregarPedidos()])} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-itens-atualizar" tooltipTitle="Recarregar os itens e os pedidos" />
+          </>
+        }
       />
 
       <CarteiraSegmentTabs<Segmento>
