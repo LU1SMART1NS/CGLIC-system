@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { avisosDeEmpenho } from '../emendasEmpenho';
-import { avisoGrave, ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notasEmitidasDepoisDaAnulacao, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, reservaDoItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { avisoGrave, ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notasEmitidasDepoisDaAnulacao, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasDaLista, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, reservaDoItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { ConferenciaEmpenho, NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
@@ -29,6 +29,27 @@ const kit = linha({ tipo: 'KIT', itemKey: null, kitId: 'k', kitComposicao: [{ it
 describe('pedidos das emendas', () => {
   it('kit ocupa N vezes a composição do dia', () => {
     expect(itensDaLinha(kit)).toEqual([{ itemKey: 'a', quantidade: 10 }, { itemKey: 'b', quantidade: 20 }]);
+  });
+
+  it('lista de pedidos: item pelo nome curto, beneficiário pela sigla, kit pelo nome e sem beneficiário = null', () => {
+    const catalogo = new Map([item('a', { nomeCurto: 'Carabina 5,56 mm' }), item('b')].map((i) => [i.itemKey, i] as const));
+    const bens = new Map([['b1', { nome: 'Polícia Militar de Minas Gerais', sigla: 'PMMG' }], ['b2', { nome: 'Guarda de Sorocaba', sigla: '' }]]);
+    const p = pedido({
+      linhas: [
+        linha({ itemKey: 'a', quantidade: 10, beneficiarioId: 'b1' }),
+        linha({ itemKey: 'b', quantidade: 2, beneficiarioId: 'b2' }),
+        linha({ tipo: 'KIT', itemKey: null, kitNome: 'Kit Academia', quantidade: 1, beneficiarioNome: 'PMRJ antigo' }),
+        linha({ itemKey: 'a', quantidade: 5, cancelada: true })
+      ]
+    });
+    const r = linhasDaLista(p, catalogo, bens);
+    expect(r.map((x) => [x.quantidade, x.nome, x.beneficiario, x.kit])).toEqual([
+      [10, 'Carabina 5,56 mm', 'PMMG', false],
+      [2, 'b', 'Guarda de Sorocaba', false],
+      [1, 'Kit Academia', 'PMRJ antigo', true]
+    ]);
+    expect(r[0].beneficiarioNome).toBe('Polícia Militar de Minas Gerais');
+    expect(linhasDaLista(pedido({ linhas: [linha({ itemKey: 'a' })] }), catalogo, bens)[0].beneficiario).toBeNull();
   });
 
   it('reservado soma pedidos e linhas não cancelados, e pode excluir o pedido em edição', () => {
