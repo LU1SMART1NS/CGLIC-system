@@ -4,7 +4,7 @@ import { buildAtaItemPath, buildAtaPath } from '../../hooks/useAta';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { SummaryBar } from '../../design-system/components/SummaryBar';
 import { InfoHint } from '../../design-system/components/InfoHint';
-import { carteiraDescricaoItem, carteiraDetalhe, carteiraFornecedor, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
+import { carteiraDescricaoItem, carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
@@ -53,11 +53,15 @@ const ataEmCinza: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b',
  * número do item abre o Item 360 na aba Emendas e o da ata abre a Ata 360 (o clique não abre a linha da tabela).
  */
 export const ItemDaAta: React.FC<{
-  item: Pick<ItemCaep, 'numeroAta' | 'numeroItem' | 'descricao' | 'codigoUasg'> | null | undefined;
+  item: (Pick<ItemCaep, 'numeroAta' | 'numeroItem' | 'descricao' | 'codigoUasg'> & Partial<Pick<ItemCaep, 'nomeCurto'>>) | null | undefined;
   semItem?: string;
   extra?: React.ReactNode;
   comLinks?: boolean;
-}> = ({ item, semItem, extra, comLinks }) => {
+  /** Mostra o nome curto da CAEP (o do quadro do gabinete) em destaque, com a descrição do edital embaixo. */
+  comNomeCurto?: boolean;
+  /** Sem "· Ata 00018/2025" ao lado do número: a tabela já está agrupada pela ata. */
+  semAta?: boolean;
+}> = ({ item, semItem, extra, comLinks, comNomeCurto, semAta }) => {
   const parar = (e: React.MouseEvent) => e.stopPropagation();
   return (
     <>
@@ -76,22 +80,33 @@ export const ItemDaAta: React.FC<{
           ) : (
             <span style={carteiraIdentificacao}>{String(item.numeroItem).padStart(5, '0')}</span>
           )}
-          <span style={ataEmCinza}>·</span>
-          {comLinks ? (
-            <Link to={buildAtaPath(item.numeroAta, item.codigoUasg)} onClick={parar} style={{ ...ataEmCinza, textDecoration: 'none' }} title={`Abrir a Ata 360 (UASG ${item.codigoUasg})`} data-testid="emendas-ata-link">
-              Ata {item.numeroAta}
-            </Link>
-          ) : (
-            <span style={ataEmCinza} title={`UASG ${item.codigoUasg}`}>
-              Ata {item.numeroAta}
-            </span>
+          {!semAta && (
+            <>
+              <span style={ataEmCinza}>·</span>
+              {comLinks ? (
+                <Link to={buildAtaPath(item.numeroAta, item.codigoUasg)} onClick={parar} style={{ ...ataEmCinza, textDecoration: 'none' }} title={`Abrir a Ata 360 (UASG ${item.codigoUasg})`} data-testid="emendas-ata-link">
+                  Ata {item.numeroAta}
+                </Link>
+              ) : (
+                <span style={ataEmCinza} title={`UASG ${item.codigoUasg}`}>
+                  Ata {item.numeroAta}
+                </span>
+              )}
+            </>
           )}
           {extra}
         </div>
       )}
-      <div title={item?.descricao} style={carteiraDescricaoItem}>
-        {item ? descricaoItemEmFrase(item.descricao) : semItem}
-      </div>
+      {comNomeCurto && item?.nomeCurto?.trim() ? (
+        // Com nome curto, a descrição do edital sai da tela e fica na dica.
+        <div title={item.descricao} style={{ ...carteiraValor, marginTop: '0.15rem' }} data-testid="emendas-item-nome-curto">
+          {item.nomeCurto.trim()}
+        </div>
+      ) : (
+        <div title={item?.descricao} style={carteiraDescricaoItem}>
+          {item ? descricaoItemEmFrase(item.descricao) : semItem}
+        </div>
+      )}
     </>
   );
 };
@@ -109,7 +124,12 @@ export const VigenciaDaAta: React.FC<{ item: Pick<ItemCaep, 'vigenciaFinal' | 'a
 };
 
 /** Linha do pedido: kit (nome e composição) ou item (ata · item e descrição). */
-export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitNome' | 'kitComposicao' | 'quantidade'>; itens: Map<string, ItemCaep>; comLinks?: boolean }> = ({ linha, itens, comLinks }) => {
+export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitNome' | 'kitComposicao' | 'quantidade'>; itens: Map<string, ItemCaep>; comLinks?: boolean; semAta?: boolean }> = ({
+  linha,
+  itens,
+  comLinks,
+  semAta
+}) => {
   if (linha.tipo === 'KIT') {
     return (
       <>
@@ -128,7 +148,7 @@ export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKe
     );
   }
   const i = linha.itemKey ? itens.get(linha.itemKey) : undefined;
-  return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} comLinks={comLinks} />;
+  return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} comLinks={comLinks} comNomeCurto semAta={semAta} />;
 };
 
 /** Nome da unidade e, ao lado, a sigla mais clara (padrão "00001 · Ata 00055/2025" das carteiras). */
@@ -143,25 +163,14 @@ export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigl
   </div>
 );
 
-/** Embaixo do nome, na linha da emenda: a razão social do CNPJ vinculado e a cidade - UF (aqui não há coluna de entrega). */
-export const RazaoELocal: React.FC<{ b: Pick<BeneficiarioEmenda, 'razaoSocial' | 'entregaMunicipio' | 'entregaUf'> }> = ({ b }) => {
-  const local = localDoBeneficiario(b);
-  return (
-    <>
-      {b.razaoSocial && <div style={carteiraFornecedor}>{b.razaoSocial}</div>}
-      {local && <div style={carteiraDetalhe}>{local}</div>}
-    </>
-  );
-};
-
-/** Beneficiário da linha: o nome com a sigla e embaixo a razão social (migration 166). */
+/** Beneficiário da linha: o nome com a sigla e, embaixo, o local de entrega; a razão social fica no cadastro (decisão de 28/10/2026). */
 export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficiarioId'>; beneficiarios: Map<string, BeneficiarioEmenda> }> = ({ linha, beneficiarios }) => {
   const b = linha.beneficiarioId ? beneficiarios.get(linha.beneficiarioId) : undefined;
   if (b) {
     return (
       <>
         <NomeComSigla b={b} />
-        <RazaoELocal b={b} />
+        {localDoBeneficiario(b) && <div style={carteiraDetalhe}>{localDoBeneficiario(b)}</div>}
         {!b.cnpj && <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />}
       </>
     );
