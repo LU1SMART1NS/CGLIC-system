@@ -85,7 +85,7 @@ describe('Pedidos: ver por pedido ou por emenda', () => {
     expect(html).toContain('Captação principal');
     expect(html).toContain('emendas-pedidos-captacao-filter-gti');
     // Com o filtro de um grupo sem beneficiário confirmado, nenhum pedido passa.
-    expect(render('/?captacao=CNCG')).toContain('0 de 4 pedidos');
+    expect(render('/?captacao=CNCG&ano=todos')).toContain('0 de 4 pedidos');
   });
 
   it('?autor= deixa só os pedidos daquele autor; a-definir são as reservas sem parlamentar', () => {
@@ -140,7 +140,7 @@ describe('Pedidos: a faixa das emendas sem pedido', () => {
 
 describe('Pedidos: lista plana que abre o Pedido 360 (protótipo aprovado em 27/10/2026)', () => {
   it('a coluna Pedido mostra o número no parlamentar; sem emenda é reserva; com a emenda sem o ano, "ano a informar"', () => {
-    const html = render('/');
+    const html = render('/?ano=todos');
     expect(html).toContain('>1/2026<');
     expect(html).toContain('>Reserva<');
     // Sem a data nem "da planilha" na coluna (decisão de 27/10/2026): a data fica no Pedido 360.
@@ -158,5 +158,19 @@ describe('Pedidos: lista plana que abre o Pedido 360 (protótipo aprovado em 27/
 
   it('endereço antigo (?pedido=): não mostra a lista, vai para o Pedido 360', () => {
     expect(render('/?pedido=p2')).not.toContain('emendas-pedidos-tabela');
+  });
+});
+
+describe('Pedidos: ano da emenda (28/10/2026)', () => {
+  it('abre no ano corrente: a reserva sem emenda entra no ano em que foi feita; a emenda sem ano fica no aviso "sem ano"', () => {
+    const html = render('/');
+    expect(html).toContain('emendas-pedidos-ano-btn');
+    expect(html).toContain('>1 sem ano<');
+    expect(html).not.toContain('Emenda 4014 0004');
+    expect(render('/?ano=sem')).toContain('Emenda 4014 0004');
+  });
+
+  it('quem chega por um aviso, etapa ou parlamentar abre em todos os anos', () => {
+    expect(render('/?autor=A1')).toContain('Emenda 4014 0004');
   });
 });

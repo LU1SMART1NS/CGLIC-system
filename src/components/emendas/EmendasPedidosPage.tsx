@@ -68,6 +68,8 @@ import { rotuloBeneficiario, type AutorEmenda, type EtapaPedido, type NotaDaLinh
 import { AutorDoPedido, LARGURA_AUTOR, ValorDoPedido } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { PedidoModal } from './PedidoModal';
+import { AnoDaEmenda } from './AnoDaEmenda';
+import { ANO_TODOS, contagemPorAno, lerAnoDaUrl, pedidoNoAno } from '../../utils/emendasAno';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 
@@ -132,6 +134,11 @@ export const EmendasPedidosPage: React.FC = () => {
   // ?ver=autor e ?ver=emenda vão para lá. O filtro de parlamentar fica no endereço (?autor=).
   const verAntigo = searchParams.get('ver');
   const filtroAutor = searchParams.get('autor') ?? '';
+  // Ano da emenda (28/10/2026): abre no ano corrente. Quem chega por um aviso, uma etapa ou um parlamentar (Início,
+  // número do menu) abre em todos os anos, para a lista bater com o número de onde veio.
+  const anoCorrente = Number(hoje.slice(0, 4));
+  const anoPadrao = searchParams.has('aviso') || searchParams.has('etapa') || searchParams.has('autor') ? ANO_TODOS : String(anoCorrente);
+  const filtroAno = searchParams.get('ano') ? lerAnoDaUrl(searchParams.get('ano'), anoCorrente, true) : anoPadrao;
   const mudarUrl = (mudar: (p: URLSearchParams) => void) =>
     setSearchParams((atual) => {
       const prox = new URLSearchParams(atual);
@@ -159,7 +166,7 @@ export const EmendasPedidosPage: React.FC = () => {
   const modoCaptacao = lerModoCaptacao(searchParams.get('captacaoConta'));
   const linhas: Linha[] = useMemo(
     () =>
-      pedidos.map((p) => {
+      pedidos.filter((p) => pedidoNoAno(p, filtroAno)).map((p) => {
         const v = valorDoPedidoNaEtapa(p, itens, precos);
         return {
           ...p,
@@ -169,8 +176,10 @@ export const EmendasPedidosPage: React.FC = () => {
           captacao: fatiasDaCaptacao([p], gruposDosBeneficiarios, itens, precos)
         };
       }),
-    [pedidos, itens, hoje, notas, precos, diferencas, credorPendente, gruposDosBeneficiarios]
+    [pedidos, filtroAno, itens, hoje, notas, precos, diferencas, credorPendente, gruposDosBeneficiarios]
   );
+  // Contagem do botão de ano: os pedidos não cancelados de cada ano (o "Todos" do trilho).
+  const anosDoSeletor = useMemo(() => contagemPorAno(pedidos, anoCorrente), [pedidos, anoCorrente]);
 
   const contagem = useMemo(() => {
     const c: Record<string, number> = { todos: 0, CANCELADO: 0 };
@@ -375,6 +384,20 @@ export const EmendasPedidosPage: React.FC = () => {
         icon={<ClipboardList size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
+            <AnoDaEmenda
+              valor={filtroAno}
+              anoCorrente={anoCorrente}
+              anos={anosDoSeletor.anos}
+              todos={anosDoSeletor.todos}
+              semAno={anosDoSeletor.semAno}
+              onChange={(v) =>
+                mudarUrl((p) => {
+                  if (v === anoPadrao) p.delete('ano');
+                  else p.set('ano', v);
+                })
+              }
+              testId="emendas-pedidos-ano"
+            />
             {podeGerir && <ActionButton action="novo" label="Nova reserva" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-pedidos-novo" />}
             <HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-pedidos-atualizar" tooltipTitle="Recarregar os pedidos" />
           </>
@@ -386,7 +409,7 @@ export const EmendasPedidosPage: React.FC = () => {
           tone={podeGerir && semPedido.urgentes > 0 ? 'danger' : 'warning'}
           testId="emendas-pedidos-faixa-sem-pedido"
           action={
-            <AppButton variant="outline" size="sm" onClick={() => navegar('/emendas/emendas?situacao=sem')} data-testid="emendas-pedidos-faixa-sem-pedido-ver">
+            <AppButton variant="outline" size="sm" onClick={() => navegar('/emendas/emendas?situacao=sem&ano=todos')} data-testid="emendas-pedidos-faixa-sem-pedido-ver">
               Ver emendas
             </AppButton>
           }
@@ -421,7 +444,9 @@ export const EmendasPedidosPage: React.FC = () => {
               setBusca('');
               setFiltroEtapa('');
               setFiltroAviso('');
-              if (searchParams.toString()) setSearchParams({}, { replace: true });
+              // O ano não é filtro da lista: fica como está.
+              const ano = searchParams.get('ano');
+              if (searchParams.toString()) setSearchParams(ano ? { ano } : {}, { replace: true });
             }}
             counter={carteiraCounter(filtradas.length, doSegmento.length, filtrosAtivos, 'pedido', 'pedidos')}
             testIdPrefix="emendas-pedidos"

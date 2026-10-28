@@ -8,7 +8,6 @@ import { DataTable, type Column } from '../../../design-system/components/DataTa
 import { StatusBadge, type StatusBadgeVariant } from '../../../design-system/components/StatusBadge';
 import { ActionButton } from '../../../design-system/components/ActionButton';
 import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilterBar';
-import { CarteiraFilterButton } from '../../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
@@ -39,6 +38,8 @@ import type { EmendaSiop, NotaDaLinha } from '../../../services/emendasService';
 import { AutorDoPedido, LARGURA_AUTOR } from '../emendasPartes';
 import { CelulaCaptacao, FiltroCaptacao } from '../CaptacaoDoPedido';
 import { EmendaSiopModal } from '../EmendaSiopModal';
+import { AnoDaEmenda } from '../AnoDaEmenda';
+import { ANO_SEM, ANO_TODOS, anosDaLista, lerAnoDaUrl } from '../../../utils/emendasAno';
 import { useSobraDasEmendas } from '../parlamentares/useSobraDasEmendas';
 import { rotaDaEmenda } from './rotaDaEmenda';
 
@@ -69,7 +70,9 @@ export const EmendasListaPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const daUrl = searchParams.get('situacao');
   const segmento: Segmento = daUrl === 'sem' || daUrl === 'com' ? daUrl : 'todas';
-  const filtroAno = searchParams.get('ano') ?? '';
+  // Ano da emenda (28/10/2026): abre no ano corrente; 'sem' = nº sem o ano; 'todos' = todos os anos.
+  const anoCorrente = Number(hoje.slice(0, 4));
+  const filtroAno = lerAnoDaUrl(searchParams.get('ano'), anoCorrente, true);
   const filtroCaptacao = lerFiltroCaptacao(searchParams.get('captacao'));
   const modoCaptacao = lerModoCaptacao(searchParams.get('captacaoConta'));
   const mudarUrl = (mudar: (p: URLSearchParams) => void) =>
@@ -103,7 +106,7 @@ export const EmendasListaPage: React.FC = () => {
   }, [lista, grupos, itens, precos]);
   const pagoPorChave = useMemo(() => new Map(lista.map((l) => [l.chave, execucaoDosPedidos(l.pedidos, notas)])), [lista, notas]);
 
-  const doAno = lista.filter((l) => !filtroAno || String(l.ano ?? 'sem') === filtroAno);
+  const doAno = lista.filter((l) => filtroAno === ANO_TODOS || String(l.ano ?? ANO_SEM) === filtroAno);
   const conta = { sem: doAno.filter(semPedido).length, com: doAno.filter((l) => !semPedido(l)).length, todas: doAno.length };
   const doSegmento = doAno.filter((l) => segmento === 'todas' || (segmento === 'sem') === semPedido(l));
   const contagemCaptacao = contarPorGti(doSegmento.map((l) => captacao.get(l.chave)), modoCaptacao, GRUPOS_CAPTACAO);
@@ -115,7 +118,7 @@ export const EmendasListaPage: React.FC = () => {
         return casaBusca(`${l.numero} ${numeroDaEmenda(l.numero)} ${a?.nome ?? ''} ${a?.uf ?? ''} ${l.emenda?.objeto ?? ''}`, termo);
       })
     : doGrupo;
-  const filtrosAtivos = Boolean(termo) || filtroCaptacao !== 'TODOS' || Boolean(filtroAno);
+  const filtrosAtivos = Boolean(termo) || filtroCaptacao !== 'TODOS';
   const ordem = useMemo<Record<string, CarteiraSortColumn<EmendaNaLista>>>(
     () => ({
       emenda: { value: (l) => `${l.ano ?? 0}${l.numero}`, firstDir: 'desc' },
@@ -224,6 +227,15 @@ export const EmendasListaPage: React.FC = () => {
         icon={<FileText size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
+            <AnoDaEmenda
+              valor={filtroAno}
+              anoCorrente={anoCorrente}
+              anos={anosDaLista(anos, anoCorrente).map((a) => ({ ano: a, count: lista.filter((l) => l.ano === a).length }))}
+              todos={lista.length}
+              semAno={lista.filter((l) => l.ano == null).length}
+              onChange={(v) => mudarUrl((p) => (v === String(anoCorrente) ? p.delete('ano') : p.set('ano', v)))}
+              testId="emendas-por-emenda-ano"
+            />
             {podeGerir && <ActionButton action="novo" label="Registrar emenda do SIOP" onClick={() => setEditando('nova')} data-testid="emendas-emenda-siop-nova" />}
             <HeaderRefreshAction onRefresh={() => void refetch()} isRefreshing={false} lastUpdated={null} dataTestId="emendas-emendas-atualizar" tooltipTitle="Recarregar" />
           </>
@@ -255,23 +267,11 @@ export const EmendasListaPage: React.FC = () => {
           mudarUrl((p) => {
             p.delete('captacao');
             p.delete('captacaoConta');
-            p.delete('ano');
           });
         }}
         counter={carteiraCounter(filtradas.length, doSegmento.length, filtrosAtivos, 'emenda', 'emendas')}
         testIdPrefix="emendas-por-emenda"
       >
-        <CarteiraFilterButton
-          label="Ano"
-          value={filtroAno}
-          emptyValue=""
-          options={[
-            ...anos.map((a) => ({ value: String(a), label: String(a), count: lista.filter((l) => l.ano === a).length })),
-            ...(lista.some((l) => l.ano == null) ? [{ value: 'sem', label: 'Ano não informado', count: lista.filter((l) => l.ano == null).length }] : [])
-          ]}
-          onChange={(v) => mudarUrl((p) => (v ? p.set('ano', v) : p.delete('ano')))}
-          testId="emendas-por-emenda-filtro-ano"
-        />
         <FiltroCaptacao gti={filtroCaptacao} modo={modoCaptacao} counts={contagemCaptacao} mudarUrl={mudarUrl} testIdPrefix="emendas-por-emenda" />
       </CarteiraFilterBar>
       <AdminListShell

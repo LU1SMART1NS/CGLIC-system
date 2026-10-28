@@ -101,7 +101,7 @@ describe('números novos: Financeiro e Início', () => {
     vi.mocked(useContagemEmendas).mockReturnValue({ total: 67, urgentes: 8, semPedido: 2 });
     const html = menu();
     expect(html).toMatch(/class="app-rail-count app-rail-count--urgente"[^>]*data-testid="rail-count-emendas"[^>]*>67</);
-    expect(html).toContain('href="/emendas/pedidos"');
+    expect(html).toContain('href="/emendas/pedidos?ano=todos"');
     vi.mocked(useContagemEmendas).mockReturnValue({ total: 59, urgentes: 0, semPedido: 0 });
     expect(menu()).toMatch(/class="app-rail-count"[^>]*data-testid="rail-count-emendas"[^>]*>59</);
   });
@@ -110,7 +110,7 @@ describe('números novos: Financeiro e Início', () => {
     vi.mocked(useContagemEmendas).mockReturnValue({ total: 3, urgentes: 1, semPedido: 3 });
     const html = menu();
     expect(html).toMatch(/data-testid="rail-count-emendas"[^>]*>3</);
-    expect(html).toContain('href="/emendas/emendas?situacao=sem"');
+    expect(html).toContain('href="/emendas/emendas?situacao=sem&amp;ano=todos"');
   });
 
   it('Ajustes (coordenador): UASGs sem grupo confirmado, e o clique abre Grupos das UASGs em "A confirmar"', () => {

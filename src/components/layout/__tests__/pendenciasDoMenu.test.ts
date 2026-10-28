@@ -43,12 +43,12 @@ describe('pendenciasDoMenu: Emendas', () => {
     expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, emendas: { total: 67, urgentes: 8 } }).emendas).toEqual({
       contagem: 67,
       vermelho: true,
-      destino: '/emendas/pedidos'
+      destino: '/emendas/pedidos?ano=todos'
     });
     expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, emendas: { total: 59, urgentes: 0 } }).emendas).toEqual({
       contagem: 59,
       vermelho: false,
-      destino: '/emendas/pedidos'
+      destino: '/emendas/pedidos?ano=todos'
     });
   });
   it('sem pedido com aviso (ou sem a contagem, como na consulta), Emendas fica sem número', () => {

@@ -2082,6 +2082,7 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .emendas-sobra-barra__empenhado { background: var(--primary); }
 .emendas-sobra-barra__andamento { background: var(--primary-light, #9bb8e8); }
 .emendas-sobra-barra__sobra { background: var(--color-warning-text, #b45309); }
+.emendas-sobra-barra__perdido { background: #b9c1ce; }
 .emendas-sobra-autor { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.4rem 0; }
 .emendas-sobra-emenda { display: flex; flex-direction: column; gap: 0.45rem; border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.65rem 0.8rem; background: var(--surface, #fff); }
 .emendas-sobra-emenda__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; }

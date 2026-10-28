@@ -27,8 +27,11 @@ const EMPENHADO = pedido('p1', 'A1', 'EMPENHADO', {
 const RESERVA = pedido('p2', 'A1', 'RESERVADO');
 const OUTRO = pedido('p3', 'A2', 'OFICIO');
 const DO_ORGAO = pedido('p4', null, 'RESERVADO');
-const PEDIDOS = [EMPENHADO, RESERVA, OUTRO, DO_ORGAO];
+// Senadora Dois: emenda de 2024 (ano encerrado) de R$ 2.000 com R$ 500 empenhados: R$ 1.500 não empenhados.
+const DE_2024 = pedido('p5', 'A2', 'CONTRATACAO', { siopEmenda: '40000001', siopEmendaAno: 2024, siopValor: 2000, linhas: [linha('l5', 1)] });
+const PEDIDOS = [EMPENHADO, RESERVA, OUTRO, DO_ORGAO, DE_2024];
 const NOTAS = new Map<string, NotaDaLinha>([
+  ['l5', { linhaId: 'l5', nota: '2024NE000007', regra: 'SEI', motivo: null, contractKey: null, empenhoId: 'e5', valorEmpenhado: 500, valorLiquidado: 0, valorPago: 0, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: '2024-06-01', atualizadoEm: null }],
   ['l1', { linhaId: 'l1', nota: '2026NE000103', regra: 'SEI', motivo: null, contractKey: null, empenhoId: 'e1', valorEmpenhado: 300, valorLiquidado: 150, valorPago: 100, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: '2026-04-17', atualizadoEm: null }]
 ]);
 // Emenda registrada sem pedido do Deputado Um, com uma conversa.
@@ -159,5 +162,28 @@ describe('Parlamentar 360', () => {
 
   it('código que não existe: parlamentar não encontrado', () => {
     expect(render('/emendas/parlamentares/X9')).toContain('Parlamentar não encontrado');
+  });
+});
+
+describe('Ano da emenda (28/10/2026)', () => {
+  it('Parlamentares abre no ano corrente; num ano encerrado a Sobra vira "Não empenhado"', () => {
+    const corrente = render('/emendas/parlamentares');
+    expect(corrente).toContain('emendas-parlamentares-ano-btn');
+    expect(corrente).toContain('>Sobra<');
+    const antigo = render('/emendas/parlamentares?ano=2024');
+    expect(antigo).toContain('Emendas de 2024 (ano encerrado)');
+    expect(antigo).toContain('>Não empenhado<');
+    expect(antigo).toMatch(/R\$\s1\.500,00/);
+    expect(antigo).toContain('Senadora Dois');
+    expect(antigo).not.toContain('Deputado Um');
+  });
+
+  it('Parlamentar 360 num ano encerrado: sem botão de pedido novo; o ano vem do endereço', () => {
+    const html = render('/emendas/parlamentares/A2?ano=2024');
+    expect(html).toContain('parlamentar-360-ano-btn');
+    expect(html).toContain('Execução da emenda (2024, ano encerrado)');
+    expect(html).toContain('perdeu o crédito');
+    expect(html).not.toContain('emendas-sobra-novo-');
+    expect(render('/emendas/parlamentares/A2')).not.toContain('Execução da emenda (2024');
   });
 });
