@@ -312,8 +312,9 @@ export const Emenda360Page: React.FC = () => {
               <HealthTile label="Valor no SIOP" value={e.valor != null ? formatCurrency(e.valor) : '—'} hint={daEmenda.length === 0 ? 'nenhum pedido' : daEmenda.length === 1 ? '1 pedido' : `${daEmenda.length} pedidos`} compact onClick={() => goToTab('pedidos')} testId="emenda-360-valor" />
               <HealthTile
                 label="Empenhado"
-                value={sobra ? formatCurrency(sobra.empenhado) : execucao.notas > 0 ? formatCurrency(execucao.empenhado) : '—'}
-                hint={sobra ? (sobra.fonteDoEmpenhado === 'PORTAL' ? 'Portal da Transparência' : 'notas ligadas aos pedidos') : execucao.notas > 0 ? 'notas ligadas aos pedidos' : 'nenhuma nota ainda'}
+                // Pelas notas sem nenhuma nota ligada: "—", como o Pago (não "R$ 0,00").
+                value={sobra && (sobra.fonteDoEmpenhado === 'PORTAL' || execucao.notas > 0) ? formatCurrency(sobra.empenhado) : execucao.notas > 0 ? formatCurrency(execucao.empenhado) : '—'}
+                hint={sobra?.fonteDoEmpenhado === 'PORTAL' ? 'Portal da Transparência' : execucao.notas > 0 ? 'notas ligadas aos pedidos' : 'nenhuma nota ainda'}
                 compact
                 onClick={() => goToTab('execucao')}
                 testId="emenda-360-empenhado"
@@ -328,9 +329,12 @@ export const Emenda360Page: React.FC = () => {
               />
               <HealthTile
                 label={encerrada ? 'Não empenhado' : 'Sobra'}
-                value={sobra ? formatCurrency(sobra.sobra) : '—'}
+                // Sem valor do SIOP a sobra é desconhecida, não zero (antes: "R$ 0,00 · crédito perdido").
+                value={sobra && sobra.situacao !== 'semValor' ? formatCurrency(sobra.sobra) : '—'}
                 hint={
-                  encerrada
+                  sobra?.situacao === 'semValor' || (!sobra && e.valor == null)
+                    ? 'sem valor do SIOP'
+                    : encerrada
                     ? `crédito perdido em 31/12/${e.ano}`
                     : sobra
                       ? ROTULO_SITUACAO_SOBRA[sobra.situacao]

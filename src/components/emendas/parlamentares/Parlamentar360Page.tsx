@@ -173,6 +173,12 @@ export const Parlamentar360Page: React.FC = () => {
   const ultimaConversa = emendas.flatMap((e) => e.contatos.map((c) => c.contatoEm)).sort().at(-1) ?? null;
   const primeiroPedido = ativos.filter((p) => p.origem !== 'PLANILHA').map((p) => p.reservadoEm).sort()[0] ?? null;
   const emendasDoAno = sobra?.emendas ?? [];
+  // Emenda sem valor do SIOP (ex.: só no pedido da planilha): o valor é desconhecido, não zero. Sem isso o cartão
+  // dizia "R$ 0,00 no SIOP" e "Não empenhado R$ 0,00 · crédito perdido" (Bancada MG, 2025).
+  const semValor = emendasDoAno.filter((e) => e.valor == null).length;
+  const todasSemValor = emendasDoAno.length > 0 && semValor === emendasDoAno.length;
+  // Empenhado só com nota ligada ou leitura do Portal; antes disso "—", como o Pago.
+  const temEmpenho = Boolean(sobra && (sobra.empenhado > 0 || execucao.notas > 0 || emendasDoAno.some((e) => e.fonteDoEmpenhado === 'PORTAL')));
   const subtitulo = [
     autor.nomeCivil && autor.nomeCivil.toLowerCase() !== autor.nome.toLowerCase() ? autor.nomeCivil : null,
     atendidos.length ? `atende ${atendidos.slice(0, 2).join(' e ')}${atendidos.length > 2 ? ` e mais ${atendidos.length - 2}` : ''}` : null
@@ -253,16 +259,18 @@ export const Parlamentar360Page: React.FC = () => {
                 hint={
                   filtroAno === ANO_SEM
                     ? 'informe o ano no pedido'
-                    : sobra
-                      ? `${formatCurrency(sobra.valor)} no SIOP`
-                      : `nenhuma emenda ${anoEmTexto(filtroAno)} com pedido`
+                    : todasSemValor
+                      ? 'sem valor do SIOP'
+                      : sobra
+                        ? `${formatCurrency(sobra.valor)} no SIOP${semValor ? ` · ${semValor} sem valor` : ''}`
+                        : `nenhuma emenda ${anoEmTexto(filtroAno)} com pedido`
                 }
                 onClick={() => goToTab('emendas')}
                 testId="parlamentar-360-emendas"
               />
               <HealthTile
                 label="Empenhado"
-                value={sobra ? formatCurrency(sobra.empenhado) : '—'}
+                value={temEmpenho && sobra ? formatCurrency(sobra.empenhado) : '—'}
                 hint={
                   sobra && sobra.valor > 0
                     ? `${Math.round((sobra.empenhado / sobra.valor) * 1000) / 10}% das emendas ${filtroEhAno(filtroAno) ? 'do ano' : anoEmTexto(filtroAno)}`
@@ -284,9 +292,11 @@ export const Parlamentar360Page: React.FC = () => {
               />
               <HealthTile
                 label={encerrado ? 'Não empenhado' : 'Sobra'}
-                value={!filtroEhAno(filtroAno) ? '—' : sobra ? formatCurrency(encerrado ? sobra.naoEmpenhado : sobra.sobra) : '—'}
+                value={!filtroEhAno(filtroAno) || todasSemValor ? '—' : sobra ? formatCurrency(encerrado ? sobra.naoEmpenhado : sobra.sobra) : '—'}
                 hint={
-                  filtroAno === ANO_TODOS
+                  todasSemValor && filtroEhAno(filtroAno)
+                    ? 'sem valor do SIOP'
+                    : filtroAno === ANO_TODOS
                     ? 'escolha um ano para ver a sobra'
                     : filtroAno === ANO_SEM
                       ? 'informe o ano no pedido'
