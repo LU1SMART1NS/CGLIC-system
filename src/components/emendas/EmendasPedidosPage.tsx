@@ -14,7 +14,7 @@ import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
-import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraIdentificacao, carteiraValor } from '../carteira/carteiraStyles';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import {
@@ -51,7 +51,6 @@ import {
   type FasePedido,
   contratosDoPedido,
   linhasAtivas,
-  linhasDaLista,
   orgaoDoPedido,
   ORDEM_ETAPA,
   reservadoPorItem,
@@ -69,6 +68,7 @@ import { rotuloBeneficiario, type AutorEmenda, type EtapaPedido, type NotaDaLinh
 import { AutorDoPedido, LARGURA_AUTOR, ValorDoPedido } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { PedidoModal } from './PedidoModal';
+import { ItensEBeneficiarios } from './ItensEBeneficiarios';
 import { AnoDaEmenda } from './AnoDaEmenda';
 import { ANO_TODOS, contagemPorAno, lerAnoDaUrl, pedidoNoAno } from '../../utils/emendasAno';
 
@@ -304,34 +304,7 @@ export const EmendasPedidosPage: React.FC = () => {
       key: 'linhas',
       header: 'Itens e beneficiários',
       minWidth: '280px',
-      render: (l) => {
-        const todas = linhasDaLista(l, itens, beneficiarios);
-        const mostradas = todas.slice(0, 2);
-        const resto = todas.length - mostradas.length;
-        return (
-          <>
-            {mostradas.map((x) => (
-              <div key={x.id} style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', minWidth: 0, maxWidth: '32rem' }}>
-                <span style={{ ...carteiraNumero, fontWeight: 700, color: '#64748b', minWidth: '2.2em', textAlign: 'right' }}>{x.quantidade}×</span>
-                <span title={x.nome} style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: '1 1 auto' }}>{x.nome}</span>
-                {x.kit && <StatusBadge label="Kit" variant="neutral" size="sm" dot={false} />}
-                <span style={{ color: '#64748b' }}>→</span>
-                <span title={x.beneficiarioNome ?? undefined} style={{ fontWeight: 600, color: x.beneficiario ? 'var(--color-primary, #0c326f)' : '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '11rem', flex: '0 1 auto' }}>
-                  {x.beneficiario ?? 'a definir'}
-                </span>
-              </div>
-            ))}
-            {resto > 0 && (
-              <div
-                style={carteiraDetalhe}
-                title={todas.map((x) => `${x.quantidade}× ${x.nome} → ${x.beneficiarioNome ?? 'a definir'}`).join('\n')}
-              >
-                +{resto} {resto === 1 ? 'linha' : 'linhas'}
-              </div>
-            )}
-          </>
-        );
-      }
+      render: (l) => <ItensEBeneficiarios pedido={l} itens={itens} beneficiarios={beneficiarios} />
     },
     { key: 'valor', header: 'Valor', align: 'right', nowrap: true, sortValue: ordem.valor.value, sortFirstDir: 'desc', render: (l) => <ValorDoPedido valor={l.valor} fonte={l.fonteDoValor} /> },
     {

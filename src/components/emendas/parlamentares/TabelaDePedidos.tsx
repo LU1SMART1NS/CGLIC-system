@@ -4,8 +4,9 @@ import { StatusBadge } from '../../../design-system/components/StatusBadge';
 import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraValor } from '../../carteira/carteiraStyles';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import { formatCurrency } from '../../../utils/format';
-import { nomeDaLinhaDoPedido } from '../../../utils/emendasKits';
-import { avisoGrave, avisosDoPedido, contratosDoPedido, execucaoDoPedido, linhasAtivas, ROTULO_ETAPA, valorDoPedidoNaEtapa } from '../../../utils/emendasPedidos';
+import { ItensEBeneficiarios } from '../ItensEBeneficiarios';
+import { useBeneficiariosEmendas } from '../../../hooks/useEmendas';
+import { avisoGrave, avisosDoPedido, contratosDoPedido, execucaoDoPedido, ROTULO_ETAPA, valorDoPedidoNaEtapa } from '../../../utils/emendasPedidos';
 import { numeroDaEmenda } from '../../../utils/emendasSemPedido';
 import { faltaAnoDaEmenda, numeroDoPedido, rotaDoPedido } from '../../../utils/emendasNomeDoPedido';
 import type { ConferenciaEmpenho, ItemCaep, NotaDaLinha, PedidoEmenda } from '../../../services/emendasService';
@@ -29,6 +30,8 @@ interface Props {
  */
 export const TabelaDePedidos: React.FC<Props> = ({ pedidos, itens, notas, precos, hoje, diferencas, credor, testId }) => {
   const navegar = useNavigateWithOrigin();
+  const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
+  const beneficiarios = React.useMemo(() => new Map(beneficiariosLista.map((b) => [b.id, b])), [beneficiariosLista]);
   const colunasPedidos: Column<PedidoEmenda>[] = [
     {
       key: 'pedido',
@@ -49,18 +52,9 @@ export const TabelaDePedidos: React.FC<Props> = ({ pedidos, itens, notas, precos
     },
     {
       key: 'itens',
-      header: 'Itens',
-      minWidth: '220px',
-      render: (p) => {
-        const ls = linhasAtivas(p);
-        const nomes = ls.slice(0, 2).map((l) => nomeDaLinhaDoPedido(l, itens, 30));
-        return (
-          <>
-            <div style={carteiraValor}>{nomes.join(' · ') || '—'}</div>
-            {ls.length > 2 && <div style={carteiraDetalhe}>+{ls.length - 2} {ls.length - 2 === 1 ? 'item' : 'itens'}</div>}
-          </>
-        );
-      }
+      header: 'Itens e beneficiários',
+      minWidth: '280px',
+      render: (p) => <ItensEBeneficiarios pedido={p} itens={itens} beneficiarios={beneficiarios} />
     },
     { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (p) => <span style={carteiraNumero}>{formatCurrency(valorDoPedidoNaEtapa(p, itens, precos).valor)}</span> },
     {
