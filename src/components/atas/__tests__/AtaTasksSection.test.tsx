@@ -9,7 +9,15 @@ const { idle } = vi.hoisted(() => ({ idle: () => ({ mutate: () => {}, isPending:
 // O plano é editável para gestor e coordenador; a consulta só lê (TaskPlanSection.test.tsx).
 vi.mock('../../../hooks/useModeloGestao', () => {
   const parado = () => ({ mutate: () => undefined, isPending: false, error: null });
-  return { useMarcarPedidoTarefa: parado, useRegistrarRespostaTarefa: parado, useAjustarPrazoTarefa: parado, useAtualizarModulo: parado };
+  return {
+    useMarcarPedidoTarefa: parado,
+    useRegistrarRespostaTarefa: parado,
+    useAjustarPrazoTarefa: parado,
+    useAtualizarModulo: parado,
+    useDispensarModulo: parado,
+    useResponderPerguntaEtapa: parado,
+    useConcluirTarefaPregao: parado
+  };
 });
 vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ role: 'gestor' }) }));
 vi.mock('../../../hooks/useUpdateAtaTask', () => ({ useUpdateAtaTask: idle }));

@@ -80,6 +80,7 @@ const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
   REAJUSTE_ATA: { label: 'Reajuste da ata', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   TAREFA_ATRASADA: { label: 'Tarefa atrasada', color: 'var(--color-danger-text-strong)', bg: 'var(--color-danger-bg)' },
   TAREFA_PROXIMA: { label: 'Tarefa próxima', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
+  COBRAR_RESPOSTA: { label: 'Cobrar resposta', color: 'var(--color-danger-text)', bg: 'var(--color-danger-bg)' },
   LEMBRETE: { label: 'Planejamento da vigência', color: '#475569', bg: '#f1f5f9' }
 };
 
@@ -186,7 +187,7 @@ export function getAcaoInfo(item: DashboardAttentionItem & { uasg?: string }, so
 }
 
 function acaoDoItem(item: DashboardAttentionItem & { uasg?: string }): AcaoInfo {
-  if (item.arpKey && item.numeroAta && (item.category === 'TAREFA_ATRASADA' || item.category === 'TAREFA_PROXIMA')) {
+  if (item.arpKey && item.numeroAta && (item.category === 'TAREFA_ATRASADA' || item.category === 'TAREFA_PROXIMA' || item.category === 'COBRAR_RESPOSTA')) {
     return { label: 'Abrir tarefa', targetUrl: ataItemUrl(item) };
   }
   if (item.category === 'LEMBRETE') {
@@ -227,6 +228,7 @@ function acaoDoItem(item: DashboardAttentionItem & { uasg?: string }): AcaoInfo 
       return { label: 'Analisar reajuste', targetUrl: contractItemUrl(item) };
     case 'TAREFA_ATRASADA':
     case 'TAREFA_PROXIMA':
+    case 'COBRAR_RESPOSTA':
       return { label: 'Abrir tarefa', targetUrl: contractItemUrl(item) };
     default:
       return { label: 'Visualizar', targetUrl: item.targetUrl || '/contratos' };
@@ -242,6 +244,10 @@ export function getAlvoResolucao(item: AttentionItemWithUasg): AlvoResolucao | n
   const titulo = item.objetoItem || item.title;
   const contexto = `${instrumento.label} · UASG ${item.uasg}`;
   if (item.avisoChave) return { tipo: 'AVISO', chave: item.avisoChave, titulo, contexto };
+  if (item.category === 'COBRAR_RESPOSTA' && item.taskId) {
+    // O ✓ registra a resposta recebida (conclui a tarefa e move as seguintes).
+    return { tipo: item.id.startsWith('ATT-ATA-TASK-') ? 'RESPOSTA_ATA' : 'RESPOSTA_CONTRATO', taskId: item.taskId, titulo, contexto };
+  }
   if ((item.category === 'TAREFA_ATRASADA' || item.category === 'TAREFA_PROXIMA') && item.taskId) {
     return { tipo: item.id.startsWith('ATT-ATA-TASK-') ? 'TAREFA_ATA' : 'TAREFA_CONTRATO', taskId: item.taskId, titulo, contexto };
   }

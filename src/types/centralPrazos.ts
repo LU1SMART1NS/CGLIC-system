@@ -52,6 +52,10 @@ export interface CentralPrazosItem {
   tarefaId?: string;
   tarefaStatus?: ContractTaskStatusValue; // PENDENTE | EM_ANDAMENTO | CONCLUIDA | NAO_APLICAVEL
   observacoes?: string;
+  /** Orientar com pedido enviado e sem resposta: a data alvo é a resposta esperada (Início: "Cobrar resposta"). */
+  aguardandoResposta?: boolean;
+  pedidoEnviadoEm?: string;
+  pedidoSei?: string;
 
   // Ficha de Explicabilidade Transparente
   explicabilidade: ExplicabilidadePrazo;

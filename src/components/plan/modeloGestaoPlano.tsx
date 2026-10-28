@@ -3,13 +3,15 @@ import type { AcaoGestor, TaskPlanModuleRef } from '../../types';
 import { ACAO_INFO, GRUPO_INFO, type GrupoTarefa } from '../../utils/modeloGestao';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { lerNumeroSei, descreverNumeroSei } from '../../utils/numeroSei';
-import { ActionButton, AppButton } from '../../design-system';
+import { ActionButton, AppButton, Modal } from '../../design-system';
+import { AppTextarea } from '../../design-system/components/FormFields';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 import { MutationError } from '../contracts/planTaskEditing';
 
 /**
- * Peças do plano do gestor (modelo de gestão da CCGA, protótipo aprovado em 26/10/2026):
- * etiqueta da ação, contadores que filtram, marcas do orientar e dados do módulo.
+ * Peças do plano do gestor (modelo de gestão da CCGA, protótipos aprovados em 26 e 28/10/2026):
+ * etiqueta da ação, contadores que filtram, marcas do orientar, dados do módulo e o que o
+ * plano automático faz sozinho (módulo que entrou, dispensa, tarefa fechada pela fonte).
  */
 
 /** Etiqueta da ação do gestor, com "com quem" ao lado quando houver. */
@@ -215,6 +217,98 @@ export const RegraDetalhes: React.FC<{
       {modeloSei && <span>Modelo no SEI: {modeloSei}</span>}
       {esforco && <span>Esforço estimado: {esforco}</span>}
     </div>
+  </div>
+);
+
+/**
+ * Módulo que entrou sozinho (plano automático, migration 225): quando e por quê, e o botão de
+ * dispensar. Dispensado: quem, quando e a justificativa.
+ */
+export const ModuloOrigem: React.FC<{
+  modulo: TaskPlanModuleRef;
+  podeDispensar: boolean;
+  onDispensar: () => void;
+}> = ({ modulo, podeDispensar, onDispensar }) => {
+  if (modulo.dispensadoEm) {
+    return (
+      <div data-testid="plan-modulo-dispensado" style={{ fontSize: '0.78rem', color: '#475569', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.5rem 0.85rem' }}>
+        <strong>Dispensado</strong> em {formatDateBR(modulo.dispensadoEm.slice(0, 10))}
+        {modulo.dispensadoPorNome && <> por {modulo.dispensadoPorNome}</>}
+        {modulo.dispensaJustificativa && <>: {modulo.dispensaJustificativa}</>}
+      </div>
+    );
+  }
+  if (modulo.origem !== 'AUTO') return null;
+  return (
+    <div data-testid="plan-modulo-auto" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.78rem', color: '#475569', padding: '0 0.85rem' }}>
+      <span style={{ fontWeight: 700, color: '#5b2a86', background: '#f4edfb', borderRadius: '4px', padding: '0.05rem 0.45rem' }}>
+        Entrou sozinho{modulo.appliedAt ? ` em ${formatDateBR(modulo.appliedAt.slice(0, 10))}` : ''}
+      </span>
+      {modulo.motivoAuto && <span>{modulo.motivoAuto}</span>}
+      {podeDispensar && (
+        <AppButton type="button" variant="ghostDanger" size="sm" onClick={onDispensar}>
+          Dispensar módulo
+        </AppButton>
+      )}
+    </div>
+  );
+};
+
+/** Janela da dispensa: justificativa obrigatória (10 letras ou mais). */
+export const DispensarModuloModal: React.FC<{
+  modulo: TaskPlanModuleRef | null;
+  isPending: boolean;
+  error: unknown;
+  onConfirm: (justificativa: string) => void;
+  onClose: () => void;
+}> = ({ modulo, isPending, error, onConfirm, onClose }) => {
+  const [texto, setTexto] = useState('');
+  const curta = texto.trim().length < 10;
+  return (
+    <Modal
+      isOpen={Boolean(modulo)}
+      onClose={onClose}
+      dismissible={!isPending}
+      size="sm"
+      title={modulo ? `Dispensar "${modulo.nome}"?` : 'Dispensar módulo'}
+      testId="dispensar-modulo-modal"
+      footer={
+        <>
+          <ActionButton action="cancelar" type="button" onClick={onClose} disabled={isPending} />
+          <ActionButton action="confirmar" type="button" onClick={() => onConfirm(texto.trim())} disabled={isPending || curta} isLoading={isPending} data-testid="dispensar-modulo-confirmar">
+            Dispensar
+          </ActionButton>
+        </>
+      }
+    >
+      <div style={{ display: 'grid', gap: '0.6rem', fontSize: '0.85rem' }}>
+        <p style={{ margin: 0, color: '#475569' }}>As tarefas abertas ficam como não se aplica e as concluídas continuam no histórico. O sistema não põe este módulo de novo.</p>
+        <AppTextarea
+          label="Justificativa"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          rows={3}
+          maxLength={1000}
+          autoFocus
+          hint="Pelo menos 10 letras. Fica registrada com seu nome e a data."
+          data-testid="dispensar-modulo-justificativa"
+        />
+        <MutationError error={error} />
+      </div>
+    </Modal>
+  );
+};
+
+/** Tarefa fechada pela fonte: o dado achado e o botão de reabrir. */
+export const FonteFechou: React.FC<{ texto: string; podeReabrir: boolean; isPending: boolean; onReabrir: () => void }> = ({ texto, podeReabrir, isPending, onReabrir }) => (
+  <div data-testid="plan-fonte-fechou" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.35rem', background: 'var(--color-success-bg)', borderRadius: '6px', padding: '0.3rem 0.65rem', fontSize: '0.78rem', color: '#1e293b', maxWidth: '640px' }}>
+    <strong style={{ color: 'var(--color-success-text)' }}>Fechada pela fonte</strong>
+    <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{texto}</span>
+    {podeReabrir && (
+      <AppButton type="button" variant="link" size="sm" disabled={isPending} onClick={onReabrir}>
+        Reabrir
+      </AppButton>
+    )}
   </div>
 );
 

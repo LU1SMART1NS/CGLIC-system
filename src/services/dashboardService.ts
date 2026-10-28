@@ -76,7 +76,7 @@ import { alocadoAcimaDoLimite, limiteComPreposicao, limiteProvisorio } from '../
 import { VIGENCIA_RULES, PAGAMENTO_RULES, TAREFA_RULES, classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
 import { motivoDoLembrete, motivoDoReajuste } from '../utils/motivoDetalhe';
-import { prazoEfetivo } from '../utils/modeloGestao';
+import { aguardandoResposta, COBRAR_CRITICO_DIAS, prazoEfetivo, textoCobrarResposta } from '../utils/modeloGestao';
 
 /**
  * Auxiliar para cálculo de dias restantes de vigência
@@ -536,7 +536,25 @@ export function calculateAttentionSummary(params: {
   const tarefasHumanas = prazosItems.filter((pItem) => pItem.tipoItem === 'TAREFA_HUMANA');
 
   for (const pItem of tarefasHumanas) {
-    if (pItem.estadoTemporal === 'ATRASADO') {
+    if (pItem.estadoTemporal === 'ATRASADO' && pItem.aguardandoResposta) {
+      // Pedido enviado e resposta vencida: o que falta é cobrar, não fazer (migration 225).
+      const atraso = Math.abs(pItem.diasRestantes);
+      items.push({
+        id: `ATT-TASK-COBRAR-${pItem.id}`,
+        category: 'COBRAR_RESPOSTA',
+        severity: atraso >= COBRAR_CRITICO_DIAS ? 'CRITICA' : 'URGENTE',
+        title: pItem.acaoDescricao || 'Cobrar resposta',
+        description: `${pItem.identificadorFormatado} — ${textoCobrarResposta({ pedidoEnviadoEm: pItem.pedidoEnviadoEm, pedidoSei: pItem.pedidoSei, prazoResposta: pItem.dataAlvo }, atraso)}`,
+        contractKey: pItem.contractKey,
+        numeroContrato: pItem.identificadorFormatado,
+        arpKey: pItem.arpKey,
+        taskId: pItem.tarefaId,
+        diasRelevantes: pItem.diasRestantes,
+        dataAlvo: pItem.dataAlvo,
+        targetUrl: pItem.contractKey ? `/contratos/${pItem.contractKey}` : undefined,
+        badgeLabel: `Cobrar (${atraso} d.u.)`
+      });
+    } else if (pItem.estadoTemporal === 'ATRASADO') {
       items.push({
         id: `ATT-TASK-OVERDUE-${pItem.id}`,
         category: 'TAREFA_ATRASADA',
@@ -940,6 +958,24 @@ export function calculateAttentionSummary(params: {
         const nivelPrazo = classifyTarefaPrazo(dias);
         if (nivelPrazo === 'DISTANTE') continue;
         const du = (n: number) => `${n} ${n === 1 ? 'dia útil' : 'dias úteis'}`;
+        if (dias < 0 && aguardandoResposta(task)) {
+          // Pedido enviado e resposta vencida: "Cobrar resposta" (migration 225).
+          items.push({
+            id: `ATT-ATA-TASK-${task.id}`,
+            category: 'COBRAR_RESPOSTA',
+            severity: Math.abs(dias) >= COBRAR_CRITICO_DIAS ? 'CRITICA' : 'URGENTE',
+            title: task.nome,
+            description: `ARP ${numAta} — ${textoCobrarResposta(task, Math.abs(dias))}`,
+            arpKey: `${numAta}-${arp.codigoUnidadeGerenciadora}`,
+            numeroAta: numAta,
+            numeroContrato: `ARP ${numAta}`,
+            taskId: task.id,
+            diasRelevantes: dias,
+            dataAlvo: prazoTarefa,
+            badgeLabel: `Cobrar (${Math.abs(dias)} d.u.)`
+          });
+          continue;
+        }
         items.push({
           id: `ATT-ATA-TASK-${task.id}`,
           category: nivelPrazo === 'VENCIDA' ? 'TAREFA_ATRASADA' : 'TAREFA_PROXIMA',

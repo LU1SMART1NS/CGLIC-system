@@ -2,8 +2,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ajustarPrazoTarefaRpc,
   atualizarModuloRpc,
+  concluirTarefaPregaoRpc,
+  dispensarModuloRpc,
   marcarPedidoTarefaRpc,
   registrarRespostaTarefaRpc,
+  responderPerguntaEtapaRpc,
   salvarDetalhesModeloRpc,
   salvarRegraTarefaModeloRpc,
   type AtualizarModuloInput,
@@ -52,6 +55,24 @@ export const useAjustarPrazoTarefa = (tipo: TipoInstrumento, key: string) =>
 
 export const useAtualizarModulo = (tipo: TipoInstrumento, key: string) =>
   usePlano<AtualizarModuloInput>(tipo, key, atualizarModuloRpc);
+
+export const useDispensarModulo = (tipo: TipoInstrumento, key: string) =>
+  usePlano<{ moduloId: string; justificativa: string }>(tipo, key, dispensarModuloRpc);
+
+export const useResponderPerguntaEtapa = (tipo: TipoInstrumento, key: string) =>
+  usePlano<{ taskId: string; aplica: boolean }>(tipo, key, responderPerguntaEtapaRpc);
+
+/** Tarefa do pregão: conclui também nas outras atas (cada uma tem seu plano em cache). */
+export function useConcluirTarefaPregao() {
+  const queryClient = useQueryClient();
+  return useMutation<unknown, AppMutationError | Error, { taskId: string; sei?: string | null }>({
+    mutationFn: (vars) => concluirTarefaPregaoRpc(vars),
+    retry: 0,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ata-task-plan'] });
+    }
+  });
+}
 
 export const useSalvarRegraTarefaModelo = (tipo: TipoInstrumento) =>
   useModelos<RegraTarefaModeloInput>(tipo, salvarRegraTarefaModeloRpc);
