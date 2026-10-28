@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { mascaraTelefone } from '../../utils/mascaras';
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Plus, Search } from 'lucide-react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
@@ -22,6 +22,7 @@ import { formatarTelefone, localDoBeneficiario, nomeESigla, rotuloBeneficiario, 
 import type { AutorEmenda, BeneficiarioEmenda, EmendaSiop, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
 import { numeroDaEmenda } from '../../utils/emendasSemPedido';
 import { QuadroGabinete } from './QuadroGabinete';
+import { BeneficiarioModal } from './BeneficiarioModal';
 
 interface Props {
   pedido: PedidoEmenda | null;
@@ -197,6 +198,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const [lado, setLado] = useState<'itens' | 'pedido'>('itens');
   const [seletorAberto, setSeletorAberto] = useState<string | null>(null);
   const [buscaBeneficiario, setBuscaBeneficiario] = useState('');
+  /** Cadastro de órgão aberto por cima da reserva: bloco que recebe o órgão salvo e o que estava digitado na busca. */
+  const [cadastro, setCadastro] = useState<{ alvo: string; nome: string } | null>(null);
   const [todasUfs, setTodasUfs] = useState(false);
   const [abertas, setAbertas] = useState<ReadonlySet<string>>(new Set());
   const [recado, setRecado] = useState<{ texto: string; desfazer?: () => void } | null>(null);
@@ -278,6 +281,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const foraDoPrazo = (i: ItemCaep) => Boolean(i.vigenciaFinal) && passouDoCorte(diasEntre(hoje, i.vigenciaFinal!));
   // Quem cadastra o nome na ata assinada (Emendas › Itens) vê quais itens ainda saem no quadro pelo começo da descrição.
   const avisarSemNomeCurto = usePodeGerirEmendas();
+  const podeCadastrarOrgao = avisarSemNomeCurto;
   const podeItem = (i: ItemCaep) => !foraDoPrazo(i) && livre(i.itemKey) > 0;
 
   const ativosBen = useMemo(() => beneficiarios.filter((b) => b.ativo).sort((a, b) => rotuloBeneficiario(a).localeCompare(rotuloBeneficiario(b), 'pt-BR')), [beneficiarios]);
@@ -353,6 +357,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   }, [piscando]);
   // Tecla "/" vai para a busca dos itens (fora de um campo de texto).
   useEffect(() => {
+    if (cadastro) return;
     const onKey = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement;
       if (e.key !== '/' || /INPUT|TEXTAREA|SELECT/.test(alvo.tagName)) return;
@@ -362,7 +367,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  }, [cadastro]);
 
   /** Escolher o autor sugere o último contato da assessoria usado com ele (só se os campos estiverem vazios). */
   const escolherAutor = (id: string) => {
@@ -420,6 +425,17 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const escolherBeneficiario = (grupo: string, id: string | null) => {
     setGrupos((gs) => gs.map((g) => (g.chave === grupo ? { ...g, beneficiarioId: id } : g)));
     setSeletorAberto(null);
+  };
+  /** Órgão salvo (ou já existente, pelo "Usar este") no cadastro aberto pela reserva: fica escolhido no bloco. */
+  const usarDoCadastro = (id: string) => {
+    if (!cadastro) return;
+    const outro = grupos.find((g) => g.chave !== cadastro.alvo && g.beneficiarioId === id);
+    if (outro) {
+      toast.error('Este órgão já está em outro bloco da reserva.');
+      return;
+    }
+    escolherBeneficiario(cadastro.alvo, id);
+    setCadastro(null);
   };
   const desfazivel = (texto: string) => {
     const antes = { linhas, grupos, ativo };
@@ -571,13 +587,21 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               ))}
               {opcoes.length === 0 && (
                 <div className="reserva-mudo reserva-lista__vazia">
-                  {filtraUf ? `Nenhum órgão de ${ufDoAutor} encontrado.` : 'Nenhum órgão encontrado. Cadastre em Ajustes › Beneficiários.'}
+                  {filtraUf ? `Nenhum órgão de ${ufDoAutor} encontrado.` : podeCadastrarOrgao ? 'Nenhum órgão encontrado.' : 'Nenhum órgão encontrado. Peça o cadastro à CAEP.'}
                 </div>
               )}
               {podeAInformar && (
                 <button type="button" role="option" aria-selected={!atual} onClick={() => escolherBeneficiario(alvo, null)}>
                   <b>A informar depois</b>
                   <small>O gabinete ainda não disse para quem é</small>
+                </button>
+              )}
+              {podeCadastrarOrgao && (
+                <button type="button" className="reserva-lista__cadastrar" onClick={() => setCadastro({ alvo, nome: buscaBeneficiario.trim() })} data-testid={`${testId}-cadastrar`}>
+                  <b>
+                    <Plus size={14} aria-hidden="true" /> Cadastrar novo órgão
+                  </b>
+                  <small>Abre o cadastro por cima; ao salvar, o órgão fica escolhido aqui</small>
                 </button>
               )}
             </div>
@@ -1349,6 +1373,17 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
 
         </section>
       </form>
+      {/* Fora do formulário da reserva: o envio do cadastro não sobe até ele. */}
+      {cadastro && (
+        <BeneficiarioModal
+          beneficiario={null}
+          lista={beneficiarios}
+          inicial={{ nome: cadastro.nome, entregaUf: ufDoAutor ?? '' }}
+          onAbrir={(b) => usarDoCadastro(b.id)}
+          onSalvo={usarDoCadastro}
+          onClose={() => setCadastro(null)}
+        />
+      )}
       {recado && (
         <div className="reserva-recado" role="status" data-testid="emendas-pedido-recado">
           <span>{recado.texto}</span>

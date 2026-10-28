@@ -82,6 +82,10 @@ interface Props {
   /** Abre o cadastro que já existe no lugar deste. */
   onAbrir: (b: BeneficiarioEmenda) => void;
   onClose: () => void;
+  /** Aberta de dentro da reserva: avisa qual cadastro foi salvo, para já ficar escolhido. */
+  onSalvo?: (id: string) => void;
+  /** Campos já preenchidos num cadastro novo (ex.: o que foi digitado na busca e a UF do parlamentar). */
+  inicial?: Partial<Formulario>;
 }
 
 const sugestao: React.CSSProperties = {
@@ -97,7 +101,7 @@ const sugestao: React.CSSProperties = {
   fontWeight: 500
 };
 
-export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbrir, onClose }) => {
+export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbrir, onClose, onSalvo, inicial }) => {
   const salvar = useSalvarBeneficiario();
   const grupos = useGruposBeneficiarios();
   const definirGrupo = useDefinirGruposBeneficiarios();
@@ -105,7 +109,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
   const [cnpj, setCnpj] = useState(formatarCnpj(beneficiario?.cnpj));
   const [receita, setReceita] = useState<DadosDaReceita | null>(beneficiario ? receitaDoCadastro(beneficiario) : null);
   const [receitaLidaAgora, setReceitaLidaAgora] = useState(false);
-  const [f, setF] = useState<Formulario>(() => formularioDe(beneficiario));
+  const [f, setF] = useState<Formulario>(() => ({ ...formularioDe(beneficiario), ...(beneficiario ? {} : inicial) }));
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
   const [erroCnpj, setErroCnpj] = useState('');
   const [buscandoCep, setBuscandoCep] = useState(false);
@@ -225,7 +229,8 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
         }
       }
       toast.success(beneficiario ? `${rotuloBeneficiario(dados)} atualizado.` : `${rotuloBeneficiario(dados)} cadastrado.`);
-      onClose();
+      if (onSalvo) onSalvo(salvo.id);
+      else onClose();
     } catch (err) {
       setErroAoSalvar((err as Error).message);
     }
@@ -342,7 +347,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
                 {localDoBeneficiario(repetido) && ` · ${localDoBeneficiario(repetido)}`}
               </span>
               <AppButton type="button" variant="outline" size="sm" onClick={() => onAbrir(repetido)}>
-                Abrir o existente
+                {onSalvo ? 'Usar este' : 'Abrir o existente'}
               </AppButton>
             </div>
           </div>
