@@ -20,6 +20,8 @@ import {
   type DadosDaReceita
 } from '../../services/emendasService';
 import { beneficiarioRepetido, linkDoWhatsapp, naturezaNaoPublica, parecidosCom, pendenciasDoBeneficiario, type FormularioBeneficiario as Formulario } from '../../utils/emendasBeneficiarios';
+import { nomeProprioEmTitulo } from '../../utils/textCase';
+import { ConfirmDialog } from '../../design-system/components/ConfirmDialog';
 import { localDoBeneficiario, rotuloBeneficiario } from '../../services/emendasService';
 
 const EMAIL_PESSOAL = /@(gmail|hotmail|outlook|yahoo|bol|uol|live|icloud)\./i;
@@ -108,6 +110,9 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [msgCep, setMsgCep] = useState<{ tom: 'erro' | 'info'; texto: string } | null>(null);
   const [tentouSalvar, setTentouSalvar] = useState(false);
+  const [confirmandoCnpj, setConfirmandoCnpj] = useState(false);
+  /** Recusa do banco ao salvar: fica na janela até a pessoa corrigir (o aviso passageiro sumia antes de ler). */
+  const [erroAoSalvar, setErroAoSalvar] = useState('');
   /** Grupo escolhido na janela; null = ainda não mexeu (vale o confirmado ou, sem ele, a sugestão). */
   const [grupoEscolhido, setGrupoEscolhido] = useState<string | null>(null);
 
@@ -122,7 +127,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
       setReceita(r);
       setReceitaLidaAgora(true);
       setCnpj(formatarCnpj(r.cnpj));
-      setF((x) => ({ ...x, nome: x.nome || (r.nomeFantasia ?? r.razaoSocial).slice(0, 300) }));
+      setF((x) => ({ ...x, nome: x.nome || nomeProprioEmTitulo(r.nomeFantasia ?? r.razaoSocial).slice(0, 300) }));
       if (r.situacaoCadastral && r.situacaoCadastral.toUpperCase() !== 'ATIVA') setErroCnpj(`Na Receita o CNPJ está ${r.situacaoCadastral.toLowerCase()}. Confira antes de salvar.`);
     } catch (err) {
       setErroCnpj((err as Error).message);
@@ -165,11 +170,22 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
     ev.preventDefault();
     setTentouSalvar(true);
     if (pendencias.length || repetido || cnpjSemBusca || faltaGrupo) return;
+    // CNPJ já cadastrado em outra unidade: a pessoa confirma numa caixa antes de gravar.
+    if (mesmoCnpj.length > 0 && beneficiario?.cnpj !== digitosCnpj && !confirmandoCnpj) {
+      setConfirmandoCnpj(true);
+      return;
+    }
+    await gravar();
+  };
+
+  const gravar = async () => {
+    setConfirmandoCnpj(false);
+    setErroAoSalvar('');
     const dados: BeneficiarioParaSalvar = {
       id: beneficiario?.id,
       versao: beneficiario?.versao,
       ativo: beneficiario?.ativo ?? true,
-      nome: f.nome.trim(),
+      nome: nomeProprioEmTitulo(f.nome.trim()),
       sigla: f.sigla.trim() || null,
       cnpj: receita?.cnpj ?? null,
       razaoSocial: receita?.razaoSocial || null,
@@ -210,7 +226,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
       toast.success(beneficiario ? `${rotuloBeneficiario(dados)} atualizado.` : `${rotuloBeneficiario(dados)} cadastrado.`);
       onClose();
     } catch (err) {
-      toast.error((err as Error).message);
+      setErroAoSalvar((err as Error).message);
     }
   };
 
@@ -447,12 +463,42 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
           </span>
         </div>
 
+        {erroAoSalvar && (
+          <div style={aviso('erro')} role="alert" data-testid="emendas-beneficiario-erro-salvar">
+            Não foi salvo: {erroAoSalvar}
+          </div>
+        )}
         {tentouSalvar && pendencias.length > 0 && (
           <div style={aviso('erro')} role="alert" data-testid="emendas-beneficiario-pendencias">
             Falta: {pendencias.join(', ')}.
           </div>
         )}
       </form>
+      <ConfirmDialog
+        isOpen={confirmandoCnpj}
+        title="CNPJ já cadastrado"
+        message={
+          <>
+            <p style={{ margin: '0 0 0.6rem' }}>
+              Este CNPJ já está em {mesmoCnpj.length === 1 ? '1 cadastro' : `${mesmoCnpj.length} cadastros`}:
+            </p>
+            <ul style={{ margin: '0 0 0.6rem', paddingLeft: '1.1rem' }}>
+              {mesmoCnpj.slice(0, 5).map((p) => (
+                <li key={p.id}>
+                  <b>{rotuloBeneficiario(p)}</b>
+                  {localDoBeneficiario(p) && ` · ${localDoBeneficiario(p)}`}
+                </li>
+              ))}
+            </ul>
+            <p style={{ margin: 0 }}>Se for outra unidade do mesmo órgão, cadastre mesmo assim. Se for uma delas, volte e use a existente.</p>
+          </>
+        }
+        confirmLabel="Cadastrar mesmo assim"
+        cancelLabel="Voltar"
+        isLoading={salvar.isPending}
+        onConfirm={() => void gravar()}
+        onCancel={() => setConfirmandoCnpj(false)}
+      />
     </Modal>
   );
 };
