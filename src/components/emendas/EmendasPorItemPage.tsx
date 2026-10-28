@@ -25,15 +25,21 @@ import { notaDoPreco } from '../../utils/emendasQuadro';
 import { DadosItemModal } from './DadosItemModal';
 import { itensDaLinha, linhasAtivas, precoParaEmenda } from '../../utils/emendasPedidos';
 import type { ItemCaep } from '../../services/emendasService';
+import { GtiCelulaAta } from '../gti/GtiVisual';
+import { ROTULO_GTI_ITENS, useFatiasItensGtiLeitura } from '../../hooks/useGruposGti';
+import { chaveItemGti, GRUPO_GTI_INFO, type FatiasDaAta } from '../../config/gruposGti';
+import { useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
+import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
 
 type Segmento = 'com' | 'sem' | 'encerrada' | 'todos';
-/** previsto/hoje: preço unitário para a emenda (o do quadro do parlamentar) e o de hoje; nota: por que mudou. pedidos: quantos pedidos reservam o item. */
-type Linha = ItemCaep & { reservado: number; saldo: number; pedidos: number; previsto: number; hoje: number; nota: string | null };
+/** previsto/hoje: preço unitário para a emenda (o do quadro do parlamentar) e o de hoje; nota: por que mudou. pedidos: quantos pedidos reservam o item. fatias: interesse de cada GTI no item (o mesmo da Carteira › Itens). */
+type Linha = ItemCaep & { reservado: number; saldo: number; pedidos: number; previsto: number; hoje: number; nota: string | null; fatias: FatiasDaAta | undefined };
 
 // Ordenação pelo cabeçalho, como nas carteiras (?ordem=); sem escolha, pela descrição do item.
 const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
   item: { value: (l) => descricaoItemEmFrase(l.descricao) },
   quadro: { value: (l) => l.nomeCurto },
+  gti: { value: (l) => (l.fatias?.principal ? GRUPO_GTI_INFO[l.fatias.principal.grupo].rotulo : null) },
   vigencia: { value: (l) => l.vigenciaFinal },
   alocado: { value: (l) => l.alocado, firstDir: 'desc' },
   reservado: { value: (l) => l.reservado, firstDir: 'desc' },
@@ -58,6 +64,9 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
   const { data: pedidos = [], refetch: recarregarPedidos } = usePedidosEmendas();
   const hoje = hojeEmBrasilia();
   const { precos, ipca } = usePrecosParaEmenda();
+  // Interesse por GTI de cada item (migration 139): a mesma coluna da Carteira › Itens.
+  const { fatias: fatiasItens, consulta: fatiasItensQuery } = useFatiasItensGtiLeitura();
+  const leituras = useLeiturasComFalha([{ rotulo: ROTULO_GTI_ITENS, query: fatiasItensQuery }]);
   const [segmento, setSegmento] = useState<Segmento>('todos');
   // Vindo do Início (saldo livre perto do fim): ?busca= já filtra o item.
   const [searchParams] = useSearchParams();
@@ -82,9 +91,18 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
     return itens.map((i) => {
       const r = reservado.get(i.itemKey) ?? 0;
       const preco = precoParaEmenda(i.itemKey, porChave, precos);
-      return { ...i, reservado: r, saldo: i.alocado - r, pedidos: pedidosDoItem.get(i.itemKey)?.size ?? 0, previsto: preco.previsto, hoje: preco.hoje, nota: notaDoPreco(preco.preco, ipca) };
+      return {
+        ...i,
+        reservado: r,
+        saldo: i.alocado - r,
+        pedidos: pedidosDoItem.get(i.itemKey)?.size ?? 0,
+        previsto: preco.previsto,
+        hoje: preco.hoje,
+        nota: notaDoPreco(preco.preco, ipca),
+        fatias: fatiasItens.get(chaveItemGti(i.numeroAta, i.codigoUasg, i.numeroItem))
+      };
     });
-  }, [itens, pedidos, precos, ipca]);
+  }, [itens, pedidos, precos, ipca, fatiasItens]);
 
   const situacao = (l: Linha): Segmento => (l.ataEncerrada ? 'encerrada' : l.saldo > 0 ? 'com' : 'sem');
   const contagem = useMemo(() => {
@@ -132,6 +150,13 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
           </div>
         </>
       )
+    },
+    {
+      key: 'gti',
+      header: 'Interesse principal',
+      minWidth: '150px',
+      sortValue: ORDEM.gti.value,
+      render: (l) => <GtiCelulaAta fatias={l.fatias} testId={`emendas-itens-gti-${l.itemKey}`} />
     },
     {
       key: 'vigencia',
@@ -194,6 +219,8 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir }) => {
           { id: 'encerrada', label: 'Ata encerrada', count: contagem.encerrada }
         ]}
       />
+
+      <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="dos itens" testIdPrefix="emendas-itens-fontes" />
 
       <CarteiraFilterBar
         busca={busca}
