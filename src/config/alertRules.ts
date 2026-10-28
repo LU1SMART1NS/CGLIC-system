@@ -160,7 +160,12 @@ export const EMENDAS_RULES = {
    * Emenda vista no SIOP e ainda sem pedido (decisão de 26/10/2026): avisa desde o dia em que é registrada e fica
    * urgente quando passa N dias sem contato registrado com a assessoria do parlamentar ou com a ASPAR dos órgãos.
    */
-  semPedidoDiasSemContato: 7
+  semPedidoDiasSemContato: 7,
+  /**
+   * Folga (%) somada ao preço dos itens com reajuste projetado (decisão de 28/10/2026): se o IPCA vier um pouco maior
+   * que o projetado, a emenda ainda cobre o empenho. Entra no preço previsto de todas as telas e do quadro.
+   */
+  folgaReajustePct: 2
 };
 
 export type TarefaPrazoNivel = 'VENCIDA' | 'URGENTE' | 'PROXIMA' | 'DISTANTE';
@@ -259,6 +264,7 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
 
   { key: 'emendas.avisoIndicacaoAntesDias', group: 'emendas', label: 'Avisar a ata da emenda a partir de', hint: 'Dias antes do fim da ata: pedidos e kits avisam que o contrato precisa ser assinado até lá.', unit: 'dias', min: 1, max: 365 },
   { key: 'emendas.corteIndicacaoAntesDias', group: 'emendas', label: 'Não receber indicação a menos de', hint: 'Dias antes do fim da ata. O sistema recusa nova reserva e novo ofício com itens da ata.', unit: 'dias', min: 0, max: 365 },
+  { key: 'emendas.folgaReajustePct', group: 'emendas', label: 'Folga no preço previsto', hint: 'Somada ao preço dos itens com reajuste projetado, para a emenda cobrir o empenho se o IPCA vier maior que o projetado.', unit: '%', min: 0, max: 20 },
   { key: 'emendas.semPedidoDiasSemContato', group: 'emendas', label: 'Emenda sem pedido fica urgente após', hint: 'Dias sem contato registrado com a assessoria do parlamentar ou com a ASPAR dos órgãos. O aviso aparece desde o dia em que a emenda é registrada.', unit: 'dias', min: 1, max: 60 },
 
   { key: 'sincronizacao.quantidadeContratadaVencidaEmHoras', group: 'sincronizacao', label: 'Reler a quantidade contratada após', unit: 'horas', min: 1, max: 168 }

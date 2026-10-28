@@ -3,14 +3,15 @@ import type { ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendas
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
 import {
   ajustesFeitos,
+  cabeNaEmenda,
   linhasParaConferir,
   linhasParaSalvar,
   livrePorItem,
   passaDoSaldo,
   precosDaMinuta,
   precosQueMudaram,
-  precoUnitarioDaMinuta,
-  valorPelaMinuta,
+  sobraDaEmendaParaOPedido,
+  valorPrevisto,
   type LinhaConferida
 } from '../emendasConferenciaOficio';
 
@@ -53,27 +54,31 @@ const previsto = (itemKey: string, precoPrevisto: number): [string, PrecoPrevist
   { itemKey, precoAtual: precoPrevisto, precoPrevisto, motivo: 'SEM_PREVISAO', devido: false, efeito: null, percentual: null, mesesEstimados: null }
 ];
 
-describe('conferência do ofício: valor pelos preços da minuta (migration 234)', () => {
-  it('a minuta guarda o preço previsto de cada item, e a conferência soma por ele', () => {
+describe('conferência do ofício: o previsto cabe no que sobra da emenda (28/10/2026)', () => {
+  it('a minuta guarda o preço previsto de cada item; a conferência soma o previsto de hoje das linhas que ficam', () => {
     const precos = new Map([previsto(VIATURA, 300000), previsto(MOTO, 40000)]);
     const p = pedido(null);
     expect(precosDaMinuta(p, itens, precos)).toEqual({ [VIATURA]: 300000, [MOTO]: 40000 });
-    const comMinuta = pedido({ [VIATURA]: 300000, [MOTO]: 40000 });
-    expect(valorPelaMinuta(linhasParaConferir(comMinuta), comMinuta, itens, precos)).toBe(1060000);
+    const [v, m] = linhasParaConferir(p);
+    expect(valorPrevisto([v, m], itens, precos)).toBe(1060000);
+    expect(valorPrevisto([{ ...v, quantidade: 2 }, { ...m, retirada: true }], itens, precos)).toBe(600000);
   });
 
-  it('sem preços da minuta (registrada antes da 234), vale o preço previsto de hoje', () => {
-    const p = pedido(null);
-    expect(valorPelaMinuta(linhasParaConferir(p), p, itens)).toBe(3 * 298000 + 4 * 38500);
+  it('a sobra desconta os outros pedidos da emenda (pelo ofício, ou pelo previsto sem ofício); igual cabe', () => {
+    const outroComOficio = { ...pedido(null), id: 'o1', etapa: 'CONTRATACAO', oficioValor: 200000 } as PedidoEmenda;
+    const outroSemOficio = { ...pedido(null), id: 'o2', etapa: 'RESERVADO', oficioValor: null, linhas: [linha('x', MOTO, 2)] } as PedidoEmenda;
+    const conta = sobraDaEmendaParaOPedido(1300000, [outroComOficio, outroSemOficio], itens);
+    expect(conta).toEqual({ outros: 277000, sobra: 1023000 });
+    expect(cabeNaEmenda(1023000, conta.sobra)).toBe(true);
+    expect(cabeNaEmenda(1023000.01, conta.sobra)).toBe(false);
   });
 
-  it('o preço que mudou depois da minuta aparece com a ata; a linha acrescentada usa o preço de hoje e não acusa', () => {
+  it('o preço que mudou depois da minuta só informa, com a ata; a linha acrescentada não acusa', () => {
     const precos = new Map([previsto(VIATURA, 310000), previsto(MOTO, 38500)]);
     const p = pedido({ [VIATURA]: 298000, [MOTO]: 38500 });
     const linhas = linhasParaConferir(p);
     expect(precosQueMudaram(linhas, p, itens, precos)).toEqual([{ itemKey: VIATURA, numeroAta: '00102/2024', naMinuta: 298000, hoje: 310000 }]);
     const nova: LinhaConferida = { ...linhas[0], chave: 'nova-1', id: null, original: 0, quantidade: 1 };
-    expect(precoUnitarioDaMinuta(nova, p, itens, precos)).toBe(310000);
     expect(precosQueMudaram([nova], p, itens, precos)).toEqual([]);
   });
 });

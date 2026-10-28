@@ -29,7 +29,7 @@ const aviso: React.CSSProperties = {
 const AJUDA_DO_QUADRO =
   'A Tabela 1 é para colar no Word ou no SEI: cada item aparece uma vez, com uma linha para cada beneficiário, e os kits ' +
   'já vêm abertos nos seus itens. O texto é a versão curta para mandar ao parlamentar pelo WhatsApp. Os valores já incluem o ' +
-  'reajuste que a ata pode ter até o empenho, para não faltar recurso. O prazo do ofício é de 30 dias, ou menos quando alguma ' +
+  'reajuste que a ata pode ter até o empenho, mais uma folga de Ajustes para o caso de o IPCA vir maior, para não faltar recurso. O prazo do ofício é de 30 dias, ou menos quando alguma ' +
   'ata está perto de vencer.';
 
 interface Props {

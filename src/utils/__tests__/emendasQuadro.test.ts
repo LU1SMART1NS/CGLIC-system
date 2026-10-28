@@ -184,7 +184,7 @@ describe('mesmo item para vários beneficiários', () => {
 });
 
 describe('preço pelo empenho provável (90 dias)', () => {
-  it('reajuste até o empenho entra; depois dele, preço de hoje; sem base, folga do IPCA; devido sempre', async () => {
+  it('reajuste até o empenho entra; depois dele, preço de hoje; sem base, folga do IPCA; devido sempre (sem a folga de Ajustes)', async () => {
     const { aplicarPrazoDoEmpenho } = await import('../emendasQuadro');
     const ipca = { percentual: 4.5, de: '2025-10-01', ate: '2026-09-01' };
     const m = aplicarPrazoDoEmpenho(
@@ -196,7 +196,9 @@ describe('preço pelo empenho provável (90 dias)', () => {
         ['emdia', preco('emdia', { precoAtual: 50, precoPrevisto: 50, motivo: 'EM_DIA' })]
       ]),
       '2026-10-24',
-      ipca
+      ipca,
+      90,
+      0
     );
     expect(m.get('perto')).toMatchObject({ precoPrevisto: 104, motivo: 'PREVISTO' });
     expect(m.get('longe')).toMatchObject({ precoPrevisto: 100, motivo: 'FORA_DO_PRAZO' });
@@ -207,6 +209,30 @@ describe('preço pelo empenho provável (90 dias)', () => {
     expect(notaDoPreco(m.get('longe'))).toBeNull();
     // Sem o IPCA, o item sem base fica como estava (preço de hoje com o aviso).
     expect(aplicarPrazoDoEmpenho(new Map([['sembase', preco('sembase', { precoAtual: 200, precoPrevisto: 200, motivo: 'SEM_PREVISAO' })]]), '2026-10-24', null).get('sembase')?.motivo).toBe('SEM_PREVISAO');
+  });
+
+  it('a folga de Ajustes (2%) entra só no reajuste projetado: o devido sozinho, o preço firme e o fora do prazo ficam como estão', async () => {
+    const { aplicarPrazoDoEmpenho } = await import('../emendasQuadro');
+    const ipca = { percentual: 4.5, de: '2025-10-01', ate: '2026-09-01' };
+    const m = aplicarPrazoDoEmpenho(
+      new Map([
+        ['perto', preco('perto', { precoAtual: 100, precoPrevisto: 104, motivo: 'PREVISTO', efeito: '2027-01-01', percentual: 4 })],
+        ['longe', preco('longe', { precoAtual: 100, precoPrevisto: 104, motivo: 'SE_PRORROGAR', efeito: '2027-03-01', percentual: 4 })],
+        ['soDevido', preco('soDevido', { precoAtual: 100, precoPrevisto: 105, motivo: 'DEVIDO', devido: true, percentual: 5 })],
+        ['sembase', preco('sembase', { precoAtual: 200, precoPrevisto: 200, motivo: 'SEM_PREVISAO' })],
+        ['emdia', preco('emdia', { precoAtual: 50, precoPrevisto: 50, motivo: 'EM_DIA' })]
+      ]),
+      '2026-10-24',
+      ipca
+    );
+    expect(m.get('perto')).toMatchObject({ precoPrevisto: 106.08, motivo: 'PREVISTO', folga: 2 });
+    expect(m.get('sembase')).toMatchObject({ precoPrevisto: 213.18, motivo: 'FOLGA_IPCA', folga: 2 });
+    expect(m.get('longe')).toMatchObject({ precoPrevisto: 100, motivo: 'FORA_DO_PRAZO' });
+    expect(m.get('soDevido')?.precoPrevisto).toBe(105);
+    expect(m.get('emdia')?.precoPrevisto).toBe(50);
+    // A explicação da folga fica nas telas da CAEP; o quadro do parlamentar não mostra notas de preço.
+    expect(notaDoPreco(m.get('perto'))).toContain('mais a folga de 2% se o IPCA vier maior');
+    expect(notaDoPreco(m.get('sembase'), ipca)).toContain('mais a folga de 2% se o IPCA vier maior');
   });
 });
 

@@ -1,11 +1,11 @@
 /**
  * Conferência do ofício (protótipo aprovado em 28/10/2026, migration 234): a CAEP confere se o ofício pede os itens do
- * pedido, ajusta o pedido ao ofício (quantidade, item tirado ou acrescentado) e confere a emenda no SIOP. O valor do
- * ofício tem de ser igual ao do pedido, centavo por centavo, pelos preços que foram no quadro da minuta.
+ * pedido, ajusta o pedido ao ofício (quantidade, item tirado ou acrescentado) e confere a emenda no SIOP. O previsto do
+ * pedido (com o reajuste projetado e a folga de Ajustes) tem de caber no que sobra da emenda.
  */
 import type { ItemCaep, ItemDoKit, LinhaPedido, LinhaParaSalvar, PedidoEmenda } from '../services/emendasService';
 import type { PrecoPrevisto } from '../services/emendasQuadroService';
-import { itensDaLinha, linhasAtivas, precoParaEmenda } from './emendasPedidos';
+import { itensDaLinha, linhasAtivas, precoParaEmenda, valorDoPedidoNaEtapa } from './emendasPedidos';
 
 /** O que se confere no SIOP. Na compra direta o beneficiário no SIOP é o próprio MJ e não há objeto. */
 export const PONTOS_SIOP: ReadonlyArray<{
@@ -74,29 +74,28 @@ export function precoUnitarioDeHoje(l: ComoLinha, itens: Map<string, ItemCaep>, 
   return centavos(itensDaLinha({ ...l, quantidade: 1 }).reduce((s, x) => s + x.quantidade * precoParaEmenda(x.itemKey, itens, precos).previsto, 0));
 }
 
-/**
- * Preço de uma unidade da linha como foi no quadro da minuta. A linha acrescentada na conferência, o item que não estava
- * na minuta e o pedido com a minuta registrada antes da migration 234 vão pelo preço de hoje.
- */
-export function precoUnitarioDaMinuta(
-  l: ComoLinha & { original?: number },
-  p: Pick<PedidoEmenda, 'minutaPrecos'>,
-  itens: Map<string, ItemCaep>,
-  precos?: Map<string, PrecoPrevisto>
-): number {
-  const daMinuta = l.original === 0 ? null : p.minutaPrecos;
-  return centavos(
-    itensDaLinha({ ...l, quantidade: 1 }).reduce((s, x) => {
-      const preco = daMinuta?.[x.itemKey];
-      return s + x.quantidade * (typeof preco === 'number' ? preco : precoParaEmenda(x.itemKey, itens, precos).previsto);
-    }, 0)
-  );
+/** Previsto do pedido ajustado: o preço previsto de hoje (reajuste projetado e folga de Ajustes) das linhas que ficam. */
+export function valorPrevisto(linhas: LinhaConferida[], itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): number {
+  return centavos(linhas.filter((l) => !l.retirada).reduce((s, l) => s + centavos(l.quantidade * precoUnitarioDeHoje(l, itens, precos)), 0));
 }
 
-/** Valor do pedido ajustado pelos preços da minuta: é este que o valor do ofício tem de igualar. */
-export function valorPelaMinuta(linhas: LinhaConferida[], p: Pick<PedidoEmenda, 'minutaPrecos'>, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): number {
-  return centavos(linhas.filter((l) => !l.retirada).reduce((s, l) => s + centavos(l.quantidade * precoUnitarioDaMinuta(l, p, itens, precos)), 0));
+/**
+ * O que sobra da emenda para este pedido (decisão de 28/10/2026): o valor da emenda no SIOP menos os outros pedidos da
+ * mesma emenda (pelo valor do ofício, ou pelo previsto quando o ofício ainda não foi informado). O pedido confere quando o
+ * previsto cabe aqui; o valor do ofício deixa de travar a conferência.
+ */
+export function sobraDaEmendaParaOPedido(
+  valorDaEmenda: number,
+  outros: PedidoEmenda[],
+  itens: Map<string, ItemCaep>,
+  precos?: Map<string, PrecoPrevisto>
+): { outros: number; sobra: number } {
+  const usado = centavos(outros.reduce((s, o) => s + valorDoPedidoNaEtapa(o, itens, precos).valor, 0));
+  return { outros: usado, sobra: centavos(valorDaEmenda - usado) };
 }
+
+/** O previsto cabe no que sobra da emenda (menor ou igual, ao centavo). */
+export const cabeNaEmenda = (previsto: number, sobra: number): boolean => previsto <= sobra + 0.004;
 
 /** Os preços unitários que a minuta guardou para cada item: os que o quadro mostra hoje (vão no registro da minuta). */
 export function precosDaMinuta(p: PedidoEmenda, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): Record<string, number> {
@@ -112,7 +111,7 @@ export interface PrecoQueMudou {
   hoje: number;
 }
 
-/** Itens do pedido cujo preço previsto mudou depois da minuta: o ofício foi feito com o preço antigo. */
+/** Itens cujo preço previsto mudou depois da minuta (só informa: o que trava é o pedido não caber na emenda). */
 export function precosQueMudaram(
   linhas: LinhaConferida[],
   p: Pick<PedidoEmenda, 'minutaPrecos'>,

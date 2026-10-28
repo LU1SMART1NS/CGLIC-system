@@ -108,18 +108,29 @@ describe('conferência do ofício no Pedido 360 (protótipo aprovado em 28/10/20
     expect(html).toContain('Não bate: gerar nova minuta');
   });
 
-  it('valor do ofício igual ao pedido bate; diferente pede ajuste ou nova minuta; sem preços da minuta avisa que vale o de hoje', () => {
-    expect(render(pedido({ oficioValor: 950 }))).toContain('conferencia-valor-bate');
-    const diferente = render(pedido({ oficioValor: 900 }));
-    expect(diferente).toContain('conferencia-valor-nao-bate');
-    expect(diferente).toContain('conferencia-sem-precos-da-minuta');
+  it('o previsto (950) cabe no que sobra da emenda: igual cabe, menor não cabe; o ofício diferente só avisa', () => {
+    const cabe = render(pedido({ siopValor: 950, oficioValor: 900 }));
+    expect(cabe).toContain('data-testid="conferencia-cabe">Cabe<');
+    expect(cabe).toContain('conferencia-oficio-diferente');
+    expect(cabe).not.toContain('conferencia-nao-cabe');
+    const naoCabe = render(pedido({ siopValor: 949.99, oficioValor: 950 }));
+    expect(naoCabe).toContain('Não cabe');
+    expect(naoCabe).toContain('conferencia-nao-cabe');
+    expect(naoCabe).not.toContain('conferencia-oficio-diferente');
   });
 
-  it('o preço que mudou depois da minuta pede nova minuta e diz a ata', () => {
-    const html = render(pedido({ oficioValor: 950, minutaPrecos: { [`${A}-00001`]: 90, [`${B}-00001`]: 50 } }));
+  it('os outros pedidos da mesma emenda descontam da sobra', () => {
+    const outro = { ...pedido({ etapa: 'CONTRATACAO', oficioValor: 100 }), id: 'outro', siopEmenda: '28630004' };
+    const html = render(pedido({ siopValor: 1000, oficioValor: 950 }), [outro]);
+    expect(html).toContain('menos R$');
+    expect(html).toContain('Não cabe');
+  });
+
+  it('o preço que mudou depois da minuta só informa e diz a ata', () => {
+    const html = render(pedido({ siopValor: 5000, oficioValor: 950, minutaPrecos: { [`${A}-00001`]: 90, [`${B}-00001`]: 50 } }));
     expect(html).toContain('conferencia-preco-mudou');
     expect(html).toContain('ata 00031/2025');
-    expect(html).not.toContain('conferencia-sem-precos-da-minuta');
+    expect(html).toContain('data-testid="conferencia-cabe">Cabe<');
   });
 
   it('nº da emenda: o código de autor de outro parlamentar acende o aviso, com o nome dele', () => {

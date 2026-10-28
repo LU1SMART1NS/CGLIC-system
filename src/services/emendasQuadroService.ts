@@ -33,6 +33,8 @@ export interface PrecoPrevisto {
   percentual: number | null;
   /** Meses do percentual que vêm da projeção do Focus, não do IPCA publicado. */
   mesesEstimados: number | null;
+  /** Folga (%) somada ao reajuste projetado na tela (aplicarPrazoDoEmpenho); ausente no preço que vem do banco. */
+  folga?: number;
 }
 
 function db() {
