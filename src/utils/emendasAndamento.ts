@@ -20,6 +20,7 @@ import {
   jaEmpenhado,
   linhasPorAta,
   ORDEM_ETAPA,
+  prazoDaEtapa,
   proximaAcao,
   rodadaDoPedido,
   tarefasDoPedido,
@@ -306,12 +307,15 @@ export function andamentoDoPedido(
   const execucao = jaEmpenhado(p.etapa) ? execucaoDoPedido(p, notas) : null;
   const temNotas = Boolean(execucao && execucao.notas > 0);
   const contratado = Boolean(contratos?.contratado);
-  const entrega = base('entrega', 'EXECUCAO', null, 'Entrega ao beneficiário', 'ACOMPANHAR', 'fiscal do contrato');
-  entrega.regra = 'a entrega ainda não tem fonte no sistema (virá da fiscalização)';
-  if (contratado) {
-    entrega.estado = 'SEM_FONTE';
-    entrega.prazo = execucao?.proximaEntrega ? dataBR(execucao.proximaEntrega.data) : null;
-    entrega.progresso = execucao?.proximaEntrega ? 'entrega prevista pelo gestor do contrato' : 'entrega prevista não informada';
+  // Migration 231: a fatura no Contratos.gov.br mostra que o fornecedor entregou e o fiscal atestou.
+  const entrega = base('entrega', 'EXECUCAO', null, 'Entrega e fatura', 'ACOMPANHAR', 'fornecedor e fiscal do contrato');
+  entrega.regra = 'fecha quando cada nota tem fatura no Contratos.gov.br (o fornecedor entregou e o fiscal atestou)';
+  if (contratado && execucao) {
+    const todas = execucao.notas > 0 && execucao.notasFaturadas >= execucao.notas;
+    entrega.estado = todas ? 'FEITA' : 'FONTE';
+    entrega.progresso = `${execucao.notasFaturadas} de ${plural(execucao.notas, 'nota', 'notas')} com fatura`;
+    if (todas) entrega.feito = execucao.faturadoEm ? `1ª fatura em ${dataBR(execucao.faturadoEm)}` : plural(execucao.notasFaturadas, 'nota faturada', 'notas faturadas');
+    else if (execucao.proximaEntrega) entrega.prazo = dataBR(execucao.proximaEntrega.data);
   }
   const liquidacao = base('liquidacao', 'EXECUCAO', null, 'Liquidação', 'ACOMPANHAR', 'gestor do contrato e CGOFI');
   liquidacao.regra = 'fecha quando o liquidado das notas chega ao empenhado';
@@ -323,8 +327,20 @@ export function andamentoDoPedido(
     liquidacao.estado = quase(execucao.liquidado, execucao.empenhado) ? 'FEITA' : 'FONTE';
     pagamento.progresso = `${reais(execucao.pago)} de ${reais(execucao.empenhado)}`;
     pagamento.estado = quase(execucao.pago, execucao.empenhado) ? 'FEITA' : 'FONTE';
-    if (liquidacao.estado === 'FEITA') liquidacao.feito = reais(execucao.liquidado);
-    if (pagamento.estado === 'FEITA') pagamento.feito = reais(execucao.pago);
+    if (liquidacao.estado === 'FEITA') liquidacao.feito = [reais(execucao.liquidado), execucao.liquidadoEm ? `em ${dataBR(execucao.liquidadoEm)}` : null].filter(Boolean).join(' ');
+    if (pagamento.estado === 'FEITA') pagamento.feito = [reais(execucao.pago), execucao.pagoEm ? `em ${dataBR(execucao.pagoEm)}` : null].filter(Boolean).join(' ');
+  }
+
+  // Prazo medido da etapa atual (D5, 28/10/2026) na tarefa que a fecha; a que já tem prazo próprio (corte da ata,
+  // fim da ata para o contrato) fica com o dela. Pedido aguardando outra unidade com o prazo vencido: cobrar.
+  const prazo = cancelado ? null : prazoDaEtapa(p, notas, hoje);
+  const daEtapa: Partial<Record<EtapaPedido, TarefaDoAndamento>> = { OFICIO: conferir, SOLICITADO: assinatura, AUTORIZADO: cgofi, CGOFI: empenho, EMPENHADO: despacho };
+  const tarefaDoPrazo = daEtapa[p.etapa];
+  if (prazo && tarefaDoPrazo && !tarefaDoPrazo.prazo && tarefaDoPrazo.estado !== 'FEITA') {
+    tarefaDoPrazo.prazo = dataBR(prazo.ate);
+    tarefaDoPrazo.vencido = prazo.vencido;
+    tarefaDoPrazo.regra ??= `${prazo.prazo} dias da etapa anterior (tempo medido em 80% dos pedidos)`;
+    if (prazo.vencido && tarefaDoPrazo.estado === 'AGUARDANDO') tarefaDoPrazo.estado = 'COBRAR';
   }
 
   const lista: TarefaDoAndamento[] = [
