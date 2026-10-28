@@ -263,7 +263,7 @@ export function andamentoDoPedido(
     if (assinatura.estado === 'FEITA') assinatura.feito = assinadas.length ? [...new Set(assinadas.map(dataBR))].join(', ') : p.autorizadoEm ? dataBR(p.autorizadoEm) : null;
   } else if (esta('SOLICITADO')) assinatura.estado = 'AGUARDANDO';
 
-  const cgofi = base('cgofi', 'EMPENHO', 'CGOFI', 'Enviar o processo à CGOFI', 'FAZER', 'CGOFI');
+  const cgofi = base('cgofi', 'EMPENHO', 'CGOFI', 'Enviar o processo à CGOFI', 'FAZER', 'CAEP');
   if (passou('CGOFI')) {
     cgofi.estado = comAcao('cgofi') ? 'COMIGO' : 'FEITA';
     if (cgofi.estado === 'FEITA') cgofi.feito = p.cgofiEm ? dataBR(p.cgofiEm) : null;
