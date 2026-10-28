@@ -5,6 +5,7 @@ import { DateField, Field, FooterButtons } from '../contracts/payment/PaymentCyc
 import { errorMessage, useEmpenhosDoContrato } from '../contracts/payment/cicloPagamentoShared';
 import { formatCurrencyInputBR, isoToBR, parseCurrencyInputBR, parseDateInputBR, todayISO } from '../contracts/payment/paymentFormUtils';
 import { formatCurrency } from '../../utils/format';
+import { documentoSeiValido, mascaraDocumentoSei } from '../../utils/mascaras';
 
 const paraCampo = (v: number) => (v > 0 ? formatCurrencyInputBR(String(Math.round(v * 100))) : '');
 
@@ -218,6 +219,7 @@ export const RegistrarEnvioModal: React.FC<{
     e.preventDefault();
     const dataISO = parseDateInputBR(data);
     if (!dataISO) return setErro('Informe a data completa.');
+    if (!documentoSeiValido(sei)) return setErro('Documento SEI: só números, de 7 a 10 dígitos.');
     setSalvando(true);
     setErro(null);
     try {
@@ -245,7 +247,7 @@ export const RegistrarEnvioModal: React.FC<{
           que for pago no mês.{jaEnviada ? ' Já havia um envio registrado: este o substitui.' : ''}
         </NoticeBar>
         <Field id="envio-prev-sei" label="SEI do documento enviado *">
-          <input id="envio-prev-sei" className="form-input" type="text" value={sei} onChange={(e) => setSei(e.target.value)} required />
+          <input id="envio-prev-sei" className="form-input" type="text" inputMode="numeric" value={sei} onChange={(e) => setSei(mascaraDocumentoSei(e.target.value))} required />
         </Field>
         <DateField id="envio-prev-data" label="Enviado em *" value={data} onChange={setData} />
         {erro && <NoticeBar tone="danger" testId="previsao-envio-erro">{erro}</NoticeBar>}

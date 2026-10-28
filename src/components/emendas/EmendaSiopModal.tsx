@@ -9,6 +9,7 @@ import { hojeEmBrasilia, useSalvarEmendaSiop } from '../../hooks/useEmendas';
 import { casaBusca } from '../../utils/emendasBeneficiarios';
 import { autorPeloCodigo, lerNumeroDaEmenda, numeroDaEmenda } from '../../utils/emendasSemPedido';
 import { dataBR } from '../../utils/emendasKits';
+import { lerValorBR, mascaraValorBR } from '../../utils/mascaras';
 import { nomeESigla, type AutorEmenda, type BeneficiarioEmenda, type EmendaSiop, type Gnd, type PedidoEmenda } from '../../services/emendasService';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
 
@@ -63,7 +64,7 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
     ? pedidos.find((p) => p.etapa !== 'CANCELADO' && p.siopEmenda === lido.numero && (p.siopEmendaAno ?? lido.ano) === lido.ano && (!emenda || p.emendaId !== emenda.id))
     : undefined;
   const jaRegistrada = lido ? emendas.find((e) => e.numero === lido.numero && e.ano === lido.ano && e.id !== emenda?.id) : undefined;
-  const valorLido = valor.trim() ? Number(valor.replace(/[^\d,]/g, '').replace(',', '.')) : null;
+  const valorLido = lerValorBR(valor);
   const beneficiariosOrdenados = useMemo(() => [...beneficiarios].filter((b) => b.ativo || b.id === beneficiarioId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')), [beneficiarios, beneficiarioId]);
 
   const faltas: string[] = [];
@@ -145,7 +146,7 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
             placeholder="1.200.000,00"
             inputMode="decimal"
             value={valor}
-            onChange={(e) => setValor(e.target.value)}
+            onChange={(e) => setValor(mascaraValorBR(e.target.value, valor))}
             error={tentou && (!valorLido || valorLido <= 0) ? 'Informe o valor.' : undefined}
             data-testid="emendas-emenda-siop-valor"
           />
