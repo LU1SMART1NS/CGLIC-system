@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppDateInput } from '../../../design-system/components/FormFields';
 import { ActionButton, AppButton, AppInput, Modal, NoticeBar, useToast } from '../../../design-system';
 import { useAcoesReajuste } from '../../../hooks/useReajusteAtas';
 import type { ParametrosReajuste } from '../../../services/reajusteAtasService';
@@ -77,8 +78,8 @@ export const InformarTermoModal: React.FC<Props> = ({ aberto, ataId, numeroAta, 
         <NoticeBar tone="info" testId="informar-termo-dica">{dica}</NoticeBar>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
           Data do Termo de Conformidade
-          <AppInput id="reajuste-termo-data" type="date" value={data} max={inicioVigencia || undefined} style={{ width: 180 }}
-            onChange={(e) => setData(e.target.value)} data-testid="informar-termo-data" />
+          <AppDateInput id="reajuste-termo-data" value={data} max={inicioVigencia || undefined} style={{ width: 180 }}
+            onValueChange={setData} data-testid="informar-termo-data" />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
           Número do documento SEI do termo

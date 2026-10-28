@@ -3,7 +3,7 @@ import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { NoticeBar } from '../../design-system/components/NoticeBar';
-import { AppInput, AppSelect, AppTextarea } from '../../design-system/components/FormFields';
+import { AppInput, AppSelect, AppTextarea, AppDateInput } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useSalvarEmendaSiop } from '../../hooks/useEmendas';
 import { casaBusca } from '../../utils/emendasBeneficiarios';
@@ -154,7 +154,7 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
             <option value="GND-4">GND-4 · Investimento</option>
             <option value="GND-3">GND-3 · Custeio</option>
           </AppSelect>
-          <AppInput label="Vista no SIOP em" type="date" max={hoje} value={vistaEm} onChange={(e) => setVistaEm(e.target.value)} data-testid="emendas-emenda-siop-vista" />
+          <AppDateInput label="Vista no SIOP em" max={hoje} value={vistaEm} onValueChange={setVistaEm} data-testid="emendas-emenda-siop-vista" />
         </div>
 
         {pedidoDoNumero && (

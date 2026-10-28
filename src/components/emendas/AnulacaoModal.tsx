@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
+import { AppInput, AppTextarea, AppDateInput } from '../../design-system/components/FormFields';
 import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useRegistrarAnulacao } from '../../hooks/useEmendas';
@@ -132,12 +132,11 @@ export const AnulacaoModal: React.FC<Props> = ({ pedido, itens, notas, nomeDoAut
             error={tentou && !documentoSeiDaEtapaValido(documento) ? 'Informe o número do documento (7 a 10 dígitos).' : undefined}
             data-testid="emendas-anulacao-sei"
           />
-          <AppInput
+          <AppDateInput
             label="Data da anulação"
-            type="date"
             max={hoje}
             value={data}
-            onChange={(e) => setData(e.target.value)}
+            onValueChange={setData}
             error={tentou && (!data || data > hoje) ? 'Informe a data (hoje ou antes).' : undefined}
             data-testid="emendas-anulacao-data"
           />

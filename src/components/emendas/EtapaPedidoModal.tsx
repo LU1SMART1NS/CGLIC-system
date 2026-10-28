@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { AppInput, AppSelect, AppTextarea } from '../../design-system/components/FormFields';
+import { AppInput, AppSelect, AppTextarea, AppDateInput } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useEmendasSiop, useInformarSolicitacaoDaAta, usePedidoEmDiaNaTela, usePedidosEmendas, useRegistrarEnvioCgofi } from '../../hooks/useEmendas';
 import { formatCurrency } from '../../utils/format';
@@ -412,13 +412,12 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
                 ))}
               </AppSelect>
               {autorizado && (
-                <AppInput
+                <AppDateInput
                   label="Assinada pela Diretora do FNSP em"
-                  type="date"
                   hint="Em branco se ainda não assinou."
                   value={assinadaEm}
                   max={hojeEmBrasilia()}
-                  onChange={(e) => setAssinadaEm(e.target.value)}
+                  onValueChange={setAssinadaEm}
                   data-testid="emendas-etapa-assinada-em"
                 />
               )}
@@ -480,7 +479,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
                 data-testid="emendas-etapa-processo"
               />
             )}
-            {ROTULO_DATA[modo] && <AppInput label={ROTULO_DATA[modo]!} type="date" value={data} onChange={(e) => setData(e.target.value)} />}
+            {ROTULO_DATA[modo] && <AppDateInput label={ROTULO_DATA[modo]!} value={data} onValueChange={setData} />}
           </div>
         )}
 
@@ -564,7 +563,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
                 <option value="GND-4">GND-4 Investimento</option>
                 <option value="GND-3">GND-3 Custeio</option>
               </AppSelect>
-              <AppInput label="Conferido em" type="date" value={data} onChange={(e) => setData(e.target.value)} />
+              <AppDateInput label="Conferido em" value={data} onValueChange={setData} />
             </div>
             <div style={aviso('info')} data-testid="emendas-etapa-previsto">
               Valor previsto dos itens, com o reajuste das atas (o mesmo do quadro do parlamentar): {formatCurrency(previsto)}
@@ -605,7 +604,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
         {modo === 'DIVERGENCIA' && (
           <>
             <AppTextarea label="O que não bate *" rows={3} value={divergencia} onChange={(e) => setDivergencia(e.target.value)} placeholder="Ex.: valor do ofício (R$ 120.000) diferente do SIOP (R$ 98.000)" data-testid="emendas-etapa-divergencia" />
-            <AppInput label="Devolvido em" type="date" value={data} onChange={(e) => setData(e.target.value)} />
+            <AppDateInput label="Devolvido em" value={data} onValueChange={setData} />
             <div style={aviso('info')}>
               O pedido volta para "Minuta": a CAEP faz a {rodada + 1}ª minuta e manda ao parlamentar. A minuta e o ofício devolvidos ficam no histórico do pedido.
               A reserva continua.

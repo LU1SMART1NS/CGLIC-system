@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppDateInput } from '../../../design-system/components/FormFields';
 import { mascaraPercentual } from '../../../utils/mascaras';
 import { ActionButton, AppButton, AppInput, Modal, NoticeBar, useToast } from '../../../design-system';
 import { useAcoesReajuste } from '../../../hooks/useReajusteAtas';
@@ -104,17 +105,17 @@ export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numero
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
             Início dos efeitos
-            <AppInput id="reajuste-efeito" type="date" value={efeito} style={{ width: 180 }} onChange={(e) => setEfeito(e.target.value)} data-testid="informar-percentual-efeito" />
+            <AppDateInput id="reajuste-efeito" value={efeito} style={{ width: 180 }} onValueChange={setEfeito} data-testid="informar-percentual-efeito" />
           </label>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
             Índice de
-            <AppInput id="reajuste-periodo-de" type="month" value={de} style={{ width: 180 }} onChange={(e) => setDe(e.target.value)} data-testid="informar-percentual-de" />
+            <AppDateInput mes id="reajuste-periodo-de" value={de} style={{ width: 180 }} onValueChange={setDe} data-testid="informar-percentual-de" />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
             até
-            <AppInput id="reajuste-periodo-ate" type="month" value={ate} style={{ width: 180 }} onChange={(e) => setAte(e.target.value)} data-testid="informar-percentual-ate" />
+            <AppDateInput mes id="reajuste-periodo-ate" value={ate} style={{ width: 180 }} onValueChange={setAte} data-testid="informar-percentual-ate" />
           </label>
         </div>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>

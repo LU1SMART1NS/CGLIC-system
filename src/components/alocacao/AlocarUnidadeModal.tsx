@@ -320,12 +320,14 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                             ) : (
                               <>
                                 <input
-                                  type="number"
-                                  min={a.minimo}
-                                  max={l.inativa ? l.original : undefined}
+                                  type="text"
+                                  inputMode="numeric"
                                   value={l.qtd}
                                   autoFocus={l.id === focoId}
-                                  onChange={(e) => alterar(l.id, { qtd: e.target.value === '' ? '' : Number(e.target.value) })}
+                                  onChange={(e) => {
+                                    const d = e.target.value.replace(/\D/g, '');
+                                    alterar(l.id, { qtd: d === '' ? '' : Number(d) });
+                                  }}
                                   disabled={salvando}
                                   aria-label={`Quantidade alocada para ${l.unitName}`}
                                   aria-invalid={a.abaixoDoMinimo || a.acimaDoGravado || undefined}
@@ -396,11 +398,11 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                     ))}
                   </select>
                   <input
-                    type="number"
-                    min="1"
+                    type="text"
+                    inputMode="numeric"
                     placeholder="Quantidade"
                     value={novaQtd}
-                    onChange={(e) => setNovaQtd(e.target.value)}
+                    onChange={(e) => setNovaQtd(e.target.value.replace(/\D/g, ''))}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); adicionar(); } }}
                     disabled={salvando}
                     aria-label="Quantidade da nova unidade"

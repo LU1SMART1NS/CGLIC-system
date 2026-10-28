@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AppDateInput } from '../../design-system/components/FormFields';
 import { Check, Circle, CircleDot, Minus, Sliders, ExternalLink, Plus } from 'lucide-react';
 import type {
   AtaTask,
@@ -639,11 +640,9 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             <label className="form-label">
               Prazo limite
             </label>
-            <input
-              type="date"
+            <AppDateInput
               value={prazo}
-              onChange={(e) => setPrazo(e.target.value)}
-              className="form-input"
+              onValueChange={setPrazo}
             />
             {temRegra && (
               <div data-testid="plan-prazo-regra" style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>

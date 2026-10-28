@@ -5,7 +5,7 @@ import { formatDateBR } from '../../services/temporalEngineService';
 import { lerNumeroSei, descreverNumeroSei } from '../../utils/numeroSei';
 import { mascaraProcessoSei } from '../../utils/mascaras';
 import { ActionButton, AppButton, Modal } from '../../design-system';
-import { AppTextarea } from '../../design-system/components/FormFields';
+import { AppTextarea, AppDateInput } from '../../design-system/components/FormFields';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 import { MutationError } from '../contracts/planTaskEditing';
 
@@ -174,7 +174,7 @@ export const MarcaOrientarForm: React.FC<{
           <label htmlFor={`${id}-data`} className="form-label">
             {tipo === 'PEDIDO' ? 'Enviado em' : 'Recebida em'}
           </label>
-          <input id={`${id}-data`} type="date" required value={data} max={hojeISO()} onChange={(e) => setData(e.target.value)} className="form-input" />
+          <AppDateInput id={`${id}-data`} required value={data} max={hojeISO()} onValueChange={setData} />
         </div>
         <ActionButton action="salvar" label={tipo === 'PEDIDO' ? 'Marcar enviado' : 'Registrar e concluir'} type="submit" size="sm" disabled={isPending || lido.tipo === 'INVALIDO' || !data} isLoading={isPending} />
         <ActionButton action="cancelar" type="button" size="sm" onClick={onCancel} />
@@ -365,7 +365,7 @@ export const ModuloDados: React.FC<{
           <label htmlFor={`ancora-${modulo.id}`} className="form-label">
             Data de partida
           </label>
-          <input id={`ancora-${modulo.id}`} type="date" className="form-input" value={ancora} onChange={(e) => setAncora(e.target.value)} />
+          <AppDateInput id={`ancora-${modulo.id}`} value={ancora} onValueChange={setAncora} />
         </div>
         <ActionButton action="salvar" type="submit" size="sm" disabled={isPending || processoInvalido} isLoading={isPending} />
         <ActionButton action="cancelar" type="button" size="sm" onClick={() => setEditando(false)} />
