@@ -120,6 +120,18 @@ describe('Pedido 360: endereço e número do pedido (migration 217)', () => {
     expect(html).toContain('emendas-pedido-sem-autor-p4');
   });
 
+  it('cartão (28/10/2026): o pedido no título, o parlamentar embaixo, itens somados pelo nome e a próxima tarefa na etapa', () => {
+    const html = render('/emendas/parlamentares/A1/pedidos/2026/1');
+    expect(html).toMatch(/<h1 class="i360-title">.*?>Pedido 1\/2026<\/button>/);
+    expect(html).toContain('pedido-360-abrir-parlamentar');
+    expect(html).toContain('pedido-360-abrir-emenda');
+    expect(html).not.toContain('instrument-360-origin');
+    const blocos = render('/emendas/pedidos/id/blocos');
+    expect(blocos).toContain('3 itens em 2 atas: 11 Carabina, 5 Mira.');
+    expect(render('/emendas/pedidos/id/p1')).toContain('próximo: conferir com o SIOP');
+    expect(render('/emendas/pedidos/id/dev')).toContain('próximo: registrar a 2ª minuta');
+  });
+
   it('endereço que não existe: pedido não encontrado', () => {
     expect(render('/emendas/parlamentares/A1/pedidos/2026/9')).toContain('Pedido não encontrado');
   });

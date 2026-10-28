@@ -264,7 +264,6 @@ export const Emenda360Page: React.FC = () => {
                 <span>{e.autorId ?? 'Parlamentar não identificado'}</span>
               )}
               {autor && <span>{linhaDoAutor(autor)}</span>}
-              {beneficiario && <span>· beneficiário indicado: {nomeESigla(beneficiario)}</span>}
             </span>
           }
           objeto={registrada?.objeto ? `Objeto no SIOP: ${registrada.objeto}` : registrada ? undefined : 'Nº conferido no SIOP pelo pedido: a emenda não foi registrada a partir do SIOP.'}
@@ -292,7 +291,7 @@ export const Emenda360Page: React.FC = () => {
         >
           <div data-testid="emenda-360-indicadores">
             <HealthTileGrid columns={4}>
-              <HealthTile label="Valor no SIOP" value={e.valor != null ? formatCurrency(e.valor) : '—'} hint={e.ano ? `${e.ano}${e.numero}` : 'ano não informado'} compact testId="emenda-360-valor" />
+              <HealthTile label="Valor no SIOP" value={e.valor != null ? formatCurrency(e.valor) : '—'} hint={daEmenda.length === 0 ? 'nenhum pedido' : daEmenda.length === 1 ? '1 pedido' : `${daEmenda.length} pedidos`} compact onClick={() => goToTab('pedidos')} testId="emenda-360-valor" />
               <HealthTile
                 label="Empenhado"
                 value={sobra ? formatCurrency(sobra.empenhado) : execucao.notas > 0 ? formatCurrency(execucao.empenhado) : '—'}
@@ -304,7 +303,7 @@ export const Emenda360Page: React.FC = () => {
               <HealthTile
                 label="Pago"
                 value={execucao.notas > 0 ? formatCurrency(execucao.pago) : '—'}
-                hint={execucao.notas > 0 ? `nas ${execucao.notas} ${execucao.notas === 1 ? 'nota' : 'notas'} dos pedidos` : 'depois do empenho'}
+                hint={execucao.notas > 0 ? `nas ${execucao.notas} ${execucao.notas === 1 ? 'nota' : 'notas'} dos pedidos` : 'nenhuma nota ainda'}
                 compact
                 onClick={() => goToTab('execucao')}
                 testId="emenda-360-pago"

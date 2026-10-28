@@ -9,6 +9,7 @@ import { InstrumentPageState } from '../../instrument360/InstrumentPageState';
 import { InstrumentSection } from '../../instrument360/InstrumentSection';
 import { useInstrumentTab } from '../../instrument360/useInstrumentTab';
 import { useBackTarget, useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
+import { rotaDaEmenda } from '../emendas360/rotaDaEmenda';
 import {
   hojeEmBrasilia,
   useAutoresEmendas,
@@ -154,6 +155,7 @@ export const Pedido360Page: React.FC = () => {
           onAnular={() => setAnulando(true)}
           onAba={irPara}
           onAbrirParlamentar={p.autorId ? () => navegar(`/emendas/parlamentares/${encodeURIComponent(p.autorId!)}`) : undefined}
+          onAbrirEmenda={p.siopEmenda ? () => navegar(rotaDaEmenda({ ano: p.siopEmendaAno ?? null, numero: p.siopEmenda! })) : undefined}
           verMais={<CaptacaoBotao fatias={captacao} aberto={captacaoAberta} onToggle={() => setCaptacaoAberta((v) => !v)} />}
         />
         <CaptacaoNoTopo fatias={captacao} beneficiarios={beneficiarios} aberto={captacaoAberta} onFechar={() => setCaptacaoAberta(false)} />
