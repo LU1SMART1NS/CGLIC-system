@@ -104,6 +104,8 @@ export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tit
       if (!n.nome.trim()) return setErro(`Escreva o nome do órgão da UASG ${n.uasg.trim()} (não veio do Compras.gov.br).`);
       if (!inteiro(n.quantidade)) return setErro(`Informe a quantidade da UASG ${n.uasg.trim()} (número inteiro).`);
     }
+    // A ata assinada distribui o que a licitação homologou: a soma não pode passar do homologado (migration 224).
+    if (soma > homologado) return setErro(`A soma (${formatNumber(soma)}) passa do homologado (${formatNumber(homologado)}) em ${formatNumber(soma - homologado)}. Confira a ata: algum órgão está com mais do que a licitação homologou.`);
     if (!documentoSeiValido(documento)) return setErro('O número do documento SEI tem 8 dígitos (ex.: 12345678).');
     if (corrigir && justificativa.trim().length < 15) return setErro('Escreva a justificativa da correção (mínimo de 15 caracteres).');
     try {
@@ -228,7 +230,9 @@ export const InformarAtaAssinadaModal: React.FC<Props> = ({ aberto, itemKey, tit
           Soma informada <strong>{formatNumber(soma)}</strong> · homologado do item <strong>{formatNumber(homologado)}</strong>
           {soma === homologado
             ? <StatusBadge label="confere" variant="success" size="sm" dot={false} />
-            : <StatusBadge label={`diferença de ${formatNumber(soma - homologado)}: grava com aviso`} variant="warning" size="sm" dot={false} />}
+            : soma > homologado
+              ? <StatusBadge label={`passa do homologado em ${formatNumber(soma - homologado)}: corrija para gravar`} variant="danger" size="sm" dot={false} />
+              : <StatusBadge label={`faltam ${formatNumber(homologado - soma)} para o homologado: grava com aviso`} variant="warning" size="sm" dot={false} />}
         </div>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
           Número do documento SEI da ata assinada (8 dígitos)
