@@ -29,7 +29,9 @@ const OUTRO = pedido('p3', 'A2', 'OFICIO');
 const DO_ORGAO = pedido('p4', null, 'RESERVADO');
 // Senadora Dois: emenda de 2024 (ano encerrado) de R$ 2.000 com R$ 500 empenhados: R$ 1.500 não empenhados.
 const DE_2024 = pedido('p5', 'A2', 'CONTRATACAO', { siopEmenda: '40000001', siopEmendaAno: 2024, siopValor: 2000, linhas: [linha('l5', 1)] });
-const PEDIDOS = [EMPENHADO, RESERVA, OUTRO, DO_ORGAO, DE_2024];
+// Deputado Um em 2025: emenda só no pedido, sem o valor do SIOP (como a da Bancada MG).
+const SEM_VALOR = pedido('p6', 'A1', 'AUTORIZADO', { numeroNoAno: 1, anoDoNumero: 2025, siopEmenda: '71140003', siopEmendaAno: 2025, linhas: [linha('l6', 2)] });
+const PEDIDOS = [EMPENHADO, RESERVA, OUTRO, DO_ORGAO, DE_2024, SEM_VALOR];
 const NOTAS = new Map<string, NotaDaLinha>([
   ['l5', { linhaId: 'l5', nota: '2024NE000007', regra: 'SEI', motivo: null, contractKey: null, empenhoId: 'e5', valorEmpenhado: 500, valorLiquidado: 0, valorPago: 0, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: '2024-06-01', atualizadoEm: null }],
   ['l1', { linhaId: 'l1', nota: '2026NE000103', regra: 'SEI', motivo: null, contractKey: null, empenhoId: 'e1', valorEmpenhado: 300, valorLiquidado: 150, valorPago: 100, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: '2026-04-17', atualizadoEm: null }]
@@ -176,6 +178,16 @@ describe('Ano da emenda (28/10/2026)', () => {
     expect(antigo).toMatch(/R\$\s1\.500,00/);
     expect(antigo).toContain('Senadora Dois');
     expect(antigo).not.toContain('Deputado Um');
+  });
+
+  it('emenda sem valor do SIOP: "sem valor do SIOP" no lugar de R$ 0,00 e de "crédito perdido"', () => {
+    const html = render('/emendas/parlamentares/A1?ano=2025');
+    const cartao = (id: string) => html.match(new RegExp(`data-testid="parlamentar-360-${id}".*?</button>`))?.[0] ?? '';
+    expect(cartao('emendas')).toContain('sem valor do SIOP');
+    expect(cartao('sobra')).toContain('sem valor do SIOP');
+    expect(cartao('sobra')).not.toContain('R$');
+    expect(cartao('sobra')).not.toContain('crédito perdido');
+    expect(cartao('empenhado')).not.toContain('R$');
   });
 
   it('Parlamentar 360 num ano encerrado: sem botão de pedido novo; o ano vem do endereço', () => {

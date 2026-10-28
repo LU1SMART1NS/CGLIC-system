@@ -29,7 +29,9 @@ const CONTATOS: ContatoDaEmenda[] = [
   { id: 'c1', emendaId: 'e2', contatoEm: '2026-10-21', comQuem: 'ASPAR · PM · SP', meio: 'WHATSAPP', resumo: 'vão mandar os itens', criadoPorNome: null, criadoEm: '2026-10-21T12:00:00Z' }
 ];
 const COM_EMENDA = pedido('p1', 'A1', 'EMPENHADO', { numeroNoAno: 1, anoDoNumero: 2026, siopEmenda: '31660008', siopEmendaAno: 2026, siopValor: 1000, linhas: [linha('l1', 3)] });
-const PEDIDOS = [COM_EMENDA, pedido('p2', 'A1', 'RESERVADO')];
+// Emenda de 2025 só no pedido, sem o valor do SIOP (como a da Bancada MG): valor desconhecido, não zero.
+const SEM_VALOR = pedido('p3', 'A1', 'AUTORIZADO', { numeroNoAno: 1, anoDoNumero: 2025, siopEmenda: '71140003', siopEmendaAno: 2025, siopValor: null, linhas: [linha('l3', 2)] });
+const PEDIDOS = [COM_EMENDA, pedido('p2', 'A1', 'RESERVADO'), SEM_VALOR];
 const NOTAS = new Map<string, NotaDaLinha>([
   ['l1', { linhaId: 'l1', nota: '2026NE000103', regra: 'SEI', motivo: null, contractKey: null, empenhoId: 'e1', valorEmpenhado: 300, valorLiquidado: 150, valorPago: 100, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: '2026-04-17', atualizadoEm: null }]
 ]);
@@ -163,6 +165,15 @@ describe('Emenda 360', () => {
     } finally {
       perfil.gerir = true;
     }
+  });
+
+  it('emenda sem valor do SIOP: sobra e empenhado em "—", sem "crédito perdido"', () => {
+    const html = render('/emendas/emendas/2025/71140003');
+    const cartao = (id: string) => html.match(new RegExp(`data-testid="emenda-360-${id}".*?</button>`))?.[0] ?? '';
+    expect(cartao('sobra')).toContain('sem valor do SIOP');
+    expect(cartao('sobra')).not.toContain('R$');
+    expect(cartao('empenhado')).toContain('nenhuma nota ainda');
+    expect(cartao('empenhado')).not.toContain('R$');
   });
 
   it('nº que não existe: emenda não encontrada', () => {
