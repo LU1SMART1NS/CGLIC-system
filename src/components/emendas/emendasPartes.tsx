@@ -12,7 +12,7 @@ import { AUTOR_A_DEFINIR, chaveDoContratoDaEmenda, ORDEM_SITUACAO_LINHA, ROTULO_
 import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { formatCurrency } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import { formatarCnpj, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido, type NotaDaLinha } from '../../services/emendasService';
+import { formatarCnpj, localDoBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido, type NotaDaLinha } from '../../services/emendasService';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
@@ -59,7 +59,9 @@ export const ItemDaAta: React.FC<{
   comLinks?: boolean;
   /** Mostra o nome curto da CAEP (o do quadro do gabinete) em destaque, com a descrição do edital embaixo. */
   comNomeCurto?: boolean;
-}> = ({ item, semItem, extra, comLinks, comNomeCurto }) => {
+  /** Sem "· Ata 00018/2025" ao lado do número: a tabela já está agrupada pela ata. */
+  semAta?: boolean;
+}> = ({ item, semItem, extra, comLinks, comNomeCurto, semAta }) => {
   const parar = (e: React.MouseEvent) => e.stopPropagation();
   return (
     <>
@@ -78,15 +80,19 @@ export const ItemDaAta: React.FC<{
           ) : (
             <span style={carteiraIdentificacao}>{String(item.numeroItem).padStart(5, '0')}</span>
           )}
-          <span style={ataEmCinza}>·</span>
-          {comLinks ? (
-            <Link to={buildAtaPath(item.numeroAta, item.codigoUasg)} onClick={parar} style={{ ...ataEmCinza, textDecoration: 'none' }} title={`Abrir a Ata 360 (UASG ${item.codigoUasg})`} data-testid="emendas-ata-link">
-              Ata {item.numeroAta}
-            </Link>
-          ) : (
-            <span style={ataEmCinza} title={`UASG ${item.codigoUasg}`}>
-              Ata {item.numeroAta}
-            </span>
+          {!semAta && (
+            <>
+              <span style={ataEmCinza}>·</span>
+              {comLinks ? (
+                <Link to={buildAtaPath(item.numeroAta, item.codigoUasg)} onClick={parar} style={{ ...ataEmCinza, textDecoration: 'none' }} title={`Abrir a Ata 360 (UASG ${item.codigoUasg})`} data-testid="emendas-ata-link">
+                  Ata {item.numeroAta}
+                </Link>
+              ) : (
+                <span style={ataEmCinza} title={`UASG ${item.codigoUasg}`}>
+                  Ata {item.numeroAta}
+                </span>
+              )}
+            </>
           )}
           {extra}
         </div>
@@ -118,7 +124,12 @@ export const VigenciaDaAta: React.FC<{ item: Pick<ItemCaep, 'vigenciaFinal' | 'a
 };
 
 /** Linha do pedido: kit (nome e composição) ou item (ata · item e descrição). */
-export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitNome' | 'kitComposicao' | 'quantidade'>; itens: Map<string, ItemCaep>; comLinks?: boolean }> = ({ linha, itens, comLinks }) => {
+export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitNome' | 'kitComposicao' | 'quantidade'>; itens: Map<string, ItemCaep>; comLinks?: boolean; semAta?: boolean }> = ({
+  linha,
+  itens,
+  comLinks,
+  semAta
+}) => {
   if (linha.tipo === 'KIT') {
     return (
       <>
@@ -137,7 +148,7 @@ export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKe
     );
   }
   const i = linha.itemKey ? itens.get(linha.itemKey) : undefined;
-  return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} comLinks={comLinks} comNomeCurto />;
+  return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} comLinks={comLinks} comNomeCurto semAta={semAta} />;
 };
 
 /** Nome da unidade e, ao lado, a sigla mais clara (padrão "00001 · Ata 00055/2025" das carteiras). */
@@ -152,13 +163,14 @@ export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigl
   </div>
 );
 
-/** Beneficiário da linha: só o nome com a sigla; razão social e cidade ficam no cadastro e na coluna Entrega (decisão de 28/10/2026). */
+/** Beneficiário da linha: o nome com a sigla e, embaixo, o local de entrega; a razão social fica no cadastro (decisão de 28/10/2026). */
 export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficiarioId'>; beneficiarios: Map<string, BeneficiarioEmenda> }> = ({ linha, beneficiarios }) => {
   const b = linha.beneficiarioId ? beneficiarios.get(linha.beneficiarioId) : undefined;
   if (b) {
     return (
       <>
         <NomeComSigla b={b} />
+        {localDoBeneficiario(b) && <div style={carteiraDetalhe}>{localDoBeneficiario(b)}</div>}
         {!b.cnpj && <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />}
       </>
     );
