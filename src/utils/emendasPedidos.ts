@@ -91,7 +91,7 @@ export function proximaAcao(etapa: EtapaPedido, rodada = 1): { acao: Exclude<Aca
     case 'MINUTA':
       return { acao: 'OFICIO', rotulo: rodada > 1 ? `Registrar o ${rodada}º ofício` : 'Registrar o ofício' };
     case 'OFICIO':
-      return { acao: 'CONFERIDO', rotulo: 'Conferir com o SIOP' };
+      return { acao: 'CONFERIDO', rotulo: 'Conferir o ofício' };
     case 'CONFERIDO':
       return { acao: 'SOLICITADO', rotulo: 'Registrar a solicitação de empenho' };
     case 'SOLICITADO':

@@ -42,6 +42,7 @@ import { AutorizacaoQuadrosModal } from '../AutorizacaoQuadrosModal';
 import { Pedido360Header } from './Pedido360Header';
 import { AndamentoDoPedido } from './AndamentoDoPedido';
 import { ExecucaoDoPedidoAba } from './ExecucaoDoPedidoAba';
+import { ConferenciaDoOficio } from './ConferenciaDoOficio';
 import { PEDIDO360_ABAS, type Pedido360Aba } from './pedido360Abas';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
@@ -84,6 +85,8 @@ export const Pedido360Page: React.FC = () => {
   const [editando, setEditando] = useState(false);
   const [anulando, setAnulando] = useState(false);
   const [janela, setJanela] = useState<{ acao: AcaoDaJanela; contexto?: ContextoDaJanela } | null>(null);
+  // Conferência do ofício (protótipo aprovado em 28/10/2026): abre no lugar das abas, numa área larga, e não em janela.
+  const [conferindo, setConferindo] = useState<{ devolvendo: boolean } | null>(null);
   // Captação principal (migration 218): botão no cartão e gaveta entre o cartão e as abas, como na Ata 360.
   const gruposDosBeneficiarios = useMapaGruposBeneficiarios();
   const [captacaoAberta, setCaptacaoAberta] = useState(false);
@@ -133,7 +136,10 @@ export const Pedido360Page: React.FC = () => {
   const avisos = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id));
   const valor = valorDoPedidoNaEtapa(p, itens, precos);
   const captacao = fatiasDaCaptacao([p], gruposDosBeneficiarios, itens, precos);
-  const onAcao = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) => setJanela({ acao, contexto });
+  const onAcao = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) =>
+    acao === 'CONFERIDO' || acao === 'DIVERGENCIA' ? setConferindo({ devolvendo: acao === 'DIVERGENCIA' }) : setJanela({ acao, contexto });
+  // Só com o ofício recebido: depois de registrar, o pedido muda de etapa e a tela volta às abas.
+  const naConferencia = Boolean(conferindo && podeGerir && p.etapa === 'OFICIO');
   const tabs = PEDIDO360_ABAS.map((a) => (a.id === 'itens' ? { ...a, label: `Itens (${linhasAtivas(p).length})` } : a));
 
   return (
@@ -159,72 +165,96 @@ export const Pedido360Page: React.FC = () => {
           verMais={<CaptacaoBotao fatias={captacao} aberto={captacaoAberta} onToggle={() => setCaptacaoAberta((v) => !v)} />}
         />
         <CaptacaoNoTopo fatias={captacao} beneficiarios={beneficiarios} aberto={captacaoAberta} onFechar={() => setCaptacaoAberta(false)} />
-        <Instrument360Tabs ref={tabsRef} tabs={tabs} active={activeTab} onSelect={irPara} idPrefix="pedido" ariaLabel={`Seções do ${nomeDoPedido(p).toLowerCase()}`} />
+        {!naConferencia && (
+          <Instrument360Tabs ref={tabsRef} tabs={tabs} active={activeTab} onSelect={irPara} idPrefix="pedido" ariaLabel={`Seções do ${nomeDoPedido(p).toLowerCase()}`} />
+        )}
       </Instrument360Head>
 
-      <Instrument360TabPanel idPrefix="pedido" activeTab={activeTab}>
-        {activeTab === 'andamento' && (
-          <InstrumentSection id="pedido-andamento" title="Andamento" subtitle="As etapas do pedido como tarefas: o que já foi feito, o que é com a CAEP e o que depende de outra unidade" icon={ListTodo}>
-            <AndamentoDoPedido
-              p={p}
-              itens={itens}
-              notas={notas}
-              avisos={avisos}
-              hoje={hoje}
-              podeGerir={podeGerir}
-              podeVerContratos={podeVerContratos}
-              onAcao={onAcao}
-              onAlterar={() => setEditando(true)}
-              onAnular={() => setAnulando(true)}
-            />
-          </InstrumentSection>
-        )}
-        {activeTab === 'itens' && (
-          <InstrumentSection id="pedido-itens" title="Itens por ata" subtitle="Cada item com o beneficiário, a solicitação, a nota e o contrato" icon={Layers}>
-            <LinhasPorAta
-              p={p}
-              itens={itens}
-              beneficiarios={beneficiarios}
-              notas={notas}
-              precos={precos}
-              podeGerir={podeGerir}
-              podeVerContratos={podeVerContratos}
-              hoje={hoje}
-              itemDeOrigem={itemDeOrigem}
-              onAcao={onAcao}
-              conferencia={conferenciaPorItem}
-              resolvidos={resolvidos}
-            />
-            {(() => {
-              const tiradas = p.linhas.filter((l) => l.cancelada);
-              if (!tiradas.length) return null;
-              return (
-                <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '0.75rem' }} data-testid={`pedido360-tiradas-${p.id}`}>
-                  {tiradas.length} {tiradas.length === 1 ? 'item tirado' : 'itens tirados'} do pedido: {[...new Set(tiradas.map((l) => l.canceladaMotivo).filter(Boolean))].join(' ')}
-                </div>
-              );
-            })()}
-          </InstrumentSection>
-        )}
-        {activeTab === 'execucao' && (
-          <InstrumentSection id="pedido-execucao" title="Execução" subtitle="Da nota de empenho ao pagamento, nota por nota" icon={Wallet}>
-            <ExecucaoDoPedidoAba
-              p={p}
-              itens={itens}
-              notas={notas}
-              conferencia={conferencia}
-              credor={credorDoPedido.get(p.id) ?? SEM_CREDOR}
-              podeGerir={podeGerir}
-              podeVerContratos={podeVerContratos}
-            />
-          </InstrumentSection>
-        )}
-        {activeTab === 'quadro' && (
-          <InstrumentSection id="pedido-quadro" title="Quadro do ofício" subtitle="O quadro da minuta do ofício, para copiar" icon={FileText}>
-            <QuadroGabinete autor={autor} linhas={linhasAtivas(p)} data={p.reservadoEm} devolvidoEm={p.devolvidoEm} testId="pedido360-quadro" />
-          </InstrumentSection>
-        )}
-      </Instrument360TabPanel>
+      {naConferencia ? (
+        <ConferenciaDoOficio
+          pedido={p}
+          pedidos={pedidos}
+          itens={itens}
+          itensLista={itensLista}
+          beneficiarios={beneficiarios}
+          beneficiariosLista={beneficiariosLista}
+          autor={autor}
+          nomeDoAutor={nomeDoAutor}
+          precos={precos}
+          reservadoFora={reservadoPorItem(pedidos, p.id)}
+          hoje={hoje}
+          iniciarDevolvendo={conferindo?.devolvendo}
+          onSair={() => setConferindo(null)}
+          onNovaMinuta={() => {
+            setConferindo(null);
+            irPara('quadro');
+          }}
+        />
+      ) : (
+        <Instrument360TabPanel idPrefix="pedido" activeTab={activeTab}>
+          {activeTab === 'andamento' && (
+            <InstrumentSection id="pedido-andamento" title="Andamento" subtitle="As etapas do pedido como tarefas: o que já foi feito, o que é com a CAEP e o que depende de outra unidade" icon={ListTodo}>
+              <AndamentoDoPedido
+                p={p}
+                itens={itens}
+                notas={notas}
+                avisos={avisos}
+                hoje={hoje}
+                podeGerir={podeGerir}
+                podeVerContratos={podeVerContratos}
+                onAcao={onAcao}
+                onAlterar={() => setEditando(true)}
+                onAnular={() => setAnulando(true)}
+              />
+            </InstrumentSection>
+          )}
+          {activeTab === 'itens' && (
+            <InstrumentSection id="pedido-itens" title="Itens por ata" subtitle="Cada item com o beneficiário, a solicitação, a nota e o contrato" icon={Layers}>
+              <LinhasPorAta
+                p={p}
+                itens={itens}
+                beneficiarios={beneficiarios}
+                notas={notas}
+                precos={precos}
+                podeGerir={podeGerir}
+                podeVerContratos={podeVerContratos}
+                hoje={hoje}
+                itemDeOrigem={itemDeOrigem}
+                onAcao={onAcao}
+                conferencia={conferenciaPorItem}
+                resolvidos={resolvidos}
+              />
+              {(() => {
+                const tiradas = p.linhas.filter((l) => l.cancelada);
+                if (!tiradas.length) return null;
+                return (
+                  <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '0.75rem' }} data-testid={`pedido360-tiradas-${p.id}`}>
+                    {tiradas.length} {tiradas.length === 1 ? 'item tirado' : 'itens tirados'} do pedido: {[...new Set(tiradas.map((l) => l.canceladaMotivo).filter(Boolean))].join(' ')}
+                  </div>
+                );
+              })()}
+            </InstrumentSection>
+          )}
+          {activeTab === 'execucao' && (
+            <InstrumentSection id="pedido-execucao" title="Execução" subtitle="Da nota de empenho ao pagamento, nota por nota" icon={Wallet}>
+              <ExecucaoDoPedidoAba
+                p={p}
+                itens={itens}
+                notas={notas}
+                conferencia={conferencia}
+                credor={credorDoPedido.get(p.id) ?? SEM_CREDOR}
+                podeGerir={podeGerir}
+                podeVerContratos={podeVerContratos}
+              />
+            </InstrumentSection>
+          )}
+          {activeTab === 'quadro' && (
+            <InstrumentSection id="pedido-quadro" title="Quadro do ofício" subtitle="O quadro da minuta do ofício, para copiar" icon={FileText}>
+              <QuadroGabinete autor={autor} linhas={linhasAtivas(p)} data={p.reservadoEm} devolvidoEm={p.devolvidoEm} testId="pedido360-quadro" />
+            </InstrumentSection>
+          )}
+        </Instrument360TabPanel>
+      )}
 
       {editando && (
         <PedidoModal

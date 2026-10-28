@@ -226,7 +226,7 @@ export function andamentoDoPedido(
   }
 
   // ---------- Empenho ----------
-  const conferir = base('conferir', 'EMPENHO', 'CONFERIDO', 'Conferir a emenda no SIOP', 'CONFERIR', 'CAEP');
+  const conferir = base('conferir', 'EMPENHO', 'CONFERIDO', 'Conferir o ofício e a emenda no SIOP', 'CONFERIR', 'CAEP');
   conferir.regra = 'nº, autor, valor, GND, beneficiário e objeto; se não bater, o ofício volta à minuta';
   if (passou('CONFERIDO')) {
     conferir.estado = 'FEITA';

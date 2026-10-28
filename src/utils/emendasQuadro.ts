@@ -14,6 +14,7 @@ import type { GndItem, IpcaDozeMeses, PrecoPrevisto } from '../services/emendasQ
 import { descricaoItemEmFrase } from './textCase';
 import { dataBR, limiteDaIndicacao } from './emendasKits';
 import { AVISO_SEM_OFICIO_DIAS } from './emendasPedidos';
+import { EMENDAS_RULES } from '../config/alertRules';
 
 const MARCAS = ['¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
@@ -152,20 +153,26 @@ const somarDias = (iso: string, dias: number): string => {
  * - próximo reajuste até o empenho provável: o preço projetado; depois dele: o preço de hoje (FORA_DO_PRAZO);
  * - sem base para calcular: preço de hoje mais o IPCA dos últimos 12 meses (FOLGA_IPCA), porque o reajuste pode cair
  *   antes do empenho.
+ * O reajuste projetado (PREVISTO, SE_PRORROGAR, FOLGA_IPCA) ganha ainda a folga de Ajustes (decisão de 28/10/2026):
+ * se o IPCA vier um pouco maior que o projetado, a emenda ainda cobre o empenho. O reajuste devido já é conhecido.
  */
 export function aplicarPrazoDoEmpenho(
   precos: Map<string, PrecoPrevisto>,
   hoje: string,
   ipca: IpcaDozeMeses | null | undefined,
-  prazoDias = PRAZO_ATE_O_EMPENHO_DIAS
+  prazoDias = PRAZO_ATE_O_EMPENHO_DIAS,
+  folgaPct = EMENDAS_RULES.folgaReajustePct
 ): Map<string, PrecoPrevisto> {
   const limite = somarDias(hoje, prazoDias);
+  const comFolga = (p: PrecoPrevisto): PrecoPrevisto => (folgaPct > 0 ? { ...p, precoPrevisto: centavos(p.precoPrevisto * (1 + folgaPct / 100)), folga: folgaPct } : p);
   const m = new Map<string, PrecoPrevisto>();
   for (const [k, p] of precos) {
     if ((p.motivo === 'PREVISTO' || p.motivo === 'SE_PRORROGAR') && p.efeito && p.efeito > limite && !p.devido) {
       m.set(k, { ...p, precoPrevisto: p.precoAtual, motivo: 'FORA_DO_PRAZO' });
     } else if (p.motivo === 'SEM_PREVISAO' && ipca) {
-      m.set(k, { ...p, precoPrevisto: centavos(p.precoAtual * (1 + ipca.percentual / 100)), motivo: 'FOLGA_IPCA', percentual: ipca.percentual, efeito: null, mesesEstimados: null });
+      m.set(k, comFolga({ ...p, precoPrevisto: centavos(p.precoAtual * (1 + ipca.percentual / 100)), motivo: 'FOLGA_IPCA', percentual: ipca.percentual, efeito: null, mesesEstimados: null }));
+    } else if (p.motivo === 'PREVISTO' || p.motivo === 'SE_PRORROGAR') {
+      m.set(k, comFolga(p));
     } else m.set(k, p);
   }
   return m;
@@ -175,7 +182,7 @@ export function aplicarPrazoDoEmpenho(
 export function notaDoPreco(p: PrecoPrevisto | undefined, ipca?: IpcaDozeMeses | null): string | null {
   if (!p) return null;
   const focus = p.mesesEstimados ? `, ${p.mesesEstimados} ${p.mesesEstimados === 1 ? 'mês' : 'meses'} pela projeção do Focus` : '';
-  const junto = p.devido ? '; inclui o reajuste já devido' : '';
+  const junto = (p.devido ? '; inclui o reajuste já devido' : '') + (p.folga ? `; mais a folga de ${p.folga.toLocaleString('pt-BR')}% se o IPCA vier maior` : '');
   switch (p.motivo) {
     case 'DEVIDO':
       return 'Reajuste do IPCA já devido, ainda não aplicado na ata.';
@@ -186,7 +193,7 @@ export function notaDoPreco(p: PrecoPrevisto | undefined, ipca?: IpcaDozeMeses |
     case 'SEM_PREVISAO':
       return 'Sem previsão de reajuste (falta base para o cálculo): considerar folga.';
     case 'FOLGA_IPCA':
-      return `Ata sem data-base de reajuste informada: folga do IPCA dos últimos 12 meses (${pct(p.percentual ?? 0)}${ipca ? `, ${mesAno(ipca.de)} a ${mesAno(ipca.ate)}` : ''}).`;
+      return `Ata sem data-base de reajuste informada: folga do IPCA dos últimos 12 meses (${pct(p.percentual ?? 0)}${ipca ? `, ${mesAno(ipca.de)} a ${mesAno(ipca.ate)}` : ''})${junto}.`;
     default:
       return null;
   }
