@@ -216,6 +216,8 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
       return 'registrar o empenho';
     case 'credorDiferente':
       return 'conferir a nota e o item';
+    case 'semBeneficiario':
+      return 'informar o beneficiário dos itens';
     case 'semNota':
     default:
       return 'procurar a nota pelo contrato';

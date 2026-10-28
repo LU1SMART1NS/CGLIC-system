@@ -235,6 +235,7 @@ export type TipoAviso =
   | 'ataNoCorte'
   | 'ataVencendo'
   | 'semNota'
+  | 'semBeneficiario'
   | 'semAutorizacao'
   | 'empenhoAMais'
   | 'empenhoAMenos'
@@ -266,7 +267,8 @@ export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = {
   notaEmitida: 9,
   empenhoAMenos: 10,
   semAutorizacao: 11,
-  semNota: 12
+  semNota: 12,
+  semBeneficiario: 13
 };
 
 /** Os tipos de aviso do mais grave ao mais leve (ordem de GRAVIDADE_DO_AVISO): trilhos, filtros e cartões percorrem esta lista. */
@@ -286,7 +288,8 @@ export const ROTULO_AVISO: Record<TipoAviso, string> = {
   notaEmitida: 'Nota já emitida',
   empenhoAMenos: 'Empenhado a menos',
   semAutorizacao: 'Item sem empenho autorizado',
-  semNota: 'Sem nota de empenho'
+  semNota: 'Sem nota de empenho',
+  semBeneficiario: 'Item sem beneficiário'
 };
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
@@ -429,6 +432,17 @@ export function avisosDoPedido(
       // A linha da primeira solicitação sem envio: o Início mostra esse item na coluna Item · ata.
       linhaId: linhasAtivas(p).find((l) => solicitacaoDaLinha(p, l)?.id === semEnvio[0].id)?.id
     });
+  }
+  if (p.etapa !== 'CANCELADO' && !jaEmpenhado(p.etapa)) {
+    const sem = linhasAtivas(p).filter((l) => !l.beneficiarioId);
+    if (sem.length) {
+      avisos.push({
+        tipo: 'semBeneficiario',
+        curto: `${sem.length} sem beneficiário`,
+        texto: `${sem.length === 1 ? '1 item sem beneficiário' : `${sem.length} itens sem beneficiário`}: sem isso o quadro e o ofício saem incompletos`,
+        linhaId: sem[0].id
+      });
+    }
   }
   if (notas && jaEmpenhado(p.etapa)) {
     const semNota = linhasSemNota(p, notas).length;
@@ -1133,7 +1147,7 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
 
   // 5) Avisos das atas e do pedido (os mesmos da lista), menos os que já viraram tarefa acima.
   for (const a of avisosDoPedido(p, itens, hoje, notas)) {
-    if (a.tipo === 'semNota' || a.tipo === 'semAutorizacao' || a.tipo === 'semEnvioCgofi') continue;
+    if (a.tipo === 'semNota' || a.tipo === 'semAutorizacao' || a.tipo === 'semEnvioCgofi' || a.tipo === 'semBeneficiario') continue;
     t.push({ chave: `aviso-${a.tipo}`, titulo: a.curto, detalhe: a.texto, tom: 'atencao' });
   }
   // Depois do empenho a ata ainda importa: o contrato precisa estar assinado antes do fim.

@@ -9,7 +9,7 @@ const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
 });
 const linha = (extra: Partial<LinhaPedido>): LinhaPedido => ({
   id: 'l' + Math.random(), ordem: 1, tipo: 'ITEM', itemKey: 'longe', kitId: null, kitNome: null, kitVersao: null, kitComposicao: null,
-  quantidade: 1, beneficiarioId: null, cancelada: false, canceladaMotivo: null,
+  quantidade: 1, beneficiarioId: 'b1', cancelada: false, canceladaMotivo: null,
   empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null, ...extra
 });
 const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
