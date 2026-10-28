@@ -18,7 +18,6 @@ vi.mock('../../hooks/useGruposGti', async (orig) => ({
 // Listas e janelas têm testes próprios: aqui só importa se a página as mostra e com quantas linhas.
 vi.mock('../atas/ArpPortfolioList', () => ({ ArpPortfolioList: (p: { cards: unknown[] }) => <div data-testid="lista-atas">{p.cards.length} atas</div> }));
 vi.mock('../itens/ItensPortfolioTable', () => ({ ItensPortfolioTable: (p: { rows: unknown[] }) => <div data-testid="lista-itens">{p.rows.length} itens</div> }));
-vi.mock('../modals/ExportExcelModal', () => ({ ExportExcelModal: () => null }));
 
 import { useAtasPortfolio, ROTULO_ITENS_NAS_FONTES } from '../../hooks/useAtasPortfolio';
 import { useCarteiraItens, ROTULOS_CARTEIRA_ITENS } from '../../hooks/useCarteiraItens';
