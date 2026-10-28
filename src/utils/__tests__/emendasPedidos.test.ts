@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { avisosDeEmpenho } from '../emendasEmpenho';
-import { ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notasEmitidasDepoisDaAnulacao, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, reservaDoItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
+import { avisoGrave, ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notasEmitidasDepoisDaAnulacao, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, reservaDoItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { ConferenciaEmpenho, NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
 import type { PrecoPrevisto } from '../../services/emendasQuadroService';
@@ -62,9 +62,9 @@ describe('pedidos das emendas', () => {
   });
 
   it('avisos: 30 dias sem ofício, ofício devolvido e ata vencendo ou vencida antes do empenho', () => {
-    expect(avisosDoPedido(pedido({ reservadoEm: '2026-09-01', linhas: [linha({})] }), itens, HOJE).map((a) => a.curto)).toEqual(['52 dias sem ofício']);
+    expect(avisosDoPedido(pedido({ reservadoEm: '2026-09-01', linhas: [linha({ beneficiarioId: 'b1' })] }), itens, HOJE).map((a) => a.curto)).toEqual(['52 dias sem ofício']);
     // Devolvido: o pedido volta para a minuta, com o aviso; os 30 dias contam da devolução, não da reserva.
-    const devolvido = pedido({ reservadoEm: '2026-09-01', divergencia: 'valor diferente', devolvidoEm: '2026-10-20', linhas: [linha({})] });
+    const devolvido = pedido({ reservadoEm: '2026-09-01', divergencia: 'valor diferente', devolvidoEm: '2026-10-20', linhas: [linha({ beneficiarioId: 'b1' })] });
     expect(avisosDoPedido(devolvido, itens, HOJE).map((a) => [a.tipo, a.texto])).toEqual([['divergencia', 'Ofício devolvido em 20/10/2026: valor diferente']]);
     expect(avisosDoPedido({ ...devolvido, devolvidoEm: '2026-09-10' }, itens, HOJE).map((a) => a.curto)).toEqual(['Ofício devolvido', '43 dias sem ofício']);
     expect(avisosDoPedido(pedido({ etapa: 'CGOFI', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)[0].tipo).toBe('ataVencida');
@@ -166,9 +166,20 @@ describe('reserva para um órgão (parlamentar a definir)', () => {
   });
 });
 
+describe('aviso de item sem beneficiário', () => {
+  it('amarelo, conta só linhas ativas e some depois do empenho ou do cancelamento', () => {
+    const l = [linha({}), linha({}), linha({ beneficiarioId: 'b1' }), linha({ cancelada: true })];
+    const a = avisosDoPedido(pedido({ linhas: l }), itens, HOJE).find((x) => x.tipo === 'semBeneficiario');
+    expect(a?.curto).toBe('2 sem beneficiário');
+    expect(a && avisoGrave(a)).toBe(false);
+    expect(avisosDoPedido(pedido({ etapa: 'EMPENHADO', linhas: l }), itens, HOJE).some((x) => x.tipo === 'semBeneficiario')).toBe(false);
+    expect(avisosDoPedido(pedido({ etapa: 'CANCELADO', linhas: l }), itens, HOJE).some((x) => x.tipo === 'semBeneficiario')).toBe(false);
+  });
+});
+
 describe('etiqueta curta dos avisos na lista', () => {
   it('cada aviso tem até 4 palavras e o mais grave vem primeiro', () => {
-    const p = pedido({ reservadoEm: '2026-09-01', linhas: [linha({ itemKey: 'v' })] });
+    const p = pedido({ reservadoEm: '2026-09-01', linhas: [linha({ itemKey: 'v', beneficiarioId: 'b1' })] });
     const a = avisosDoPedido(p, itens, HOJE);
     expect(a.map((x) => x.curto)).toEqual(['Ata encerrada', '52 dias sem ofício']);
     expect(a.every((x) => x.curto.split(' ').length <= 4)).toBe(true);
