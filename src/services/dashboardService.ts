@@ -13,6 +13,7 @@
  * 3. Funções puras para cálculos em memória e orquestração assíncrona paralela (Promise.all).
  */
 
+import { chaveDaAtaDoTermo, fetchAtasComProrrogacaoSoSaldo } from './termosProrrogacaoService';
 import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
 import { fetchResumoReajusteAtas, type ResumoReajusteAta } from './reajusteAtasService';
 import { avisosDoReajusteDasAtas } from './reajusteAtasAvisos';
@@ -332,6 +333,8 @@ export function calculateAttentionSummary(params: {
   ausentesDaFonte?: AusenteDaFonte[];
   /** Contrato × item com a quantidade real das notas acima do contratado (migration 133). */
   empenhadoAcima?: EmpenhadoAcima[];
+  /** Atas cujo termo de prorrogação cobre só o saldo (migration 222): o aviso "registrado acima" delas sai da fila. */
+  atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
   const {
@@ -866,6 +869,8 @@ export function calculateAttentionSummary(params: {
     const uasgItem = aItem.codigo_uasg || aItem.codigoUasg || aItem.uasg || '200331';
     const itemKey = aItem.item_key || aItem.itemKey || (numAta && numItem ? `${numAta}-${uasgItem}-${numItem}` : '');
     if (!itemKey) continue;
+    // Ata prorrogada com termo "só o saldo" (migration 222): o termo explica o excedente; o desconto continua.
+    if (params.atasComProrrogacaoSoSaldo?.has(chaveDaAtaDoTermo(numAta, uasgItem))) continue;
     items.push(itemRegistradoAcima(aItem, itemKey, numAta, uasgItem, numItem, chave));
   }
 
@@ -1404,6 +1409,7 @@ export function buildManagementDashboardReadModel(params: {
   ausentesDaFonte?: AusenteDaFonte[];
   empenhadoAcima?: EmpenhadoAcima[];
   reajustesAtas?: ResumoReajusteAta[];
+  atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1665,6 +1671,7 @@ export function buildManagementDashboardReadModel(params: {
     ausentesDaFonte: params.ausentesDaFonte,
     empenhadoAcima: params.empenhadoAcima,
     reajustesAtas: params.reajustesAtas,
+    atasComProrrogacaoSoSaldo: params.atasComProrrogacaoSoSaldo,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1739,7 +1746,8 @@ export async function fetchManagementDashboardData(
     vinculosAConferir,
     ausentesDaFonte,
     empenhadoAcima,
-    reajustesAtas
+    reajustesAtas,
+    atasComProrrogacaoSoSaldo
   ] = await Promise.all([
     ler('contratos', 'contratos', cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg), [] as ContractDashboardRecord[]),
     ler('arps', 'atas (ARPs)', cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
@@ -1755,7 +1763,8 @@ export async function fetchManagementDashboardData(
     lerSemUasg('vinculos', 'vínculos a conferir', fetchVinculosAConferir, [] as VinculoAConferir[]),
     lerSemUasg('ausentes', 'notas e faturas a conferir', fetchAusentesDaFonte, [] as AusenteDaFonte[]),
     lerSemUasg('empenhadoAcima', 'empenhado acima do contratado', fetchEmpenhadoAcima, [] as EmpenhadoAcima[]),
-    lerSemUasg('reajusteAtas', 'reajuste das atas', fetchResumoReajusteAtas, [] as ResumoReajusteAta[])
+    lerSemUasg('reajusteAtas', 'reajuste das atas', fetchResumoReajusteAtas, [] as ResumoReajusteAta[]),
+    lerSemUasg('termosProrrogacao', 'termos de prorrogação das atas', fetchAtasComProrrogacaoSoSaldo, new Set<string>())
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
   const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
@@ -1778,6 +1787,7 @@ export async function fetchManagementDashboardData(
     ausentesDaFonte,
     empenhadoAcima,
     reajustesAtas,
+    atasComProrrogacaoSoSaldo,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate
