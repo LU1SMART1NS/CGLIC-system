@@ -12,8 +12,26 @@ import type { PrecoPrevisto } from '../services/emendasQuadroService';
 
 /** Dias de reserva sem ofício até o aviso (decisão de 23/10/2026). */
 export const AVISO_SEM_OFICIO_DIAS = 30;
-/** Dias parado na mesma etapa (Ofício a CGOFI) para o aviso de pedido parado. */
+/** Dias parado na mesma etapa nas etapas sem tempo medido (Ofício e Conferido), para o aviso de pedido parado. */
 export const AVISO_PARADO_DIAS = 30;
+
+/**
+ * Prazo de cada etapa em dias corridos, contado da entrada na etapa (D5 do protótipo de 28/10/2026). É o tempo em que
+ * 80% dos pedidos já tinham passado ao próximo passo; Ofício e Conferido, sem casos suficientes, ficam com 30 dias. Na
+ * contratação conta da nota (o contrato leva 32 dias na mediana e 56 em 80% dos casos).
+ */
+export const PRAZO_DA_ETAPA: Partial<Record<EtapaPedido, { dias: number; proximo: string }>> = {
+  OFICIO: { dias: AVISO_PARADO_DIAS, proximo: 'conferir a emenda no SIOP' },
+  CONFERIDO: { dias: AVISO_PARADO_DIAS, proximo: 'elaborar a solicitação de empenho' },
+  SOLICITADO: { dias: 6, proximo: 'cobrar a assinatura da solicitação na DGFNSP' },
+  AUTORIZADO: { dias: 7, proximo: 'enviar o processo à CGOFI' },
+  // 5 dias úteis.
+  CGOFI: { dias: 7, proximo: 'cobrar a nota de empenho da CGOFI' },
+  EMPENHADO: { dias: 10, proximo: 'enviar o processo à CCGA' },
+  CONTRATACAO: { dias: 60, proximo: 'cobrar o contrato da CCGA' }
+};
+
+const somaDiasIso = (iso: string, dias: number): string => new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) + dias * 86_400_000).toISOString().slice(0, 10);
 
 export const ETAPAS: ReadonlyArray<{ etapa: Exclude<EtapaPedido, 'CANCELADO'>; rotulo: string; curto: string; descricao: string }> = [
   { etapa: 'RESERVADO', rotulo: 'Itens reservados', curto: 'Reservados', descricao: 'A CAEP combinou com o parlamentar e separou a quantidade.' },
@@ -41,8 +59,8 @@ export const FASES_PEDIDO: ReadonlyArray<{ id: FasePedido; nome: string; etapas:
 /** Fase de uma etapa (o cancelado não tem fase). */
 export const faseDaEtapa = (etapa: EtapaPedido): FasePedido | null => FASES_PEDIDO.find((f) => (f.etapas as readonly EtapaPedido[]).includes(etapa))?.id ?? null;
 
-/** Etapas da linha do tempo: as 9 gravadas e Contratado. */
-export const TOTAL_ETAPAS_PEDIDO = ETAPAS.length + 1;
+/** Passos do caminho: as 9 etapas gravadas, Contratado e a execução (Faturado, Liquidado e Pago). */
+export const TOTAL_ETAPAS_PEDIDO = ETAPAS.length + 4;
 
 export const ROTULO_ETAPA: Record<EtapaPedido, string> = {
   ...(Object.fromEntries(ETAPAS.map((e) => [e.etapa, e.rotulo])) as Record<Exclude<EtapaPedido, 'CANCELADO'>, string>),
@@ -330,7 +348,7 @@ export const ROTULO_AVISO: Record<TipoAviso, string> = {
   semAutorizacao: 'Item sem empenho autorizado',
   semNota: 'Sem nota de empenho',
   semBeneficiario: 'Item sem beneficiário',
-  pedidoParado: `Parado há mais de ${AVISO_PARADO_DIAS} dias`
+  pedidoParado: 'Parado além do prazo da etapa'
 };
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
@@ -481,17 +499,14 @@ export function avisosDoPedido(
       linhaId: linhasAtivas(p).find((l) => solicitacaoDaLinha(p, l)?.id === semEnvio[0].id)?.id
     });
   }
-  // Do ofício ao envio à CGOFI não havia prazo: conta da data em que o pedido entrou na etapa atual.
-  const entrouNaEtapa = { OFICIO: p.oficioEm, CONFERIDO: p.conferidoEm, SOLICITADO: p.solicitadoEm, AUTORIZADO: p.autorizadoEm, CGOFI: p.cgofiEm }[p.etapa as 'OFICIO'];
-  if (entrouNaEtapa) {
-    const dias = diasEntre(entrouNaEtapa.slice(0, 10), hoje);
-    if (dias > AVISO_PARADO_DIAS) {
-      avisos.push({
-        tipo: 'pedidoParado',
-        curto: `${dias} dias parado`,
-        texto: `${dias} dias em "${ROTULO_ETAPA[p.etapa]}" desde ${dataBR(entrouNaEtapa.slice(0, 10))}: cobrar o próximo passo`
-      });
-    }
+  // Prazo medido de cada etapa (D5, 28/10/2026), contado da entrada na etapa atual. O item sem nota já tem o aviso dele.
+  const prazo = prazoDaEtapa(p, notas, hoje);
+  if (prazo?.vencido && !emitida) {
+    avisos.push({
+      tipo: 'pedidoParado',
+      curto: `${prazo.dias} dias parado`,
+      texto: `${prazo.dias} dias em "${rotuloDaEtapaDoPedido(p, notas ?? new Map())}" desde ${dataBR(prazo.desde)} (prazo de ${prazo.prazo} dias): ${prazo.proximo}`
+    });
   }
   if (p.etapa !== 'CANCELADO' && !jaEmpenhado(p.etapa)) {
     const sem = linhasAtivas(p).filter((l) => !l.beneficiarioId);
@@ -627,11 +642,51 @@ export function contratosDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinh
   };
 }
 
-/** Etapa do pedido como a tela mostra: na contratação, "Contratado" ou "Contratado em parte" pelos contratos dos itens. */
-export function rotuloDaEtapaDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): string {
-  if (p.etapa !== 'CONTRATACAO') return ROTULO_ETAPA[p.etapa];
+/** Onde o pedido está na contratação e na execução (D3 e D4 do protótipo de 28/10/2026). */
+export type PassoNaContratacao = 'AGUARDANDO_CONTRATO' | 'PARTE_CONTRATADA' | 'CONTRATADO' | 'EM_EXECUCAO' | 'PAGO';
+
+const porcento = (parte: number, total: number) => Math.min(99, Math.floor((parte / total) * 100));
+
+/**
+ * O passo do pedido na contratação, o rótulo da tela e a posição no caminho (de TOTAL_ETAPAS_PEDIDO). Depois de
+ * contratado, a execução pelas notas: Faturado (a primeira fatura no Contratos.gov.br), Liquidado e Pago (valores da
+ * nota no Tesouro, com a porcentagem enquanto houver parte). Com parte dos itens sem contrato, fica em "Contratado em
+ * parte": é o que a CAEP precisa acompanhar.
+ */
+export function passoNaContratacao(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): { passo: PassoNaContratacao; rotulo: string; posicao: number } | null {
+  if (p.etapa !== 'CONTRATACAO') return null;
+  const base = ORDEM_ETAPA.CONTRATACAO + 1;
   const c = contratosDoPedido(p, notas);
-  return c.contratado ? 'Contratado' : c.emParte ? 'Contratado em parte' : ROTULO_ETAPA[p.etapa];
+  if (!c.contratado) return c.emParte ? { passo: 'PARTE_CONTRATADA', rotulo: 'Contratado em parte', posicao: base } : { passo: 'AGUARDANDO_CONTRATO', rotulo: ROTULO_ETAPA.CONTRATACAO, posicao: base };
+  const e = execucaoDoPedido(p, notas);
+  const quase = (a: number) => e.empenhado > 0 && a >= e.empenhado - 0.01;
+  if (quase(e.pago)) return { passo: 'PAGO', rotulo: 'Pago', posicao: base + 4 };
+  if (e.pago > 0) return { passo: 'EM_EXECUCAO', rotulo: `Pago ${porcento(e.pago, e.empenhado)}%`, posicao: base + 3 };
+  if (e.liquidado > 0) return { passo: 'EM_EXECUCAO', rotulo: `Liquidado ${quase(e.liquidado) ? 100 : porcento(e.liquidado, e.empenhado)}%`, posicao: base + 3 };
+  if (e.notasFaturadas > 0) return { passo: 'EM_EXECUCAO', rotulo: 'Faturado', posicao: base + 2 };
+  return { passo: 'CONTRATADO', rotulo: 'Contratado', posicao: base + 1 };
+}
+
+/**
+ * Prazo do pedido na etapa atual (PRAZO_DA_ETAPA): de quando entrou nela, até quando e se já venceu. Na contratação só
+ * enquanto falta contrato, contado da nota. Sem data de entrada (pedidos da carga antiga), sem prazo.
+ */
+export function prazoDaEtapa(p: PedidoEmenda, notas: Map<string, NotaDaLinha> | undefined, hoje: string): { desde: string; ate: string; dias: number; vencido: boolean; prazo: number; proximo: string } | null {
+  const regra = PRAZO_DA_ETAPA[p.etapa];
+  if (!regra) return null;
+  if (p.etapa === 'CONTRATACAO' && (!notas || contratosDoPedido(p, notas).contratado)) return null;
+  const entrou = { OFICIO: p.oficioEm, CONFERIDO: p.conferidoEm, SOLICITADO: p.solicitadoEm, AUTORIZADO: p.autorizadoEm, CGOFI: p.cgofiEm, EMPENHADO: p.empenhadoEm, CONTRATACAO: p.empenhadoEm }[
+    p.etapa as 'OFICIO'
+  ];
+  if (!entrou) return null;
+  const desde = entrou.slice(0, 10);
+  const ate = somaDiasIso(desde, regra.dias);
+  return { desde, ate, dias: diasEntre(desde, hoje), vencido: diasEntre(ate, hoje) > 0, prazo: regra.dias, proximo: regra.proximo };
+}
+
+/** Etapa do pedido como a tela mostra: na contratação, o passo pelos contratos e pela execução das notas. */
+export function rotuloDaEtapaDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): string {
+  return passoNaContratacao(p, notas)?.rotulo ?? ROTULO_ETAPA[p.etapa];
 }
 
 export interface ExecucaoDoPedido {
@@ -642,6 +697,11 @@ export interface ExecucaoDoPedido {
   /** Próxima entrega prevista nos contratos das notas (informada pelo gestor do contrato). */
   proximaEntrega: { data: string; valor: number | null } | null;
   linhasSemNota: number;
+  /** Notas com fatura no Contratos.gov.br, a primeira fatura, a última liquidação e o último pagamento (migration 231). */
+  notasFaturadas: number;
+  faturadoEm: string | null;
+  liquidadoEm: string | null;
+  pagoEm: string | null;
 }
 
 /**
@@ -658,13 +718,18 @@ export function execucaoDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha
     if (n.entregaPrevista && (!proximaEntrega || n.entregaPrevista < proximaEntrega.data)) proximaEntrega = { data: n.entregaPrevista, valor: n.entregaPrevistaValor };
   }
   const soma = (f: (n: NotaDaLinha) => number | null) => [...porNota.values()].reduce((s, n) => s + (f(n) ?? 0), 0);
+  const datas = (f: (n: NotaDaLinha) => string | null | undefined) => [...porNota.values()].map(f).filter((d): d is string => Boolean(d)).sort();
   return {
     notas: porNota.size,
     empenhado: soma((n) => n.valorEmpenhado),
     liquidado: soma((n) => n.valorLiquidado),
     pago: soma((n) => n.valorPago),
     proximaEntrega,
-    linhasSemNota: linhasSemNota(p, notas).length
+    linhasSemNota: linhasSemNota(p, notas).length,
+    notasFaturadas: [...porNota.values()].filter((n) => (n.faturas ?? 0) > 0).length,
+    faturadoEm: datas((n) => n.faturadoEm)[0] ?? null,
+    liquidadoEm: datas((n) => n.liquidadoEm).at(-1) ?? null,
+    pagoEm: datas((n) => n.pagoEm).at(-1) ?? null
   };
 }
 

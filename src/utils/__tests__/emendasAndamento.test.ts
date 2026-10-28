@@ -50,10 +50,13 @@ describe('Andamento do pedido: as etapas como tarefas', () => {
   });
 
   it('solicitado: a assinatura da Diretora do FNSP aguarda resposta', () => {
-    const t = estado(pedido({ etapa: 'SOLICITADO', solicitadoEm: '2026-10-01' }), 'assinatura');
+    const t = estado(pedido({ etapa: 'SOLICITADO', solicitadoEm: '2026-10-25' }), 'assinatura');
     expect(t.acao).toBe('ASSINAR');
     expect(t.estado).toBe('AGUARDANDO');
+    expect(t.prazo).toBe('31/10/2026');
     expect(t.proxima).toBe('Registrar a autorização');
+    // Passou dos 6 dias medidos (D5): cobrar a assinatura.
+    expect(estado(pedido({ etapa: 'SOLICITADO', solicitadoEm: '2026-10-01' }), 'assinatura')).toMatchObject({ estado: 'COBRAR', prazo: '07/10/2026', vencido: true });
   });
 
   it('passos registrados pela fonte (migration 230): o envio à CGOFI fica comprovado pela nota, e o envio à CCGA pelo contrato', () => {
@@ -78,18 +81,22 @@ describe('Andamento do pedido: as etapas como tarefas', () => {
     expect(estado(p, 'pagamento', notas).estado).toBe('FONTE');
   });
 
-  it('contratado e pago: o pedido termina no pagamento; a entrega fica sem fonte', () => {
-    const notas = new Map([['l1', nota('l1', { contractKey: '200331-00163-2026', valorLiquidado: 200, valorPago: 200 })]]);
+  it('contratado e pago: o pedido termina no pagamento; a entrega fecha pela fatura (migration 231)', () => {
+    const notas = new Map([['l1', nota('l1', { contractKey: '200331-00163-2026', valorLiquidado: 200, valorPago: 200, faturas: 1, faturadoEm: '2026-07-20', liquidadoEm: '2026-08-11', pagoEm: '2026-10-06' })]]);
     const p = pedido({ etapa: 'CONTRATACAO', contratacaoEm: '2026-10-15', empenhadoEm: '2026-04-17' });
     expect(estado(p, 'contrato', notas).estado).toBe('FEITA');
-    expect(estado(p, 'entrega', notas).estado).toBe('SEM_FONTE');
+    expect(estado(p, 'entrega', notas)).toMatchObject({ estado: 'FEITA', feito: '1ª fatura em 20/07/2026', progresso: '1 de 1 nota com fatura' });
     expect(estado(p, 'liquidacao', notas).estado).toBe('FEITA');
+    expect(estado(p, 'liquidacao', notas).feito).toMatch(/200,00 em 11\/08\/2026$/);
     expect(estado(p, 'pagamento', notas).estado).toBe('FEITA');
+    expect(estado(p, 'pagamento', notas).feito).toMatch(/200,00 em 06\/10\/2026$/);
     const a = andamentoDoPedido(p, itens, notas, HOJE, true);
-    // A entrega sem fonte não entra em contador nem conta como feita.
     expect(a.contagem).toEqual({ COMIGO: 0, COBRAR: 0, AGUARDANDO: 0, FONTE: 0 });
-    expect(a.feitas).toBe(11);
+    expect(a.feitas).toBe(12);
     expect(a.total).toBe(12);
+    // Sem fatura ainda: a entrega fecha sozinha quando a fatura chegar.
+    const semFatura = new Map([['l1', nota('l1', { contractKey: '200331-00163-2026' })]]);
+    expect(estado(p, 'entrega', semFatura)).toMatchObject({ estado: 'FONTE', progresso: '0 de 1 nota com fatura' });
   });
 
   it('cancelado: feito o que aconteceu, o resto não houve e nada entra nos contadores', () => {

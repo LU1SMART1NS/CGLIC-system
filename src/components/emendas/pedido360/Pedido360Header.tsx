@@ -19,6 +19,7 @@ import {
   proximaAcao,
   resumoDasLinhas,
   rodadaDoPedido,
+  passoNaContratacao,
   rotuloDaEtapaDoPedido,
   TOTAL_ETAPAS_PEDIDO,
   atasDoPedido,
@@ -78,7 +79,7 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
   const contratos = p.etapa === 'CONTRATACAO' ? contratosDoPedido(p, notas) : null;
   const contratado = Boolean(contratos?.contratado);
   const execucao = jaEmpenhado(p.etapa) ? execucaoDoPedido(p, notas) : null;
-  const posicao = contratado ? TOTAL_ETAPAS_PEDIDO : ORDEM_ETAPA[p.etapa] + 1;
+  const posicao = passoNaContratacao(p, notas)?.posicao ?? ORDEM_ETAPA[p.etapa] + 1;
   const situacao = cancelado ? 'Cancelado' : rotuloDaEtapaDoPedido(p, notas);
   const grave = avisos.find(avisoGrave) ?? null;
   const seguinte = !cancelado && p.autorId ? proximaAcao(p.etapa, rodadaDoPedido(p)) : null;

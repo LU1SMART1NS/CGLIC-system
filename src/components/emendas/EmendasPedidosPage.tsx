@@ -49,8 +49,9 @@ import {
   FASES_PEDIDO,
   faseDaEtapa,
   type FasePedido,
-  contratosDoPedido,
+  passoNaContratacao,
   rotuloDaEtapaDoPedido,
+  type PassoNaContratacao,
   linhasAtivas,
   orgaoDoPedido,
   ORDEM_ETAPA,
@@ -76,8 +77,8 @@ import { ANO_TODOS, contagemPorAno, lerAnoDaUrl, pedidoNoAno } from '../../utils
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 
 type Segmento = 'todos' | FasePedido | 'CANCELADO';
-/** Filtro de etapa dentro da fase; na Contratação separa quem aguarda o contrato, quem tem parte dos itens contratados e quem já está contratado. */
-type FiltroEtapa = '' | Exclude<EtapaPedido, 'CANCELADO' | 'CONTRATACAO'> | 'AGUARDANDO_CONTRATO' | 'PARTE_CONTRATADA' | 'CONTRATADO';
+/** Filtro de etapa dentro da fase; na Contratação, o passo pelo contrato e pela execução das notas (passoNaContratacao). */
+type FiltroEtapa = '' | Exclude<EtapaPedido, 'CANCELADO' | 'CONTRATACAO'> | PassoNaContratacao;
 type Linha = PedidoEmenda & { valor: number; fonteDoValor: 'EMENDA' | 'PREVISTO'; avisos: AvisoPedido[]; captacao: ReturnType<typeof fatiasDaCaptacao> };
 
 const POR_PAGINA = 25;
@@ -199,11 +200,7 @@ export const EmendasPedidosPage: React.FC = () => {
     [linhas, segmento]
   );
   const etapaDoFiltro = useCallback(
-    (l: Linha): FiltroEtapa => {
-      if (l.etapa !== 'CONTRATACAO') return l.etapa as FiltroEtapa;
-      const c = contratosDoPedido(l, notas);
-      return c.contratado ? 'CONTRATADO' : c.emParte ? 'PARTE_CONTRATADA' : 'AGUARDANDO_CONTRATO';
-    },
+    (l: Linha): FiltroEtapa => passoNaContratacao(l, notas)?.passo ?? (l.etapa as FiltroEtapa),
     [notas]
   );
   // Opções do filtro de etapa: as etapas da fase da aba, com a contagem.
@@ -215,7 +212,9 @@ export const EmendasPedidosPage: React.FC = () => {
         ? [
             { value: 'AGUARDANDO_CONTRATO', label: 'Aguardando contrato' },
             { value: 'PARTE_CONTRATADA', label: 'Parte contratada' },
-            { value: 'CONTRATADO', label: 'Contratado' }
+            { value: 'CONTRATADO', label: 'Contratado' },
+            { value: 'EM_EXECUCAO', label: 'Em execução' },
+            { value: 'PAGO', label: 'Pago' }
           ]
         : fase.etapas.map((e) => ({ value: e as FiltroEtapa, label: ROTULO_ETAPA[e] }));
     return valores.map((v) => ({ ...v, count: doSegmento.filter((l) => etapaDoFiltro(l) === v.value).length }));
@@ -331,7 +330,7 @@ export const EmendasPedidosPage: React.FC = () => {
         const documento = l.siopEmenda ? `Emenda ${l.siopEmenda}` : l.oficioProcessoSei ? `Processo ${l.oficioProcessoSei}` : null;
         return (
           <>
-            {etapaDoFiltro(l) === 'CONTRATADO' || etapaDoFiltro(l) === 'PARTE_CONTRATADA' ? (
+            {l.etapa === 'CONTRATACAO' && etapaDoFiltro(l) !== 'AGUARDANDO_CONTRATO' ? (
               <StatusBadge label={rotuloDaEtapaDoPedido(l, notas)} variant="success" size="sm" dot={false} />
             ) : (
               <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />

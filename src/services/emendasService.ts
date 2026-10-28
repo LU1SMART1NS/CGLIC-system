@@ -1080,6 +1080,11 @@ export interface NotaDaLinha {
   emitidaEm: string | null;
   /** Data de assinatura do contrato da nota, do Contratos.gov.br (migration 230). */
   contratoAssinadoEm?: string | null;
+  /** Faturas do Contratos.gov.br que citam a nota, a primeira emissão, a última liquidação e a última ordem bancária (migration 231). */
+  faturas?: number;
+  faturadoEm?: string | null;
+  liquidadoEm?: string | null;
+  pagoEm?: string | null;
   atualizadoEm: string | null;
 }
 
@@ -1108,6 +1113,10 @@ export async function fetchNotasDasLinhas(): Promise<Map<string, NotaDaLinha>> {
         entregaPrevistaValor: numOuNulo(r.entrega_prevista_valor),
         emitidaEm: r.emitida_em ?? null,
         contratoAssinadoEm: r.contrato_assinado_em ?? null,
+        faturas: num(r.faturas ?? 0),
+        faturadoEm: r.faturado_em ?? null,
+        liquidadoEm: r.liquidado_em ?? null,
+        pagoEm: r.pago_em ?? null,
         atualizadoEm: r.atualizado_em ?? null
       }
     ])
