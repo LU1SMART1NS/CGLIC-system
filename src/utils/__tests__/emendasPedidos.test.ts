@@ -251,18 +251,30 @@ describe('etapa Contratado pelo Contratos.gov.br', () => {
   });
 
   it('conta por nota: contratado só quando toda nota tem contrato no sistema e o pedido foi à CCGA', async () => {
-    const { contratosDoPedido } = await import('../emendasPedidos');
+    const { contratosDoPedido, rotuloDaEtapaDoPedido } = await import('../emendasPedidos');
     const l1 = linha({ id: 'l1' }), l2 = linha({ id: 'l2' }), l3 = linha({ id: 'l3', contratoNumero: '00138/2026' });
     const parcial = new Map([
-      ['l1', nota('l1', { nota: '2026NE000100', contractKey: '200331-00045-2026' })],
+      ['l1', nota('l1', { nota: '2026NE000100', contractKey: '200331-00045-2026', contratoAssinadoEm: '2026-07-20' })],
       ['l2', nota('l2', { nota: '2026NE000100' })],
       // Número da planilha sem contrato no sistema não conta.
       ['l3', nota('l3', { nota: '2026NE000101', motivo: 'CONTRATO_FORA' })]
     ]);
     const p = pedido({ etapa: 'CONTRATACAO', linhas: [l1, l2, l3] });
-    expect(contratosDoPedido(p, parcial)).toEqual({ notas: 2, comContrato: 1, contratos: ['200331-00045-2026'], contratado: false });
+    expect(contratosDoPedido(p, parcial)).toEqual({
+      notas: 2,
+      comContrato: 1,
+      contratos: ['200331-00045-2026'],
+      contratado: false,
+      itens: 3,
+      itensContratados: 1,
+      assinadoEm: '2026-07-20',
+      emParte: true
+    });
+    expect(rotuloDaEtapaDoPedido(p, parcial)).toBe('Contratado em parte');
     const completo = new Map(parcial).set('l3', nota('l3', { nota: '2026NE000101', contractKey: '200331-00138-2026' }));
     expect(contratosDoPedido(p, completo).contratado).toBe(true);
+    expect(rotuloDaEtapaDoPedido(p, completo)).toBe('Contratado');
+    expect(rotuloDaEtapaDoPedido(p, new Map())).toBe('Processo enviado à CCGA');
     expect(contratosDoPedido({ ...p, etapa: 'EMPENHADO' }, completo).contratado).toBe(false);
     expect(contratosDoPedido(pedido({ etapa: 'CONTRATACAO', linhas: [] }), completo).contratado).toBe(false);
   });
@@ -380,16 +392,25 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
     expect(situacaoDaLinha(pedido({ etapa: 'OFICIO', linhas: [l1] }), l1, semNotas)).toMatchObject({ situacao: 'ANTES', rotulo: 'Ofício recebido' });
   });
 
-  it('nota já emitida antes de a CAEP registrar o empenho (migration 189): a linha fica empenhada e o pedido avisa', () => {
+  it('nota já emitida antes do empenho registrado (migrations 189 e 230): o item fica empenhado e o que ficou sem nota avisa depois de 30 dias', () => {
     const p = pedido({ etapa: 'CGOFI', linhas: [l1, l2, l3], documentos: [doc('d1', '37098929', A, '2026-06-01', ['l1', 'l2']), doc('d3', '37104393', B, '2026-06-01', ['l3'])] });
-    const notas = new Map<string, NotaDaLinha>([['l1', { ...nota('l1', '2026NE000230', null), regra: 'FORNECEDOR', emitidaEm: '2026-06-16' }]]);
-    expect(situacaoDaLinha(p, l1, notas)).toMatchObject({ situacao: 'EMPENHADO', detalhe: 'NE 2026NE000230 emitida em 16/06/2026 · registre o empenho', pendente: false });
+    const ne = (linhaId: string): NotaDaLinha => ({ ...nota(linhaId, '2026NE000230', null), regra: 'FORNECEDOR', emitidaEm: '2026-06-16' });
+    const notas = new Map<string, NotaDaLinha>([['l1', ne('l1')], ['l2', ne('l2')]]);
+    expect(situacaoDaLinha(p, l1, notas)).toMatchObject({ situacao: 'EMPENHADO', detalhe: 'NE 2026NE000230 emitida em 16/06/2026 · o empenho se registra sozinho com nota em todos os itens', pendente: false });
     expect(situacaoDaLinha(p, l3, notas)).toMatchObject({ situacao: 'NA_CGOFI' });
-    expect(notaEmitidaSemRegistro(p, notas)).toMatchObject({ tipo: 'notaEmitida', curto: 'Nota já emitida', texto: 'Nota de empenho emitida em 16/06/2026 para 1 item: registre o empenho', linhaId: 'l1' });
-    expect(avisosDoPedido(p, itens, HOJE, notas).some((a) => a.tipo === 'notaEmitida')).toBe(true);
-    expect(notaEmitidaSemRegistro({ ...p, etapa: 'AUTORIZADO' }, notas)?.texto).toContain('registre o envio à CGOFI e o empenho');
-    expect(notaEmitidaSemRegistro({ ...p, etapa: 'EMPENHADO' }, notas)).toBeNull();
-    expect(notaEmitidaSemRegistro(p, semNotas)).toBeNull();
+    expect(notaEmitidaSemRegistro(p, notas, '2026-10-28')).toMatchObject({
+      tipo: 'notaEmitida',
+      curto: 'Item sem nota',
+      texto: 'Nota de empenho emitida em 16/06/2026 para 2 de 3 itens; 1 item continua sem nota há 134 dias: cobre a CGOFI ou cancele o item',
+      linhaId: 'l3'
+    });
+    expect(avisosDoPedido(p, itens, '2026-10-28', notas).some((a) => a.tipo === 'notaEmitida')).toBe(true);
+    // Até 30 dias da primeira nota, a CGOFI ainda pode estar emitindo as outras.
+    expect(notaEmitidaSemRegistro(p, notas, '2026-07-16')).toBeNull();
+    // Nota em todos os itens: o sistema registra o empenho sozinho, sem aviso.
+    expect(notaEmitidaSemRegistro(p, new Map([...notas, ['l3', ne('l3')]]), '2026-10-28')).toBeNull();
+    expect(notaEmitidaSemRegistro({ ...p, etapa: 'EMPENHADO' }, notas, '2026-10-28')).toBeNull();
+    expect(notaEmitidaSemRegistro(p, semNotas, '2026-10-28')).toBeNull();
   });
 
   it('envio à CGOFI por rodada (migration 193): a rodada nova assinada e não enviada pede o envio; pedido antigo não', () => {

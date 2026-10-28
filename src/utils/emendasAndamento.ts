@@ -266,31 +266,33 @@ export function andamentoDoPedido(
   const cgofi = base('cgofi', 'EMPENHO', 'CGOFI', 'Enviar o processo à CGOFI', 'FAZER', 'CAEP');
   if (passou('CGOFI')) {
     cgofi.estado = comAcao('cgofi') ? 'COMIGO' : 'FEITA';
-    if (cgofi.estado === 'FEITA') cgofi.feito = p.cgofiEm ? dataBR(p.cgofiEm) : null;
+    // Migration 230: com o empenho registrado pelo sistema, o envio sem registro fica comprovado pela nota.
+    if (cgofi.estado === 'FEITA') cgofi.feito = p.cgofiEm ? dataBR(p.cgofiEm) : p.empenhadoPelaFonte && !p.cgofiDocumentoSei ? 'comprovado pela nota' : null;
   } else if (esta('AUTORIZADO')) cgofi.estado = 'COMIGO';
 
   const empenho = base('empenho', 'EMPENHO', 'EMPENHADO', 'Nota de empenho emitida', 'ACOMPANHAR', 'CGOFI');
-  empenho.regra = 'a CGOFI emite uma nota por fornecedor; a CAEP registra o número SEI';
+  empenho.regra = 'a CGOFI emite uma nota por fornecedor; com nota em todos os itens o sistema registra sozinho, e a CAEP completa o número SEI';
   if (jaEmpenhado(p.etapa)) {
     empenho.estado = 'FEITA';
     const n = execucaoDoPedido(p, notas).notas;
-    empenho.feito = [p.empenhadoEm ? dataBR(p.empenhadoEm) : null, n ? plural(n, 'nota', 'notas') : null].filter(Boolean).join(' · ') || null;
+    empenho.feito = [p.empenhadoEm ? dataBR(p.empenhadoEm) : null, p.empenhadoPelaFonte ? 'pela nota no Tesouro' : null, n ? plural(n, 'nota', 'notas') : null].filter(Boolean).join(' · ') || null;
   } else if (esta('CGOFI')) empenho.estado = 'AGUARDANDO';
 
   // ---------- Contratação ----------
   const despacho = base('despacho', 'CONTRATACAO', 'CONTRATACAO', 'Despacho para contratação, um por nota', 'FAZER', 'CCGA');
   if (esta('CONTRATACAO')) {
     despacho.estado = 'FEITA';
-    despacho.feito = p.contratacaoEm ? dataBR(p.contratacaoEm) : null;
+    despacho.feito = p.contratacaoEm ? dataBR(p.contratacaoEm) : p.contratacaoPelaFonte ? 'comprovado pelo contrato' : null;
   } else if (esta('EMPENHADO')) despacho.estado = 'COMIGO';
 
   const contrato = base('contrato', 'CONTRATACAO', null, 'Contrato assinado', 'ACOMPANHAR', 'CCGA');
-  contrato.regra = 'fecha quando o contrato entra no Contratos.gov.br; precisa ser assinado antes do fim da ata';
+  contrato.regra = 'fecha quando o contrato entra no Contratos.gov.br (já assinado), em qualquer etapa; precisa ser assinado antes do fim da ata';
   const contratos = esta('CONTRATACAO') ? contratosDoPedido(p, notas) : null;
   if (contratos) {
-    contrato.progresso = `${contratos.comContrato} de ${plural(contratos.notas, 'nota', 'notas')} com contrato`;
+    contrato.progresso = `${contratos.itensContratados} de ${plural(contratos.itens, 'item', 'itens')} com contrato`;
     contrato.estado = contratos.contratado ? 'FEITA' : 'FONTE';
-    if (contratos.contratado) contrato.feito = plural(contratos.contratos.length, 'contrato', 'contratos');
+    if (contratos.contratado)
+      contrato.feito = [contratos.assinadoEm ? `assinado em ${dataBR(contratos.assinadoEm)}` : null, plural(contratos.contratos.length, 'contrato', 'contratos')].filter(Boolean).join(' · ');
     if (!contratos.contratado) {
       const fim = grupos.map((g) => g.vigenciaFinal).filter((d): d is string => Boolean(d)).sort()[0];
       if (fim) {

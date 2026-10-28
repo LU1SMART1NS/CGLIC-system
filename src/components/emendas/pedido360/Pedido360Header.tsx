@@ -19,7 +19,7 @@ import {
   proximaAcao,
   resumoDasLinhas,
   rodadaDoPedido,
-  ROTULO_ETAPA,
+  rotuloDaEtapaDoPedido,
   TOTAL_ETAPAS_PEDIDO,
   atasDoPedido,
   type AvisoPedido
@@ -79,7 +79,7 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
   const contratado = Boolean(contratos?.contratado);
   const execucao = jaEmpenhado(p.etapa) ? execucaoDoPedido(p, notas) : null;
   const posicao = contratado ? TOTAL_ETAPAS_PEDIDO : ORDEM_ETAPA[p.etapa] + 1;
-  const situacao = cancelado ? 'Cancelado' : contratado ? 'Contratado' : ROTULO_ETAPA[p.etapa];
+  const situacao = cancelado ? 'Cancelado' : rotuloDaEtapaDoPedido(p, notas);
   const grave = avisos.find(avisoGrave) ?? null;
   const seguinte = !cancelado && p.autorId ? proximaAcao(p.etapa, rodadaDoPedido(p)) : null;
   const prox = podeGerir ? seguinte : null;
@@ -226,7 +226,7 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
             value={cancelado ? 'Cancelado' : `${posicao} de ${TOTAL_ETAPAS_PEDIDO}`}
             hint={
               contratos && !contratado
-                ? `${contratos.comContrato} de ${contratos.notas} ${contratos.notas === 1 ? 'nota' : 'notas'} com contrato`
+                ? `${contratos.itensContratados} de ${contratos.itens} ${contratos.itens === 1 ? 'item contratado' : 'itens contratados'}`
                 : resumo.divergem
                   ? resumo.texto
                   : seguinte

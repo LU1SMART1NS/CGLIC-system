@@ -56,11 +56,23 @@ describe('Andamento do pedido: as etapas como tarefas', () => {
     expect(t.proxima).toBe('Registrar a autorização');
   });
 
+  it('passos registrados pela fonte (migration 230): o envio à CGOFI fica comprovado pela nota, e o envio à CCGA pelo contrato', () => {
+    const empenhado = pedido({ etapa: 'EMPENHADO', autorizadoEm: '2026-04-01', empenhadoEm: '2026-04-09', empenhadoPelaFonte: true });
+    expect(estado(empenhado, 'cgofi')).toMatchObject({ estado: 'FEITA', feito: 'comprovado pela nota' });
+    expect(estado(empenhado, 'empenho', new Map([['l1', nota('l1', {})]])).feito).toBe('09/04/2026 · pela nota no Tesouro · 1 nota');
+    // Envio registrado pela CAEP: a data, sem "comprovado".
+    expect(estado({ ...empenhado, cgofiEm: '2026-04-03', cgofiDocumentoSei: '12345678' }, 'cgofi').feito).toBe('03/04/2026');
+    const contratado = pedido({ etapa: 'CONTRATACAO', empenhadoEm: '2026-06-16', empenhadoPelaFonte: true, contratacaoPelaFonte: true });
+    const notas = new Map([['l1', nota('l1', { contractKey: '200331-00045-2026', contratoAssinadoEm: '2026-07-20' })]]);
+    expect(estado(contratado, 'despacho', notas)).toMatchObject({ estado: 'FEITA', feito: 'comprovado pelo contrato' });
+    expect(estado(contratado, 'contrato', notas)).toMatchObject({ estado: 'FEITA', feito: 'assinado em 20/07/2026 · 1 contrato', progresso: '1 de 1 item com contrato' });
+  });
+
   it('na CCGA sem contrato: o contrato fecha sozinho; entrega, liquidação e pagamento ainda não', () => {
     const notas = new Map([['l1', nota('l1', {})]]);
     const p = pedido({ etapa: 'CONTRATACAO', contratacaoEm: '2026-10-15', empenhadoEm: '2026-04-17' });
     expect(estado(p, 'contrato', notas).estado).toBe('FONTE');
-    expect(estado(p, 'contrato', notas).progresso).toBe('0 de 1 nota com contrato');
+    expect(estado(p, 'contrato', notas).progresso).toBe('0 de 1 item com contrato');
     expect(estado(p, 'entrega', notas).estado).toBe('DEPOIS');
     expect(estado(p, 'liquidacao', notas).estado).toBe('FONTE');
     expect(estado(p, 'pagamento', notas).estado).toBe('FONTE');
