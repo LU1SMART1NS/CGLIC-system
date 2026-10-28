@@ -53,11 +53,13 @@ const ataEmCinza: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b',
  * número do item abre o Item 360 na aba Emendas e o da ata abre a Ata 360 (o clique não abre a linha da tabela).
  */
 export const ItemDaAta: React.FC<{
-  item: Pick<ItemCaep, 'numeroAta' | 'numeroItem' | 'descricao' | 'codigoUasg'> | null | undefined;
+  item: (Pick<ItemCaep, 'numeroAta' | 'numeroItem' | 'descricao' | 'codigoUasg'> & Partial<Pick<ItemCaep, 'nomeCurto'>>) | null | undefined;
   semItem?: string;
   extra?: React.ReactNode;
   comLinks?: boolean;
-}> = ({ item, semItem, extra, comLinks }) => {
+  /** Mostra o nome curto da CAEP (o do quadro do gabinete) em destaque, com a descrição do edital embaixo. */
+  comNomeCurto?: boolean;
+}> = ({ item, semItem, extra, comLinks, comNomeCurto }) => {
   const parar = (e: React.MouseEvent) => e.stopPropagation();
   return (
     <>
@@ -87,6 +89,11 @@ export const ItemDaAta: React.FC<{
             </span>
           )}
           {extra}
+        </div>
+      )}
+      {comNomeCurto && item?.nomeCurto?.trim() && (
+        <div style={{ ...carteiraValor, marginTop: '0.15rem' }} data-testid="emendas-item-nome-curto">
+          {item.nomeCurto.trim()}
         </div>
       )}
       <div title={item?.descricao} style={carteiraDescricaoItem}>
@@ -128,7 +135,7 @@ export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKe
     );
   }
   const i = linha.itemKey ? itens.get(linha.itemKey) : undefined;
-  return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} comLinks={comLinks} />;
+  return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} comLinks={comLinks} comNomeCurto />;
 };
 
 /** Nome da unidade e, ao lado, a sigla mais clara (padrão "00001 · Ata 00055/2025" das carteiras). */
