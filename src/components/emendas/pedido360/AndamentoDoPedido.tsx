@@ -13,7 +13,7 @@ import type { GrupoTarefa } from '../../../utils/modeloGestao';
 import { numeroDaChave } from '../../../utils/contractKeyUtils';
 import { formatCurrency } from '../../../utils/format';
 import { dataBR } from '../../../utils/emendasKits';
-import { contratosDoPedido, documentosDaEtapa, ETAPAS_COM_VARIOS_SEI, jaEmpenhado, rodadaDoPedido, solicitacoesSemAta, avisoGrave, type AvisoPedido } from '../../../utils/emendasPedidos';
+import { contratosDoPedido, documentosDaEtapa, ETAPAS_COM_VARIOS_SEI, jaEmpenhado, rodadaDoPedido, seiDaEtapa, solicitacoesSemAta, avisoGrave, type AvisoPedido } from '../../../utils/emendasPedidos';
 import { andamentoDoPedido, grupoDaTarefaDoPedido, type EstadoDaTarefa, type TarefaDoAndamento } from '../../../utils/emendasAndamento';
 import type { ItemCaep, NotaDaLinha, PedidoEmenda } from '../../../services/emendasService';
 import { BotaoDaPendencia, RodadasDoPedido, type AoAgir } from '../PedidoAberto';
@@ -186,6 +186,12 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, ho
         return (
           <>
             <Documentos p={p} etapa="CGOFI" />
+            {/* Envio comprovado pela nota (migration 230): a CAEP completa o documento depois. */}
+            {podeGerir && jaEmpenhado(p.etapa) && !p.cgofiDocumentoSei && (
+              <AppButton size="xs" variant="link" onClick={() => onAcao('MAIS_CGOFI' as AcaoDaJanela)} data-testid="emendas-pedido-mais-sei-CGOFI">
+                Completar o número SEI
+              </AppButton>
+            )}
             <div style={{ marginTop: '0.4rem' }}>
               <RodadasDoPedido p={p} notas={notas} podeGerir={podeGerir} onAcao={onAcao} />
             </div>
@@ -197,7 +203,7 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, ho
             <Documentos p={p} etapa="EMPENHADO" />
             {podeGerir && jaEmpenhado(p.etapa) && ETAPAS_COM_VARIOS_SEI.has('EMPENHADO') && (
               <AppButton size="xs" variant="link" onClick={() => onAcao('MAIS_EMPENHADO' as AcaoDaJanela)} data-testid="emendas-pedido-mais-sei-EMPENHADO">
-                + número SEI
+                {seiDaEtapa(p, 'EMPENHADO').length ? '+ número SEI' : 'Completar o número SEI'}
               </AppButton>
             )}
           </>
@@ -208,7 +214,7 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, ho
             <Documentos p={p} etapa="CONTRATACAO" />
             {podeGerir && p.etapa === 'CONTRATACAO' && (
               <AppButton size="xs" variant="link" onClick={() => onAcao('MAIS_CONTRATACAO' as AcaoDaJanela)} data-testid="emendas-pedido-mais-sei-CONTRATACAO">
-                + número SEI
+                {seiDaEtapa(p, 'CONTRATACAO').length ? '+ número SEI' : 'Completar o número SEI'}
               </AppButton>
             )}
           </>

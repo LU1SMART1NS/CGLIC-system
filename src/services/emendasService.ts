@@ -613,6 +613,10 @@ export interface PedidoEmenda {
   contratacaoEm: string | null;
   /** Documentos SEI do despacho para contratação: um por nota. */
   contratacaoDocumentosSei: string[];
+  /** O empenho foi registrado pelo sistema, pela nota emitida (migration 230). */
+  empenhadoPelaFonte?: boolean;
+  /** Chegou à contratação pelo contrato no Contratos.gov.br, sem o envio à CCGA registrado (migration 230). */
+  contratacaoPelaFonte?: boolean;
   canceladoEm: string | null;
   canceladoMotivo: string | null;
   versao: number;
@@ -834,6 +838,8 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       empenhadoDocumentosSei: Array.isArray(p.empenhado_documentos_sei) ? p.empenhado_documentos_sei : [],
       contratacaoEm: p.contratacao_em ?? null,
       contratacaoDocumentosSei: Array.isArray(p.contratacao_documentos_sei) ? p.contratacao_documentos_sei : [],
+      empenhadoPelaFonte: Boolean(p.empenhado_pela_fonte),
+      contratacaoPelaFonte: Boolean(p.contratacao_pela_fonte),
       canceladoEm: p.cancelado_em ?? null,
       canceladoMotivo: p.cancelado_motivo ?? null,
       versao: p.versao,
@@ -1072,6 +1078,8 @@ export interface NotaDaLinha {
   entregaPrevistaValor: number | null;
   /** Data de emissão da nota ligada (migration 189). */
   emitidaEm: string | null;
+  /** Data de assinatura do contrato da nota, do Contratos.gov.br (migration 230). */
+  contratoAssinadoEm?: string | null;
   atualizadoEm: string | null;
 }
 
@@ -1099,6 +1107,7 @@ export async function fetchNotasDasLinhas(): Promise<Map<string, NotaDaLinha>> {
         entregaPrevista: r.entrega_prevista ?? null,
         entregaPrevistaValor: numOuNulo(r.entrega_prevista_valor),
         emitidaEm: r.emitida_em ?? null,
+        contratoAssinadoEm: r.contrato_assinado_em ?? null,
         atualizadoEm: r.atualizado_em ?? null
       }
     ])

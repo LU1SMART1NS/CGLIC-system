@@ -35,7 +35,7 @@ import { lerValorBR, mascaraProcessoSei, mascaraValorBR, processoSeiValido } fro
  * MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa.
  * SOLICITACAO_ATA: a solicitação de empenho de uma ata (migration 178), sem mudar de etapa.
  */
-export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA' | 'CANCELAR' | 'QUADROS_AUTORIZACAO';
+export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_CGOFI' | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA' | 'CANCELAR' | 'QUADROS_AUTORIZACAO';
 
 /** De onde a janela foi aberta: a ata e o número que já estão na linha do tempo. */
 export interface ContextoDaJanela {
@@ -75,6 +75,7 @@ const TITULO: Record<AcaoDaJanela, string> = {
   CGOFI: 'Registrar o envio à CGOFI',
   EMPENHADO: 'Registrar o empenho',
   CONTRATACAO: 'Registrar o envio para contratação',
+  MAIS_CGOFI: 'Completar o envio à CGOFI',
   MAIS_EMPENHADO: 'Acrescentar número SEI do empenho',
   MAIS_CONTRATACAO: 'Acrescentar número SEI do despacho para contratação',
   SOLICITACAO_ATA: 'Solicitação de empenho de uma ata',
@@ -89,6 +90,7 @@ const ROTULO_SEI: Partial<Record<AcaoDaJanela, string>> = {
   CGOFI: 'Documento SEI do envio à CGOFI *',
   EMPENHADO: 'Documento(s) SEI do empenho *',
   CONTRATACAO: 'Documento(s) SEI do despacho para contratação *',
+  MAIS_CGOFI: 'Documento SEI do envio à CGOFI *',
   MAIS_EMPENHADO: 'Documento(s) SEI do empenho *',
   MAIS_CONTRATACAO: 'Documento(s) SEI do despacho para contratação *'
 };
@@ -238,6 +240,15 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const rodada = rodadaDoPedido(pedido);
   const numeros = numerosSei(documentoSei);
   const pedeSei = Boolean(ROTULO_SEI[modo]);
+  // Passo que o sistema registrou pela fonte sem data (migration 230): completar o SEI pede também a data.
+  const rotuloData =
+    modo === 'MAIS_CGOFI' && !pedido.cgofiEm
+      ? 'Enviado em'
+      : modo === 'MAIS_EMPENHADO' && !pedido.empenhadoEm
+        ? 'Empenhado em'
+        : modo === 'MAIS_CONTRATACAO' && !pedido.contratacaoEm
+          ? 'Enviado em'
+          : ROTULO_DATA[modo];
   const semBeneficiario = linhas.filter((l) => !l.beneficiarioId).length;
   const todosPontos = PONTOS_SIOP.every(([k]) => pontos[k]);
   const ocupado = avancar.isPending || cancelar.isPending || informar.isPending || registrarEnvio.isPending;
@@ -316,11 +327,11 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
         await cancelar.mutateAsync({ id: pedido.id, versao: pedido.versao, motivo: motivo === 'Outro' ? outroMotivo.trim() : motivo });
         toast.success(`Pedido de ${nomeDoAutor} cancelado. A quantidade voltou ao saldo da CAEP.`);
       } else {
-        const mais = modo === 'MAIS_EMPENHADO' || modo === 'MAIS_CONTRATACAO';
+        const mais = modo === 'MAIS_CGOFI' || modo === 'MAIS_EMPENHADO' || modo === 'MAIS_CONTRATACAO';
         const acao: AcaoPedido = mais ? 'ACRESCENTAR_SEI' : (modo as AcaoPedido);
         const dados: Record<string, unknown> =
           mais
-            ? { etapa: modo === 'MAIS_EMPENHADO' ? 'EMPENHADO' : 'CONTRATACAO', documentos_sei: numeros }
+            ? { etapa: modo.replace('MAIS_', ''), documentos_sei: numeros, ...(rotuloData ? { data } : {}) }
             : modo === 'MINUTA'
               ? { data }
               : modo === 'OFICIO'
@@ -455,7 +466,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
           </>
         )}
 
-        {(pedeSei || ROTULO_DATA[modo]) && modo !== 'CONFERIDO' && modo !== 'DIVERGENCIA' && (
+        {(pedeSei || rotuloData) && modo !== 'CONFERIDO' && modo !== 'DIVERGENCIA' && (
           <div style={grade}>
             {pedeSei && !variasAtas && (
               <AppInput
@@ -479,7 +490,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
                 data-testid="emendas-etapa-processo"
               />
             )}
-            {ROTULO_DATA[modo] && <AppDateInput label={ROTULO_DATA[modo]!} value={data} onValueChange={setData} />}
+            {rotuloData && <AppDateInput label={rotuloData} value={data} onValueChange={setData} />}
           </div>
         )}
 

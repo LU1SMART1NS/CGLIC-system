@@ -213,7 +213,7 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
     case 'semEnvioCgofi':
       return 'registrar o envio à CGOFI';
     case 'notaEmitida':
-      return 'registrar o empenho';
+      return 'cobrar a CGOFI ou cancelar o item';
     case 'credorDiferente':
       return 'conferir a nota e o item';
     case 'pedidoParado':

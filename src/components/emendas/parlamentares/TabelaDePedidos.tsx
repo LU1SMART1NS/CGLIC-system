@@ -6,7 +6,7 @@ import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import { formatCurrency } from '../../../utils/format';
 import { ItensEBeneficiarios } from '../ItensEBeneficiarios';
 import { useBeneficiariosEmendas } from '../../../hooks/useEmendas';
-import { avisoGrave, avisosDoPedido, contratosDoPedido, execucaoDoPedido, ROTULO_ETAPA, valorDoPedidoNaEtapa } from '../../../utils/emendasPedidos';
+import { avisoGrave, avisosDoPedido, execucaoDoPedido, rotuloDaEtapaDoPedido, valorDoPedidoNaEtapa } from '../../../utils/emendasPedidos';
 import { numeroDaEmenda } from '../../../utils/emendasSemPedido';
 import { faltaAnoDaEmenda, numeroDoPedido, rotaDoPedido } from '../../../utils/emendasNomeDoPedido';
 import type { ConferenciaEmpenho, ItemCaep, NotaDaLinha, PedidoEmenda } from '../../../services/emendasService';
@@ -72,8 +72,7 @@ export const TabelaDePedidos: React.FC<Props> = ({ pedidos, itens, notas, precos
       header: 'Etapa',
       nowrap: true,
       render: (p) => {
-        const contratado = p.etapa === 'CONTRATACAO' && contratosDoPedido(p, notas).contratado;
-        return <StatusBadge label={contratado ? 'Contratado' : ROTULO_ETAPA[p.etapa]} variant={p.etapa === 'CANCELADO' ? 'neutral' : contratado || p.etapa === 'EMPENHADO' || p.etapa === 'CONTRATACAO' ? 'success' : 'info'} size="sm" dot={false} />;
+        return <StatusBadge label={rotuloDaEtapaDoPedido(p, notas)} variant={p.etapa === 'CANCELADO' ? 'neutral' : p.etapa === 'EMPENHADO' || p.etapa === 'CONTRATACAO' ? 'success' : 'info'} size="sm" dot={false} />;
       }
     },
     {

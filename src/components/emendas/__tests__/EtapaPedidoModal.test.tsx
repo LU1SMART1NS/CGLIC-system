@@ -143,3 +143,19 @@ describe('janela das etapas: as linhas que a solicitação cobre (migration 180)
     expect(html).not.toContain('emendas-etapa-envio-37082300');
   });
 });
+
+describe('janela das etapas: completar o SEI de um passo registrado pela fonte (migration 230)', () => {
+  it('envio à CGOFI comprovado pela nota: pede o documento e a data do envio', () => {
+    const html = renderToStaticMarkup(<EtapaPedidoModal pedido={{ ...pedido('EMPENHADO'), empenhadoEm: '2026-04-09', empenhadoPelaFonte: true }} acao="MAIS_CGOFI" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
+    expect(html).toContain('Completar o envio à CGOFI');
+    expect(html).toContain('Documento SEI do envio à CGOFI *');
+    expect(html).toContain('Enviado em');
+  });
+
+  it('acrescentar SEI ao empenho já datado não pede data; sem data, pede', () => {
+    const datado = renderToStaticMarkup(<EtapaPedidoModal pedido={{ ...pedido('EMPENHADO'), empenhadoEm: '2026-04-09' }} acao="MAIS_EMPENHADO" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
+    expect(datado).not.toContain('Empenhado em');
+    const semData = renderToStaticMarkup(<EtapaPedidoModal pedido={{ ...pedido('CONTRATACAO'), contratacaoPelaFonte: true }} acao="MAIS_CONTRATACAO" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
+    expect(semData).toContain('Enviado em');
+  });
+});

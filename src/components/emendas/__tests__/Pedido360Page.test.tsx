@@ -180,7 +180,7 @@ describe('Pedido 360: cartão e Andamento', () => {
     const html = render('/emendas/parlamentares/A1/pedidos/2026/1');
     expect(html).toContain('9 de 10');
     expect(html).toMatch(/pedido360-tarefa-contrato" data-estado="FONTE"/);
-    expect(html).toContain('0 de 1 nota com contrato');
+    expect(html).toContain('0 de 1 item com contrato');
     expect(html).toContain('aria-expanded="false"');
     expect(html).not.toContain('41000004');
     expect(html).toContain('41000006');

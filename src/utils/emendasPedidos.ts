@@ -325,7 +325,7 @@ export const ROTULO_AVISO: Record<TipoAviso, string> = {
   ataVencendo: 'Ata vence em breve',
   semEnvioCgofi: 'Sem envio à CGOFI',
   credorDiferente: 'Nota de outro fornecedor',
-  notaEmitida: 'Nota já emitida',
+  notaEmitida: 'Item sem nota',
   empenhoAMenos: 'Empenhado a menos',
   semAutorizacao: 'Item sem empenho autorizado',
   semNota: 'Sem nota de empenho',
@@ -360,22 +360,29 @@ export function ataDaLinha(p: PedidoEmenda, l: LinhaPedido, itens: Map<string, I
   return null;
 }
 
+/** Dias depois da primeira nota do pedido para avisar o item que ficou sem nota (D1 do protótipo de 28/10/2026). */
+export const AVISO_ITEM_SEM_NOTA_DIAS = 30;
+
 /**
- * A CGOFI já emitiu nota para linhas do pedido, mas a CAEP ainda não registrou o empenho (migration 189: o sistema liga
- * a nota pela emenda e pelo fornecedor, emitida depois da assinatura da solicitação da linha).
+ * A CGOFI já emitiu nota para parte dos itens e outro item continua sem nota (migration 189: o sistema liga a nota pela
+ * emenda e pelo fornecedor). Com nota em todos os itens o sistema registra o empenho sozinho (migration 230); por isso
+ * o aviso fica só para o item que falta, 30 dias depois da primeira nota: a CAEP cobra a CGOFI ou cancela o item.
  */
-export function notaEmitidaSemRegistro(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): AvisoPedido | null {
+export function notaEmitidaSemRegistro(p: PedidoEmenda, notas: Map<string, NotaDaLinha>, hoje: string): AvisoPedido | null {
   if (jaEmpenhado(p.etapa) || p.etapa === 'CANCELADO') return null;
-  const comNota = linhasAtivas(p).filter((l) => notas.get(l.id)?.nota);
-  if (!comNota.length) return null;
+  const ativas = linhasAtivas(p);
+  const comNota = ativas.filter((l) => notas.get(l.id)?.nota);
+  const semNota = ativas.filter((l) => !notas.get(l.id)?.nota);
+  if (!comNota.length || !semNota.length) return null;
   const datas = comNota.map((l) => notas.get(l.id)!.emitidaEm).filter((d): d is string => Boolean(d)).sort();
-  const desde = datas.length ? ` em ${dataBR(datas[0])}` : '';
-  const falta = p.etapa === 'CGOFI' ? 'o empenho' : p.etapa === 'AUTORIZADO' ? 'o envio à CGOFI e o empenho' : 'as etapas até o empenho';
+  if (!datas.length) return null;
+  const dias = diasEntre(datas[0], hoje);
+  if (dias <= AVISO_ITEM_SEM_NOTA_DIAS) return null;
   return {
     tipo: 'notaEmitida',
-    curto: 'Nota já emitida',
-    texto: `Nota de empenho emitida${desde} para ${comNota.length === 1 ? '1 item' : `${comNota.length} itens`}: registre ${falta}`,
-    linhaId: comNota[0].id
+    curto: 'Item sem nota',
+    texto: `Nota de empenho emitida em ${dataBR(datas[0])} para ${comNota.length} de ${ativas.length} itens; ${semNota.length === 1 ? '1 item continua' : `${semNota.length} itens continuam`} sem nota há ${dias} dias: cobre a CGOFI ou cancele o item`,
+    linhaId: semNota[0].id
   };
 }
 
@@ -459,7 +466,7 @@ export function avisosDoPedido(
   }
   const semAutorizacao = itensSemEmpenhoAutorizado(p);
   if (semAutorizacao) avisos.push(semAutorizacao);
-  const emitida = notas ? notaEmitidaSemRegistro(p, notas) : null;
+  const emitida = notas ? notaEmitidaSemRegistro(p, notas, hoje) : null;
   if (emitida) avisos.push(emitida);
   const deOutroFornecedor = p.etapa === 'CANCELADO' ? null : avisoDeCredor(credor);
   if (deOutroFornecedor) avisos.push(deOutroFornecedor);
@@ -581,11 +588,19 @@ export interface ContratosDoPedido {
   contratos: string[];
   /** Todas as notas já têm contrato no Contratos.gov.br. */
   contratado: boolean;
+  /** Itens ativos e quantos já estão num contrato ("Contratado em parte · 2 de 4 itens"). */
+  itens: number;
+  itensContratados: number;
+  /** Data de assinatura do primeiro contrato dos itens (Contratos.gov.br, migration 230). */
+  assinadoEm: string | null;
+  /** Na contratação com parte dos itens já contratados. */
+  emParte: boolean;
 }
 
 /**
  * Contratos das notas do pedido, pelo contrato achado no sistema (Contratos.gov.br, refeito de hora em hora). O pedido
  * está Contratado quando foi enviado à CCGA e toda nota tem contrato; o número da planilha sem contrato no sistema não conta.
+ * Desde a migration 230 o contrato leva o pedido à contratação sozinho (o envio à CCGA fica comprovado pelo contrato).
  */
 export function contratosDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): ContratosDoPedido {
   const porNota = new Map<string, string | null>();
@@ -596,7 +611,27 @@ export function contratosDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinh
   }
   const contratos = [...new Set([...porNota.values()].filter((c): c is string => Boolean(c)))].sort();
   const comContrato = [...porNota.values()].filter(Boolean).length;
-  return { notas: porNota.size, comContrato, contratos, contratado: p.etapa === 'CONTRATACAO' && porNota.size > 0 && comContrato === porNota.size };
+  const ativas = linhasAtivas(p);
+  const contratadas = ativas.filter((l) => notas.get(l.id)?.contractKey);
+  const assinaturas = contratadas.map((l) => notas.get(l.id)?.contratoAssinadoEm).filter((d): d is string => Boolean(d)).sort();
+  const contratado = p.etapa === 'CONTRATACAO' && porNota.size > 0 && comContrato === porNota.size;
+  return {
+    notas: porNota.size,
+    comContrato,
+    contratos,
+    contratado,
+    itens: ativas.length,
+    itensContratados: contratadas.length,
+    assinadoEm: assinaturas[0] ?? null,
+    emParte: p.etapa === 'CONTRATACAO' && !contratado && contratadas.length > 0
+  };
+}
+
+/** Etapa do pedido como a tela mostra: na contratação, "Contratado" ou "Contratado em parte" pelos contratos dos itens. */
+export function rotuloDaEtapaDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): string {
+  if (p.etapa !== 'CONTRATACAO') return ROTULO_ETAPA[p.etapa];
+  const c = contratosDoPedido(p, notas);
+  return c.contratado ? 'Contratado' : c.emParte ? 'Contratado em parte' : ROTULO_ETAPA[p.etapa];
 }
 
 export interface ExecucaoDoPedido {
@@ -920,7 +955,7 @@ export function situacaoDaLinha(p: PedidoEmenda, l: LinhaPedido, notas: Map<stri
       ? 'sem nota ligada · o sistema procura de hora em hora'
       : jaEmpenhado(p.etapa)
         ? `${notaLigada} · aguarda o envio à CCGA`
-        : `NE ${nota!.nota} emitida${nota!.emitidaEm ? ` em ${dataBR(nota!.emitidaEm)}` : ''} · registre o empenho`;
+        : `NE ${nota!.nota} emitida${nota!.emitidaEm ? ` em ${dataBR(nota!.emitidaEm)}` : ''} · o empenho se registra sozinho com nota em todos os itens`;
     return { situacao: 'EMPENHADO', rotulo: ROTULO_SITUACAO_LINHA.EMPENHADO.etiqueta, detalhe, pendente: !temNota, solicitacao };
   }
   if (p.etapa === 'CGOFI') {
