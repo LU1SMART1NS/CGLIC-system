@@ -14,7 +14,7 @@ import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
-import { carteiraDetalhe, carteiraIdentificacao, carteiraValor } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import {
@@ -38,7 +38,7 @@ import { CelulaCaptacao, FiltroCaptacao } from './CaptacaoDoPedido';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { contaEmendasSemPedido, diasSemContatoParaUrgente, emendasNaLista } from '../../utils/emendasSemPedido';
 import { formatCurrency } from '../../utils/format';
-import { avisoIndicacaoDias, corteIndicacaoDias, nomeDaLinhaDoPedido } from '../../utils/emendasKits';
+import { avisoIndicacaoDias, corteIndicacaoDias } from '../../utils/emendasKits';
 import { casaBusca, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import {
   avisoGrave,
@@ -51,6 +51,7 @@ import {
   type FasePedido,
   contratosDoPedido,
   linhasAtivas,
+  linhasDaLista,
   orgaoDoPedido,
   ORDEM_ETAPA,
   reservadoPorItem,
@@ -228,7 +229,10 @@ export const EmendasPedidosPage: React.FC = () => {
         if (!termo) return true;
         const a = l.autorId ? autorPorId.get(l.autorId) : undefined;
         const textoLinhas = linhasAtivas(l)
-          .map((x) => `${(x.tipo === 'KIT' ? x.kitNome : itens.get(x.itemKey ?? '')?.descricao) ?? ''} ${textoDoBeneficiario(x.beneficiarioId)} ${x.contratoNumero ?? ''}`)
+          .map((x) => {
+            const it = x.tipo === 'KIT' ? undefined : itens.get(x.itemKey ?? '');
+            return `${(x.tipo === 'KIT' ? x.kitNome : it?.descricao) ?? ''} ${it?.nomeCurto ?? ''} ${it?.numeroAta ?? ''} ${textoDoBeneficiario(x.beneficiarioId)} ${x.beneficiarioNome ?? ''} ${x.contratoNumero ?? ''}`;
+          })
           .join(' ');
         // O nome do contato da assessoria só entra na busca de quem o vê.
         return casaBusca(`${a?.nome ?? AUTOR_A_DEFINIR} ${podeGerir ? l.contatoNome ?? '' : ''} ${a?.uf ?? ''} ${l.oficioProcessoSei ?? ''} ${l.siopEmenda ?? ''} ${ETAPAS.flatMap((e) => seiDaEtapa(l, e.etapa)).join(' ')} ${textoLinhas}`, termo);
@@ -296,19 +300,35 @@ export const EmendasPedidosPage: React.FC = () => {
       render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} orgao={orgaoDoPedido(l, nomeDoBeneficiario)} destaque />
     },
     {
+      // O que foi pedido e para quem: uma linha por item ("10× Carabina 5,56 mm → PMMG"); a ata fica no Pedido 360 e no aviso (decisão de 28/10/2026).
       key: 'linhas',
-      header: 'Itens e kits',
-      minWidth: '240px',
+      header: 'Itens e beneficiários',
+      minWidth: '280px',
       render: (l) => {
-        const ativas = linhasAtivas(l);
-        const resumo = ativas
-          .slice(0, 2)
-          .map((x) => nomeDaLinhaDoPedido(x, itens))
-          .join(' · ');
+        const todas = linhasDaLista(l, itens, beneficiarios);
+        const mostradas = todas.slice(0, 2);
+        const resto = todas.length - mostradas.length;
         return (
           <>
-            <div style={carteiraValor}>{resumo}</div>
-            {ativas.length > 2 && <div style={carteiraDetalhe}>+{ativas.length - 2} {ativas.length - 2 === 1 ? 'item' : 'itens'}</div>}
+            {mostradas.map((x) => (
+              <div key={x.id} style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', minWidth: 0 }}>
+                <span style={{ ...carteiraNumero, fontWeight: 700, color: '#64748b', minWidth: '2.2em', textAlign: 'right' }}>{x.quantidade}×</span>
+                <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{x.nome}</span>
+                {x.kit && <StatusBadge label="Kit" variant="neutral" size="sm" dot={false} />}
+                <span style={{ color: '#64748b' }}>→</span>
+                <span title={x.beneficiarioNome ?? undefined} style={{ fontWeight: 600, color: x.beneficiario ? 'var(--color-primary, #0c326f)' : '#64748b', whiteSpace: 'nowrap' }}>
+                  {x.beneficiario ?? 'a definir'}
+                </span>
+              </div>
+            ))}
+            {resto > 0 && (
+              <div
+                style={carteiraDetalhe}
+                title={todas.map((x) => `${x.quantidade}× ${x.nome} → ${x.beneficiarioNome ?? 'a definir'}`).join('\n')}
+              >
+                +{resto} {resto === 1 ? 'linha' : 'linhas'}
+              </div>
+            )}
           </>
         );
       }

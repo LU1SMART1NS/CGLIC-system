@@ -106,6 +106,42 @@ export function itensDaLinha(l: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitCompo
 
 export const linhasAtivas = (p: PedidoEmenda): LinhaPedido[] => p.linhas.filter((l) => !l.cancelada);
 
+/** Uma linha da coluna "Itens e beneficiários" da lista de pedidos: quantidade, nome curto do item e quem recebe. */
+export interface LinhaDaLista {
+  id: string;
+  quantidade: number;
+  nome: string;
+  kit: boolean;
+  /** Sigla do beneficiário (ou o nome, se não tem sigla); null = a definir. */
+  beneficiario: string | null;
+  /** Nome por extenso, para a dica. */
+  beneficiarioNome: string | null;
+}
+
+/**
+ * As linhas ativas do pedido como a lista mostra: o item pelo nome curto da CAEP (sem ele, o começo da descrição do
+ * catálogo), o kit pelo nome do kit e o beneficiário pela sigla do cadastro; sem cadastro, o nome do controle anterior.
+ */
+export function linhasDaLista(
+  p: PedidoEmenda,
+  itens: Map<string, ItemCaep>,
+  beneficiarios: Map<string, { nome: string; sigla?: string | null }>
+): LinhaDaLista[] {
+  return linhasAtivas(p).map((l) => {
+    const b = l.beneficiarioId ? beneficiarios.get(l.beneficiarioId) : undefined;
+    const nomeBen = b?.nome?.trim() || l.beneficiarioNome?.trim() || null;
+    const item = l.tipo === 'ITEM' ? itens.get(l.itemKey ?? '') : undefined;
+    return {
+      id: l.id,
+      quantidade: l.quantidade,
+      nome: l.tipo === 'KIT' ? l.kitNome ?? 'kit' : item?.nomeCurto?.trim() || curto(item?.descricao ?? l.itemKey ?? '', 34),
+      kit: l.tipo === 'KIT',
+      beneficiario: b?.sigla?.trim() || nomeBen,
+      beneficiarioNome: nomeBen
+    };
+  });
+}
+
 /** Reservado por item somando pedidos e linhas não cancelados (a mesma conta da view do banco). */
 export function reservadoPorItem(pedidos: PedidoEmenda[], excluirPedidoId?: string): Map<string, number> {
   const m = new Map<string, number>();
