@@ -15,14 +15,15 @@ import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useItensCaep, useKitsEmendas, usePodeGerirEmendas, useReservadoPorItem, useSalvarKit } from '../../hooks/useEmendas';
 import { formatNumber } from '../../utils/format';
-import { avisoIndicacaoDias, calcularKit, corteIndicacaoDias, ROTULO_SITUACAO_KIT, type CalculoDoKit, type ComponenteDoKit, type SituacaoKit } from '../../utils/emendasKits';
+import { avisoIndicacaoDias, corteIndicacaoDias, ROTULO_SITUACAO_KIT, type ComponenteDoKit, type SituacaoKit } from '../../utils/emendasKits';
 import type { KitEmenda } from '../../services/emendasService';
 import { KitModal } from './KitModal';
+import { montarLinhasKitsCaep, saldoDoItemParaKits, type LinhaKitCaep } from '../../utils/emendasItensSaldo';
 import { ItemDaAta, ValorPrevisto, VigenciaDaAta } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 
 type Segmento = 'todos' | SituacaoKit;
-type Linha = KitEmenda & { calculo: CalculoDoKit };
+type Linha = LinhaKitCaep;
 
 const VARIANTE: Record<SituacaoKit, StatusBadgeVariant> = { disponivel: 'success', vence: 'warning', indisponivel: 'danger', desativado: 'neutral' };
 const vazio = <span style={{ ...carteiraDetalhe, marginTop: 0 }}>—</span>;
@@ -88,13 +89,15 @@ interface Props {
   /** Kit que já chega aberto (vindo de um item). */
   abrir?: string | null;
   onAbrirItem?: (itemKey: string) => void;
+  /** Botão Exportar da aba Itens (itens e kits com saldo), ao lado de Atualizar. */
+  exportar?: React.ReactNode;
 }
 
 /**
  * Emendas › Itens › Por kit (migration 155): conjunto de itens montado pela CAEP com o que ela tem alocado. A situação é
  * calculada todo dia pelas atas e pelo saldo; quem desativa é só a CAEP.
  */
-export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }) => {
+export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem, exportar }) => {
   const { data: kits = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = useKitsEmendas();
   const { data: itens = [], isLoading: carregandoItens, refetch: recarregarItens } = useItensCaep();
   const podeGerir = usePodeGerirEmendas();
@@ -113,12 +116,10 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
       return novo;
     });
 
-  const porChave = useMemo(() => new Map(itens.map((i) => [i.itemKey, i])), [itens]);
   const { data: reservado } = useReservadoPorItem();
-  // Saldo do item para os kits = alocado à CAEP − reservado nos pedidos.
-  const saldoDoItem = useMemo(() => (i: { itemKey: string; alocado: number }) => i.alocado - (reservado?.get(i.itemKey) ?? 0), [reservado]);
+  const saldoDoItem = useMemo(() => saldoDoItemParaKits(reservado), [reservado]);
   const { precos } = usePrecosParaEmenda();
-  const linhas: Linha[] = useMemo(() => kits.map((k) => ({ ...k, calculo: calcularKit(k, porChave, hoje, saldoDoItem, precos) })), [kits, porChave, hoje, saldoDoItem, precos]);
+  const linhas: Linha[] = useMemo(() => montarLinhasKitsCaep(kits, itens, hoje, reservado, precos), [kits, itens, hoje, reservado, precos]);
 
   const contagem = useMemo(() => {
     const c: Record<Segmento, number> = { todos: linhas.length, disponivel: 0, vence: 0, indisponivel: 0, desativado: 0 };
@@ -215,6 +216,7 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
         viewToggle={seletor}
         actions={
           <>
+            {exportar}
             {podeGerir && <ActionButton action="novo" label="Novo kit" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-kits-novo" />}
             <HeaderRefreshAction
               onRefresh={() => Promise.all([refetch(), recarregarItens()])}

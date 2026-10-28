@@ -4,6 +4,7 @@ import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { useItensCaep, useKitsEmendas } from '../../hooks/useEmendas';
 import { EmendasPorItemPage } from './EmendasPorItemPage';
 import { EmendasKitsPage } from './EmendasKitsPage';
+import { ExportarItensEKits } from './ExportarItensEKits';
 
 type Ver = 'item' | 'kit';
 
@@ -42,8 +43,8 @@ export const EmendasItensEKitsPage: React.FC = () => {
 
   // key: a linha aberta muda sem trocar de visão (ex.: dois itens do mesmo kit) e a tela recomeça aberta nela.
   return ver === 'kit' ? (
-    <EmendasKitsPage key={`kit-${abrir ?? ''}`} seletor={seletor} abrir={abrir} onAbrirItem={(k) => ir('item', k)} />
+    <EmendasKitsPage key={`kit-${abrir ?? ''}`} seletor={seletor} exportar={<ExportarItensEKits />} abrir={abrir} onAbrirItem={(k) => ir('item', k)} />
   ) : (
-    <EmendasPorItemPage key={`item-${abrir ?? ''}`} seletor={seletor} abrir={abrir} />
+    <EmendasPorItemPage key={`item-${abrir ?? ''}`} seletor={seletor} exportar={<ExportarItensEKits />} abrir={abrir} />
   );
 };
