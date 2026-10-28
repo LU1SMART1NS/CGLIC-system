@@ -91,14 +91,16 @@ export const ItemDaAta: React.FC<{
           {extra}
         </div>
       )}
-      {comNomeCurto && item?.nomeCurto?.trim() && (
-        <div style={{ ...carteiraValor, marginTop: '0.15rem' }} data-testid="emendas-item-nome-curto">
+      {comNomeCurto && item?.nomeCurto?.trim() ? (
+        // Com nome curto, a descrição do edital sai da tela e fica na dica.
+        <div title={item.descricao} style={{ ...carteiraValor, marginTop: '0.15rem' }} data-testid="emendas-item-nome-curto">
           {item.nomeCurto.trim()}
         </div>
+      ) : (
+        <div title={item?.descricao} style={carteiraDescricaoItem}>
+          {item ? descricaoItemEmFrase(item.descricao) : semItem}
+        </div>
       )}
-      <div title={item?.descricao} style={carteiraDescricaoItem}>
-        {item ? descricaoItemEmFrase(item.descricao) : semItem}
-      </div>
     </>
   );
 };
