@@ -21,7 +21,7 @@ export const COLUNAS_ITENS: ColunaDoExcel<LinhaItemCaep, string>[] = [
   { id: 'ata', titulo: 'Ata', largura: 14, valor: (l) => l.numeroAta },
   { id: 'item', titulo: 'Item', largura: 8, valor: (l) => Number(l.numeroItem) },
   { id: 'descricao', titulo: 'Descrição', largura: 60, valor: (l) => descricaoItemEmFrase(l.descricao) },
-  { id: 'quadro', titulo: 'Nome no quadro', largura: 40, valor: (l) => l.nomeCurto ?? '' },
+  { id: 'quadro', titulo: 'Nome na Ata', largura: 40, valor: (l) => l.nomeCurto ?? '' },
   { id: 'gnd', titulo: 'GND', largura: 20, valor: (l) => gnd(l.gnd) },
   { id: 'gti', titulo: 'Interesse principal', largura: 26, valor: interesse },
   { id: 'vigencia', titulo: 'Vigência até', largura: 13, valor: (l) => (l.vigenciaFinal ? dataBR(l.vigenciaFinal) : '') },

@@ -92,7 +92,7 @@ let seq = 0;
 const novaChave = () => `n${++seq}`;
 const novoGrupo = () => `g${++seq}`;
 
-/** Cartão de item ou kit na busca da reserva: nome do quadro (descrição no ⓘ), preço numa coluna fixa e saldo no pé. */
+/** Cartão de item ou kit na busca da reserva: nome na ata (descrição no ⓘ), preço numa coluna fixa e saldo no pé. */
 function CartaoResultado(props: {
   nome: React.ReactNode;
   descricao: string;

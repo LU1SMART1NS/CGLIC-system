@@ -112,7 +112,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, exportar }
     },
     {
       key: 'quadro',
-      header: 'No quadro',
+      header: 'Nome na Ata',
       minWidth: '160px',
       sortValue: ORDEM.quadro.value,
       render: (l) => (

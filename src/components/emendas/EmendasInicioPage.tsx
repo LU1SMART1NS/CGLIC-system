@@ -365,7 +365,7 @@ export const EmendasInicioPage: React.FC = () => {
 
   const colunasSemNome: Column<ItemCaep>[] = [
     { key: 'item', header: 'Item', priority: 'primary', minWidth: '260px', sortValue: (i) => i.descricao, render: (i) => <ItemDaAta item={i} comLinks /> },
-    { key: 'quadro', header: 'No quadro', minWidth: '200px', render: (i) => <span style={carteiraValor}>{nomeDoItem(i, i.itemKey)}</span> },
+    { key: 'quadro', header: 'Nome na Ata', minWidth: '200px', render: (i) => <span style={carteiraValor}>{nomeDoItem(i, i.itemKey)}</span> },
     { key: 'alocado', header: 'Alocado', align: 'right', nowrap: true, sortValue: (i) => i.alocado, sortFirstDir: 'desc', render: (i) => <span style={carteiraNumero}>{formatNumber(i.alocado)}</span> },
     { key: 'fim', header: 'Fim da ata', nowrap: true, sortValue: (i) => i.vigenciaFinal, render: (i) => <span style={carteiraValor}>{dataBR(i.vigenciaFinal)}</span> }
   ];
