@@ -236,11 +236,7 @@ export const Parlamentar360Page: React.FC = () => {
             ...(autor.lidoEm ? [{ label: 'Dados lidos em', value: dataBR(autor.lidoEm) }] : [])
           ]}
           identifiersTestId="parlamentar-360-identificadores"
-          identifiers={[
-            { label: 'Código do autor', value: autor.id },
-            { label: 'Tipo', value: TIPO_POR_EXTENSO[autor.tipo] ?? autor.tipo },
-            ...(autor.legislatura ? [{ label: 'Legislatura', value: String(autor.legislatura) }] : [])
-          ]}
+          identifiers={[{ label: 'Código do autor', value: autor.id }]}
         >
           <div data-testid="parlamentar-360-indicadores">
             <HealthTileGrid columns={4}>
@@ -265,7 +261,7 @@ export const Parlamentar360Page: React.FC = () => {
                     ? `${Math.round((sobra.empenhado / sobra.valor) * 1000) / 10}% das emendas ${filtroEhAno(filtroAno) ? 'do ano' : anoEmTexto(filtroAno)}`
                     : filtroAno === ANO_SEM
                       ? 'sem o ano, o Portal não é lido'
-                      : 'pelas notas e pelo Portal'
+                      : 'nenhuma nota ainda'
                 }
                 compact
                 onClick={() => goToTab('emendas')}
@@ -274,7 +270,7 @@ export const Parlamentar360Page: React.FC = () => {
               <HealthTile
                 label="Pago"
                 value={execucao.notas > 0 ? formatCurrency(execucao.pago) : '—'}
-                hint={execucao.notas > 0 ? `nas ${execucao.notas} ${execucao.notas === 1 ? 'nota' : 'notas'} dos pedidos` : 'nenhuma nota dos pedidos ainda'}
+                hint={execucao.notas > 0 ? `nas ${execucao.notas} ${execucao.notas === 1 ? 'nota' : 'notas'} dos pedidos` : 'nenhuma nota ainda'}
                 compact
                 onClick={() => goToTab('pedidos')}
                 testId="parlamentar-360-pago"

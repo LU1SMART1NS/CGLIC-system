@@ -46,18 +46,25 @@ interface Props {
   onAba: (aba: Pedido360Aba) => void;
   /** Abre o Parlamentar 360 (com origem: o Voltar de lá traz de volta a este pedido). */
   onAbrirParlamentar?: () => void;
+  /** Abre a Emenda 360 do pedido (o nº da emenda no pé do cartão). */
+  onAbrirEmenda?: () => void;
   /** Botão "Captação principal:" abaixo dos indicadores (migration 218), como o "Interesse por GTI:" da Ata 360. */
   verMais?: React.ReactNode;
 }
 
 const emendaEmTexto = (numero: string) => (/^\d{8}$/.test(numero) ? `${numero.slice(0, 4)} ${numero.slice(4)}` : numero);
 
+/** Nome curto sem o ponto final (alguns nomes da CAEP terminam em ponto e a lista ficava "Desktop Básico.,"). */
+const semPontoFinal = (nome: string) => nome.trim().replace(/\.+$/, '');
+
 /**
- * Cartão do topo do Pedido 360, no desenho das telas 360 (Instrument360Hero): parlamentar como título, a etapa como
- * situação e o aviso mais grave em selo, o contato da assessoria e as datas ao lado, quatro indicadores e, no pé, o
- * processo SEI, a emenda e o GND. A próxima tarefa é o botão principal.
+ * Cartão do topo do Pedido 360, no desenho das telas 360 (Instrument360Hero): o pedido como título ("Pedido 1/2026",
+ * como "Ata nº" e "Contrato nº") e o parlamentar logo abaixo, porque o número recomeça em cada parlamentar (decisão
+ * de 28/10/2026: com o parlamentar no título o cartão parecia o do Parlamentar 360). A etapa como situação e o aviso
+ * mais grave em selo, o contato da assessoria e as datas ao lado, quatro indicadores e, no pé, o processo SEI, a
+ * emenda (abre a Emenda 360) e o GND. A próxima tarefa é o botão principal.
  */
-export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onProxima, onAlterar, onCancelar, onAnular, onAba, onAbrirParlamentar, verMais }) => {
+export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onProxima, onAlterar, onCancelar, onAnular, onAba, onAbrirParlamentar, onAbrirEmenda, verMais }) => {
   const cancelado = p.etapa === 'CANCELADO';
   const ativas = linhasAtivas(p);
   const atas = atasDoPedido(p, itens);
@@ -67,7 +74,9 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
   const posicao = contratado ? TOTAL_ETAPAS_PEDIDO : ORDEM_ETAPA[p.etapa] + 1;
   const situacao = cancelado ? 'Cancelado' : contratado ? 'Contratado' : ROTULO_ETAPA[p.etapa];
   const grave = avisos.find(avisoGrave) ?? null;
-  const prox = podeGerir && !cancelado && p.autorId ? proximaAcao(p.etapa, rodadaDoPedido(p)) : null;
+  const seguinte = !cancelado && p.autorId ? proximaAcao(p.etapa, rodadaDoPedido(p)) : null;
+  const prox = podeGerir ? seguinte : null;
+  const resumo = resumoDasLinhas(p, notas);
 
   const beneficiariosDoPedido = [
     ...new Set(ativas.map((l) => (l.beneficiarioId ? beneficiarios.get(l.beneficiarioId) : undefined)).filter((b): b is BeneficiarioEmenda => Boolean(b)).map((b) => rotuloBeneficiario(b)))
@@ -75,21 +84,39 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
   const para = beneficiariosDoPedido.length
     ? `para ${beneficiariosDoPedido.slice(0, 2).join(' e ')}${beneficiariosDoPedido.length > 2 ? ` e mais ${beneficiariosDoPedido.length - 2}` : ''}`
     : null;
-  const subtitulo = [autor ? linhaDoAutor(autor) : null, para].filter(Boolean).join(' · ');
-  const nomes = ativas.map((l) => {
-    if (l.tipo === 'KIT') return `${l.quantidade} ${l.kitNome ?? 'kit'}`;
-    const item = l.itemKey ? itens.get(l.itemKey) : undefined;
-    return `${l.quantidade} ${item?.nomeCurto?.trim() || curto(item?.descricao ?? l.itemKey ?? '', 40)}`;
-  });
+  const nomeDoAutor = autor?.nome ?? (p.autorId ? p.autorId : AUTOR_A_DEFINIR);
+  const subtitulo = (
+    <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.25rem 0.5rem' }}>
+      {autor && onAbrirParlamentar ? (
+        <AppButton size="xs" variant="link" onClick={onAbrirParlamentar} data-testid="pedido-360-abrir-parlamentar">
+          {autor.nome}
+        </AppButton>
+      ) : (
+        <span>{nomeDoAutor}</span>
+      )}
+      {[autor ? linhaDoAutor(autor) : null, para].filter(Boolean).map((t) => (
+        <span key={t}>· {t}</span>
+      ))}
+    </span>
+  );
+  // O mesmo item aparece uma vez por beneficiário: soma as quantidades pelo nome, na ordem em que aparece.
+  const porNome = new Map<string, number>();
+  for (const l of ativas) {
+    const item = l.tipo === 'KIT' || !l.itemKey ? undefined : itens.get(l.itemKey);
+    const nome = l.tipo === 'KIT' ? (l.kitNome ?? 'kit') : semPontoFinal(item?.nomeCurto?.trim() || curto(item?.descricao ?? l.itemKey ?? '', 40));
+    porNome.set(nome, (porNome.get(nome) ?? 0) + l.quantidade);
+  }
+  const nomes = [...porNome].map(([nome, qtd]) => `${qtd} ${nome}`);
   const objeto = ativas.length
     ? `${ativas.length === 1 ? '1 item' : `${ativas.length} itens`}${atas.length > 1 ? ` em ${atas.length} atas` : ''}: ${nomes.join(', ')}.`
     : 'Sem itens.';
 
   const emenda = p.siopEmenda ? `Emenda ${emendaEmTexto(p.siopEmenda)}${p.siopEmendaAno ? ` / ${p.siopEmendaAno}` : ' · ano a informar'}` : 'Emenda a informar';
-  const eyebrow = [nomeDoPedido(p), emenda, p.siopGnd].filter(Boolean).join(' · ');
+  const eyebrow = ['Pedido de emenda', emenda].join(' · ');
 
   const datas = [
-    { label: 'Reservado em', value: p.origem === 'PLANILHA' ? 'carga da planilha' : dataBR(p.reservadoEm) },
+    // Da planilha não há data de reserva: o título já diz "Reserva da planilha".
+    ...(p.origem === 'PLANILHA' ? [] : [{ label: 'Reservado em', value: dataBR(p.reservadoEm) }]),
     ...(p.oficioEm ? [{ label: 'Ofício recebido', value: dataBR(p.oficioEm) }] : []),
     ...(p.empenhadoEm ? [{ label: 'Empenhado em', value: dataBR(p.empenhadoEm) }] : []),
     ...(p.contratacaoEm ? [{ label: 'Enviado à CCGA', value: dataBR(p.contratacaoEm) }] : []),
@@ -121,13 +148,13 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
           )}
         </>
       }
-      title={autor?.nome ?? (p.autorId ? p.autorId : AUTOR_A_DEFINIR)}
+      title={nomeDoPedido(p)}
       eyebrow={eyebrow}
       status={{ faixa: cancelado ? 'EXPIRADO' : 'REGULAR', label: situacao, neutral: true }}
       statusAlert={grave ? grave.curto : undefined}
       dockAlert={grave ? grave.curto : undefined}
-      dockSubtitle={`${situacao} · ${ativas.length === 1 ? '1 item' : `${ativas.length} itens`} · ${formatCurrency(valor.valor)}`}
-      subtitle={subtitulo || undefined}
+      dockSubtitle={`${nomeDoAutor} · ${situacao} · ${ativas.length === 1 ? '1 item' : `${ativas.length} itens`} · ${formatCurrency(valor.valor)}`}
+      subtitle={subtitulo}
       objeto={objeto}
       manager={
         podeGerir && (p.contatoNome || p.contatoTelefone || p.contatoEmail) ? (
@@ -140,23 +167,23 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
           </div>
         ) : undefined
       }
-      origin={
-        autor && onAbrirParlamentar
-          ? {
-              label: 'Parlamentar',
-              value: (
-                <AppButton size="xs" variant="link" onClick={onAbrirParlamentar} data-testid="pedido-360-abrir-parlamentar">
-                  {autor.nome}
-                </AppButton>
-              )
-            }
-          : undefined
-      }
       dates={datas}
       identifiersTestId="pedido-360-identificadores"
       identifiers={[
         { label: 'Processo SEI', value: p.oficioProcessoSei ?? undefined },
-        { label: 'Emenda', value: p.siopEmenda ? `${p.siopEmendaAno ?? ''}${p.siopEmenda}` || undefined : undefined },
+        {
+          label: 'Emenda',
+          value: p.siopEmenda ? (
+            onAbrirEmenda ? (
+              <AppButton size="xs" variant="link" onClick={onAbrirEmenda} data-testid="pedido-360-abrir-emenda">
+                {emendaEmTexto(p.siopEmenda)}
+                {p.siopEmendaAno ? ` / ${p.siopEmendaAno}` : ''}
+              </AppButton>
+            ) : (
+              `${emendaEmTexto(p.siopEmenda)}${p.siopEmendaAno ? ` / ${p.siopEmendaAno}` : ''}`
+            )
+          ) : undefined
+        },
         { label: 'GND', value: p.siopGnd ?? undefined }
       ]}
     >
@@ -168,9 +195,11 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
             hint={
               contratos && !contratado
                 ? `${contratos.comContrato} de ${contratos.notas} ${contratos.notas === 1 ? 'nota' : 'notas'} com contrato`
-                : resumoDasLinhas(p, notas).divergem
-                  ? resumoDasLinhas(p, notas).texto
-                  : situacao
+                : resumo.divergem
+                  ? resumo.texto
+                  : seguinte
+                    ? `próximo: ${seguinte.rotulo.charAt(0).toLowerCase()}${seguinte.rotulo.slice(1)}`
+                    : situacao
             }
             onClick={() => onAba('andamento')}
             testId="pedido-360-etapa"
@@ -188,7 +217,7 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
           <HealthTile
             label="Empenhado"
             value={execucao && execucao.notas > 0 ? formatCurrency(execucao.empenhado) : '—'}
-            hint={execucao ? (execucao.notas > 0 ? `${execucao.notas} ${execucao.notas === 1 ? 'nota' : 'notas'}${execucao.linhasSemNota ? ` · ${execucao.linhasSemNota} sem nota` : ''}` : 'nenhuma nota achada ainda') : 'antes do empenho'}
+            hint={execucao && execucao.notas > 0 ? `${execucao.notas} ${execucao.notas === 1 ? 'nota' : 'notas'}${execucao.linhasSemNota ? ` · ${execucao.linhasSemNota} sem nota` : ''}` : 'nenhuma nota ainda'}
             tone={execucao && execucao.linhasSemNota > 0 ? 'ATENCAO' : undefined}
             compact
             onClick={() => onAba('execucao')}
@@ -204,7 +233,7 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
                   : execucao.pago >= execucao.empenhado - 0.01
                     ? 'tudo pago'
                     : 'nada liquidado ainda'
-                : 'depois do empenho'
+                : 'nenhuma nota ainda'
             }
             positive={Boolean(execucao && execucao.notas > 0 && execucao.pago >= execucao.empenhado - 0.01)}
             compact
