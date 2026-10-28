@@ -154,9 +154,9 @@ describe('Pedido 360: cartão e Andamento', () => {
     }
   });
 
-  it('no ofício: etapa 3 de 10, a conferência é com a CAEP e o botão da próxima etapa está no cartão e na tarefa', () => {
+  it('no ofício: etapa 3 de 13, a conferência é com a CAEP e o botão da próxima etapa está no cartão e na tarefa', () => {
     const html = render('/emendas/pedidos/id/p1');
-    expect(html).toContain('3 de 10');
+    expect(html).toContain('3 de 13');
     expect(html).toContain('pedido360-proxima-p1');
     expect(html).toContain('emendas-pedido-proximo-p1');
     expect(html).toContain('Conferir com o SIOP');
@@ -178,7 +178,7 @@ describe('Pedido 360: cartão e Andamento', () => {
 
   it('na CCGA sem contrato: contrato fecha sozinho, fases concluídas recolhidas e sem cancelar nem alterar', () => {
     const html = render('/emendas/parlamentares/A1/pedidos/2026/1');
-    expect(html).toContain('9 de 10');
+    expect(html).toContain('9 de 13');
     expect(html).toMatch(/pedido360-tarefa-contrato" data-estado="FONTE"/);
     expect(html).toContain('0 de 1 item com contrato');
     expect(html).toContain('aria-expanded="false"');
@@ -187,7 +187,7 @@ describe('Pedido 360: cartão e Andamento', () => {
     expect(html).toContain('emendas-pedido-mais-sei-CONTRATACAO');
     expect(html).not.toContain('emendas-pedido-cancelar-ccga');
     expect(html).not.toContain('emendas-pedido-alterar-ccga');
-    // A fase Execução aparece, com a entrega sem fonte enquanto não há contrato.
+    // A fase Execução aparece; a entrega fecha pela fatura depois do contrato.
     expect(html).toContain('pedido360-fase-EXECUCAO');
   });
 

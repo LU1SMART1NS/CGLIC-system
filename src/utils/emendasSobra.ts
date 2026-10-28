@@ -1,8 +1,8 @@
 /**
  * Sobra das emendas (protótipo aprovado em 26/10/2026, migration 204). A emenda é a unidade da conta:
- *   sobra = valor no SIOP − o maior entre os ofícios e o empenhado (migration 231, aprovado em 28/10/2026).
+ *   sobra = valor no SIOP − o maior entre os ofícios e o empenhado (migration 232, aprovado em 28/10/2026).
  * - Valor: o da emenda registrada (emendas_siop, um por emenda, com a data da leitura do SIOP). Sem registro, o maior
- *   valor visto na conferência dos pedidos (antes da migration 231 cada pedido guardava o da emenda inteira).
+ *   valor visto na conferência dos pedidos (antes da migration 232 cada pedido guardava o da emenda inteira).
  * - Ofícios: a soma do valor do ofício de cada pedido. Pedido conferido sem esse valor fica "ofício a informar" e a
  *   conta volta à regra antiga (empenhado + em andamento), até a CAEP informar.
  * - Em andamento, com todos os ofícios informados: o que foi oficiado e ainda não empenhou (falta empenhar).

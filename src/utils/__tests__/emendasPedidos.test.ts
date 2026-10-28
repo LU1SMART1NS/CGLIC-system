@@ -71,7 +71,7 @@ describe('pedidos das emendas', () => {
     expect(calcularKit({ ativo: true, itens: kit.kitComposicao! }, itens, HOJE, (i) => i.alocado, precos)).toMatchObject({ valorPorKit: 124.02, valorPorKitHoje: 120 });
   });
 
-  it('valor do pedido nas telas: o do ofício depois de informado; antes, o previsto (migration 231)', () => {
+  it('valor do pedido nas telas: o do ofício depois de informado; antes, o previsto (migration 232)', () => {
     const precos = new Map<string, PrecoPrevisto>([['a', { itemKey: 'a', precoAtual: 100, precoPrevisto: 110, motivo: 'DEVIDO', devido: true, efeito: null, percentual: 10, mesesEstimados: null }]]);
     const p = pedido({ linhas: [linha({ itemKey: 'a', quantidade: 3 })] });
     expect(valorDoPedidoNaEtapa(p, itens, precos)).toEqual({ valor: 330, fonte: 'PREVISTO' });
@@ -189,14 +189,26 @@ describe('reserva para um órgão (parlamentar a definir)', () => {
 });
 
 describe('aviso de pedido parado em etapa', () => {
-  it('amarelo, conta da entrada na etapa atual e só de Ofício a CGOFI', () => {
+  it('amarelo, conta da entrada na etapa atual com o prazo medido de cada etapa (D5)', () => {
     const l = [linha({ beneficiarioId: 'b1' })];
-    const parado = (extra: Partial<PedidoEmenda>) => avisosDoPedido(pedido({ linhas: l, ...extra }), itens, HOJE).find((x) => x.tipo === 'pedidoParado');
-    const a = parado({ etapa: 'SOLICITADO', solicitadoEm: '2026-09-01' });
-    expect(a?.curto).toBe('52 dias parado');
+    const parado = (extra: Partial<PedidoEmenda>, notas?: Map<string, NotaDaLinha>) =>
+      avisosDoPedido(pedido({ linhas: l, ...extra }), itens, HOJE, notas).find((x) => x.tipo === 'pedidoParado');
+    // HOJE = 23/10/2026. Solicitação: 6 dias para a assinatura da DGFNSP.
+    const a = parado({ etapa: 'SOLICITADO', solicitadoEm: '2026-10-15' });
+    expect(a?.curto).toBe('8 dias parado');
+    expect(a?.texto).toBe('8 dias em "Empenho solicitado" desde 15/10/2026 (prazo de 6 dias): cobrar a assinatura da solicitação na DGFNSP');
     expect(a && avisoGrave(a)).toBe(false);
     expect(parado({ etapa: 'SOLICITADO', solicitadoEm: '2026-10-20' })).toBeUndefined();
-    expect(parado({ etapa: 'EMPENHADO', empenhadoEm: '2026-01-01' })).toBeUndefined();
+    // Autorizado: 7 dias para o envio à CGOFI; CGOFI: 5 dias úteis (7 corridos) para a nota.
+    expect(parado({ etapa: 'AUTORIZADO', autorizadoEm: '2026-05-28' })?.texto).toContain('enviar o processo à CGOFI');
+    expect(parado({ etapa: 'CGOFI', cgofiEm: '2026-10-15' })?.texto).toContain('cobrar a nota de empenho da CGOFI');
+    expect(parado({ etapa: 'CGOFI', cgofiEm: '2026-10-17' })).toBeUndefined();
+    // Empenhado: 10 dias para o envio à CCGA.
+    expect(parado({ etapa: 'EMPENHADO', empenhadoEm: '2026-10-01' })?.texto).toContain('enviar o processo à CCGA');
+    // Na contratação, 60 dias da nota enquanto falta contrato; contratado, sem aviso.
+    expect(parado({ etapa: 'CONTRATACAO', empenhadoEm: '2026-07-01' }, new Map())?.texto).toContain('cobrar o contrato da CCGA');
+    expect(parado({ etapa: 'CONTRATACAO', empenhadoEm: '2026-09-01' }, new Map())).toBeUndefined();
+    // Sem data de entrada (carga antiga), sem aviso.
     expect(parado({ etapa: 'CGOFI', cgofiEm: null })).toBeUndefined();
   });
 });
@@ -240,7 +252,7 @@ describe('nota e execução das linhas empenhadas (migration 164)', () => {
     expect(notaDaLinha(l3, notas)).toBe('2026NE000101');
     expect(notaDaLinha(l1, notas)).toBe('2026NE000100');
     const p = pedido({ etapa: 'EMPENHADO', linhas: [l1, l2, l3, l4] });
-    expect(execucaoDoPedido(p, notas)).toEqual({ notas: 2, empenhado: 1050, liquidado: 400, pago: 300, proximaEntrega: { data: '2026-11-15', valor: 200 }, linhasSemNota: 1 });
+    expect(execucaoDoPedido(p, notas)).toEqual({ notas: 2, empenhado: 1050, liquidado: 400, pago: 300, proximaEntrega: { data: '2026-11-15', valor: 200 }, linhasSemNota: 1, notasFaturadas: 0, faturadoEm: null, liquidadoEm: null, pagoEm: null });
     expect(avisosDoPedido(p, itens, HOJE, notas).find((a) => a.tipo === 'semNota')?.texto).toBe('1 item sem nota de empenho');
   });
 });
@@ -278,6 +290,22 @@ describe('etapa Contratado pelo Contratos.gov.br', () => {
     expect(rotuloDaEtapaDoPedido(p, new Map())).toBe('Processo enviado à CCGA');
     expect(contratosDoPedido({ ...p, etapa: 'EMPENHADO' }, completo).contratado).toBe(false);
     expect(contratosDoPedido(pedido({ etapa: 'CONTRATACAO', linhas: [] }), completo).contratado).toBe(false);
+  });
+
+  it('execução depois do contrato (migration 231): Faturado, Liquidado e Pago pelas notas, com a posição de 13', async () => {
+    const { passoNaContratacao, TOTAL_ETAPAS_PEDIDO } = await import('../emendasPedidos');
+    const l1 = linha({ id: 'l1' });
+    const p = pedido({ etapa: 'CONTRATACAO', linhas: [l1] });
+    const com = (extra: Partial<NotaDaLinha>) => new Map([['l1', nota('l1', { nota: '2026NE000100', empenhoId: 'e1', contractKey: '200331-00045-2026', valorEmpenhado: 1000, valorLiquidado: 0, valorPago: 0, ...extra })]]);
+    expect(TOTAL_ETAPAS_PEDIDO).toBe(13);
+    expect(passoNaContratacao(p, com({}))).toEqual({ passo: 'CONTRATADO', rotulo: 'Contratado', posicao: 10 });
+    expect(passoNaContratacao(p, com({ faturas: 1 }))).toEqual({ passo: 'EM_EXECUCAO', rotulo: 'Faturado', posicao: 11 });
+    expect(passoNaContratacao(p, com({ faturas: 1, valorLiquidado: 400 }))).toEqual({ passo: 'EM_EXECUCAO', rotulo: 'Liquidado 40%', posicao: 12 });
+    expect(passoNaContratacao(p, com({ faturas: 1, valorLiquidado: 1000, valorPago: 999 }))).toEqual({ passo: 'EM_EXECUCAO', rotulo: 'Pago 99%', posicao: 12 });
+    expect(passoNaContratacao(p, com({ faturas: 1, valorLiquidado: 1000, valorPago: 1000 }))).toEqual({ passo: 'PAGO', rotulo: 'Pago', posicao: 13 });
+    // Antes da contratação não há passo; sem contrato, aguarda.
+    expect(passoNaContratacao({ ...p, etapa: 'EMPENHADO' }, com({}))).toBeNull();
+    expect(passoNaContratacao(p, new Map())?.passo).toBe('AGUARDANDO_CONTRATO');
   });
 });
 

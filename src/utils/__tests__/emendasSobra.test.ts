@@ -73,7 +73,7 @@ describe('sobra das emendas (migration 204)', () => {
     expect(a.situacao).toBe('conferir');
   });
 
-  // Migration 231 (28/10/2026): o valor da emenda vem da emenda registrada e a sobra é emenda − ofícios.
+  // Migration 232 (28/10/2026): o valor da emenda vem da emenda registrada e a sobra é emenda − ofícios.
   const registrada = (valor: number) => ({ id: 'em1', ano: 2026, numero: '43600002', autorId: 'A1', valor, gnd: 'GND-4' as const, beneficiarioId: null, objeto: null, vistaEm: '2026-10-28', observacao: null, versao: 1, criadoPorNome: null });
 
   it('Sargento Fahur: emenda no SIOP 6.595.176, ofício retificador 6.194.520 todo empenhado → sobra 400.656', () => {

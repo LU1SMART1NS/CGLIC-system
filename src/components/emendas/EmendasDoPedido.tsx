@@ -111,7 +111,7 @@ export const EmendasDoPedido: React.FC<{ p: PedidoEmenda; podeGerir: boolean }> 
   );
 };
 
-/** Valor do ofício do pedido já conferido (migration 231): o que ficou a informar, ou o retificador que mudou o valor. */
+/** Valor do ofício do pedido já conferido (migration 232): o que ficou a informar, ou o retificador que mudou o valor. */
 const ValorDoOficio: React.FC<{ p: PedidoEmenda; onClose: () => void }> = ({ p, onClose }) => {
   const salvar = useSalvarValorOficio();
   const toast = useToast();

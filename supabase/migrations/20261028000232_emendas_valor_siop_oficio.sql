@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Migration 231: valor da emenda no SIOP × valor do ofício (protótipo aprovado em 28/10/2026, D1–D7)
+-- Migration 232: valor da emenda no SIOP × valor do ofício (protótipo aprovado em 28/10/2026, D1–D7)
 --
 -- Até aqui cada pedido guardava um só "valor no SIOP" (siop_valor), que às vezes era o valor da emenda e às vezes o do
 -- ofício (Sargento Fahur: SIOP R$ 6.595.176, ofício retificador R$ 6.194.520; a sobra de R$ 400.656 sumia).
@@ -16,10 +16,10 @@ ALTER TABLE public.emenda_pedidos
   ADD COLUMN IF NOT EXISTS oficio_valor_documento_sei VARCHAR(10) CHECK (oficio_valor_documento_sei IS NULL OR oficio_valor_documento_sei ~ '^[0-9]{7,10}$'),
   ADD COLUMN IF NOT EXISTS oficio_valor_retificador BOOLEAN NOT NULL DEFAULT FALSE;
 COMMENT ON COLUMN public.emenda_pedidos.oficio_valor IS
-  'Valor pedido no ofício do parlamentar (com retificador, o do retificador). O valor da emenda fica em emendas_siop (migration 231).';
-COMMENT ON COLUMN public.emenda_pedidos.oficio_valor_documento_sei IS 'Documento SEI do ofício (ou do retificador) que deu o valor (migration 231).';
+  'Valor pedido no ofício do parlamentar (com retificador, o do retificador). O valor da emenda fica em emendas_siop (migration 232).';
+COMMENT ON COLUMN public.emenda_pedidos.oficio_valor_documento_sei IS 'Documento SEI do ofício (ou do retificador) que deu o valor (migration 232).';
 COMMENT ON COLUMN public.emenda_pedidos.siop_valor IS
-  'Valor da emenda visto na conferência (histórico). O valor que vale é o de emendas_siop; o do pedido é oficio_valor (migration 231).';
+  'Valor da emenda visto na conferência (histórico). O valor que vale é o de emendas_siop; o do pedido é oficio_valor (migration 232).';
 
 -- 2) Pedido que volta à reserva (anulação total) perde o valor do ofício junto com a conferência.
 CREATE OR REPLACE FUNCTION public.trg_emendas_pedido_limpa_oficio_valor()
@@ -46,7 +46,7 @@ CREATE TRIGGER trg_emendas_pedido_limpa_oficio_valor
 -- 3a) Emenda registrada para todo nº conferido que ainda não tem registro (valor = o maior dos pedidos).
 INSERT INTO public.emendas_siop (ano, numero, autor_id, valor, gnd, vista_em, observacao, criado_por_nome, atualizado_por_nome)
 SELECT x.ano, x.numero, x.autor_id, x.valor, x.gnd, x.vista_em,
-       'Valor trazido dos pedidos (migration 231).', 'Sistema (migration 231)', 'Sistema (migration 231)'
+       'Valor trazido dos pedidos (migration 232).', 'Sistema (migration 232)', 'Sistema (migration 232)'
   FROM (SELECT DISTINCT ON (p.siop_emenda_ano, p.siop_emenda)
                p.siop_emenda_ano AS ano, p.siop_emenda AS numero, p.autor_id, max(p.siop_valor) OVER w AS valor,
                COALESCE(p.siop_gnd, 'GND-4') AS gnd,
@@ -239,7 +239,7 @@ BEGIN
     IF EXISTS (SELECT 1 FROM public.emenda_pedido_linhas WHERE pedido_id = p_id AND NOT cancelada AND beneficiario_id IS NULL) THEN
       RAISE EXCEPTION 'INVALID_PAYLOAD: todas as linhas precisam de beneficiário antes da conferência.' USING ERRCODE = '22023';
     END IF;
-    -- Migration 231: o valor da emenda no SIOP fica na emenda (emendas_siop, um por emenda) e o do ofício no pedido.
+    -- Migration 232: o valor da emenda no SIOP fica na emenda (emendas_siop, um por emenda) e o do ofício no pedido.
     -- "valor" (formato antigo) vale como valor da emenda.
     v_vemenda := NULLIF(COALESCE(v_d->>'valor_emenda', v_d->>'valor'), '')::NUMERIC;
     v_voficio := NULLIF(v_d->>'valor_oficio', '')::NUMERIC;
@@ -387,7 +387,7 @@ BEGIN
     RAISE EXCEPTION 'INVALID_PAYLOAD: a data em que a emenda foi vista no SIOP não pode ser futura.' USING ERRCODE = '22023';
   END IF;
 
-  -- Migration 231: nº que já está em pedido também se registra (uma emenda por ano + nº) e os pedidos passam a apontar
+  -- Migration 232: nº que já está em pedido também se registra (uma emenda por ano + nº) e os pedidos passam a apontar
   -- para ela; antes a RPC recusava com JA_TEM_PEDIDO.
 
   IF v_id IS NULL THEN

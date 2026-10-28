@@ -594,10 +594,10 @@ export interface PedidoEmenda {
   siopEmenda: string | null;
   /** Ano da emenda: o número se repete entre anos (migration 186). */
   siopEmendaAno: number | null;
-  /** Valor visto na conferência (histórico, migration 231). O valor da emenda que vale está em EmendaSiop. */
+  /** Valor visto na conferência (histórico, migration 232). O valor da emenda que vale está em EmendaSiop. */
   siopValor: number | null;
   siopGnd: string | null;
-  /** Valor pedido no ofício do parlamentar (com retificador, o do retificador). Nulo = a informar (migration 231). */
+  /** Valor pedido no ofício do parlamentar (com retificador, o do retificador). Nulo = a informar (migration 232). */
   oficioValor?: number | null;
   /** Documento SEI do ofício (ou do retificador) que deu o valor. */
   oficioValorDocumentoSei?: string | null;
@@ -1089,6 +1089,11 @@ export interface NotaDaLinha {
   emitidaEm: string | null;
   /** Data de assinatura do contrato da nota, do Contratos.gov.br (migration 230). */
   contratoAssinadoEm?: string | null;
+  /** Faturas do Contratos.gov.br que citam a nota, a primeira emissão, a última liquidação e a última ordem bancária (migration 231). */
+  faturas?: number;
+  faturadoEm?: string | null;
+  liquidadoEm?: string | null;
+  pagoEm?: string | null;
   atualizadoEm: string | null;
 }
 
@@ -1117,6 +1122,10 @@ export async function fetchNotasDasLinhas(): Promise<Map<string, NotaDaLinha>> {
         entregaPrevistaValor: numOuNulo(r.entrega_prevista_valor),
         emitidaEm: r.emitida_em ?? null,
         contratoAssinadoEm: r.contrato_assinado_em ?? null,
+        faturas: num(r.faturas ?? 0),
+        faturadoEm: r.faturado_em ?? null,
+        liquidadoEm: r.liquidado_em ?? null,
+        pagoEm: r.pago_em ?? null,
         atualizadoEm: r.atualizado_em ?? null
       }
     ])
@@ -1441,7 +1450,7 @@ export async function salvarEmendaSiop(e: EmendaParaSalvar): Promise<{ id: strin
   return data as { id: string; versao: number };
 }
 
-/** Valor do ofício depois da conferência: o que estava a informar, ou o retificador que mudou o valor (migration 231). */
+/** Valor do ofício depois da conferência: o que estava a informar, ou o retificador que mudou o valor (migration 232). */
 export async function salvarValorOficioPedido(id: string, versao: number, v: { valor: number; documentoSei: string; retificador: boolean }): Promise<{ id: string; versao: number }> {
   const { data, error } = await db().rpc('salvar_valor_oficio_pedido', {
     p_id: id,

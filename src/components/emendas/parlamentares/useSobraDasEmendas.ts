@@ -16,7 +16,7 @@ const SEM_EMENDAS: EmendaSiop[] = [];
 export function useSobraDasEmendas(pedidos: PedidoEmenda[], itens: Map<string, ItemCaep>, notas: Map<string, NotaDaLinha>, ano: number | readonly number[]) {
   const { precos } = usePrecosParaEmenda();
   const { data: portal = SEM_PORTAL } = useExecucaoEmendas();
-  // Valor da emenda no SIOP: o da emenda registrada (migration 231).
+  // Valor da emenda no SIOP: o da emenda registrada (migration 232).
   const { data: registradas = SEM_EMENDAS } = useEmendasSiop();
   const minimo = useMemo(() => menorPrecoDisponivel(itens, reservadoPorItem(pedidos), precos), [itens, pedidos, precos]);
   // Um ano (Parlamentares: o corrente) ou vários (Emendas: os anos das emendas da lista).

@@ -208,7 +208,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const [valor, setValor] = useState(pedido.siopValor != null ? pedido.siopValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
   const { precos } = usePrecosParaEmenda();
   const [gnd, setGnd] = useState(pedido.siopGnd ?? 'GND-4');
-  // Migration 231: o valor da emenda fica na emenda registrada; o pedido guarda o valor do seu ofício.
+  // Migration 232: o valor da emenda fica na emenda registrada; o pedido guarda o valor do seu ofício.
   const valorBR = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const [valorOficio, setValorOficio] = useState(pedido.oficioValor != null ? valorBR(pedido.oficioValor) : '');
   const [seiOficio, setSeiOficio] = useState(pedido.oficioValorDocumentoSei ?? pedido.oficioDocumentoSei ?? '');
