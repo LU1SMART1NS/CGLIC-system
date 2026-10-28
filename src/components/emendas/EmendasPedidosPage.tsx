@@ -311,12 +311,12 @@ export const EmendasPedidosPage: React.FC = () => {
         return (
           <>
             {mostradas.map((x) => (
-              <div key={x.id} style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', minWidth: 0 }}>
+              <div key={x.id} style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', minWidth: 0, maxWidth: '32rem' }}>
                 <span style={{ ...carteiraNumero, fontWeight: 700, color: '#64748b', minWidth: '2.2em', textAlign: 'right' }}>{x.quantidade}×</span>
-                <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{x.nome}</span>
+                <span title={x.nome} style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: '1 1 auto' }}>{x.nome}</span>
                 {x.kit && <StatusBadge label="Kit" variant="neutral" size="sm" dot={false} />}
                 <span style={{ color: '#64748b' }}>→</span>
-                <span title={x.beneficiarioNome ?? undefined} style={{ fontWeight: 600, color: x.beneficiario ? 'var(--color-primary, #0c326f)' : '#64748b', whiteSpace: 'nowrap' }}>
+                <span title={x.beneficiarioNome ?? undefined} style={{ fontWeight: 600, color: x.beneficiario ? 'var(--color-primary, #0c326f)' : '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '11rem', flex: '0 1 auto' }}>
                   {x.beneficiario ?? 'a definir'}
                 </span>
               </div>
