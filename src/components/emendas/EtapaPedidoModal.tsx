@@ -29,6 +29,7 @@ import { corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from '../../util
 import { QuadroGabinete } from './QuadroGabinete';
 import type { AcaoPedido, ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
 import { curto } from '../../utils/emendasKits';
+import { lerValorBR, mascaraProcessoSei, mascaraValorBR, processoSeiValido } from '../../utils/mascaras';
 
 /**
  * MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa.
@@ -231,7 +232,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const idsDosOutros = [...new Set((conferenciaDaEmenda?.mesmaEmenda ?? []).map((x) => identificacaoDoPedido(x)))];
   const identificacoesDosOutros =
     idsDosOutros.length === 1 && (conferenciaDaEmenda?.mesmaEmenda.length ?? 0) > 1 ? `todos do ${idsDosOutros[0]}` : idsDosOutros.join(', ');
-  const valorDigitado = valor.trim() ? Number(valor.replace(/\./g, '').replace(',', '.')) : null;
+  const valorDigitado = lerValorBR(valor);
   const previsto = valorDoPedido(pedido, itens, precos);
   const deHoje = valorDoPedido(pedido, itens);
   const rodada = rodadaDoPedido(pedido);
@@ -266,7 +267,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   } else if (pedeSei && (numeros.length === 0 || numeros.some((n) => !documentoSeiDaEtapaValido(n)) || (!VARIOS.has(modo) && numeros.length > 1))) {
     pendencias.push(VARIOS.has(modo) ? 'documento SEI (só números, 7 a 10 dígitos; vários: separe por vírgula)' : 'documento SEI (um número, só números, 7 a 10 dígitos)');
   }
-  if (modo === 'OFICIO' && !processoSei.trim()) pendencias.push('processo SEI');
+  if (modo === 'OFICIO' && !processoSeiValido(processoSei)) pendencias.push('processo SEI (17 dígitos)');
   if (modo === 'CGOFI') {
     if (semEnvio.length === 0) pendencias.push('uma solicitação assinada e ainda não enviada (informe a assinatura na linha do tempo)');
     else if (paraEnviar.size === 0) pendencias.push('marcar pelo menos uma solicitação que o despacho leva');
@@ -472,8 +473,10 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
                 label="Processo SEI *"
                 placeholder="08020.000000/2026-00"
                 hint={rodada > 1 ? 'Mesmo processo do ofício devolvido; troque se mudou.' : undefined}
+                inputMode="numeric"
                 value={processoSei}
-                onChange={(e) => setProcessoSei(e.target.value)}
+                onChange={(e) => setProcessoSei(mascaraProcessoSei(e.target.value))}
+                error={processoSei.trim() && !processoSeiValido(processoSei) ? 'O processo tem 17 dígitos (08020.000000/2026-00).' : undefined}
                 data-testid="emendas-etapa-processo"
               />
             )}
@@ -556,7 +559,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
                 onChange={(e) => digitarEmenda(e.target.value)}
                 data-testid="emendas-etapa-emenda"
               />
-              <AppInput label="Valor no SIOP (R$)" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
+              <AppInput label="Valor no SIOP (R$)" inputMode="decimal" placeholder="1.200.000,00" value={valor} onChange={(e) => setValor(mascaraValorBR(e.target.value, valor))} />
               <AppSelect label="GND" value={gnd} onChange={(e) => setGnd(e.target.value)}>
                 <option value="GND-4">GND-4 Investimento</option>
                 <option value="GND-3">GND-3 Custeio</option>

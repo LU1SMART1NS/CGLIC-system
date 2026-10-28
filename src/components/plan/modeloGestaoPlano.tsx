@@ -3,6 +3,7 @@ import type { AcaoGestor, TaskPlanModuleRef } from '../../types';
 import { ACAO_INFO, GRUPO_INFO, type GrupoTarefa } from '../../utils/modeloGestao';
 import { formatDateBR } from '../../services/temporalEngineService';
 import { lerNumeroSei, descreverNumeroSei } from '../../utils/numeroSei';
+import { mascaraProcessoSei } from '../../utils/mascaras';
 import { ActionButton, AppButton, Modal } from '../../design-system';
 import { AppTextarea } from '../../design-system/components/FormFields';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
@@ -351,8 +352,9 @@ export const ModuloDados: React.FC<{
           <input
             id={`proc-${modulo.id}`}
             className="form-input"
+            inputMode="numeric"
             value={processo}
-            onChange={(e) => setProcesso(e.target.value)}
+            onChange={(e) => setProcesso(mascaraProcessoSei(e.target.value))}
             autoFocus
             placeholder="00000.000000/0000-00"
             aria-invalid={processoInvalido}
@@ -369,7 +371,7 @@ export const ModuloDados: React.FC<{
         <ActionButton action="cancelar" type="button" size="sm" onClick={() => setEditando(false)} />
         {processoInvalido && (
           <div role="alert" style={{ flexBasis: '100%', fontSize: '0.75rem', color: 'var(--color-danger-text)' }}>
-            {lido.tipo === 'DOCUMENTO' ? 'Informe o número do processo (00000.000000/0000-00), não de um documento.' : descreverNumeroSei(lido)}
+            Informe o número do processo com os 17 dígitos (00000.000000/0000-00).
           </div>
         )}
       </form>

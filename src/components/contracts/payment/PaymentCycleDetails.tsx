@@ -7,6 +7,7 @@ import { rotuloDoItem } from './checklistPagamento';
 import { numeroDoEmpenho, textoDoPagamento } from './cicloPagamentoShared';
 import { TIPOS_DOCUMENTO_RECEBIDO } from './cicloPagamentoShared';
 import { formatCurrencyInputBR, isoToBR, parseCurrencyInputBR } from './paymentFormUtils';
+import { documentoSeiValido, mascaraDocumentoSei } from '../../../utils/mascaras';
 import { formatCurrencyOrDash, formatCurrency } from '../../../utils/format';
 import { NumeroSeiEtiqueta } from '../../../design-system/components/NumeroSeiEtiqueta';
 
@@ -30,6 +31,7 @@ export const PaymentCycleDocuments: React.FC<{
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!documentoSeiValido(sei)) return setError('Documento SEI: só números, de 7 a 10 dígitos.');
     setSaving(true);
     setError(null);
     try {
@@ -78,7 +80,7 @@ export const PaymentCycleDocuments: React.FC<{
             ))}
           </select>
           <input aria-label="Número do documento" className="form-input" type="text" placeholder="Nº" value={numero} onChange={(e) => setNumero(e.target.value)} />
-          <input aria-label="Id. SEI" className="form-input" type="text" placeholder="Id. SEI *" value={sei} onChange={(e) => setSei(e.target.value)} required />
+          <input aria-label="Id. SEI" className="form-input" type="text" inputMode="numeric" placeholder="Id. SEI *" value={sei} onChange={(e) => setSei(mascaraDocumentoSei(e.target.value))} required />
           <input aria-label="Valor do documento" className="form-input" type="text" inputMode="numeric" placeholder="Valor (R$)" value={valor} onChange={(e) => setValor(formatCurrencyInputBR(e.target.value))} />
           <AppButton type="submit" variant="outline" size="sm" icon={<Plus size={15} />} disabled={saving} isLoading={saving} title="Incluir documento" className="payment-doc-remove">
             <span className="payment-doc-remove__label">Incluir</span>
