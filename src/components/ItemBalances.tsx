@@ -81,7 +81,7 @@ import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
 import { isUnidadeSenasp, quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
 import { useAtaItemSaldos } from '../hooks/useAta';
 import { QuantitativosTab } from './item-balances/QuantitativosTab';
-import { registradoAcimaDoSaldo } from '../utils/registradoAcima';
+import { ataFoiProrrogada, registradoAcimaDoSaldo } from '../utils/registradoAcima';
 import { formatPncpAtaPdfUrl } from '../utils/pncpUtils';
 import { useInteresseGti } from './item-balances/InteresseGti';
 import { EXPLICACAO_GTI, InteresseGtiBotao, InteresseGtiNoTopo } from './gti/InteresseGti';
@@ -827,6 +827,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               pdfDaAta={formatPncpAtaPdfUrl(arp.numeroControlePncpAta)}
               numeroAta={arp.numeroAtaRegistroPreco}
               uasgAta={arp.codigoUnidadeGerenciadora}
+              ataProrrogada={ataFoiProrrogada(arp.dataVigenciaInicial, arp.dataVigenciaFinal)}
               pregaoItem={`${arp.numeroCompra ? `Pregão ${arp.numeroCompra}${arp.anoCompra ? `/${arp.anoCompra}` : ''} · ` : ''}item ${Number(item.numeroItem) || item.numeroItem}`}
               podeInformar={canEditData && !quantitativosNaoCarregaram}
               podeRemanejar={canManageAllocations && !quantitativosNaoCarregaram}

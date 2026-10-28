@@ -14,6 +14,7 @@
  */
 
 import { chaveDaAtaDoTermo, fetchAtasComProrrogacaoSoSaldo } from './termosProrrogacaoService';
+import { fetchDecisoesRegistradoAcima } from './registradoAcimaDecisaoService';
 import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
 import { fetchResumoReajusteAtas, type ResumoReajusteAta } from './reajusteAtasService';
 import { avisosDoReajusteDasAtas } from './reajusteAtasAvisos';
@@ -335,6 +336,8 @@ export function calculateAttentionSummary(params: {
   empenhadoAcima?: EmpenhadoAcima[];
   /** Atas cujo termo de prorrogação cobre só o saldo (migration 222): o aviso "registrado acima" delas sai da fila. */
   atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
+  /** Chaves dos avisos "registrado acima" com decisão do gestor da ata (migration 223): saem da fila. */
+  registradoAcimaDecididos?: ReadonlySet<string>;
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
   const {
@@ -871,6 +874,8 @@ export function calculateAttentionSummary(params: {
     if (!itemKey) continue;
     // Ata prorrogada com termo "só o saldo" (migration 222): o termo explica o excedente; o desconto continua.
     if (params.atasComProrrogacaoSoSaldo?.has(chaveDaAtaDoTermo(numAta, uasgItem))) continue;
+    // Gestor da ata decidiu manter fora do saldo (ou aceitar) (migration 223).
+    if (params.registradoAcimaDecididos?.has(chave)) continue;
     items.push(itemRegistradoAcima(aItem, itemKey, numAta, uasgItem, numItem, chave));
   }
 
@@ -1410,6 +1415,7 @@ export function buildManagementDashboardReadModel(params: {
   empenhadoAcima?: EmpenhadoAcima[];
   reajustesAtas?: ResumoReajusteAta[];
   atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
+  registradoAcimaDecididos?: ReadonlySet<string>;
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1672,6 +1678,7 @@ export function buildManagementDashboardReadModel(params: {
     empenhadoAcima: params.empenhadoAcima,
     reajustesAtas: params.reajustesAtas,
     atasComProrrogacaoSoSaldo: params.atasComProrrogacaoSoSaldo,
+    registradoAcimaDecididos: params.registradoAcimaDecididos,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1747,7 +1754,8 @@ export async function fetchManagementDashboardData(
     ausentesDaFonte,
     empenhadoAcima,
     reajustesAtas,
-    atasComProrrogacaoSoSaldo
+    atasComProrrogacaoSoSaldo,
+    registradoAcimaDecididos
   ] = await Promise.all([
     ler('contratos', 'contratos', cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg), [] as ContractDashboardRecord[]),
     ler('arps', 'atas (ARPs)', cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
@@ -1764,7 +1772,8 @@ export async function fetchManagementDashboardData(
     lerSemUasg('ausentes', 'notas e faturas a conferir', fetchAusentesDaFonte, [] as AusenteDaFonte[]),
     lerSemUasg('empenhadoAcima', 'empenhado acima do contratado', fetchEmpenhadoAcima, [] as EmpenhadoAcima[]),
     lerSemUasg('reajusteAtas', 'reajuste das atas', fetchResumoReajusteAtas, [] as ResumoReajusteAta[]),
-    lerSemUasg('termosProrrogacao', 'termos de prorrogação das atas', fetchAtasComProrrogacaoSoSaldo, new Set<string>())
+    lerSemUasg('termosProrrogacao', 'termos de prorrogação das atas', fetchAtasComProrrogacaoSoSaldo, new Set<string>()),
+    lerSemUasg('decisoesRegistradoAcima', 'decisões do registrado acima do homologado', () => fetchDecisoesRegistradoAcima().then((l) => new Set(l.map((d) => d.chave))), new Set<string>())
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
   const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
@@ -1788,6 +1797,7 @@ export async function fetchManagementDashboardData(
     empenhadoAcima,
     reajustesAtas,
     atasComProrrogacaoSoSaldo,
+    registradoAcimaDecididos,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate
