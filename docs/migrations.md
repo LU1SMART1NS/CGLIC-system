@@ -162,7 +162,7 @@ Situação em 14/10/2026: 126 arquivos, de `20260917000001` a `20261014000124`.
 - **Contratos e gestão:** planos e modelos 5, 12–14, 19, 34, 21b, 23b, 37–44, 64; complexidade 66; gestor e distribuição 69–71, 86; contratos oficiais 72, itens 78, detalhes 93; avisos 46, 101.
 - **Notas de empenho:** 16–18, 51–54, 80–82, 85, 94, 99, 104, 113, 117, 118, 121.
 - **Faturas e OB:** 83, 119, 120, 122, 123.
-- **Ciclo de pagamento e previsão:** 22b, 45, 58, 60–63, 87–90; feriados 59.
+- **Ciclo de pagamento e previsão:** 22b, 45, 58, 60–63, 87–90; feriados 59, importação automática 228.
 - **Alocação e unidades internas:** 4, 6–9, 11, 21, 28, 29, 35; nota → unidade 55, 98; contratado por unidade 103, 110; unidade em uso 108.
 - **Vínculos automáticos:** item ↔ contrato 15, 48–50, 95, 100, 112, 115; nota ↔ item 94 (contrato de um item), 118 (pelo valor), 121 (SIAFI).
 - **Sincronização e cron:** 72, 76, 77, 78, 80, 82, 83, 87, 91, 95, 105, 109, 111, 121, 123.
@@ -194,6 +194,7 @@ Os jobs de sincronização chamam `disparar_sincronizacao(recurso, uasg)`, que a
 | sincronizar-ordens-bancarias-200330 / -200331 | :53 / :57 | ordens bancárias | 83 (134 move a 200330) |
 | vincular-contratos-automaticamente | :55 | `executar_vinculos_automaticos(...,'CRON')` | 95 |
 | limpar-historico-do-cron | domingo 03:00 | apaga o histórico do cron com mais de 7 dias | 77 |
+| garantir-feriados | todo dia 09:13 UTC (06:13 em Brasília) | `garantir_feriados()`: importa os feriados calculados do ano corrente e do seguinte, só no ano sem nenhuma data cadastrada | 228 |
 | plano-automatico | todo dia 10:00 UTC (07:00 em Brasília) | `executar_plano_automatico()`: módulos que entram sozinhos no plano e tarefas que a fonte fecha; cada rodada fica em `plano_automatico_execucoes` | 225 |
 
 Nenhum job foi removido: as migrations 87 e 123 usam `cron.unschedule` só para recriar o próprio job; a 134 só troca horários (`cron.alter_job` pelo nome) e confere no fim que nenhum minuto ficou com dois jobs. O endereço da função e o segredo ficam no Vault, fora das migrations.
