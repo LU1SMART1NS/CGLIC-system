@@ -12,6 +12,8 @@ import type { PrecoPrevisto } from '../services/emendasQuadroService';
 
 /** Dias de reserva sem ofício até o aviso (decisão de 23/10/2026). */
 export const AVISO_SEM_OFICIO_DIAS = 30;
+/** Dias parado na mesma etapa (Ofício a CGOFI) para o aviso de pedido parado. */
+export const AVISO_PARADO_DIAS = 30;
 
 export const ETAPAS: ReadonlyArray<{ etapa: Exclude<EtapaPedido, 'CANCELADO'>; rotulo: string; curto: string; descricao: string }> = [
   { etapa: 'RESERVADO', rotulo: 'Itens reservados', curto: 'Reservados', descricao: 'A CAEP combinou com o parlamentar e separou a quantidade.' },
@@ -236,6 +238,7 @@ export type TipoAviso =
   | 'ataVencendo'
   | 'semNota'
   | 'semBeneficiario'
+  | 'pedidoParado'
   | 'semAutorizacao'
   | 'empenhoAMais'
   | 'empenhoAMenos'
@@ -268,7 +271,8 @@ export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = {
   empenhoAMenos: 10,
   semAutorizacao: 11,
   semNota: 12,
-  semBeneficiario: 13
+  pedidoParado: 13,
+  semBeneficiario: 14
 };
 
 /** Os tipos de aviso do mais grave ao mais leve (ordem de GRAVIDADE_DO_AVISO): trilhos, filtros e cartões percorrem esta lista. */
@@ -289,7 +293,8 @@ export const ROTULO_AVISO: Record<TipoAviso, string> = {
   empenhoAMenos: 'Empenhado a menos',
   semAutorizacao: 'Item sem empenho autorizado',
   semNota: 'Sem nota de empenho',
-  semBeneficiario: 'Item sem beneficiário'
+  semBeneficiario: 'Item sem beneficiário',
+  pedidoParado: `Parado há mais de ${AVISO_PARADO_DIAS} dias na etapa`
 };
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
@@ -432,6 +437,18 @@ export function avisosDoPedido(
       // A linha da primeira solicitação sem envio: o Início mostra esse item na coluna Item · ata.
       linhaId: linhasAtivas(p).find((l) => solicitacaoDaLinha(p, l)?.id === semEnvio[0].id)?.id
     });
+  }
+  // Do ofício ao envio à CGOFI não havia prazo: conta da data em que o pedido entrou na etapa atual.
+  const entrouNaEtapa = { OFICIO: p.oficioEm, CONFERIDO: p.conferidoEm, SOLICITADO: p.solicitadoEm, AUTORIZADO: p.autorizadoEm, CGOFI: p.cgofiEm }[p.etapa as 'OFICIO'];
+  if (entrouNaEtapa) {
+    const dias = diasEntre(entrouNaEtapa.slice(0, 10), hoje);
+    if (dias > AVISO_PARADO_DIAS) {
+      avisos.push({
+        tipo: 'pedidoParado',
+        curto: `${dias} dias parado`,
+        texto: `${dias} dias em "${ROTULO_ETAPA[p.etapa]}" desde ${dataBR(entrouNaEtapa.slice(0, 10))}: cobrar o próximo passo`
+      });
+    }
   }
   if (p.etapa !== 'CANCELADO' && !jaEmpenhado(p.etapa)) {
     const sem = linhasAtivas(p).filter((l) => !l.beneficiarioId);
@@ -1147,7 +1164,7 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
 
   // 5) Avisos das atas e do pedido (os mesmos da lista), menos os que já viraram tarefa acima.
   for (const a of avisosDoPedido(p, itens, hoje, notas)) {
-    if (a.tipo === 'semNota' || a.tipo === 'semAutorizacao' || a.tipo === 'semEnvioCgofi' || a.tipo === 'semBeneficiario') continue;
+    if (a.tipo === 'semNota' || a.tipo === 'semAutorizacao' || a.tipo === 'semEnvioCgofi' || a.tipo === 'semBeneficiario' || a.tipo === 'pedidoParado') continue;
     t.push({ chave: `aviso-${a.tipo}`, titulo: a.curto, detalhe: a.texto, tom: 'atencao' });
   }
   // Depois do empenho a ata ainda importa: o contrato precisa estar assinado antes do fim.
