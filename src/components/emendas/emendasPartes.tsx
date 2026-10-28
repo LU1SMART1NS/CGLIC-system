@@ -4,7 +4,7 @@ import { buildAtaItemPath, buildAtaPath } from '../../hooks/useAta';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { SummaryBar } from '../../design-system/components/SummaryBar';
 import { InfoHint } from '../../design-system/components/InfoHint';
-import { carteiraDescricaoItem, carteiraDetalhe, carteiraFornecedor, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
+import { carteiraDescricaoItem, carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
@@ -12,7 +12,7 @@ import { AUTOR_A_DEFINIR, chaveDoContratoDaEmenda, ORDEM_SITUACAO_LINHA, ROTULO_
 import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { formatCurrency } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import { formatarCnpj, localDoBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido, type NotaDaLinha } from '../../services/emendasService';
+import { formatarCnpj, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido, type NotaDaLinha } from '../../services/emendasService';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
@@ -152,25 +152,13 @@ export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigl
   </div>
 );
 
-/** Embaixo do nome, na linha da emenda: a razão social do CNPJ vinculado e a cidade - UF (aqui não há coluna de entrega). */
-export const RazaoELocal: React.FC<{ b: Pick<BeneficiarioEmenda, 'razaoSocial' | 'entregaMunicipio' | 'entregaUf'> }> = ({ b }) => {
-  const local = localDoBeneficiario(b);
-  return (
-    <>
-      {b.razaoSocial && <div style={carteiraFornecedor}>{b.razaoSocial}</div>}
-      {local && <div style={carteiraDetalhe}>{local}</div>}
-    </>
-  );
-};
-
-/** Beneficiário da linha: o nome com a sigla e embaixo a razão social (migration 166). */
+/** Beneficiário da linha: só o nome com a sigla; razão social e cidade ficam no cadastro e na coluna Entrega (decisão de 28/10/2026). */
 export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficiarioId'>; beneficiarios: Map<string, BeneficiarioEmenda> }> = ({ linha, beneficiarios }) => {
   const b = linha.beneficiarioId ? beneficiarios.get(linha.beneficiarioId) : undefined;
   if (b) {
     return (
       <>
         <NomeComSigla b={b} />
-        <RazaoELocal b={b} />
         {!b.cnpj && <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />}
       </>
     );

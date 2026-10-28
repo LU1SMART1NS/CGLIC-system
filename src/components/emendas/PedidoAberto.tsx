@@ -276,7 +276,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
                   data={g.linhas}
                   keyExtractor={(l) => l.id}
                   columns={colunas}
-                  className="emendas-tabela-topo"
+                  className="data-table-container--flush emendas-tabela-topo"
                   // Vindo do Item 360: a linha do item fica com o azul claro de seleção (não é aviso, então não é amarelo).
                   rowStyle={(l) => (temItem(l) ? { background: 'var(--primary-light)' } : undefined)}
                 />
