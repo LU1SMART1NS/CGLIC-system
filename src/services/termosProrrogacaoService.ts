@@ -40,3 +40,17 @@ export async function fetchTermosDeProrrogacao(numeroAta: string, uasg: string):
     url: urlDoDocumentoDaAta(r.numero_controle_pncp, Number(r.documento_pncp_sequencial))
   }));
 }
+
+/** Chave "número da ata-UASG" das atas cujo termo de prorrogação cobre só o saldo não contratado. */
+export const chaveDaAtaDoTermo = (numeroAta: string, uasg: string) => `${numeroAta}-${uasg}`;
+
+/**
+ * Atas prorrogadas cujo termo aditivo diz que a prorrogação cobre só o saldo não contratado: o aviso "registrado
+ * acima do homologado" delas já está explicado pelo termo e sai da fila do Painel (o desconto continua).
+ */
+export async function fetchAtasComProrrogacaoSoSaldo(): Promise<Set<string>> {
+  if (!supabase) return new Set();
+  const { data, error } = await supabase.from('v_ata_termos_prorrogacao').select('numero_ata, codigo_uasg').eq('cobertura', 'SALDO');
+  if (error) throw error;
+  return new Set((data ?? []).map((r: any) => chaveDaAtaDoTermo(String(r.numero_ata), String(r.codigo_uasg))));
+}

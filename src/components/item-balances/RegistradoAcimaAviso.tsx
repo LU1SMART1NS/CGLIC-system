@@ -30,8 +30,8 @@ export interface RegistradoAcimaAvisoProps {
 const dataBR = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '');
 
 /**
- * O que o termo de prorrogação publicado no PNCP diz sobre o saldo. Em 27/10/2026 quase todo aviso aberto era de ata
- * prorrogada, e os termos dizem que o 2º ano cobre só o saldo não contratado.
+ * O que o termo de prorrogação publicado no PNCP diz sobre o saldo, no quadro do aviso (termo que renova ou que não deu
+ * para ler). Com o termo "só o saldo" o aviso vira uma linha discreta (decisão do usuário em 27/10/2026).
  */
 export const TermoDaProrrogacao: React.FC<{ termo: TermoDeProrrogacao }> = ({ termo: t }) => (
   <div data-testid="registrado-acima-termo" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.5rem 0.7rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -93,8 +93,21 @@ export const RegistradoAcimaAviso: React.FC<RegistradoAcimaAvisoProps> = (p) => 
     );
   }
 
-  const acima = a.ataAssinadaInformada ? orgaosAcimaDaAtaAssinada(q.orgaos, q.gerenciadoParticipantes) : [];
+  // Enquanto lê os termos, não pisca o quadro vermelho de uma ata que vai virar linha discreta.
+  if (termos.isLoading) return null;
   const termo = termos.data?.[0] ?? null;
+  // Ata prorrogada com termo "só o saldo" (migration 222): o termo explica o excedente; só uma linha, o desconto continua.
+  if (termo?.cobertura === 'SALDO') {
+    return (
+      <div data-testid="registrado-acima-explicado" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', border: '1px dashed var(--border)', borderRadius: '8px', padding: '0.5rem 0.75rem', fontVariantNumeric: 'tabular-nums' }}>
+        <b>Registrado acima do homologado por causa da prorrogação.</b> O Compras.gov.br registra {formatNumber(a.excedente)} acima do homologado
+        ({formatNumber(a.somaRegistrado)} × {formatNumber(a.homologado)}). O termo aditivo{termo.publicadoEm ? ` de ${dataBR(termo.publicadoEm)}` : ''} cobre só o saldo não contratado:{' '}
+        {a.desconto > 0 ? `${formatNumber(a.desconto)} da SENASP ${a.desconto === 1 ? 'fica' : 'ficam'} fora do saldo.` : 'o saldo da SENASP não muda.'}
+        {termo.url && <> <a href={termo.url} target="_blank" rel="noopener noreferrer" data-testid="registrado-acima-explicado-link">Abrir o termo ↗</a></>}
+      </div>
+    );
+  }
+  const acima = a.ataAssinadaInformada ? orgaosAcimaDaAtaAssinada(q.orgaos, q.gerenciadoParticipantes) : [];
   const participantes = a.excedente - a.excedenteSenasp;
   const baseComDesconto = p.baseSemDesconto - a.desconto;
 

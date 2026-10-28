@@ -60,6 +60,13 @@ describe('Início — registrado acima do homologado', () => {
     expect(a.description).toContain('60.800 na SENASP (provisório: ata assinada não informada) fora do saldo');
   });
 
+  it('ata prorrogada com termo "só o saldo" (migration 222): sai da fila; sem o termo, continua', () => {
+    const comTermo = calculateAttentionSummary({ arpItems: [acima()], atasComProrrogacaoSoSaldo: new Set(['00065/2024-200331']), currentDate: new Date('2026-10-16T12:00:00') } as any);
+    expect(comTermo.items.filter((i) => i.category === 'REGISTRADO_ACIMA')).toEqual([]);
+    const outraAta = calculateAttentionSummary({ arpItems: [acima()], atasComProrrogacaoSoSaldo: new Set(['00059/2025-200331']), currentDate: new Date('2026-10-16T12:00:00') } as any);
+    expect(outraAta.items.filter((i) => i.category === 'REGISTRADO_ACIMA')).toHaveLength(1);
+  });
+
   it('item sem excedente não gera aviso; o aviso de quantitativos não repete a soma acima', () => {
     expect(avisos([acima({ registrado_acima_chave: null })])).toEqual([]);
     expect(motivosDosQuantitativos(acima())).toEqual([]);
