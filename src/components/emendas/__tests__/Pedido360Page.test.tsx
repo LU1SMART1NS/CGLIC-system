@@ -127,7 +127,9 @@ describe('Pedido 360: endereço e número do pedido (migration 217)', () => {
     expect(html).toContain('pedido-360-abrir-emenda');
     expect(html).not.toContain('instrument-360-origin');
     const blocos = render('/emendas/pedidos/id/blocos');
-    expect(blocos).toContain('3 itens em 2 atas: 11 Carabina, 5 Mira.');
+    const resumo = blocos.match(/data-testid="pedido-360-resumo-itens">(.*?)<\/span><\/div>/)?.[1].replace(/<!-- -->|<[^>]*>/g, '');
+    expect(resumo).toBe('3 itens em 2 atas · 11× Carabina · 5× Mira');
+    expect(blocos).not.toContain('pedido-360-mais-itens');
     expect(render('/emendas/pedidos/id/p1')).toContain('próximo: conferir com o SIOP');
     expect(render('/emendas/pedidos/id/dev')).toContain('próximo: registrar a 2ª minuta');
   });

@@ -152,6 +152,21 @@ export const Emenda360Page: React.FC = () => {
   const primeiroPedido = daEmenda.filter((p) => p.origem !== 'PLANILHA').map((p) => p.reservadoEm).sort()[0] ?? null;
   const situacao = e.situacao === 'COM_PEDIDO' && e.pedidos.length > 1 ? `${e.pedidos.length} pedidos` : ROTULO_SITUACAO_EMENDA[e.situacao];
   const tipo = autor?.tipo === 'BANCADA' ? 'de bancada' : 'individual';
+  // Quem a emenda atende pelos pedidos (sigla, como nas listas): a emenda que só existe num pedido não tem o
+  // beneficiário do SIOP, e o pé dizia "Não informado" mesmo com o pedido indicando para quem vai.
+  const ativosDaEmenda = daEmenda.filter((p) => p.etapa !== 'CANCELADO');
+  const atendidos = [
+    ...new Set(
+      ativosDaEmenda
+        .flatMap((p) => linhasAtivas(p).map((l) => (l.beneficiarioId ? beneficiarios.get(l.beneficiarioId) : undefined)))
+        .filter((b): b is NonNullable<typeof b> => Boolean(b))
+        .map((b) => b.sigla?.trim() || b.nome)
+    )
+  ];
+  const paraQuem = atendidos.length ? `${atendidos.slice(0, 2).join(' e ')}${atendidos.length > 2 ? ` e mais ${atendidos.length - 2}` : ''}` : null;
+  const pagaOs = ativosDaEmenda.length
+    ? `Paga ${ativosDaEmenda.length === 1 ? `o ${nomeDoPedido(ativosDaEmenda[0])}` : `${ativosDaEmenda.length} pedidos (${ativosDaEmenda.map((p) => nomeDoPedido(p)).join(', ')})`}${paraQuem ? ` · para ${paraQuem}` : ''}`
+    : null;
   const alerta = e.urgente ? `${e.diasSemContato} dias sem contato` : sobra?.situacao === 'acima' ? 'Empenhado acima do valor' : undefined;
 
   // Notas da emenda: as ligadas às linhas dos pedidos (uma vez cada) e as que o sistema achou sem pedido.
@@ -243,8 +258,9 @@ export const Emenda360Page: React.FC = () => {
               </>
             ) : undefined
           }
-          title={`Emenda ${numeroDaEmenda(e.numero)}`}
-          eyebrow={[e.ano ? `Emenda ${e.ano}` : 'Ano não informado', e.gnd, tipo].filter(Boolean).join(' · ')}
+          // O ano vai no título ("Emenda 2210 0013 / 2026"): a linha de cima só com o tipo e o GND, sem repetir "Emenda".
+          title={`Emenda ${numeroDaEmenda(e.numero)}${e.ano ? ` / ${e.ano}` : ''}`}
+          eyebrow={[tipo === 'individual' ? 'Individual' : 'Bancada', e.gnd, e.ano ? null : 'ano a informar'].filter(Boolean).join(' · ')}
           status={{ faixa: 'REGULAR', label: situacao, neutral: true }}
           statusAlert={alerta}
           dockAlert={alerta}
@@ -266,7 +282,7 @@ export const Emenda360Page: React.FC = () => {
               {autor && <span>{linhaDoAutor(autor)}</span>}
             </span>
           }
-          objeto={registrada?.objeto ? `Objeto no SIOP: ${registrada.objeto}` : registrada ? undefined : 'Nº conferido no SIOP pelo pedido: a emenda não foi registrada a partir do SIOP.'}
+          objeto={registrada?.objeto ? `Objeto no SIOP: ${registrada.objeto}` : (pagaOs ?? undefined)}
           manager={
             registrada?.criadoPorNome ? (
               <div>
@@ -284,9 +300,11 @@ export const Emenda360Page: React.FC = () => {
           identifiersTestId="emenda-360-identificadores"
           identifiers={[
             { label: 'Nº SIOP', value: e.numero },
-            { label: 'Ano', value: e.ano ? String(e.ano) : undefined },
-            { label: 'GND', value: e.gnd ?? undefined },
-            { label: 'Beneficiário', value: beneficiario ? nomeESigla(beneficiario) : undefined }
+            ...(beneficiario
+              ? [{ label: 'Beneficiário', value: nomeESigla(beneficiario) }]
+              : atendidos.length
+                ? [{ label: atendidos.length === 1 ? 'Beneficiário' : 'Beneficiários', value: atendidos.join(', ') }]
+                : [])
           ]}
         >
           <div data-testid="emenda-360-indicadores">
