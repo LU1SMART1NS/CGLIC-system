@@ -166,6 +166,19 @@ describe('reserva para um órgão (parlamentar a definir)', () => {
   });
 });
 
+describe('aviso de pedido parado em etapa', () => {
+  it('amarelo, conta da entrada na etapa atual e só de Ofício a CGOFI', () => {
+    const l = [linha({ beneficiarioId: 'b1' })];
+    const parado = (extra: Partial<PedidoEmenda>) => avisosDoPedido(pedido({ linhas: l, ...extra }), itens, HOJE).find((x) => x.tipo === 'pedidoParado');
+    const a = parado({ etapa: 'SOLICITADO', solicitadoEm: '2026-09-01' });
+    expect(a?.curto).toBe('52 dias parado');
+    expect(a && avisoGrave(a)).toBe(false);
+    expect(parado({ etapa: 'SOLICITADO', solicitadoEm: '2026-10-20' })).toBeUndefined();
+    expect(parado({ etapa: 'EMPENHADO', empenhadoEm: '2026-01-01' })).toBeUndefined();
+    expect(parado({ etapa: 'CGOFI', cgofiEm: null })).toBeUndefined();
+  });
+});
+
 describe('aviso de item sem beneficiário', () => {
   it('amarelo, conta só linhas ativas e some depois do empenho ou do cancelamento', () => {
     const l = [linha({}), linha({}), linha({ beneficiarioId: 'b1' }), linha({ cancelada: true })];
