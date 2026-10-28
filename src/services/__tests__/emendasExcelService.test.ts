@@ -37,4 +37,14 @@ describe('Excel de Emendas › Itens: itens e kits com saldo', () => {
     expect(ws.getCell(3, 3).value).toBe('Item 00001');
     expect(wb.getWorksheet('Kits com saldo')!.getCell(3, 1).value).toBe('Kit bom');
   });
+
+  it('só as colunas escolhidas, e aba sem colunas fica de fora', () => {
+    const itensSaldo = montarLinhasItensCaep(ITENS, [], undefined, null, FATIAS);
+    const kitsSaldo = montarLinhasKitsCaep(KITS, ITENS, HOJE, new Map([['a', 40]]), undefined);
+    const [itens, ...resto] = planilhasDeSaldo(itensSaldo, kitsSaldo, HOJE, { itens: ['saldo', 'ata'], kits: [] });
+    expect(resto).toEqual([]);
+    // Na ordem do cadastro das colunas, não na ordem do clique.
+    expect(itens.colunas.map((c) => c.titulo)).toEqual(['Ata', 'Saldo']);
+    expect(itens.linhas).toEqual([['00031/2025', 100]]);
+  });
 });
