@@ -2,7 +2,7 @@ import React from 'react';
 import { StatusBadge } from '../../../design-system/components/StatusBadge';
 import { ActionButton } from '../../../design-system/components/ActionButton';
 import { carteiraDetalhe } from '../../carteira/carteiraStyles';
-import { formatCurrency } from '../../../utils/format';
+import { formatCurrency, formatDateBR } from '../../../utils/format';
 import { ROTULO_SITUACAO_SOBRA, type SobraDaEmenda } from '../../../utils/emendasSobra';
 import { hojeEmBrasilia } from '../../../hooks/useEmendas';
 import { VARIANTE_SOBRA } from './sobraVisual';
@@ -51,13 +51,18 @@ export const SobraDaEmendaCartao: React.FC<{ e: SobraDaEmenda; minimo: number | 
     <div className="emendas-sobra-emenda__valores">
       <span>
         Valor no SIOP <b>{e.valor == null ? '—' : formatCurrency(e.valor)}</b>
+        {e.valorLidoEm && <> (lido em {formatDateBR(e.valorLidoEm)})</>}
+      </span>
+      <span>
+        Ofícios <b>{formatCurrency(e.oficiado)}</b>
+        {e.oficiosAInformar > 0 && <> ({e.oficiosAInformar === 1 ? '1 a informar' : `${e.oficiosAInformar} a informar`})</>}
       </span>
       <span>
         Empenhado <b>{formatCurrency(e.empenhado)}</b> {e.fonteDoEmpenhado === 'PORTAL' ? '(notas da SENASP no Portal da Transparência)' : '(notas ligadas no sistema)'}
       </span>
       {!encerrado && (
         <span>
-          Em andamento <b>{formatCurrency(e.emAndamento)}</b>
+          {e.oficiosAInformar === 0 ? 'Falta empenhar' : 'Em andamento'} <b>{formatCurrency(e.emAndamento)}</b>
         </span>
       )}
       <span>
@@ -75,7 +80,18 @@ export const SobraDaEmendaCartao: React.FC<{ e: SobraDaEmenda; minimo: number | 
         {e.linhasSemNota === 1 ? '1 item empenhado ainda sem nota ligada' : `${e.linhasSemNota} itens empenhados ainda sem nota ligada`}: {encerrado ? 'o não empenhado' : 'a sobra'} pelas notas do sistema não é confiável. As notas da emenda ainda não foram lidas no Portal da Transparência.
       </div>
     )}
-    {e.situacao === 'acima' && <div style={carteiraDetalhe}>O empenhado passa do valor no SIOP: confira o valor da emenda no pedido ou a nota ligada.</div>}
+    {e.situacao === 'informar' && (
+      <div style={carteiraDetalhe}>
+        {e.oficiosAInformar === 1 ? '1 pedido conferido sem o valor do ofício' : `${e.oficiosAInformar} pedidos conferidos sem o valor do ofício`}: informe no pedido para a sobra sair pela diferença entre a emenda e os ofícios.
+      </div>
+    )}
+    {e.situacao === 'acima' && (
+      <div style={carteiraDetalhe}>
+        {e.valor != null && e.oficiado - e.valor > 0.004
+          ? 'Os ofícios somam mais que o valor da emenda no SIOP: confira se o SIOP diminuiu ou se um ofício substitui o outro.'
+          : 'O empenhado passa do valor no SIOP: confira o valor da emenda ou a nota ligada.'}
+      </div>
+    )}
     {e.situacao === 'semValor' && <div style={carteiraDetalhe}>Sem o valor da emenda: ele é informado na conferência com o SIOP.</div>}
     {e.situacao === 'executada' && !encerrado && e.sobra > 0.004 && minimo != null && <div style={carteiraDetalhe}>A sobra não compra nem o item mais barato da CAEP ({formatCurrency(minimo)}).</div>}
   </div>

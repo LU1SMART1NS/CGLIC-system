@@ -276,11 +276,11 @@ export const ValorPrevisto: React.FC<{ previsto: number; hoje: number; nota?: st
   </span>
 );
 
-/** Valor do pedido: o da emenda no SIOP depois da conferência; antes, o previsto pelos itens (ver valorDoPedidoNaEtapa). */
-export const ValorDoPedido: React.FC<{ valor: number; fonte: 'EMENDA' | 'PREVISTO' }> = ({ valor, fonte }) => (
-  <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }} title={fonte === 'EMENDA' ? 'Valor da emenda no SIOP' : 'Previsto pelos itens, com o reajuste das atas (o mesmo do quadro do parlamentar)'}>
+/** Valor do pedido: o do ofício depois de informado; antes, o previsto pelos itens (ver valorDoPedidoNaEtapa). */
+export const ValorDoPedido: React.FC<{ valor: number; fonte: 'OFICIO' | 'PREVISTO' }> = ({ valor, fonte }) => (
+  <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }} title={fonte === 'OFICIO' ? 'Valor pedido no ofício do parlamentar' : 'Previsto pelos itens, com o reajuste das atas (o mesmo do quadro do parlamentar)'}>
     <span style={carteiraNumero}>{formatCurrency(valor)}</span>
-    <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{fonte === 'EMENDA' ? 'da emenda' : 'previsto'}</span>
+    <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{fonte === 'OFICIO' ? 'do ofício' : 'previsto'}</span>
   </span>
 );
 

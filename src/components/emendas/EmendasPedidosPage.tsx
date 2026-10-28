@@ -79,7 +79,7 @@ const SEM_NOTAS = new Map<string, NotaDaLinha>();
 type Segmento = 'todos' | FasePedido | 'CANCELADO';
 /** Filtro de etapa dentro da fase; na Contratação, o passo pelo contrato e pela execução das notas (passoNaContratacao). */
 type FiltroEtapa = '' | Exclude<EtapaPedido, 'CANCELADO' | 'CONTRATACAO'> | PassoNaContratacao;
-type Linha = PedidoEmenda & { valor: number; fonteDoValor: 'EMENDA' | 'PREVISTO'; avisos: AvisoPedido[]; captacao: ReturnType<typeof fatiasDaCaptacao> };
+type Linha = PedidoEmenda & { valor: number; fonteDoValor: 'OFICIO' | 'PREVISTO'; avisos: AvisoPedido[]; captacao: ReturnType<typeof fatiasDaCaptacao> };
 
 const POR_PAGINA = 25;
 /** Filtro de aviso da lista: um tipo, 'com' (qualquer aviso) ou 'grave' (só os vermelhos, como no cartão do Início). */

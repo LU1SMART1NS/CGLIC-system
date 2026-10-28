@@ -300,7 +300,7 @@ export const Parlamentar360Page: React.FC = () => {
                     ? 'escolha um ano para ver a sobra'
                     : filtroAno === ANO_SEM
                       ? 'informe o ano no pedido'
-                      : encerrado && (sobra?.situacao === 'conferir' || sobra?.situacao === 'acima')
+                      : encerrado && (sobra?.situacao === 'conferir' || sobra?.situacao === 'informar' || sobra?.situacao === 'acima')
                         ? ROTULO_SITUACAO_SOBRA[sobra.situacao]
                         : encerrado
                           ? `crédito perdido em 31/12/${filtroAno}`

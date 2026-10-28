@@ -71,11 +71,12 @@ describe('pedidos das emendas', () => {
     expect(calcularKit({ ativo: true, itens: kit.kitComposicao! }, itens, HOJE, (i) => i.alocado, precos)).toMatchObject({ valorPorKit: 124.02, valorPorKitHoje: 120 });
   });
 
-  it('valor do pedido nas telas: o da emenda depois da conferência; antes, o previsto', () => {
+  it('valor do pedido nas telas: o do ofício depois de informado; antes, o previsto (migration 232)', () => {
     const precos = new Map<string, PrecoPrevisto>([['a', { itemKey: 'a', precoAtual: 100, precoPrevisto: 110, motivo: 'DEVIDO', devido: true, efeito: null, percentual: 10, mesesEstimados: null }]]);
     const p = pedido({ linhas: [linha({ itemKey: 'a', quantidade: 3 })] });
     expect(valorDoPedidoNaEtapa(p, itens, precos)).toEqual({ valor: 330, fonte: 'PREVISTO' });
-    expect(valorDoPedidoNaEtapa({ ...p, etapa: 'CONFERIDO', siopValor: 320 }, itens, precos)).toEqual({ valor: 320, fonte: 'EMENDA' });
+    expect(valorDoPedidoNaEtapa({ ...p, etapa: 'CONFERIDO', siopValor: 320 }, itens, precos)).toEqual({ valor: 330, fonte: 'PREVISTO' });
+    expect(valorDoPedidoNaEtapa({ ...p, etapa: 'CONFERIDO', siopValor: 320, oficioValor: 300 }, itens, precos)).toEqual({ valor: 300, fonte: 'OFICIO' });
   });
 
   it('valor pelo preço da ata', () => {

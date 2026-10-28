@@ -196,11 +196,12 @@ export const textoDoPreco = (previsto: number, hoje: number, unidade = ''): stri
   Math.abs(previsto - hoje) > 0.004 ? `${formatCurrency(previsto)}${unidade} previsto (hoje ${formatCurrency(hoje)})` : `${formatCurrency(previsto)}${unidade}`;
 
 /**
- * O valor que as telas mostram do pedido: o da emenda no SIOP, quando já foi conferida; antes disso, o previsto pelos
- * itens. O empenhado das notas não entra: a nota inteira pode ter outros itens da mesma emenda.
+ * O valor que as telas mostram do pedido: o do ofício do parlamentar, quando já foi informado (migration 232; o valor da
+ * emenda inteira fica na emenda); antes disso, o previsto pelos itens. O empenhado das notas não entra: a nota inteira
+ * pode ter outros itens da mesma emenda.
  */
-export function valorDoPedidoNaEtapa(p: PedidoEmenda, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): { valor: number; fonte: 'EMENDA' | 'PREVISTO' } {
-  if (p.siopValor != null && p.etapa !== 'CANCELADO') return { valor: p.siopValor, fonte: 'EMENDA' };
+export function valorDoPedidoNaEtapa(p: PedidoEmenda, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): { valor: number; fonte: 'OFICIO' | 'PREVISTO' } {
+  if (p.oficioValor != null && p.etapa !== 'CANCELADO') return { valor: p.oficioValor, fonte: 'OFICIO' };
   return { valor: valorDoPedido(p, itens, precos), fonte: 'PREVISTO' };
 }
 

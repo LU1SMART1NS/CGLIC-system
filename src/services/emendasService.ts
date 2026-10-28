@@ -594,8 +594,14 @@ export interface PedidoEmenda {
   siopEmenda: string | null;
   /** Ano da emenda: o número se repete entre anos (migration 186). */
   siopEmendaAno: number | null;
+  /** Valor visto na conferência (histórico, migration 232). O valor da emenda que vale está em EmendaSiop. */
   siopValor: number | null;
   siopGnd: string | null;
+  /** Valor pedido no ofício do parlamentar (com retificador, o do retificador). Nulo = a informar (migration 232). */
+  oficioValor?: number | null;
+  /** Documento SEI do ofício (ou do retificador) que deu o valor. */
+  oficioValorDocumentoSei?: string | null;
+  oficioValorRetificador?: boolean;
   conferidoEm: string | null;
   /** Solicitação de empenho (CAEP → DGFNSP). */
   solicitadoEm: string | null;
@@ -827,6 +833,9 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       siopEmendaAno: p.siop_emenda_ano ?? null,
       siopValor: p.siop_valor == null ? null : num(p.siop_valor),
       siopGnd: p.siop_gnd ?? null,
+      oficioValor: p.oficio_valor == null ? null : num(p.oficio_valor),
+      oficioValorDocumentoSei: p.oficio_valor_documento_sei ?? null,
+      oficioValorRetificador: p.oficio_valor_retificador === true,
       conferidoEm: p.conferido_em ?? null,
       solicitadoEm: p.solicitado_em ?? null,
       solicitadoDocumentoSei: p.solicitado_documento_sei ?? null,
@@ -1436,6 +1445,17 @@ export async function salvarEmendaSiop(e: EmendaParaSalvar): Promise<{ id: strin
       vista_em: e.vistaEm,
       observacao: e.observacao
     }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/** Valor do ofício depois da conferência: o que estava a informar, ou o retificador que mudou o valor (migration 232). */
+export async function salvarValorOficioPedido(id: string, versao: number, v: { valor: number; documentoSei: string; retificador: boolean }): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('salvar_valor_oficio_pedido', {
+    p_id: id,
+    p_versao: versao,
+    p: { valor: v.valor, documento_sei: v.documentoSei, retificador: v.retificador }
   });
   if (error) throw new Error(mensagemDoBanco(error));
   return data as { id: string; versao: number };

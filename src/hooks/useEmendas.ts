@@ -39,6 +39,7 @@ import {
   fetchAsparDosOrgaos,
   salvarEmendaSiop,
   apagarEmendaSiop,
+  salvarValorOficioPedido,
   registrarContatoEmenda,
   salvarAsparEmenda,
   type AcaoPedido,
@@ -315,6 +316,16 @@ export function useAsparDosOrgaos() {
 export function useSalvarEmendaSiop() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: salvarEmendaSiop, retry: 0, onSettled: invalidar });
+}
+
+export function useSalvarValorOficio() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({
+    mutationFn: (v: { id: string; versao: number; valor: number; documentoSei: string; retificador: boolean }) =>
+      salvarValorOficioPedido(v.id, v.versao, { valor: v.valor, documentoSei: v.documentoSei, retificador: v.retificador }),
+    retry: 0,
+    onSettled: invalidar
+  });
 }
 
 export function useApagarEmendaSiop() {
