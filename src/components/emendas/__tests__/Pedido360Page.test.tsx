@@ -130,7 +130,7 @@ describe('Pedido 360: endereço e número do pedido (migration 217)', () => {
     const resumo = blocos.match(/data-testid="pedido-360-resumo-itens">(.*?)<\/span><\/div>/)?.[1].replace(/<!-- -->|<[^>]*>/g, '');
     expect(resumo).toBe('3 itens em 2 atas · 11× Carabina · 5× Mira');
     expect(blocos).not.toContain('pedido-360-mais-itens');
-    expect(render('/emendas/pedidos/id/p1')).toContain('próximo: conferir com o SIOP');
+    expect(render('/emendas/pedidos/id/p1')).toContain('próximo: conferir o ofício');
     expect(render('/emendas/pedidos/id/dev')).toContain('próximo: registrar a 2ª minuta');
   });
 
@@ -159,7 +159,7 @@ describe('Pedido 360: cartão e Andamento', () => {
     expect(html).toContain('3 de 13');
     expect(html).toContain('pedido360-proxima-p1');
     expect(html).toContain('emendas-pedido-proximo-p1');
-    expect(html).toContain('Conferir com o SIOP');
+    expect(html).toContain('Conferir o ofício');
     expect(html).toMatch(/pedido360-tarefa-conferir" data-estado="COMIGO"/);
     expect(html).toMatch(/pedido360-tarefa-minuta" data-estado="FEITA"/);
     // A etiqueta da ação e os contadores do Plano de gestão das atas.

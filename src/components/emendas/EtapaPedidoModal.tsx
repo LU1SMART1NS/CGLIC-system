@@ -2,34 +2,30 @@ import React, { useState } from 'react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { AppInput, AppSelect, AppTextarea, AppDateInput } from '../../design-system/components/FormFields';
+import { AppInput, AppSelect, AppDateInput } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useEmendasSiop, useInformarSolicitacaoDaAta, usePedidoEmDiaNaTela, usePedidosEmendas, useRegistrarEnvioCgofi } from '../../hooks/useEmendas';
-import { formatCurrency } from '../../utils/format';
+import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useInformarSolicitacaoDaAta, usePedidoEmDiaNaTela, useRegistrarEnvioCgofi } from '../../hooks/useEmendas';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import {
   ataDoItem,
   atasDoPedido,
-  conferirNumeroDaEmenda,
   documentoSeiDaEtapaValido,
   identificacaoDoPedido,
   itensDaLinha,
-  lerNumeroDaEmenda,
   linhasAtivas,
-  numeroDaEmendaEmTexto,
   numerosSei,
   ORDEM_ETAPA,
   rodadaDoPedido,
   solicitacaoDaLinha,
   solicitacoesAssinadasSemEnvio,
-  valorDoPedido,
   type AtaDoPedido
 } from '../../utils/emendasPedidos';
 import { corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from '../../utils/emendasKits';
 import { QuadroGabinete } from './QuadroGabinete';
 import type { AcaoPedido, ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
 import { curto } from '../../utils/emendasKits';
-import { lerValorBR, mascaraProcessoSei, mascaraValorBR, processoSeiValido } from '../../utils/mascaras';
+import { mascaraProcessoSei, processoSeiValido } from '../../utils/mascaras';
+import { precosDaMinuta } from '../../utils/emendasConferenciaOficio';
 
 /**
  * MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa.
@@ -54,22 +50,13 @@ interface Props {
   onClose: () => void;
 }
 
-const PONTOS_SIOP: ReadonlyArray<[string, string]> = [
-  ['numero_emenda', 'Nº da emenda'],
-  ['autor', 'Parlamentar'],
-  ['valor', 'Valor'],
-  ['gnd', 'GND'],
-  ['beneficiario', 'Beneficiário'],
-  ['objeto', 'Objeto']
-];
-
 const MOTIVOS_CANCELAMENTO = ['Parlamentar desistiu', 'Divergência não resolvida', 'Passou do prazo sem ofício', 'Ata vencida sem substituto', 'Outro'];
 
 const TITULO: Record<AcaoDaJanela, string> = {
   MINUTA: 'Registrar a minuta',
   OFICIO: 'Registrar o ofício',
   DIVERGENCIA: 'Ofício com divergência',
-  CONFERIDO: 'Conferir com o SIOP',
+  CONFERIDO: 'Conferir o ofício',
   SOLICITADO: 'Registrar a solicitação de empenho',
   AUTORIZADO: 'Registrar a autorização de empenho',
   CGOFI: 'Registrar o envio à CGOFI',
@@ -100,8 +87,6 @@ const VARIOS: ReadonlySet<AcaoDaJanela> = new Set(['EMPENHADO', 'CONTRATACAO', '
 const ROTULO_DATA: Partial<Record<AcaoDaJanela, string>> = {
   MINUTA: 'Enviada em',
   OFICIO: 'Chegou em',
-  DIVERGENCIA: 'Devolvido em',
-  CONFERIDO: 'Conferido em',
   SOLICITADO: 'Enviada à DGFNSP em',
   AUTORIZADO: 'Assinado pela DGFNSP em',
   CGOFI: 'Enviado em',
@@ -187,67 +172,16 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const [porAta, setPorAta] = useState<Record<string, string>>({});
   const toast = useToast();
   const { data: autores = [] } = useAutoresEmendas();
-  const [modo, setModo] = useState<AcaoDaJanela>(acao);
+  const modo = acao;
   const [data, setData] = useState(hojeEmBrasilia());
   const [documentoSei, setDocumentoSei] = useState('');
   const [processoSei, setProcessoSei] = useState(pedido.oficioProcessoSei ?? '');
-  const [emenda, setEmenda] = useState(pedido.siopEmenda ? numeroDaEmendaEmTexto(pedido.siopEmenda) : '');
-  // O número se repete entre anos (migration 186). Colar o código de 12 dígitos do SIOP preenche o ano.
-  const anoDeHoje = Number(hojeEmBrasilia().slice(0, 4));
-  const [anoEmenda, setAnoEmenda] = useState(pedido.siopEmendaAno ?? anoDeHoje);
-  const anosDaEmenda = [...new Set([...Array.from({ length: 5 }, (_, i) => anoDeHoje - i), anoEmenda])].sort((a, b) => b - a);
-  const digitarEmenda = (texto: string) => {
-    const lido = lerNumeroDaEmenda(texto);
-    if (lido?.ano) {
-      setAnoEmenda(lido.ano);
-      setEmenda(numeroDaEmendaEmTexto(lido.numero));
-    } else setEmenda(texto);
-  };
-  const { data: pedidos = [] } = usePedidosEmendas();
-  // No formato brasileiro (1.234,56): a leitura abaixo tira os pontos de milhar.
-  const [valor, setValor] = useState(pedido.siopValor != null ? pedido.siopValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
   const { precos } = usePrecosParaEmenda();
-  const [gnd, setGnd] = useState(pedido.siopGnd ?? 'GND-4');
-  // Migration 232: o valor da emenda fica na emenda registrada; o pedido guarda o valor do seu ofício.
-  const valorBR = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const [valorOficio, setValorOficio] = useState(pedido.oficioValor != null ? valorBR(pedido.oficioValor) : '');
-  const [seiOficio, setSeiOficio] = useState(pedido.oficioValorDocumentoSei ?? pedido.oficioDocumentoSei ?? '');
-  const [retificador, setRetificador] = useState(pedido.oficioValorRetificador ?? false);
-  const [corrigindoSiop, setCorrigindoSiop] = useState(false);
-  const [pontos, setPontos] = useState<Record<string, boolean>>({});
-  // Pedido criado a partir da emenda registrada (migration 205): a conferência já vem com o nº, o valor e o GND dela.
-  const { data: emendasSiop } = useEmendasSiop();
-  const daEmenda = pedido.emendaId ? emendasSiop?.find((e) => e.id === pedido.emendaId) : undefined;
-  const [preenchido, setPreenchido] = useState(false);
-  // Ajuste durante a renderização (a emenda pode chegar depois de a janela abrir), uma vez só.
-  if (!preenchido && daEmenda && !pedido.siopEmenda) {
-    setPreenchido(true);
-    setEmenda(numeroDaEmendaEmTexto(daEmenda.numero));
-    setAnoEmenda(daEmenda.ano);
-    setValor(daEmenda.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-    setGnd(daEmenda.gnd);
-  }
-  const [divergencia, setDivergencia] = useState(pedido.divergencia ?? '');
   const [motivo, setMotivo] = useState(MOTIVOS_CANCELAMENTO[0]);
   const [outroMotivo, setOutroMotivo] = useState('');
   const [tentou, setTentou] = useState(false);
 
   const linhas = linhasAtivas(pedido);
-  const emendaLida = lerNumeroDaEmenda(emenda);
-  const conferenciaDaEmenda = modo === 'CONFERIDO' && emendaLida ? conferirNumeroDaEmenda(pedido, emendaLida.numero, emendaLida.ano ?? anoEmenda, pedidos) : null;
-  const nomeDe = (autorId: string | null) => autores.find((a) => a.id === autorId)?.nome ?? 'outro parlamentar';
-  // A emenda dividida em vários pedidos do mesmo processo: o processo uma vez só ("todos do Processo …").
-  const idsDosOutros = [...new Set((conferenciaDaEmenda?.mesmaEmenda ?? []).map((x) => identificacaoDoPedido(x)))];
-  const identificacoesDosOutros =
-    idsDosOutros.length === 1 && (conferenciaDaEmenda?.mesmaEmenda.length ?? 0) > 1 ? `todos do ${idsDosOutros[0]}` : idsDosOutros.join(', ');
-  const valorDigitado = lerValorBR(valor);
-  const valorDoOficio = lerValorBR(valorOficio);
-  // Emenda já registrada (lida do SIOP ou de outra conferência): o valor vem dela e só se corrige se o SIOP mudou.
-  const registrada = emendaLida ? emendasSiop?.find((e) => e.numero === emendaLida.numero && e.ano === (emendaLida.ano ?? anoEmenda)) : undefined;
-  const digitaValorDaEmenda = !registrada || corrigindoSiop;
-  const valorDaEmenda = digitaValorDaEmenda ? valorDigitado : registrada.valor;
-  const previsto = valorDoPedido(pedido, itens, precos);
-  const deHoje = valorDoPedido(pedido, itens);
   const rodada = rodadaDoPedido(pedido);
   const numeros = numerosSei(documentoSei);
   const pedeSei = Boolean(ROTULO_SEI[modo]);
@@ -260,8 +194,6 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
         : modo === 'MAIS_CONTRATACAO' && !pedido.contratacaoEm
           ? 'Enviado em'
           : ROTULO_DATA[modo];
-  const semBeneficiario = linhas.filter((l) => !l.beneficiarioId).length;
-  const todosPontos = PONTOS_SIOP.every(([k]) => pontos[k]);
   const ocupado = avancar.isPending || cancelar.isPending || informar.isPending || registrarEnvio.isPending;
   const variasAtas = modo === 'SOLICITADO' && atas.length > 1;
   const numerosPorAta = atas
@@ -294,16 +226,6 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
     if (semEnvio.length === 0) pendencias.push('uma solicitação assinada e ainda não enviada (informe a assinatura na linha do tempo)');
     else if (paraEnviar.size === 0) pendencias.push('marcar pelo menos uma solicitação que o despacho leva');
   }
-  if (modo === 'CONFERIDO') {
-    if (!emenda.trim()) pendencias.push('número da emenda');
-    else if (!emendaLida) pendencias.push('nº da emenda com 8 dígitos (ex.: 4095 0004), ou 12 com o ano na frente');
-    if (digitaValorDaEmenda && !(valorDigitado != null && valorDigitado > 0)) pendencias.push('valor da emenda no SIOP');
-    if (!(valorDoOficio != null && valorDoOficio > 0)) pendencias.push('valor do ofício');
-    if (seiOficio.trim() && !documentoSeiDaEtapaValido(seiOficio.replace(/\D/g, ''))) pendencias.push('documento SEI do ofício (só números, 7 a 10 dígitos)');
-    if (!todosPontos) pendencias.push('marcar os 6 pontos que batem (se algo não bate, use "Ofício com divergência")');
-    if (semBeneficiario) pendencias.push(`beneficiário em ${semBeneficiario === 1 ? 'um item' : `${semBeneficiario} itens`} (use "Alterar itens")`);
-  }
-  if (modo === 'DIVERGENCIA' && !divergencia.trim()) pendencias.push('o que não bate');
   if (modo === 'CANCELAR' && motivo === 'Outro' && !outroMotivo.trim()) pendencias.push('o motivo');
 
   const enviar = async (ev: React.FormEvent) => {
@@ -347,34 +269,15 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
           mais
             ? { etapa: modo.replace('MAIS_', ''), documentos_sei: numeros, ...(rotuloData ? { data } : {}) }
             : modo === 'MINUTA'
-              ? { data }
+              ? // Migration 234: os preços do quadro da minuta, para a conferência do ofício comparar com o ofício.
+                { data, ...(precos ? { precos: precosDaMinuta(pedido, itens, precos) } : {}) }
               : modo === 'OFICIO'
                 ? { data, documento_sei: numeros[0], processo_sei: processoSei.trim() }
-                : modo === 'DIVERGENCIA'
-                  ? { data, texto: divergencia.trim() }
-                  : modo === 'CONFERIDO'
-                    ? {
-                        data,
-                        emenda: emendaLida?.numero,
-                        ano: emendaLida?.ano ?? anoEmenda,
-                        ...(digitaValorDaEmenda ? { valor_emenda: valorDigitado } : {}),
-                        valor_oficio: valorDoOficio,
-                        oficio_valor_documento_sei: seiOficio.replace(/\D/g, '') || null,
-                        oficio_retificador: retificador,
-                        gnd,
-                        conferencia: pontos
-                      }
-                    : VARIOS.has(modo)
-                      ? { data, documentos_sei: numeros }
-                      : { data, documento_sei: numeros[0] };
+                : VARIOS.has(modo)
+                  ? { data, documentos_sei: numeros }
+                  : { data, documento_sei: numeros[0] };
         const gravado = await avancar.mutateAsync({ id: pedido.id, versao: pedido.versao, acao, dados });
-        toast.success(
-          modo === 'DIVERGENCIA'
-            ? `Ofício devolvido. O pedido voltou para a minuta (${rodada + 1}ª). A reserva continua.`
-            : mais
-              ? 'Número SEI acrescentado.'
-              : `${nomeDoAutor}: ${TITULO[modo].replace('Registrar ', '').replace('Conferir com o SIOP', 'conferido no SIOP')}.`
-        );
+        toast.success(mais ? 'Número SEI acrescentado.' : `${nomeDoAutor}: ${TITULO[modo].replace('Registrar ', '')}.`);
         // Gravou, mas a lista não recarregou (banco lento ou fora do ar): avisa em vez de deixar a etapa antiga na tela.
         if (!emDiaNaTela(gravado.id, gravado.versao)) toast.show('Registrado, mas a lista ainda não mostra a mudança. Clique em "Atualizar" no alto da tela.', 'warning');
       }
@@ -389,19 +292,14 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
       isOpen
       onClose={onClose}
       dismissible={!ocupado}
-      size={modo === 'CONFERIDO' ? 'lg' : 'md'}
+      size="md"
       testId="emendas-etapa-modal"
       title={TITULO[modo] + (rodada > 1 && (modo === 'MINUTA' || modo === 'OFICIO') ? ` (${rodada}ª rodada)` : '')}
       footer={
         <>
           <ActionButton action="cancelar" label={modo === 'CANCELAR' ? 'Voltar' : 'Cancelar'} type="button" onClick={onClose} disabled={ocupado} />
-          {modo === 'CONFERIDO' && (
-            <AppButton type="button" variant="ghostDanger" onClick={() => setModo('DIVERGENCIA')} disabled={ocupado}>
-              Ofício com divergência
-            </AppButton>
-          )}
-          <AppButton type="submit" form="emendas-etapa-form" variant={modo === 'CANCELAR' || modo === 'DIVERGENCIA' ? 'danger' : 'primary'} disabled={ocupado} isLoading={ocupado} data-testid="emendas-etapa-salvar">
-            {modo === 'CANCELAR' ? 'Cancelar o pedido' : modo === 'CONFERIDO' ? 'Tudo confere' : modo === 'DIVERGENCIA' ? 'Devolver para a minuta' : modo.startsWith('MAIS_') ? 'Acrescentar' : modo === 'SOLICITACAO_ATA' ? 'Salvar' : 'Registrar'}
+          <AppButton type="submit" form="emendas-etapa-form" variant={modo === 'CANCELAR' ? 'danger' : 'primary'} disabled={ocupado} isLoading={ocupado} data-testid="emendas-etapa-salvar">
+            {modo === 'CANCELAR' ? 'Cancelar o pedido' : modo.startsWith('MAIS_') ? 'Acrescentar' : modo === 'SOLICITACAO_ATA' ? 'Salvar' : 'Registrar'}
           </AppButton>
         </>
       }
@@ -490,7 +388,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
           </>
         )}
 
-        {(pedeSei || rotuloData) && modo !== 'CONFERIDO' && modo !== 'DIVERGENCIA' && (
+        {(pedeSei || rotuloData) && (
           <div style={grade}>
             {pedeSei && !variasAtas && (
               <AppInput
@@ -573,128 +471,6 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
         )}
         {modo === 'EMPENHADO' && <div style={aviso('info')}>As notas de empenho não são digitadas: o sistema acha cada nota pelo contrato e pela emenda.</div>}
         {modo === 'CONTRATACAO' && <div style={aviso('info')}>Ao registrar, o processo segue com a CCGA para a contratação e a CAEP passa a só acompanhar.</div>}
-
-        {modo === 'CONFERIDO' && (
-          <>
-            <div style={grade}>
-              <AppSelect label="Ano da emenda *" value={String(anoEmenda)} onChange={(e) => setAnoEmenda(Number(e.target.value))} data-testid="emendas-etapa-emenda-ano">
-                {anosDaEmenda.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </AppSelect>
-              <AppInput
-                label="Nº da emenda *"
-                placeholder="Ex.: 4095 0004"
-                hint="8 dígitos. Pode colar o código do SIOP com o ano."
-                inputMode="numeric"
-                value={emenda}
-                onChange={(e) => digitarEmenda(e.target.value)}
-                data-testid="emendas-etapa-emenda"
-              />
-              {digitaValorDaEmenda ? (
-                <AppInput
-                  label={registrada ? 'Valor novo da emenda no SIOP (R$) *' : 'Valor da emenda no SIOP (R$) *'}
-                  hint="Só a parte de compra direta pelo MJ."
-                  inputMode="decimal"
-                  placeholder="1.200.000,00"
-                  value={valor}
-                  onChange={(e) => setValor(mascaraValorBR(e.target.value, valor))}
-                  data-testid="emendas-etapa-valor-emenda"
-                />
-              ) : null}
-              <AppSelect label="GND" value={gnd} onChange={(e) => setGnd(e.target.value)}>
-                <option value="GND-4">GND-4 Investimento</option>
-                <option value="GND-3">GND-3 Custeio</option>
-              </AppSelect>
-              <AppDateInput label="Conferido em" value={data} onValueChange={setData} />
-              <AppInput
-                label="Valor deste ofício (R$) *"
-                hint="O que o parlamentar pediu neste ofício."
-                inputMode="decimal"
-                placeholder="1.200.000,00"
-                value={valorOficio}
-                onChange={(e) => setValorOficio(mascaraValorBR(e.target.value, valorOficio))}
-                data-testid="emendas-etapa-valor-oficio"
-              />
-              <AppInput
-                label="Documento SEI do ofício"
-                hint="Com retificador, o do retificador."
-                inputMode="numeric"
-                value={seiOficio}
-                onChange={(e) => setSeiOficio(e.target.value)}
-                data-testid="emendas-etapa-sei-oficio"
-              />
-            </div>
-            {registrada && (
-              <div style={{ ...aviso('info'), display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }} data-testid="emendas-etapa-valor-registrado">
-                <span>
-                  Valor da emenda no SIOP: <b>{formatCurrency(registrada.valor)}</b> · {registrada.gnd} · lido em {dataBR(registrada.vistaEm)}
-                </span>
-                <span style={{ flex: 1 }} />
-                <AppButton type="button" variant="ghost" size="sm" onClick={() => setCorrigindoSiop((c) => !c)} data-testid="emendas-etapa-corrigir-siop">
-                  {corrigindoSiop ? 'Manter o valor lido' : 'O SIOP mudou? Corrigir'}
-                </AppButton>
-              </div>
-            )}
-            <label style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', fontSize: '0.85rem' }}>
-              <input type="checkbox" checked={retificador} onChange={(e) => setRetificador(e.target.checked)} data-testid="emendas-etapa-retificador" />
-              Ofício retificador (o valor substitui o do ofício anterior)
-            </label>
-            {valorDaEmenda != null && valorDoOficio != null && valorDoOficio > 0 && (
-              <div style={aviso(valorDoOficio - valorDaEmenda > 0.004 ? 'atencao' : 'info')} role="status" data-testid="emendas-etapa-sobra">
-                {valorDoOficio - valorDaEmenda > 0.004
-                  ? `O ofício pede ${formatCurrency(valorDoOficio - valorDaEmenda)} a mais que o valor da emenda no SIOP.`
-                  : `Emenda ${formatCurrency(valorDaEmenda)} − este ofício ${formatCurrency(valorDoOficio)} = ${formatCurrency(valorDaEmenda - valorDoOficio)} (os outros pedidos da emenda também descontam).`}
-              </div>
-            )}
-            <div style={aviso('info')} data-testid="emendas-etapa-previsto">
-              Valor previsto dos itens, com o reajuste das atas (o mesmo do quadro do parlamentar): {formatCurrency(previsto)}
-              {Math.abs(previsto - deHoje) > 0.004 ? `; pelo preço de hoje, ${formatCurrency(deHoje)}` : ''}.
-            </div>
-            {conferenciaDaEmenda && conferenciaDaEmenda.outroAutor.length > 0 && (
-              <div style={aviso('atencao')} role="status" data-testid="emendas-etapa-emenda-outro-autor">
-                Os 4 primeiros dígitos ({emendaLida!.numero.slice(0, 4)}) são o código do autor, e nos pedidos{' '}
-                {conferenciaDaEmenda.outroAutor.map((x) => `${nomeDe(x.autorId)} (emenda ${numeroDaEmendaEmTexto(x.siopEmenda!)})`).join(', ')} eles são de outro
-                parlamentar. Confira se o número não está trocado.
-              </div>
-            )}
-            {conferenciaDaEmenda && conferenciaDaEmenda.mesmaEmenda.length > 0 && (
-              <div style={aviso('info')} data-testid="emendas-etapa-emenda-outro-pedido">
-                Esta emenda também está em {conferenciaDaEmenda.mesmaEmenda.length === 1 ? 'outro pedido' : `${conferenciaDaEmenda.mesmaEmenda.length} outros pedidos`} de{' '}
-                {nomeDoAutor} ({identificacoesDosOutros}): o valor do SIOP é da emenda inteira; cada pedido tem o valor do seu ofício.
-              </div>
-            )}
-            {valorDoOficio != null && Number.isFinite(valorDoOficio) && valorDoOficio + 0.004 < previsto && (
-              <div style={aviso('atencao')} role="status" data-testid="emendas-etapa-abaixo">
-                O valor do ofício fica {formatCurrency(previsto - valorDoOficio)} abaixo do previsto: pode faltar dinheiro para empenhar todos os itens.
-              </div>
-            )}
-            <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <legend style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>O que bate entre o ofício e o SIOP</legend>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '0.45rem' }}>
-                {PONTOS_SIOP.map(([k, r]) => (
-                  <label key={k} style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', fontSize: '0.85rem', fontWeight: 600, padding: '0.45rem 0.6rem', border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 6, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={Boolean(pontos[k])} onChange={(e) => setPontos((p) => ({ ...p, [k]: e.target.checked }))} data-testid={`emendas-etapa-ponto-${k}`} />
-                    {r}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          </>
-        )}
-
-        {modo === 'DIVERGENCIA' && (
-          <>
-            <AppTextarea label="O que não bate *" rows={3} value={divergencia} onChange={(e) => setDivergencia(e.target.value)} placeholder="Ex.: valor do ofício (R$ 120.000) diferente do SIOP (R$ 98.000)" data-testid="emendas-etapa-divergencia" />
-            <AppDateInput label="Devolvido em" value={data} onValueChange={setData} />
-            <div style={aviso('info')}>
-              O pedido volta para "Minuta": a CAEP faz a {rodada + 1}ª minuta e manda ao parlamentar. A minuta e o ofício devolvidos ficam no histórico do pedido.
-              A reserva continua.
-            </div>
-          </>
-        )}
 
         {modo === 'CANCELAR' && (
           <>

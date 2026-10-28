@@ -28,6 +28,7 @@ import {
   removerEmendaDoPedido,
   salvarPedidoEmenda,
   avancarPedidoEmenda,
+  conferirOficioPedido,
   cancelarPedidoEmenda,
   registrarAnulacaoEmpenho,
   fetchExecucaoEmendas,
@@ -264,6 +265,11 @@ export function useAvancarPedido() {
     retry: 0,
     onSettled: invalidar
   });
+}
+
+export function useConferirOficio() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: conferirOficioPedido, retry: 0, onSettled: invalidar });
 }
 
 export function useInformarSolicitacaoDaAta() {

@@ -602,6 +602,8 @@ export interface PedidoEmenda {
   /** Documento SEI do ofício (ou do retificador) que deu o valor. */
   oficioValorDocumentoSei?: string | null;
   oficioValorRetificador?: boolean;
+  /** Preço unitário de cada item (item_key → R$) no quadro da minuta registrada (migration 234); nulo antes disso. */
+  minutaPrecos?: Record<string, number> | null;
   conferidoEm: string | null;
   /** Solicitação de empenho (CAEP → DGFNSP). */
   solicitadoEm: string | null;
@@ -836,6 +838,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       oficioValor: p.oficio_valor == null ? null : num(p.oficio_valor),
       oficioValorDocumentoSei: p.oficio_valor_documento_sei ?? null,
       oficioValorRetificador: p.oficio_valor_retificador === true,
+      minutaPrecos: p.minuta_precos && typeof p.minuta_precos === 'object' ? (p.minuta_precos as Record<string, number>) : null,
       conferidoEm: p.conferido_em ?? null,
       solicitadoEm: p.solicitado_em ?? null,
       solicitadoDocumentoSei: p.solicitado_documento_sei ?? null,
@@ -917,6 +920,32 @@ export type AcaoPedido = 'MINUTA' | 'OFICIO' | 'DIVERGENCIA' | 'CONFERIDO' | 'SO
 
 export async function avancarPedidoEmenda(id: string, versao: number, acao: AcaoPedido, dados: Record<string, unknown>): Promise<{ id: string; versao: number }> {
   const { data, error } = await db().rpc('avancar_pedido_emenda', { p_id: id, p_versao: versao, p_acao: acao, p_dados: dados });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/**
+ * Conferência do ofício (migration 234): ajusta as linhas do pedido ao ofício (null = sem ajuste; a linha que fica de
+ * fora é tirada com o motivo) e registra CONFERIDO ou DIVERGENCIA (nova minuta), numa transação só.
+ */
+export async function conferirOficioPedido(v: {
+  id: string;
+  versao: number;
+  acao: 'CONFERIDO' | 'DIVERGENCIA';
+  dados: Record<string, unknown>;
+  linhas: LinhaParaSalvar[] | null;
+  motivo: string | null;
+}): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('conferir_oficio_pedido', {
+    p_id: v.id,
+    p_versao: v.versao,
+    p_acao: v.acao,
+    p_dados: v.dados,
+    p_linhas: v.linhas
+      ? v.linhas.map((l) => ({ id: l.id ?? null, tipo: l.tipo, item_key: l.itemKey ?? null, kit_id: l.kitId ?? null, quantidade: l.quantidade, beneficiario_id: l.beneficiarioId }))
+      : null,
+    p_motivo: v.motivo
+  });
   if (error) throw new Error(mensagemDoBanco(error));
   return data as { id: string; versao: number };
 }
