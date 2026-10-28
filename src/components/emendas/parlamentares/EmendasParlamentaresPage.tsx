@@ -157,14 +157,14 @@ export const EmendasParlamentaresPage: React.FC = () => {
 
   const doTipo = linhas.filter((l) => tipo === 'todos' || l.autor?.tipo === tipo);
   const termo = semAcento(busca.trim());
-  const naSituacao = (l: Linha) => !situacao || (situacao === 'sobra' ? (restoDa(l.emendas, encerrado) ?? 0) > 0 : l.emendas?.emendas.some((e) => e.situacao === 'conferir' || e.situacao === 'acima'));
+  const naSituacao = (l: Linha) => !situacao || (situacao === 'sobra' ? (restoDa(l.emendas, encerrado) ?? 0) > 0 : l.emendas?.emendas.some((e) => e.situacao === 'conferir' || e.situacao === 'informar' || e.situacao === 'acima'));
   const filtradas = doTipo.filter((l) => naSituacao(l) && (!uf || l.autor?.uf === uf) && passaFiltroGti(l.captacao, filtroCaptacao, modoCaptacao) && (!termo || semAcento(`${l.autorId ? l.autor?.nome ?? '' : AUTOR_A_DEFINIR} ${l.autor?.partido ?? ''} ${l.autor?.uf ?? ''}`).includes(termo)));
   const ufs = [...new Set(doTipo.map((l) => l.autor?.uf).filter((x): x is string => Boolean(x)))].sort().map((v) => ({ value: v, label: v, count: doTipo.filter((l) => l.autor?.uf === v).length }));
   const filtrosAtivos = Boolean(termo || uf || mostrar || situacao || filtroCaptacao !== 'TODOS');
   const naoEmpenhadas = emendas.filter((e) => e.situacao === 'naoEmpenhado');
   const contagemCaptacao = contarPorGti(doTipo.map((l) => l.captacao), modoCaptacao, GRUPOS_CAPTACAO);
   const comSobra = emendas.filter((e) => e.situacao === 'sobra');
-  const aConferir = emendas.filter((e) => e.situacao === 'conferir' || e.situacao === 'acima');
+  const aConferir = emendas.filter((e) => e.situacao === 'conferir' || e.situacao === 'informar' || e.situacao === 'acima');
   const valorOu = (v: number | undefined) => (v == null ? vazio : <span style={carteiraNumero}>{formatCurrency(v)}</span>);
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ORDEM);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chaveDaLinha, POR_PAGINA);
@@ -314,7 +314,7 @@ export const EmendasParlamentaresPage: React.FC = () => {
           emptyValue=""
           options={[
             { value: 'sobra', label: encerrado ? 'Com não empenhado' : 'Com sobra', count: doTipo.filter((l) => (restoDa(l.emendas, encerrado) ?? 0) > 0).length },
-            { value: 'conferir', label: 'A conferir', count: doTipo.filter((l) => l.emendas?.emendas.some((e) => e.situacao === 'conferir' || e.situacao === 'acima')).length }
+            { value: 'conferir', label: 'A conferir', count: doTipo.filter((l) => l.emendas?.emendas.some((e) => e.situacao === 'conferir' || e.situacao === 'informar' || e.situacao === 'acima')).length }
           ]}
           onChange={(v) => mudar('emendas', v)}
           testId="emendas-parlamentares-filtro-emendas"

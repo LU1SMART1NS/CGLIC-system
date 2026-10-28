@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { InfoHint } from '../../design-system/components/InfoHint';
 import { AppButton } from '../../design-system/components/AppButton';
 import { useToast } from '../../design-system/components/Toast';
-import { useRemoverEmendaDoPedido } from '../../hooks/useEmendas';
+import { useRemoverEmendaDoPedido, useSalvarValorOficio } from '../../hooks/useEmendas';
+import { AppInput } from '../../design-system/components/FormFields';
+import { formatCurrency } from '../../utils/format';
+import { lerValorBR, mascaraValorBR } from '../../utils/mascaras';
 import { numeroDaEmendaEmTexto } from '../../utils/emendasPedidos';
 import { dataBR } from '../../utils/emendasKits';
 import { carteiraDetalhe, carteiraSubtitle } from '../carteira/carteiraStyles';
@@ -19,6 +22,7 @@ const linha: React.CSSProperties = { display: 'flex', gap: '0.5rem', alignItems:
 export const EmendasDoPedido: React.FC<{ p: PedidoEmenda; podeGerir: boolean }> = ({ p, podeGerir }) => {
   const [adicionando, setAdicionando] = useState(false);
   const [tirando, setTirando] = useState<string | null>(null);
+  const [editandoOficio, setEditandoOficio] = useState(false);
   const remover = useRemoverEmendaDoPedido();
   const toast = useToast();
   if (!p.siopEmenda) return null;
@@ -52,8 +56,25 @@ export const EmendasDoPedido: React.FC<{ p: PedidoEmenda; podeGerir: boolean }> 
             {numeroDaEmendaEmTexto(p.siopEmenda)}
           </b>
           <span style={{ ...carteiraSubtitle, display: 'block' }}>conferida com o ofício{p.siopGnd ? ` · ${p.siopGnd}` : ''}</span>
+          <span style={{ ...carteiraSubtitle, display: 'block' }} data-testid={`emendas-pedido-valor-oficio-${p.id}`}>
+            {p.oficioValor != null ? (
+              <>
+                Valor do ofício <b>{formatCurrency(p.oficioValor)}</b>
+                {p.oficioValorDocumentoSei ? ` · SEI ${p.oficioValorDocumentoSei}` : ''}
+                {p.oficioValorRetificador ? ' (retificador)' : ''}
+              </>
+            ) : (
+              <b style={{ color: 'var(--color-warning-text, #8a5300)' }}>Valor do ofício a informar</b>
+            )}
+          </span>
         </span>
+        {podeGerir && p.etapa !== 'CANCELADO' && !editandoOficio && (
+          <AppButton size="xs" variant="link" onClick={() => setEditandoOficio(true)} data-testid={`emendas-pedido-oficio-editar-${p.id}`}>
+            {p.oficioValor != null ? 'Alterar' : 'Informar'}
+          </AppButton>
+        )}
       </div>
+      {editandoOficio && <ValorDoOficio p={p} onClose={() => setEditandoOficio(false)} />}
       {p.outrasEmendas.map((o) => {
         const texto = `${o.ano} · ${numeroDaEmendaEmTexto(o.numero)}`;
         return (
@@ -87,5 +108,49 @@ export const EmendasDoPedido: React.FC<{ p: PedidoEmenda; podeGerir: boolean }> 
       })}
       {adicionando && <LigarEmendaModal pedido={p} onClose={() => setAdicionando(false)} />}
     </div>
+  );
+};
+
+/** Valor do ofício do pedido já conferido (migration 231): o que ficou a informar, ou o retificador que mudou o valor. */
+const ValorDoOficio: React.FC<{ p: PedidoEmenda; onClose: () => void }> = ({ p, onClose }) => {
+  const salvar = useSalvarValorOficio();
+  const toast = useToast();
+  const [valor, setValor] = useState(p.oficioValor != null ? p.oficioValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
+  const [sei, setSei] = useState(p.oficioValorDocumentoSei ?? p.oficioDocumentoSei ?? '');
+  const [retificador, setRetificador] = useState(p.oficioValorRetificador ?? false);
+  const lido = lerValorBR(valor);
+  const seiLimpo = sei.replace(/\D/g, '');
+  const ok = lido != null && lido > 0 && /^[0-9]{7,10}$/.test(seiLimpo);
+  const gravar = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    if (!ok) return;
+    try {
+      await salvar.mutateAsync({ id: p.id, versao: p.versao, valor: lido!, documentoSei: seiLimpo, retificador });
+      toast.success(`Valor do ofício do ${pedidoEmTexto(p)} gravado.`);
+      onClose();
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+  return (
+    <form onSubmit={gravar} style={{ ...linha, flexWrap: 'wrap', alignItems: 'flex-end' }} data-testid={`emendas-pedido-oficio-form-${p.id}`}>
+      <div style={{ flex: '1 1 10rem' }}>
+        <AppInput label="Valor do ofício (R$)" inputMode="decimal" value={valor} onChange={(e) => setValor(mascaraValorBR(e.target.value, valor))} data-testid="emendas-pedido-oficio-valor" />
+      </div>
+      <div style={{ flex: '1 1 8rem' }}>
+        <AppInput label="Documento SEI do ofício" inputMode="numeric" hint="Só números, 7 a 10 dígitos." value={sei} onChange={(e) => setSei(e.target.value)} data-testid="emendas-pedido-oficio-sei" />
+      </div>
+      <label style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', fontSize: '0.82rem' }}>
+        <input type="checkbox" checked={retificador} onChange={(e) => setRetificador(e.target.checked)} /> Retificador
+      </label>
+      <span style={{ display: 'inline-flex', gap: '0.3rem' }}>
+        <AppButton size="xs" variant="link" type="button" onClick={onClose} disabled={salvar.isPending}>
+          Cancelar
+        </AppButton>
+        <AppButton size="xs" type="submit" disabled={!ok} isLoading={salvar.isPending} data-testid="emendas-pedido-oficio-salvar">
+          Salvar
+        </AppButton>
+      </span>
+    </form>
   );
 };

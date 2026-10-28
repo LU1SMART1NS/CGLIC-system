@@ -148,7 +148,7 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, ho
                 emenda {p.siopEmendaAno ? `${p.siopEmendaAno} · ` : ''}
                 {p.siopEmenda.slice(0, 4)} {p.siopEmenda.slice(4)}
                 {p.siopGnd ? ` · ${p.siopGnd}` : ''}
-                {p.siopValor != null ? ` · ${formatCurrency(p.siopValor)}` : ''}
+                {p.oficioValor != null ? ` · ofício ${formatCurrency(p.oficioValor)}` : ' · valor do ofício a informar'}
               </div>
             )}
             {podeGerir && p.etapa === 'OFICIO' && (

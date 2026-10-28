@@ -25,11 +25,11 @@ const conta = (pedidos: PedidoEmenda[], notas: NotaDaLinha[], portal: ExecucaoNo
   sobraDasEmendas({ pedidos, ano: 2026, itens, notas: new Map(notas.map((n) => [n.linhaId, n])), portal: new Map(portal.map((p) => [p.codigo, p])), minimo });
 
 describe('sobra das emendas (migration 204)', () => {
-  it('valor − empenhado das notas (cada nota uma vez) − em andamento', () => {
+  it('ofício a informar: valor − empenhado das notas (cada nota uma vez) − em andamento, a regra antiga', () => {
     const empenhado = pedido(1, 'CONTRATACAO', [linha('l1', 'a', 3), linha('l2', 'a', 2)]);
     const daSobra = pedido(2, 'RESERVADO', [linha('l3', 'a', 1)], { siopValor: null });
     const [e] = conta([empenhado, daSobra], [nota('l1', '2026NE000001', 5000), nota('l2', '2026NE000001', 5000)]);
-    expect(e).toMatchObject({ codigo: '202643600002', valor: 10000, empenhado: 5000, emAndamento: 1000, sobra: 4000, fonteDoEmpenhado: 'NOTAS', situacao: 'sobra' });
+    expect(e).toMatchObject({ codigo: '202643600002', valor: 10000, empenhado: 5000, emAndamento: 1000, sobra: 4000, fonteDoEmpenhado: 'NOTAS', situacao: 'informar', oficiosAInformar: 2 });
     expect(e.pedidos.map((p) => p.numero)).toEqual([1, 2]);
   });
 
@@ -38,7 +38,7 @@ describe('sobra das emendas (migration 204)', () => {
   });
 
   it('com as notas da SENASP lidas no Portal, vale o empenhado delas (não o da emenda inteira)', () => {
-    const p = pedido(1, 'CONTRATACAO', [linha('l1', 'a', 3), linha('l2', 'a', 2)]);
+    const p = pedido(1, 'CONTRATACAO', [linha('l1', 'a', 3), linha('l2', 'a', 2)], { oficioValor: 9990 });
     const [e] = conta([p], [nota('l1', '2026NE000001', 3000)], [portal({})]);
     expect(e).toMatchObject({ empenhado: 9990, fonteDoEmpenhado: 'PORTAL', sobra: 10, situacao: 'executada' });
   });
@@ -66,11 +66,32 @@ describe('sobra das emendas (migration 204)', () => {
   });
 
   it('por autor soma só a sobra usável e fica com a pior situação', () => {
-    const e1 = conta([pedido(1, 'CONTRATACAO', [linha('l1', 'a', 1)])], [nota('l1', 'n1', 4000)])[0];
+    const e1 = conta([pedido(1, 'CONTRATACAO', [linha('l1', 'a', 1)], { oficioValor: 4000 })], [nota('l1', 'n1', 4000)])[0];
     const e2 = { ...e1, codigo: 'x', situacao: 'conferir' as const, sobra: 999 };
     const a = sobraPorAutor([e1, e2]).get('A1')!;
     expect(a.sobra).toBe(6000);
     expect(a.situacao).toBe('conferir');
+  });
+
+  // Migration 231 (28/10/2026): o valor da emenda vem da emenda registrada e a sobra é emenda − ofícios.
+  const registrada = (valor: number) => ({ id: 'em1', ano: 2026, numero: '43600002', autorId: 'A1', valor, gnd: 'GND-4' as const, beneficiarioId: null, objeto: null, vistaEm: '2026-10-28', observacao: null, versao: 1, criadoPorNome: null });
+
+  it('Sargento Fahur: emenda no SIOP 6.595.176, ofício retificador 6.194.520 todo empenhado → sobra 400.656', () => {
+    const p = pedido(1, 'CONTRATACAO', [linha('l1', 'a', 1)], { siopValor: 6194520, oficioValor: 6194520 });
+    const [e] = sobraDasEmendas({ pedidos: [p], ano: 2026, itens, notas: new Map([['l1', nota('l1', 'n1', 6194520)]]), portal: new Map(), minimo: 19, emendas: [registrada(6595176)] });
+    expect(e).toMatchObject({ valor: 6595176, valorLidoEm: '2026-10-28', oficiado: 6194520, empenhado: 6194520, emAndamento: 0, sobra: 400656, situacao: 'sobra' });
+  });
+
+  it('o que foi oficiado e não empenhou fica em andamento (falta empenhar)', () => {
+    const p = pedido(1, 'CGOFI', [linha('l1', 'a', 1)], { oficioValor: 8000 });
+    const [e] = sobraDasEmendas({ pedidos: [p], ano: 2026, itens, notas: new Map(), portal: new Map(), minimo: 19, emendas: [registrada(10000)] });
+    expect(e).toMatchObject({ oficiado: 8000, empenhado: 0, emAndamento: 8000, sobra: 2000, situacao: 'sobra' });
+  });
+
+  it('ofícios acima do valor da emenda: acima', () => {
+    const ps = [pedido(1, 'CONTRATACAO', [], { oficioValor: 6000 }), pedido(2, 'CONFERIDO', [], { oficioValor: 6000 })];
+    const [e] = sobraDasEmendas({ pedidos: ps, ano: 2026, itens, notas: new Map(), portal: new Map(), minimo: 19, emendas: [registrada(10000)] });
+    expect(e).toMatchObject({ oficiado: 12000, situacao: 'acima' });
   });
 
   it('menor preço só de ata vigente com saldo livre', () => {

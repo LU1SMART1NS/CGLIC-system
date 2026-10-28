@@ -124,6 +124,7 @@ export const EmendasListaPage: React.FC = () => {
       emenda: { value: (l) => `${l.ano ?? 0}${l.numero}`, firstDir: 'desc' },
       autor: { value: (l) => (l.autorId ? autorPorId.get(l.autorId)?.nome ?? l.autorId : null) },
       valor: { value: (l) => l.valor, firstDir: 'desc' },
+      oficios: { value: (l) => sobraPorCodigo.get(`${l.ano}${l.numero}`)?.oficiado ?? null, firstDir: 'desc' },
       empenhado: { value: (l) => sobraPorCodigo.get(`${l.ano}${l.numero}`)?.empenhado ?? null, firstDir: 'desc' },
       pago: { value: (l) => pagoPorChave.get(l.chave)?.pago ?? null, firstDir: 'desc' },
       sobra: { value: (l) => sobraPorCodigo.get(`${l.ano}${l.numero}`)?.sobra ?? null, firstDir: 'desc' },
@@ -160,6 +161,24 @@ export const EmendasListaPage: React.FC = () => {
       render: (l) => {
         const f = captacao.get(l.chave);
         return f ? <CelulaCaptacao fatias={f} testId={`emendas-por-emenda-captacao-${l.chave}`} /> : <span style={carteiraDetalhe}>—</span>;
+      }
+    },
+    {
+      key: 'oficios',
+      header: 'Ofícios',
+      align: 'right',
+      nowrap: true,
+      sortValue: ordem.oficios.value,
+      sortFirstDir: 'desc',
+      render: (l) => {
+        const x = sobraDe(l);
+        if (!x) return <span style={carteiraDetalhe}>—</span>;
+        return (
+          <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            <span style={carteiraNumero}>{formatCurrency(x.oficiado)}</span>
+            {x.oficiosAInformar > 0 && <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{x.oficiosAInformar === 1 ? '1 a informar' : `${x.oficiosAInformar} a informar`}</span>}
+          </span>
+        );
       }
     },
     { key: 'empenhado', header: 'Empenhado', align: 'right', nowrap: true, sortValue: ordem.empenhado.value, sortFirstDir: 'desc', render: (l) => valorOu(sobraDe(l)?.empenhado) },

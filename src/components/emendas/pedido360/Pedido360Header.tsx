@@ -37,7 +37,7 @@ interface Props {
   beneficiarios: Map<string, BeneficiarioEmenda>;
   notas: Map<string, NotaDaLinha>;
   avisos: AvisoPedido[];
-  valor: { valor: number; fonte: 'EMENDA' | 'PREVISTO' };
+  valor: { valor: number; fonte: 'OFICIO' | 'PREVISTO' };
   podeGerir: boolean;
   back: { label: string; back: () => void };
   onProxima: () => void;
@@ -241,7 +241,7 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
           <HealthTile
             label="Valor do pedido"
             value={formatCurrency(valor.valor)}
-            hint={valor.fonte === 'EMENDA' ? 'pela emenda no SIOP' : 'previsto pelos itens'}
+            hint={valor.fonte === 'OFICIO' ? 'pelo ofício do parlamentar' : 'previsto pelos itens'}
             compact
             onClick={() => onAba('itens')}
             testId="pedido-360-valor"

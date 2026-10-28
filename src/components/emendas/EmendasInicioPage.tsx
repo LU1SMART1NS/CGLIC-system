@@ -164,8 +164,8 @@ export const EmendasInicioPage: React.FC = () => {
   const { data: portal = SEM_PORTAL } = useExecucaoEmendas();
   const sobras = useMemo(() => {
     const minimo = menorPrecoDisponivel(itens, reservadoPorItem(pedidos), precos);
-    return sobraDasEmendas({ pedidos, ano: Number(hoje.slice(0, 4)), itens, notas, portal: new Map(portal.map((x) => [x.codigo, x])), precos, minimo }).filter((e) => e.situacao === 'sobra');
-  }, [pedidos, hoje, itens, notas, portal, precos]);
+    return sobraDasEmendas({ pedidos, ano: Number(hoje.slice(0, 4)), itens, notas, portal: new Map(portal.map((x) => [x.codigo, x])), precos, minimo, emendas: emendasSiop ?? [] }).filter((e) => e.situacao === 'sobra');
+  }, [pedidos, hoje, itens, notas, portal, precos, emendasSiop]);
   const valorDasSobras = sobras.reduce((t, e) => t + e.sobra, 0);
   // Pedidos com o nº da emenda e sem o ano (28/10/2026): não entram em nenhum ano, nem na sobra nem no Portal.
   const semAno = useMemo(() => pedidos.filter((p) => p.etapa !== 'CANCELADO' && anoDoPedido(p) === ANO_SEM), [pedidos]);
@@ -173,7 +173,7 @@ export const EmendasInicioPage: React.FC = () => {
     { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, render: (p) => <AutorDoPedido autor={p.autorId ? autorPorId.get(p.autorId) : undefined} autorId={p.autorId} /> },
     { key: 'emenda', header: 'Emenda', nowrap: true, render: (p) => <span style={carteiraValor}>{numeroDaEmenda(p.siopEmenda ?? '')}</span> },
     { key: 'etapa', header: 'Etapa', nowrap: true, render: (p) => <StatusBadge label={ROTULO_ETAPA[p.etapa]} variant={VARIANTE_ETAPA[p.etapa]} size="sm" dot={false} /> },
-    { key: 'valor', header: 'Valor no SIOP', align: 'right', nowrap: true, render: (p) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{p.siopValor != null ? formatCurrency(p.siopValor) : '—'}</span> }
+    { key: 'valor', header: 'Valor do ofício', align: 'right', nowrap: true, render: (p) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{p.oficioValor != null ? formatCurrency(p.oficioValor) : 'a informar'}</span> }
   ];
   const colunasSobra: Column<SobraDaEmenda>[] = [
     { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, render: (e) => <AutorDoPedido autor={e.autorId ? autorPorId.get(e.autorId) : undefined} autorId={e.autorId} destaque /> },
