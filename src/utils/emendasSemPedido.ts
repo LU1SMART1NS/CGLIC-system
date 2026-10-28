@@ -54,8 +54,6 @@ export function lerNumeroDaEmenda(texto: string, anoPadrao: number | null): { nu
 }
 
 /** Ano da emenda no pedido: o conferido no SIOP ou, sem ele, o ano da reserva. */
-const anoDoPedido = (p: PedidoEmenda): number => p.siopEmendaAno ?? Number(p.reservadoEm.slice(0, 4));
-
 /** O pedido é desta emenda: nasceu dela, ou tem o mesmo nº conferido (e o mesmo ano, quando o pedido tem). */
 export function pedidoDaEmenda(p: PedidoEmenda, e: EmendaSiop): boolean {
   if (p.emendaId) return p.emendaId === e.id;
@@ -95,10 +93,17 @@ export function emendasNaLista(emendas: EmendaSiop[], pedidos: PedidoEmenda[], c
 
   // Números que só existem nos pedidos (conferidos no SIOP antes do registro de emendas): uma linha por ano + nº.
   const soNosPedidos = new Map<string, EmendaNaLista>();
+  const anosPorNumero = new Map<string, Set<number>>();
+  for (const x of [...emendas.map((e) => ({ numero: e.numero, ano: e.ano })), ...ativos.map((p) => ({ numero: p.siopEmenda, ano: p.siopEmendaAno }))]) {
+    if (x.numero && x.ano != null) anosPorNumero.set(x.numero, (anosPorNumero.get(x.numero) ?? new Set()).add(x.ano));
+  }
   for (const p of ativos) {
     if (usados.has(p.id) || !p.siopEmenda) continue;
-    const ano = anoDoPedido(p);
-    const chave = `pedido:${ano}:${p.siopEmenda}`;
+    // Sem o ano conferido (28/10/2026): junta-se à linha do mesmo nº quando só um ano tem esse nº; senão fica "sem ano"
+    // (antes ia para o ano da reserva e escondia a falta do ano).
+    const anosDoNumero = anosPorNumero.get(p.siopEmenda);
+    const ano = p.siopEmendaAno ?? (anosDoNumero?.size === 1 ? [...anosDoNumero][0] : null);
+    const chave = `pedido:${ano ?? 'sem'}:${p.siopEmenda}`;
     const l = soNosPedidos.get(chave) ?? {
       chave,
       emenda: null,

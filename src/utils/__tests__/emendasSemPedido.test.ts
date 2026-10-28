@@ -88,6 +88,9 @@ describe('Emendas sem pedido', () => {
     expect(kiko.pedidos.map((p) => p.numero)).toEqual([9, 8]);
     expect(kiko.valor).toBe(900_000);
     expect(lista.find((l) => l.chave === 'pedido:2025:42680021')!.valor).toBe(300);
+    // Nº que só aparece sem o ano fica em "sem ano" (28/10/2026), e não no ano da reserva.
+    const sozinho = emendasNaLista([], [pedido({ numero: 10, siopEmenda: '43950006', siopEmendaAno: null, reservadoEm: '2026-03-01' })], [], HOJE);
+    expect(sozinho.map((l) => [l.chave, l.ano])).toEqual([['pedido:sem:43950006', null]]);
   });
 
   it('lê o nº como no SIOP', () => {

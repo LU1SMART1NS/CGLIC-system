@@ -77,4 +77,19 @@ describe('sobra das emendas (migration 204)', () => {
     expect(menorPrecoDisponivel(itens, new Map())).toBe(19);
     expect(menorPrecoDisponivel(itens, new Map([['b', 100]]))).toBe(1000);
   });
+
+  it('ano encerrado: sem em andamento nem sobra; o resto fica "Não empenhado" (28/10/2026)', () => {
+    const empenhado = pedido(1, 'CONTRATACAO', [linha('l1', 'a', 3)], { siopEmendaAno: 2024 });
+    const parado = pedido(2, 'RESERVADO', [linha('l2', 'a', 1)], { siopEmendaAno: 2024, siopValor: null });
+    const [e] = sobraDasEmendas({ pedidos: [empenhado, parado], ano: 2024, itens, notas: new Map([['l1', nota('l1', '2024NE000001', 6000)]]), portal: new Map(), minimo: 19, encerrado: true });
+    expect(e).toMatchObject({ codigo: '202443600002', empenhado: 6000, emAndamento: 0, sobra: 4000, situacao: 'naoEmpenhado' });
+    const autor = sobraPorAutor([e]).get('A1')!;
+    expect(autor).toMatchObject({ sobra: 0, naoEmpenhado: 4000, situacao: 'naoEmpenhado' });
+  });
+
+  it('ano encerrado todo empenhado continua "Executada"', () => {
+    const p = pedido(1, 'CONTRATACAO', [linha('l1', 'a', 3)], { siopEmendaAno: 2024 });
+    const [e] = sobraDasEmendas({ pedidos: [p], ano: 2024, itens, notas: new Map([['l1', nota('l1', '2024NE000001', 10000)]]), portal: new Map(), minimo: 19, encerrado: true });
+    expect(e.situacao).toBe('executada');
+  });
 });

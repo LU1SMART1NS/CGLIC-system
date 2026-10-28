@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { FileText, ListTodo, Phone } from 'lucide-react';
 import { Instrument360Page } from '../../instrument360/Instrument360Page';
 import { Instrument360Head } from '../../instrument360/Instrument360Head';
@@ -47,6 +47,8 @@ import { SobraDaEmendaCartao } from './SobraDaEmendaCartao';
 import { TabelaDePedidos } from './TabelaDePedidos';
 import { rotaDaEmenda } from '../emendas360/rotaDaEmenda';
 import { useSobraDasEmendas } from './useSobraDasEmendas';
+import { AnoDaEmenda } from '../AnoDaEmenda';
+import { ANO_SEM, ANO_TODOS, anoDoPedido, anoEmTexto, anoEncerrado, anosDaLista, filtroEhAno, lerAnoDaUrl, pedidoNoAno } from '../../../utils/emendasAno';
 
 type Aba = 'emendas' | 'pedidos' | 'contatos';
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
@@ -74,22 +76,54 @@ export const Parlamentar360Page: React.FC = () => {
   const { porPedido: credorPendente } = useCredorDiferente();
   const podeGerir = usePodeGerirEmendas();
   const hoje = hojeEmBrasilia();
-  const ano = Number(hoje.slice(0, 4));
+  const anoCorrente = Number(hoje.slice(0, 4));
+  // Ano da emenda (28/10/2026): ?ano= vem da lista de Parlamentares; sem ele, o corrente.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filtroAno = lerAnoDaUrl(searchParams.get('ano'), anoCorrente, true);
+  const encerrado = anoEncerrado(filtroAno, anoCorrente);
+  const mudarAno = (v: string) =>
+    setSearchParams(
+      (atual) => {
+        const prox = new URLSearchParams(atual);
+        if (v === String(anoCorrente)) prox.delete('ano');
+        else prox.set('ano', v);
+        return prox;
+      },
+      { replace: true }
+    );
 
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
   const beneficiarios = useMemo(() => new Map(beneficiariosLista.map((b) => [b.id, b])), [beneficiariosLista]);
   const aspar = useMemo(() => new Map(asparLista.map((a) => [`${a.uf}:${a.orgao}`, a])), [asparLista]);
   const autor = autores.find((a) => a.id === autorId);
-  const doParlamentar = useMemo(() => pedidosDoParlamentar(pedidos, autorId), [pedidos, autorId]);
-  const { porAutor, minimo, precos } = useSobraDasEmendas(pedidos, itens, notas, ano);
-  const sobra = porAutor.get(autorId);
-  const sobraPorCodigo = useMemo(() => new Map((sobra?.emendas ?? []).map((e) => [e.codigo, e])), [sobra]);
+  const todosDoParlamentar = useMemo(() => pedidosDoParlamentar(pedidos, autorId), [pedidos, autorId]);
+  const doParlamentar = useMemo(() => todosDoParlamentar.filter((p) => pedidoNoAno(p, filtroAno)), [todosDoParlamentar, filtroAno]);
   // Todas as emendas do parlamentar (registradas no SIOP ou só nos pedidos), da mais nova à mais antiga.
-  const emendas = useMemo(
+  const todasAsEmendas = useMemo(
     () => emendasNaLista(emendasSiop, pedidos, contatos, hoje).filter((e) => e.autorId === autorId).sort((a, b) => (b.ano ?? 0) - (a.ano ?? 0) || b.numero.localeCompare(a.numero)),
     [emendasSiop, pedidos, contatos, hoje, autorId]
   );
+  const emendas = useMemo(
+    () => todasAsEmendas.filter((e) => filtroAno === ANO_TODOS || (filtroAno === ANO_SEM ? e.ano == null : String(e.ano) === filtroAno)),
+    [todasAsEmendas, filtroAno]
+  );
+  // A sobra por ano: um ano, todos os anos das emendas dele, ou nenhum (sem o ano, o Portal não é lido).
+  const anosDaSobra = useMemo(
+    () => (filtroEhAno(filtroAno) ? [Number(filtroAno)] : filtroAno === ANO_TODOS ? [...new Set(todasAsEmendas.map((e) => e.ano).filter((a): a is number => a != null))] : []),
+    [filtroAno, todasAsEmendas]
+  );
+  const { porAutor, minimo, precos } = useSobraDasEmendas(pedidos, itens, notas, anosDaSobra);
+  const sobra = porAutor.get(autorId);
+  const sobraPorCodigo = useMemo(() => new Map((sobra?.emendas ?? []).map((e) => [e.codigo, e])), [sobra]);
   const execucao = useMemo(() => execucaoDosPedidos(doParlamentar, notas), [doParlamentar, notas]);
+  const seletorDeAno = useMemo(() => {
+    const doAno = (k: string) => todosDoParlamentar.filter((p) => String(anoDoPedido(p)) === k).length;
+    return {
+      anos: anosDaLista([...todosDoParlamentar.map(anoDoPedido), ...todasAsEmendas.map((e) => e.ano)], anoCorrente).map((a) => ({ ano: a, count: doAno(String(a)) })),
+      semAno: doAno(ANO_SEM),
+      todos: todosDoParlamentar.length
+    };
+  }, [todosDoParlamentar, todasAsEmendas, anoCorrente]);
   const contatoDoAutor = useMemo(() => ultimoContatoPorAutor(pedidos).get(autorId), [pedidos, autorId]);
 
   const abas: Array<{ id: Aba; label: string }> = [
@@ -128,7 +162,8 @@ export const Parlamentar360Page: React.FC = () => {
     );
   }
 
-  const ativos = doParlamentar.filter((p) => p.etapa !== 'CANCELADO');
+  // Quem atende e o primeiro pedido descrevem o parlamentar: valem todos os anos.
+  const ativos = todosDoParlamentar.filter((p) => p.etapa !== 'CANCELADO');
   const atendidos = [
     ...new Set(
       ativos.flatMap((p) => linhasAtivas(p).map((l) => (l.beneficiarioId ? beneficiarios.get(l.beneficiarioId) : undefined))).filter((b): b is NonNullable<typeof b> => Boolean(b)).map((b) => rotuloBeneficiario(b))
@@ -168,9 +203,18 @@ export const Parlamentar360Page: React.FC = () => {
           onBack={back.back}
           backTestId="parlamentar-360-back-btn"
           actions={
-            podeGerir ? (
-              <ActionButton action="novo" size="sm" label="Nova reserva" onClick={() => setNovaReserva(true)} data-testid="parlamentar-360-nova-reserva" />
-            ) : undefined
+            <>
+              <AnoDaEmenda
+                valor={filtroAno}
+                anoCorrente={anoCorrente}
+                anos={seletorDeAno.anos}
+                todos={seletorDeAno.todos}
+                semAno={seletorDeAno.semAno}
+                onChange={mudarAno}
+                testId="parlamentar-360-ano"
+              />
+              {podeGerir && <ActionButton action="novo" size="sm" label="Nova reserva" onClick={() => setNovaReserva(true)} data-testid="parlamentar-360-nova-reserva" />}
+            </>
           }
           title={autor.nome}
           eyebrow={[TIPO_POR_EXTENSO[autor.tipo] ?? autor.tipo, autor.partido, autor.uf, autor.legislatura ? `${autor.legislatura}ª legislatura` : null].filter(Boolean).join(' · ')}
@@ -201,16 +245,28 @@ export const Parlamentar360Page: React.FC = () => {
           <div data-testid="parlamentar-360-indicadores">
             <HealthTileGrid columns={4}>
               <HealthTile
-                label={`Emendas ${ano}`}
-                value={String(emendasDoAno.length)}
-                hint={sobra ? `${formatCurrency(sobra.valor)} no SIOP` : 'nenhuma emenda do ano com pedido'}
+                label={filtroEhAno(filtroAno) ? `Emendas ${filtroAno}` : filtroAno === ANO_SEM ? 'Emendas sem ano' : 'Emendas'}
+                value={String(filtroAno === ANO_SEM ? emendas.length : emendasDoAno.length)}
+                hint={
+                  filtroAno === ANO_SEM
+                    ? 'informe o ano no pedido'
+                    : sobra
+                      ? `${formatCurrency(sobra.valor)} no SIOP`
+                      : `nenhuma emenda ${anoEmTexto(filtroAno)} com pedido`
+                }
                 onClick={() => goToTab('emendas')}
                 testId="parlamentar-360-emendas"
               />
               <HealthTile
                 label="Empenhado"
                 value={sobra ? formatCurrency(sobra.empenhado) : '—'}
-                hint={sobra && sobra.valor > 0 ? `${Math.round((sobra.empenhado / sobra.valor) * 1000) / 10}% das emendas do ano` : 'pelas notas e pelo Portal'}
+                hint={
+                  sobra && sobra.valor > 0
+                    ? `${Math.round((sobra.empenhado / sobra.valor) * 1000) / 10}% das emendas ${filtroEhAno(filtroAno) ? 'do ano' : anoEmTexto(filtroAno)}`
+                    : filtroAno === ANO_SEM
+                      ? 'sem o ano, o Portal não é lido'
+                      : 'pelas notas e pelo Portal'
+                }
                 compact
                 onClick={() => goToTab('emendas')}
                 testId="parlamentar-360-empenhado"
@@ -224,10 +280,22 @@ export const Parlamentar360Page: React.FC = () => {
                 testId="parlamentar-360-pago"
               />
               <HealthTile
-                label="Sobra"
-                value={sobra ? formatCurrency(sobra.sobra) : '—'}
-                hint={sobra?.situacao ? ROTULO_SITUACAO_SOBRA[sobra.situacao] : 'sem emenda do ano'}
-                tone={sobra?.situacao === 'acima' ? 'CRITICA' : sobra && sobra.sobra > 0 ? 'ATENCAO' : undefined}
+                label={encerrado ? 'Não empenhado' : 'Sobra'}
+                value={!filtroEhAno(filtroAno) ? '—' : sobra ? formatCurrency(encerrado ? sobra.naoEmpenhado : sobra.sobra) : '—'}
+                hint={
+                  filtroAno === ANO_TODOS
+                    ? 'escolha um ano para ver a sobra'
+                    : filtroAno === ANO_SEM
+                      ? 'informe o ano no pedido'
+                      : encerrado && (sobra?.situacao === 'conferir' || sobra?.situacao === 'acima')
+                        ? ROTULO_SITUACAO_SOBRA[sobra.situacao]
+                        : encerrado
+                          ? `crédito perdido em 31/12/${filtroAno}`
+                          : sobra?.situacao
+                          ? ROTULO_SITUACAO_SOBRA[sobra.situacao]
+                          : 'sem emenda do ano'
+                }
+                tone={sobra?.situacao === 'acima' ? 'CRITICA' : sobra && !encerrado && filtroEhAno(filtroAno) && sobra.sobra > 0 ? 'ATENCAO' : undefined}
                 compact
                 onClick={() => goToTab('emendas')}
                 testId="parlamentar-360-sobra"
@@ -243,7 +311,9 @@ export const Parlamentar360Page: React.FC = () => {
           <InstrumentSection id="parlamentar-emendas" title="Emendas" subtitle="Cada emenda com a sobra, os pedidos que ela paga, os contatos e as ações" icon={FileText}>
             {emendas.length === 0 ? (
               <NoticeBar tone="info" testId="parlamentar-360-sem-emendas">
-                Nenhuma emenda deste parlamentar no sistema. A emenda entra quando é registrada do SIOP ou conferida num pedido.
+                {todasAsEmendas.length === 0
+                  ? 'Nenhuma emenda deste parlamentar no sistema. A emenda entra quando é registrada do SIOP ou conferida num pedido.'
+                  : `Nenhuma emenda ${anoEmTexto(filtroAno)}. Escolha outro ano no botão “Ano”.`}
               </NoticeBar>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
@@ -273,10 +343,12 @@ export const Parlamentar360Page: React.FC = () => {
         )}
 
         {activeTab === 'pedidos' && (
-          <InstrumentSection id="parlamentar-pedidos" title="Pedidos" subtitle="Todos os pedidos do parlamentar, inclusive os cancelados; a linha abre o Pedido 360" icon={ListTodo}>
+          <InstrumentSection id="parlamentar-pedidos" title="Pedidos" subtitle={`Os pedidos ${anoEmTexto(filtroAno)}, inclusive os cancelados; a linha abre o Pedido 360`} icon={ListTodo}>
             {doParlamentar.length === 0 ? (
               <NoticeBar tone="info" testId="parlamentar-360-sem-pedidos">
-                Nenhum pedido ainda.{podeGerir ? ' Use "Nova reserva" quando combinar itens com o gabinete.' : ''}
+                {todosDoParlamentar.length === 0
+                  ? `Nenhum pedido ainda.${podeGerir ? ' Use "Nova reserva" quando combinar itens com o gabinete.' : ''}`
+                  : `Nenhum pedido ${anoEmTexto(filtroAno)}. Escolha outro ano ou “Todos os anos” no botão “Ano”.`}
               </NoticeBar>
             ) : (
               <TabelaDePedidos pedidos={doParlamentar} itens={itens} notas={notas} precos={precos} hoje={hoje} diferencas={diferencas} credor={credorPendente} testId="parlamentar-360-pedidos" />

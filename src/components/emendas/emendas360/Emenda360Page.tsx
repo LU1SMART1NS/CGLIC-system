@@ -95,6 +95,8 @@ export const Emenda360Page: React.FC = () => {
   const lista = useMemo(() => emendasNaLista(emendasQ.data ?? [], pedidos, contatos, hoje), [emendasQ.data, pedidos, contatos, hoje]);
   const e = useMemo(() => emendaDoEndereco(lista, ano, numero), [lista, ano, numero]);
   const anoDaSobra = e?.ano ?? Number(hoje.slice(0, 4));
+  // Ano encerrado (28/10/2026): o que não foi empenhado até 31/12 perdeu o crédito; sem pedido novo.
+  const encerrada = e?.ano != null && e.ano < Number(hoje.slice(0, 4));
   const { emendas: sobras, minimo, precos, portalPorCodigo } = useSobraDasEmendas(pedidos, itens, notas, anoDaSobra);
   const codigo = e?.ano ? `${e.ano}${e.numero}` : null;
   const sobra = codigo ? sobras.find((s) => s.codigo === codigo) : undefined;
@@ -235,7 +237,7 @@ export const Emenda360Page: React.FC = () => {
                 )}
                 {sobra?.situacao === 'sobra' ? (
                   <ActionButton action="novo" size="sm" label="Novo pedido com a sobra" onClick={() => setNovoPedido(sobra)} data-testid="emenda-360-novo-com-sobra" />
-                ) : registrada && semPedido(e) ? (
+                ) : registrada && semPedido(e) && !encerrada ? (
                   <ActionButton action="novo" size="sm" label="Criar pedido com esta emenda" onClick={() => setNovoPedido('emenda')} data-testid="emenda-360-criar-pedido" />
                 ) : null}
               </>
@@ -250,7 +252,12 @@ export const Emenda360Page: React.FC = () => {
           subtitle={
             <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.25rem 0.5rem' }}>
               {autor ? (
-                <AppButton size="xs" variant="link" onClick={() => navegar(`/emendas/parlamentares/${encodeURIComponent(autor.id)}`)} data-testid="emenda-360-abrir-parlamentar">
+                <AppButton
+                  size="xs"
+                  variant="link"
+                  onClick={() => navegar(`/emendas/parlamentares/${encodeURIComponent(autor.id)}${e.ano && e.ano !== Number(hoje.slice(0, 4)) ? `?ano=${e.ano}` : !e.ano ? '?ano=sem' : ''}`)}
+                  data-testid="emenda-360-abrir-parlamentar"
+                >
                   {autor.nome}
                 </AppButton>
               ) : (
@@ -303,9 +310,17 @@ export const Emenda360Page: React.FC = () => {
                 testId="emenda-360-pago"
               />
               <HealthTile
-                label="Sobra"
+                label={encerrada ? 'Não empenhado' : 'Sobra'}
                 value={sobra ? formatCurrency(sobra.sobra) : '—'}
-                hint={sobra ? ROTULO_SITUACAO_SOBRA[sobra.situacao] : semPedido(e) ? 'a emenda inteira, sem pedido' : 'só nas emendas com valor e ano'}
+                hint={
+                  encerrada
+                    ? `crédito perdido em 31/12/${e.ano}`
+                    : sobra
+                      ? ROTULO_SITUACAO_SOBRA[sobra.situacao]
+                      : semPedido(e)
+                        ? 'a emenda inteira, sem pedido'
+                        : 'só nas emendas com valor e ano'
+                }
                 tone={sobra?.situacao === 'acima' ? 'CRITICA' : sobra?.situacao === 'sobra' ? 'ATENCAO' : undefined}
                 compact
                 onClick={() => goToTab('pedidos')}

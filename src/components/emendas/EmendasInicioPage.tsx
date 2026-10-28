@@ -61,13 +61,14 @@ import { nomeDoItem } from '../../utils/emendasQuadro';
 import { menorPrecoDisponivel, sobraDasEmendas, type ExecucaoNoPortal, type SobraDaEmenda } from '../../utils/emendasSobra';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { prazoDoAviso, resumoInicioEmendas, type ItemLivrePertoDoFim, type PedidoComAviso } from '../../utils/emendasInicio';
-import type { AutorEmenda, EtapaPedido, ItemCaep, NotaDaLinha, NotaSemPedido } from '../../services/emendasService';
+import type { AutorEmenda, EtapaPedido, ItemCaep, NotaDaLinha, NotaSemPedido, PedidoEmenda } from '../../services/emendasService';
 import { AutorDoPedido, LARGURA_AUTOR, ItemDaAta } from './emendasPartes';
 import { DadosItemModal } from './DadosItemModal';
 import { contaEmendasSemPedido, diasSemContatoParaUrgente, emendasNaLista, haDias, numeroDaEmenda, semPedido as emendaSemPedido, textoDias, type EmendaNaLista } from '../../utils/emendasSemPedido';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { nomeDoPedido, pedidoEmTexto, rotaDoPedido } from '../../utils/emendasNomeDoPedido';
 import { rotaDaEmenda } from './emendas360/rotaDaEmenda';
+import { ANO_SEM, anoDoPedido } from '../../utils/emendasAno';
 
 /** Trilho das pendências: a pergunta principal é a gravidade; o tipo de aviso vira o filtro "+ Aviso". */
 type Segmento = 'graves' | 'atencao' | 'todas';
@@ -75,7 +76,7 @@ type Segmento = 'graves' | 'atencao' | 'todas';
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 const SEM_NOTAS_SEM_PEDIDO: NotaSemPedido[] = [];
 const POR_PAGINA = 25;
-const GAVETAS: PainelGavetaId[] = ['emendasSemPedido', 'saldoLivre', 'empenhoAConferir', 'notasSemPedido', 'sobraEmenda', 'semNomeCurto'];
+const GAVETAS: PainelGavetaId[] = ['emendasSemPedido', 'emendasSemAno', 'saldoLivre', 'empenhoAConferir', 'notasSemPedido', 'sobraEmenda', 'semNomeCurto'];
 const SEM_PORTAL: ExecucaoNoPortal[] = [];
 const chave = (l: PedidoComAviso) => l.pedido.id;
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -166,6 +167,14 @@ export const EmendasInicioPage: React.FC = () => {
     return sobraDasEmendas({ pedidos, ano: Number(hoje.slice(0, 4)), itens, notas, portal: new Map(portal.map((x) => [x.codigo, x])), precos, minimo }).filter((e) => e.situacao === 'sobra');
   }, [pedidos, hoje, itens, notas, portal, precos]);
   const valorDasSobras = sobras.reduce((t, e) => t + e.sobra, 0);
+  // Pedidos com o nº da emenda e sem o ano (28/10/2026): não entram em nenhum ano, nem na sobra nem no Portal.
+  const semAno = useMemo(() => pedidos.filter((p) => p.etapa !== 'CANCELADO' && anoDoPedido(p) === ANO_SEM), [pedidos]);
+  const colunasSemAno: Column<PedidoEmenda>[] = [
+    { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, render: (p) => <AutorDoPedido autor={p.autorId ? autorPorId.get(p.autorId) : undefined} autorId={p.autorId} /> },
+    { key: 'emenda', header: 'Emenda', nowrap: true, render: (p) => <span style={carteiraValor}>{numeroDaEmenda(p.siopEmenda ?? '')}</span> },
+    { key: 'etapa', header: 'Etapa', nowrap: true, render: (p) => <StatusBadge label={ROTULO_ETAPA[p.etapa]} variant={VARIANTE_ETAPA[p.etapa]} size="sm" dot={false} /> },
+    { key: 'valor', header: 'Valor no SIOP', align: 'right', nowrap: true, render: (p) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{p.siopValor != null ? formatCurrency(p.siopValor) : '—'}</span> }
+  ];
   const colunasSobra: Column<SobraDaEmenda>[] = [
     { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, render: (e) => <AutorDoPedido autor={e.autorId ? autorPorId.get(e.autorId) : undefined} autorId={e.autorId} destaque /> },
     { key: 'emenda', header: 'Emenda', nowrap: true, render: (e) => <span style={carteiraNumero}>{`${numeroDaEmendaEmTexto(e.emenda)} / ${e.ano}`}</span> },
@@ -483,7 +492,7 @@ export const EmendasInicioPage: React.FC = () => {
           valor={valor(r.antesDoEmpenho)}
           unidade={r.antesDoEmpenho === 1 ? 'pedido' : 'pedidos'}
           linhas={linhasAntes}
-          onClick={() => navigate('/emendas/pedidos')}
+          onClick={() => navigate('/emendas/pedidos?ano=todos')}
           testId="emendas-inicio-cartao-antes"
         />
         <PainelCartao
@@ -527,6 +536,15 @@ export const EmendasInicioPage: React.FC = () => {
                 : `${plural(contaSemPedido.total, 'emenda', 'emendas')}${contaSemPedido.urgentes ? ` · ${formatNumber(contaSemPedido.urgentes)} ${contaSemPedido.urgentes === 1 ? 'urgente' : 'urgentes'}` : ''}`,
             atencao: contaSemPedido.total > 0
           },
+          ...(semAno.length > 0
+            ? [
+                {
+                  id: 'emendasSemAno' as const,
+                  resumo: carregando ? undefined : plural(semAno.length, 'pedido', 'pedidos'),
+                  atencao: true
+                }
+              ]
+            : []),
           {
             id: 'saldoLivre',
             resumo: carregando
@@ -579,6 +597,23 @@ export const EmendasInicioPage: React.FC = () => {
               rowOpen={(e) => () => navigate(rotaDaEmenda(e))}
             />
           )}
+        </PainelGaveta>
+      )}
+      {gavetaAberta === 'emendasSemAno' && (
+        <PainelGaveta
+          id="emendasSemAno"
+          subtitulo="Clique na linha para abrir o pedido e informar o ano na conferência."
+          hint="Pedidos com o número da emenda, mas sem o ano (quase todos vieram da planilha). Sem o ano, o pedido não ganha número, não entra no filtro de nenhum ano e o sistema não lê o empenhado da emenda no Portal da Transparência nem calcula a sobra."
+          onFechar={fecharGaveta}
+        >
+          <DataTable<PedidoEmenda>
+            testId="emendas-inicio-sem-ano"
+            className="data-table-container--flush"
+            data={semAno}
+            keyExtractor={(p) => p.id}
+            columns={colunasSemAno}
+            rowOpen={(p) => () => navigate(rotaDoPedido(p))}
+          />
         </PainelGaveta>
       )}
       {gavetaAberta === 'saldoLivre' && (

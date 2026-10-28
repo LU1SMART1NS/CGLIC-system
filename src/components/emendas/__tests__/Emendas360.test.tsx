@@ -111,7 +111,7 @@ describe('Emendas › Emendas (aba)', () => {
     expect(html).toContain('3166 0008');
     expect(html).toMatch(/R\$\s100,00/);
     expect(html).toContain('Captação principal');
-    expect(html).toContain('emendas-por-emenda-filtro-ano');
+    expect(html).toContain('emendas-por-emenda-ano-btn');
     expect(html).not.toContain('Registrada em');
   });
 });

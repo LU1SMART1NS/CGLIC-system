@@ -22,6 +22,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/carteira/CarteiraSegmentTabs.tsx': 1, // abas
   'src/components/carteira/CarteiraSortHeader.tsx': 1, // cabeçalho de ordenação
   'src/components/contracts/planTaskEditing.tsx': 1, // cabeçalho recolhível
+  'src/components/emendas/AnoDaEmenda.tsx': 3, // aviso "sem ano", botão do ano e opções da lista (como o filtro de coluna)
   'src/components/emendas/pedido360/AndamentoDoPedido.tsx': 1, // cabeçalho recolhível das fases do pedido
   'src/components/emendas/PedidoAberto.tsx': 1, // cabeçalho recolhível dos blocos por ata do pedido
   'src/components/emendas/PedidoModal.tsx': 14, // abas do celular, chips de filtro, segmentos Parlamentar/Órgão e Por beneficiário/Por item, seletor e opções de beneficiário e autor, descrição que abre e o − e + da quantidade

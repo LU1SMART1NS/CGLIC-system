@@ -8,6 +8,8 @@
  *   ou se alguma nota da SENASP ainda não está no sistema.
  * - Em andamento: as linhas sem nota dos pedidos antes do empenho, pelo preço previsto (o do quadro do parlamentar).
  * Regras aprovadas: só emendas do ano corrente; uma emenda por pedido; aviso quando a sobra compra o item mais barato.
+ * Ano encerrado (28/10/2026): o que não foi empenhado até 31/12 perdeu o crédito. Não há "em andamento" nem pedido
+ * novo; o resto (valor − empenhado) fica como "Não empenhado".
  */
 import type { ItemCaep, NotaDaLinha, PedidoEmenda } from '../services/emendasService';
 import type { PrecoPrevisto } from '../services/emendasQuadroService';
@@ -29,7 +31,7 @@ export interface ExecucaoNoPortal {
   notasSemValor: number | null;
 }
 
-export type SituacaoDaSobra = 'sobra' | 'conferir' | 'acima' | 'executada' | 'semValor';
+export type SituacaoDaSobra = 'sobra' | 'conferir' | 'acima' | 'executada' | 'semValor' | 'naoEmpenhado';
 
 export interface SobraDaEmenda {
   /** Ano + nº (12 dígitos), o código do Portal. */
@@ -78,8 +80,10 @@ export function sobraDasEmendas(opts: {
   precos?: Map<string, PrecoPrevisto>;
   /** Sobra mínima para virar "sobra": o item mais barato disponível. Sem ele, qualquer valor acima de um centavo. */
   minimo: number | null;
+  /** Ano já encerrado: sem "em andamento" e sem sobra; o resto fica "Não empenhado". */
+  encerrado?: boolean;
 }): SobraDaEmenda[] {
-  const { pedidos, ano, itens, notas, portal, precos, minimo } = opts;
+  const { pedidos, ano, itens, notas, portal, precos, minimo, encerrado = false } = opts;
   const grupos = new Map<string, PedidoEmenda[]>();
   for (const p of pedidos) {
     if (p.etapa === 'CANCELADO' || !p.siopEmenda || p.siopEmendaAno !== ano) continue;
@@ -109,7 +113,7 @@ export function sobraDasEmendas(opts: {
     const peloPortal = Boolean(doPortal?.notasSenasp != null && doPortal.empenhadoSenasp != null);
     const notasSemValor = peloPortal ? doPortal!.notasSemValor ?? 0 : 0;
     const empenhado = arredondar(peloPortal ? doPortal!.empenhadoSenasp! : [...porNota.values()].reduce((s, v) => s + v, 0));
-    emAndamento = arredondar(emAndamento);
+    emAndamento = encerrado ? 0 : arredondar(emAndamento);
     const sobra = valor == null ? 0 : arredondar(valor - empenhado - emAndamento);
     const situacao: SituacaoDaSobra =
       valor == null
@@ -118,9 +122,13 @@ export function sobraDasEmendas(opts: {
           ? 'acima'
           : (!peloPortal && linhasSemNota > 0) || notasSemValor > 0
             ? 'conferir'
-            : sobra >= (minimo ?? 0.01)
-              ? 'sobra'
-              : 'executada';
+            : encerrado
+              ? sobra > CENTAVO
+                ? 'naoEmpenhado'
+                : 'executada'
+              : sobra >= (minimo ?? 0.01)
+                ? 'sobra'
+                : 'executada';
     resultado.push({
       codigo,
       emenda: codigo.slice(4),
@@ -147,22 +155,25 @@ export interface SobraDoAutor {
   emAndamento: number;
   /** Só a sobra que dá para usar (emendas em "sobra"). */
   sobra: number;
+  /** O que ficou sem empenho nas emendas de ano encerrado (crédito perdido). */
+  naoEmpenhado: number;
   /** A pior situação entre as emendas, para a etiqueta da linha. */
   situacao: SituacaoDaSobra | null;
 }
 
-const PESO: Record<SituacaoDaSobra, number> = { acima: 0, conferir: 1, sobra: 2, semValor: 3, executada: 4 };
+const PESO: Record<SituacaoDaSobra, number> = { acima: 0, conferir: 1, sobra: 2, naoEmpenhado: 3, semValor: 4, executada: 5 };
 
 export function sobraPorAutor(emendas: SobraDaEmenda[]): Map<string, SobraDoAutor> {
   const m = new Map<string, SobraDoAutor>();
   for (const e of emendas) {
     const chave = e.autorId ?? '';
-    const a = m.get(chave) ?? { emendas: [], valor: 0, empenhado: 0, emAndamento: 0, sobra: 0, situacao: null };
+    const a = m.get(chave) ?? { emendas: [], valor: 0, empenhado: 0, emAndamento: 0, sobra: 0, naoEmpenhado: 0, situacao: null };
     a.emendas.push(e);
     a.valor += e.valor ?? 0;
     a.empenhado += e.empenhado;
     a.emAndamento += e.emAndamento;
     if (e.situacao === 'sobra') a.sobra += e.sobra;
+    if (e.situacao === 'naoEmpenhado') a.naoEmpenhado += e.sobra;
     if (a.situacao == null || PESO[e.situacao] < PESO[a.situacao]) a.situacao = e.situacao;
     m.set(chave, a);
   }
@@ -174,5 +185,6 @@ export const ROTULO_SITUACAO_SOBRA: Record<SituacaoDaSobra, string> = {
   conferir: 'Empenhado a confirmar',
   acima: 'Empenhado acima do valor',
   executada: 'Executada',
-  semValor: 'Sem valor do SIOP'
+  semValor: 'Sem valor do SIOP',
+  naoEmpenhado: 'Não empenhado'
 };
