@@ -114,3 +114,41 @@ export function mascaraOrdemBancaria(texto: string, anterior = ''): string {
 export function ordemBancariaValida(texto: string): boolean {
   return /^\d{4}OB\d{6}$/.test(texto.trim());
 }
+
+/** Data dd/mm/aaaa enquanto se digita. */
+export function mascaraDataBR(texto: string): string {
+  const d = texto.replace(/\D/g, '').slice(0, 8);
+  return [d.slice(0, 2), d.slice(2, 4), d.slice(4, 8)].filter(Boolean).join('/');
+}
+
+/** Mês mm/aaaa enquanto se digita. */
+export function mascaraMesBR(texto: string): string {
+  const d = texto.replace(/\D/g, '').slice(0, 6);
+  return [d.slice(0, 2), d.slice(2, 6)].filter(Boolean).join('/');
+}
+
+/** dd/mm/aaaa → aaaa-mm-dd; incompleta ou inexistente (31/02) → ''. */
+export function dataBRparaISO(texto: string): string {
+  const d = texto.replace(/\D/g, '');
+  if (d.length !== 8) return '';
+  const [dia, mes, ano] = [Number(d.slice(0, 2)), Number(d.slice(2, 4)), Number(d.slice(4, 8))];
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  if (ano < 1900 || data.getUTCFullYear() !== ano || data.getUTCMonth() !== mes - 1 || data.getUTCDate() !== dia) return '';
+  return `${d.slice(4, 8)}-${d.slice(2, 4)}-${d.slice(0, 2)}`;
+}
+
+/** mm/aaaa → aaaa-mm; incompleto ou mês inexistente → ''. */
+export function mesBRparaISO(texto: string): string {
+  const d = texto.replace(/\D/g, '');
+  if (d.length !== 6) return '';
+  const mes = Number(d.slice(0, 2));
+  if (mes < 1 || mes > 12 || Number(d.slice(2)) < 1900) return '';
+  return `${d.slice(2)}-${d.slice(0, 2)}`;
+}
+
+/** aaaa-mm-dd → dd/mm/aaaa e aaaa-mm → mm/aaaa (vazio se não houver). */
+export function isoParaBR(iso?: string | null): string {
+  const [a, m, d] = (iso || '').split('T')[0].split('-');
+  if (!a || !m) return '';
+  return d ? `${d}/${m}/${a}` : `${m}/${a}`;
+}

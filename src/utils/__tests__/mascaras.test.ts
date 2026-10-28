@@ -1,15 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import {
+  dataBRparaISO,
   documentoSeiValido,
+  isoParaBR,
   lerValorBR,
   mascaraCep,
   mascaraCnpj,
+  mascaraDataBR,
   mascaraDocumentoSei,
+  mascaraMesBR,
   mascaraOrdemBancaria,
   mascaraPercentual,
   mascaraProcessoSei,
   mascaraTelefone,
   mascaraValorBR,
+  mesBRparaISO,
   ordemBancariaValida,
   processoSeiValido
 } from '../mascaras';
@@ -118,5 +123,27 @@ describe('mascaraOrdemBancaria', () => {
   });
   it('apagar o OB volta ao ano', () => {
     expect(mascaraOrdemBancaria('2026O', '2026OB')).toBe('202');
+  });
+});
+
+describe('datas digitadas', () => {
+  it('monta dd/mm/aaaa e mm/aaaa', () => {
+    expect(mascaraDataBR('2810')).toBe('28/10');
+    expect(mascaraDataBR('28102026')).toBe('28/10/2026');
+    expect(mascaraMesBR('102026')).toBe('10/2026');
+  });
+  it('só converte data que existe', () => {
+    expect(dataBRparaISO('28/10/2026')).toBe('2026-10-28');
+    expect(dataBRparaISO('29/02/2024')).toBe('2024-02-29');
+    expect(dataBRparaISO('31/02/2026')).toBe('');
+    expect(dataBRparaISO('28/10/202')).toBe('');
+    expect(mesBRparaISO('10/2026')).toBe('2026-10');
+    expect(mesBRparaISO('13/2026')).toBe('');
+  });
+  it('volta do ISO', () => {
+    expect(isoParaBR('2026-10-28')).toBe('28/10/2026');
+    expect(isoParaBR('2026-10-28T12:00:00Z')).toBe('28/10/2026');
+    expect(isoParaBR('2026-10')).toBe('10/2026');
+    expect(isoParaBR('')).toBe('');
   });
 });

@@ -152,7 +152,7 @@ export const KitModal: React.FC<Props> = ({ kit, itens, nomesExistentes, hoje, s
                       </div>
                     )}
                   </div>
-                  <AppInput aria-label="Quantidade por kit" label="Por kit" type="number" min={1} step={1} value={String(l.quantidade || '')} onChange={(e) => muda(l.itemKey, { quantidade: Number(e.target.value) })} data-testid={`emendas-kit-qtd-${l.itemKey}`} />
+                  <AppInput aria-label="Quantidade por kit" label="Por kit" inputMode="numeric" value={String(l.quantidade || '')} onChange={(e) => muda(l.itemKey, { quantidade: Number(e.target.value.replace(/\D/g, '')) })} data-testid={`emendas-kit-qtd-${l.itemKey}`} />
                   <ActionButton action="remover" iconOnly label="Tirar do kit" type="button" onClick={() => setLinhas((ls) => ls.filter((x) => x.itemKey !== l.itemKey))} />
                 </div>
               );

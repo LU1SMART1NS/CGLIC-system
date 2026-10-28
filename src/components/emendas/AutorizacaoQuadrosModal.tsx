@@ -3,7 +3,7 @@ import { Copy } from 'lucide-react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { AppInput } from '../../design-system/components/FormFields';
+import { AppInput, AppDateInput } from '../../design-system/components/FormFields';
 import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { Tabs } from '../../design-system/components/Tabs';
@@ -234,7 +234,7 @@ export const AutorizacaoQuadrosModal: React.FC<Props> = ({ pedido, ataKey, pedid
               <b>Depois de assinada: registrar a solicitação {doQuadro.length > 1 ? `nos ${doQuadro.length} pedidos` : 'no pedido'}</b>
               <div className="reserva-barra">
                 <AppInput label="Documento SEI da autorização" inputMode="numeric" placeholder="Só números" value={numero} onChange={(e) => setNumero(e.target.value)} data-testid="emendas-autorizacao-sei" />
-                <AppInput label="Assinada em (opcional)" type="date" max={hojeEmBrasilia()} value={assinadaEm} onChange={(e) => setAssinadaEm(e.target.value)} data-testid="emendas-autorizacao-assinada" />
+                <AppDateInput label="Assinada em (opcional)" max={hojeEmBrasilia()} value={assinadaEm} onValueChange={setAssinadaEm} data-testid="emendas-autorizacao-assinada" />
                 <AppButton type="button" onClick={() => void registrar()} disabled={registrando || !numero.trim()} isLoading={registrando} data-testid="emendas-autorizacao-registrar">
                   Registrar
                 </AppButton>
