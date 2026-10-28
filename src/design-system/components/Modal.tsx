@@ -29,6 +29,9 @@ const WIDTHS = { sm: '420px', md: '560px', lg: '760px', xl: '1040px', xxl: '1240
 /** Camada única de modais: mesmo z-index, Esc para fechar, foco inicial e rolagem do fundo travada. */
 export const MODAL_Z_INDEX = 1000;
 
+/** Janelas abertas, da mais antiga para a de cima: com uma janela sobre outra, o Esc fecha só a de cima. */
+const abertas: symbol[] = [];
+
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
@@ -53,6 +56,16 @@ export const Modal: React.FC<ModalProps> = ({
     onCloseRef.current = onClose;
   }, [onClose]);
 
+  // Registro na pilha só ao abrir/fechar: mudar o dismissible (ex.: gravando) não leva a janela de baixo para cima.
+  const [eu] = React.useState(() => Symbol('modal'));
+  React.useEffect(() => {
+    if (!isOpen) return;
+    abertas.push(eu);
+    return () => {
+      abertas.splice(abertas.indexOf(eu), 1);
+    };
+  }, [isOpen, eu]);
+
   React.useEffect(() => {
     if (!isOpen) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -60,7 +73,7 @@ export const Modal: React.FC<ModalProps> = ({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && dismissible) onCloseRef.current();
+      if (e.key === 'Escape' && dismissible && abertas[abertas.length - 1] === eu) onCloseRef.current();
     };
     document.addEventListener('keydown', onKey);
     return () => {
@@ -68,7 +81,7 @@ export const Modal: React.FC<ModalProps> = ({
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus?.();
     };
-  }, [isOpen, dismissible]);
+  }, [isOpen, dismissible, eu]);
 
   if (!isOpen) return null;
 
