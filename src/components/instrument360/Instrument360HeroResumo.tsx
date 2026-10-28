@@ -45,7 +45,7 @@ export const Instrument360HeroResumo: React.FC<Instrument360HeroProps> = ({
 }) => {
   const [aberto, setAberto] = React.useState(false);
   const dock = useInstrument360Dock();
-  const texto = toSentenceCaseIfAllCaps(objeto);
+  const texto: React.ReactNode = typeof objeto === 'string' ? toSentenceCaseIfAllCaps(objeto) : objeto;
   const vigencia = (dates ?? []).find((d) => d.emphasis);
   const badges = (compact: boolean) => (
     <>

@@ -139,6 +139,12 @@ describe('Emenda 360', () => {
     const pedidos = render('/emendas/emendas/2026/31660008');
     expect(pedidos).toContain('emenda-360-pedidos');
     expect(pedidos).toContain('>1/2026<');
+    // Só no pedido (sem registro do SIOP): a frase diz qual pedido a emenda paga, sem "Não informado" nem "Emenda" repetida.
+    expect(pedidos).toContain('Emenda 3166 0008 / 2026');
+    expect(pedidos).toContain('Paga o Pedido 1/2026');
+    expect(pedidos).not.toContain('Nº conferido no SIOP');
+    expect(pedidos).not.toContain('Não informado');
+    expect(pedidos).not.toContain('Emenda 2026');
     const execucao = render('/emendas/emendas/2026/31660008?aba=execucao');
     expect(execucao).toContain('emenda-360-portal');
     expect(execucao).toContain('emenda-360-notas-ligadas');

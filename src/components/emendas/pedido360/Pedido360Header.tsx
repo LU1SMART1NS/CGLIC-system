@@ -6,6 +6,7 @@ import { AppButton } from '../../../design-system/components/AppButton';
 import { ProgressBar } from '../../../design-system/components/ProgressBar';
 import { formatCurrency } from '../../../utils/format';
 import { curto, dataBR } from '../../../utils/emendasKits';
+import { descricaoItemEmFrase } from '../../../utils/textCase';
 import {
   AUTOR_A_DEFINIR,
   avisoGrave,
@@ -54,8 +55,14 @@ interface Props {
 
 const emendaEmTexto = (numero: string) => (/^\d{8}$/.test(numero) ? `${numero.slice(0, 4)} ${numero.slice(4)}` : numero);
 
-/** Nome curto sem o ponto final (alguns nomes da CAEP terminam em ponto e a lista ficava "Desktop Básico.,"). */
-const semPontoFinal = (nome: string) => nome.trim().replace(/\.+$/, '');
+/**
+ * Nome curto sem ponto: alguns nomes da CAEP terminam em ponto ("Desktop Básico.") ou têm ponto no meio ("Cadeira de
+ * escritório. tipo executiva").
+ */
+const semPontos = (nome: string) => nome.trim().replace(/\.+$/, '').replace(/\.\s+/g, ' ');
+/** Itens nomeados no cartão; os demais ficam em "e mais N itens" (abre a aba Itens). Nome longo cortado com "…". */
+const ITENS_NO_CARTAO = 3;
+const LIMITE_DO_NOME = 40;
 
 /**
  * Cartão do topo do Pedido 360, no desenho das telas 360 (Instrument360Hero): o pedido como título ("Pedido 1/2026",
@@ -79,7 +86,7 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
   const resumo = resumoDasLinhas(p, notas);
 
   const beneficiariosDoPedido = [
-    ...new Set(ativas.map((l) => (l.beneficiarioId ? beneficiarios.get(l.beneficiarioId) : undefined)).filter((b): b is BeneficiarioEmenda => Boolean(b)).map((b) => rotuloBeneficiario(b)))
+    ...new Set(ativas.map((l) => (l.beneficiarioId ? beneficiarios.get(l.beneficiarioId) : undefined)).filter((b): b is BeneficiarioEmenda => Boolean(b)).map((b) => b.sigla?.trim() || rotuloBeneficiario(b)))
   ];
   const para = beneficiariosDoPedido.length
     ? `para ${beneficiariosDoPedido.slice(0, 2).join(' e ')}${beneficiariosDoPedido.length > 2 ? ` e mais ${beneficiariosDoPedido.length - 2}` : ''}`
@@ -94,25 +101,50 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
       ) : (
         <span>{nomeDoAutor}</span>
       )}
-      {[autor ? linhaDoAutor(autor) : null, para].filter(Boolean).map((t) => (
+      {/* Bancada: o nome já diz "Bancada DF"; o tipo e a UF só se repetiriam. */}
+      {[autor && autor.tipo !== 'BANCADA' ? linhaDoAutor(autor) : null, para].filter(Boolean).map((t) => (
         <span key={t}>· {t}</span>
       ))}
     </span>
   );
-  // O mesmo item aparece uma vez por beneficiário: soma as quantidades pelo nome, na ordem em que aparece.
+  // O mesmo item aparece uma vez por beneficiário: soma as quantidades pelo nome e mostra os de maior quantidade.
+  // "304× nome" e "·" entre os itens: a vírgula fica só dentro dos nomes ("Veículo, tipo Camioneta/SUV").
   const porNome = new Map<string, number>();
   for (const l of ativas) {
     const item = l.tipo === 'KIT' || !l.itemKey ? undefined : itens.get(l.itemKey);
-    const nome = l.tipo === 'KIT' ? (l.kitNome ?? 'kit') : semPontoFinal(item?.nomeCurto?.trim() || curto(item?.descricao ?? l.itemKey ?? '', 40));
+    const nome = l.tipo === 'KIT' ? (l.kitNome ?? 'kit') : semPontos(item?.nomeCurto?.trim() || descricaoItemEmFrase(item?.descricao ?? l.itemKey ?? ''));
     porNome.set(nome, (porNome.get(nome) ?? 0) + l.quantidade);
   }
-  const nomes = [...porNome].map(([nome, qtd]) => `${qtd} ${nome}`);
-  const objeto = ativas.length
-    ? `${ativas.length === 1 ? '1 item' : `${ativas.length} itens`}${atas.length > 1 ? ` em ${atas.length} atas` : ''}: ${nomes.join(', ')}.`
-    : 'Sem itens.';
+  const maiores = [...porNome].sort((a, b) => b[1] - a[1]);
+  const restantes = maiores.length - ITENS_NO_CARTAO;
+  const objeto = ativas.length ? (
+    <span data-testid="pedido-360-resumo-itens">
+      {ativas.length === 1 ? '1 item' : `${ativas.length} itens`}
+      {atas.length > 1 ? ` em ${atas.length} atas` : ''}
+      {maiores.slice(0, ITENS_NO_CARTAO).map(([nome, qtd]) => (
+        <React.Fragment key={nome}>
+          {' · '}
+          <span title={nome.length > LIMITE_DO_NOME ? nome : undefined}>
+            {qtd}× {curto(nome, LIMITE_DO_NOME)}
+          </span>
+        </React.Fragment>
+      ))}
+      {restantes > 0 && (
+        <>
+          {' · '}
+          <AppButton size="xs" variant="link" onClick={() => onAba('itens')} data-testid="pedido-360-mais-itens">
+            e mais {restantes === 1 ? '1 item' : `${restantes} itens`}
+          </AppButton>
+        </>
+      )}
+    </span>
+  ) : (
+    'Sem itens.'
+  );
 
   const emenda = p.siopEmenda ? `Emenda ${emendaEmTexto(p.siopEmenda)}${p.siopEmendaAno ? ` / ${p.siopEmendaAno}` : ' · ano a informar'}` : 'Emenda a informar';
-  const eyebrow = ['Pedido de emenda', emenda].join(' · ');
+  // O título já diz "Pedido": a linha de cima só com a emenda que paga o pedido.
+  const eyebrow = emenda;
 
   const datas = [
     // Da planilha não há data de reserva: o título já diz "Reserva da planilha".

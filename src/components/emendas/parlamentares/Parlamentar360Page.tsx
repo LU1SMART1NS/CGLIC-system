@@ -162,11 +162,12 @@ export const Parlamentar360Page: React.FC = () => {
     );
   }
 
+  const bancada = autor.tipo === 'BANCADA';
   // Quem atende e o primeiro pedido descrevem o parlamentar: valem todos os anos.
   const ativos = todosDoParlamentar.filter((p) => p.etapa !== 'CANCELADO');
   const atendidos = [
     ...new Set(
-      ativos.flatMap((p) => linhasAtivas(p).map((l) => (l.beneficiarioId ? beneficiarios.get(l.beneficiarioId) : undefined))).filter((b): b is NonNullable<typeof b> => Boolean(b)).map((b) => rotuloBeneficiario(b))
+      ativos.flatMap((p) => linhasAtivas(p).map((l) => (l.beneficiarioId ? beneficiarios.get(l.beneficiarioId) : undefined))).filter((b): b is NonNullable<typeof b> => Boolean(b)).map((b) => b.sigla?.trim() || rotuloBeneficiario(b))
     )
   ];
   const ultimaConversa = emendas.flatMap((e) => e.contatos.map((c) => c.contatoEm)).sort().at(-1) ?? null;
@@ -217,9 +218,15 @@ export const Parlamentar360Page: React.FC = () => {
             </>
           }
           title={autor.nome}
-          eyebrow={[TIPO_POR_EXTENSO[autor.tipo] ?? autor.tipo, autor.partido, autor.uf, autor.legislatura ? `${autor.legislatura}ª legislatura` : null].filter(Boolean).join(' · ')}
-          status={{ faixa: 'REGULAR', label: autor.emExercicio === false ? 'Fora de exercício' : 'Em exercício', neutral: true }}
-          dockSubtitle={linhaDoAutor(autor)}
+          // Bancada: o nome já diz "Bancada DF"; sem a linha de cima repetida, sem "Em exercício" (vale para quem tem
+          // mandato) e sem o código interno "B:DF" no pé.
+          eyebrow={
+            bancada
+              ? undefined
+              : [TIPO_POR_EXTENSO[autor.tipo] ?? autor.tipo, autor.partido, autor.uf, autor.legislatura ? `${autor.legislatura}ª legislatura` : null].filter(Boolean).join(' · ')
+          }
+          status={bancada ? undefined : { faixa: 'REGULAR', label: autor.emExercicio === false ? 'Fora de exercício' : 'Em exercício', neutral: true }}
+          dockSubtitle={bancada ? undefined : linhaDoAutor(autor)}
           subtitle={subtitulo || undefined}
           manager={
             podeGerir && contatoDoAutor && (contatoDoAutor.contatoNome || contatoDoAutor.contatoTelefone || contatoDoAutor.contatoEmail) ? (
@@ -236,7 +243,7 @@ export const Parlamentar360Page: React.FC = () => {
             ...(autor.lidoEm ? [{ label: 'Dados lidos em', value: dataBR(autor.lidoEm) }] : [])
           ]}
           identifiersTestId="parlamentar-360-identificadores"
-          identifiers={[{ label: 'Código do autor', value: autor.id }]}
+          identifiers={bancada ? [] : [{ label: 'Código do autor', value: autor.id }]}
         >
           <div data-testid="parlamentar-360-indicadores">
             <HealthTileGrid columns={4}>
