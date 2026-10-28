@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { mascaraCep, mascaraCnpj, mascaraTelefone } from '../../utils/mascaras';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
@@ -260,7 +261,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
                 inputMode="numeric"
                 placeholder="00.000.000/0000-00"
                 onChange={(e) => {
-                  setCnpj(e.target.value);
+                  setCnpj(mascaraCnpj(e.target.value));
                   if (!soDigitos(e.target.value)) setReceita(null);
                 }}
                 onKeyDown={(e) => {
@@ -407,7 +408,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
                 value={f.entregaCep}
                 inputMode="numeric"
                 placeholder="00000-000"
-                onChange={(e) => muda('entregaCep', e.target.value)}
+                onChange={(e) => muda('entregaCep', mascaraCep(e.target.value))}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -446,7 +447,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
               inputMode="tel"
               placeholder="(00) 00000-0000"
               value={f.responsavelTelefone}
-              onChange={(e) => muda('responsavelTelefone', e.target.value)}
+              onChange={(e) => muda('responsavelTelefone', mascaraTelefone(e.target.value))}
               onBlur={() => muda('responsavelTelefone', formatarTelefone(f.responsavelTelefone))}
             />
             <AppInput

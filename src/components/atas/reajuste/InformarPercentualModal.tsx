@@ -1,4 +1,5 @@
 import React from 'react';
+import { mascaraPercentual } from '../../../utils/mascaras';
 import { ActionButton, AppButton, AppInput, Modal, NoticeBar, useToast } from '../../../design-system';
 import { useAcoesReajuste } from '../../../hooks/useReajusteAtas';
 import type { CicloReajuste, ReajustePublicado } from '../../../services/reajusteAtasService';
@@ -99,7 +100,7 @@ export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numero
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
             Percentual aplicado
             <AppInput id="reajuste-percentual" inputMode="decimal" placeholder="4,44" value={valor} style={{ width: 140 }}
-              onChange={(e) => setValor(e.target.value.replace(/[^\d.,]/g, ''))} data-testid="informar-percentual-valor" />
+              onChange={(e) => setValor(mascaraPercentual(e.target.value))} data-testid="informar-percentual-valor" />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
             Início dos efeitos
