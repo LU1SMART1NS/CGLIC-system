@@ -3,7 +3,8 @@ import ExcelJS from 'exceljs';
 import type { ItemCaep, KitEmenda } from '../emendasService';
 import { resumirFatias } from '../../config/gruposGti';
 import { montarLinhasItensCaep, montarLinhasKitsCaep } from '../../utils/emendasItensSaldo';
-import { gerarExcelDeSaldo, planilhasDeSaldo } from '../emendasExcelService';
+import { planilhasDeSaldo } from '../emendasExcelService';
+import { gerarExcel } from '../excelSimples';
 
 const HOJE = '2026-10-28';
 const item = (itemKey: string, numeroItem: string, alocado: number, extra: Partial<ItemCaep> = {}): ItemCaep => ({
@@ -28,7 +29,7 @@ describe('Excel de Emendas › Itens: itens e kits com saldo', () => {
   });
 
   it('gera o .xlsx com as duas abas', async () => {
-    const blob = await gerarExcelDeSaldo(planilhas(), HOJE);
+    const blob = await gerarExcel(planilhas());
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await blob.arrayBuffer());
     expect(wb.worksheets.map((w) => w.name)).toEqual(['Itens com saldo', 'Kits com saldo']);

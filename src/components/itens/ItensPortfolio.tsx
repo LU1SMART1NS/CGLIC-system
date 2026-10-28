@@ -19,7 +19,7 @@ import { canFilterByGestor, listGestores, matchesGestorFilter } from '../carteir
 import { comparePrazo, matchesStatusFilter, type CarteiraStatusFilter } from '../carteira/carteiraPrazo';
 import { TODAS_UNIDADES } from '../carteira/CarteiraExecucaoSelects';
 import { formatCurrency } from '../carteira/carteiraFormat';
-import { ExportExcelModal } from '../modals/ExportExcelModal';
+import { ExportarCarteiraItensModal } from './ExportarCarteiraItensModal';
 import { passaFiltroNivel, type NivelAtendimento } from '../../utils/itemAtendimento';
 import type { CarteiraItemRow } from '../../utils/carteiraItens';
 import { ItensPortfolioFilters, ITENS_FILTER_SCHEMA } from './ItensPortfolioFilters';
@@ -174,6 +174,8 @@ export const ItensPortfolio: React.FC = () => {
     [setFilter]
   );
 
+  const exportarCtx = useMemo(() => ({ fatiasDaLinha }), [fatiasDaLinha]);
+
   const abrirItem = (row: CarteiraItemRow) =>
     navigateToDetail(buildAtaItemPath(row.arp.numeroAtaRegistroPreco, row.arp.codigoUnidadeGerenciadora, row.item.numeroItem));
 
@@ -195,7 +197,7 @@ export const ItensPortfolio: React.FC = () => {
         icon={<ListChecks size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
-            <ActionButton action="exportar" label="Exportar Relatório" onClick={() => setIsExportOpen(true)} data-testid="itens-export-btn" />
+            <ActionButton action="exportar" onClick={() => setIsExportOpen(true)} disabled={isBusy || rows.length === 0} data-testid="itens-export-btn" />
           </>
         }
       />
@@ -277,7 +279,7 @@ export const ItensPortfolio: React.FC = () => {
         </>
       )}
 
-      <ExportExcelModal isOpen={isExportOpen} onClose={() => setIsExportOpen(false)} atas={scopedArps} itemsByAta={itemsByAta} />
+      {isExportOpen && <ExportarCarteiraItensModal isOpen onClose={() => setIsExportOpen(false)} naTela={lista} todos={rows} ctx={exportarCtx} />}
     </PageContainer>
   );
 };

@@ -1,7 +1,7 @@
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
-import { SelectionProvider, useSelection } from './context/SelectionContext';
+import { SelectionProvider } from './context/SelectionContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { rotaInicialDoPerfil } from './config/navigation';
 import { ToastProvider, ConfirmProvider } from './design-system';
@@ -17,8 +17,7 @@ import { temSenhaPendente } from './utils/senhaPendente';
 import { lazyComRecarga } from './utils/recargaAposPublicacao';
 import { FalhaTelaBoundary } from './components/layout/FalhaTelaBoundary';
 
-// Cada tela vira um pacote próprio, baixado só quando a rota é aberta. O ExportExcelModal leva o exceljs
-// junto e só é baixado quando o modal abre. A tela de login fica no pacote principal (é a primeira de quem ainda não entrou).
+// Cada tela vira um pacote próprio, baixado só quando a rota é aberta. A tela de login fica no pacote principal (é a primeira de quem ainda não entrou).
 // Se o pacote sumiu numa publicação nova, lazyComRecarga recarrega a página uma vez.
 const GestaoInstrumentosRoute = lazyComRecarga(() => import('./routes/GestaoInstrumentosRoute').then((m) => ({ default: m.GestaoInstrumentosRoute })));
 const ArpSearchRoute = lazyComRecarga(() => import('./routes/ArpSearchRoute').then((m) => ({ default: m.ArpSearchRoute })));
@@ -55,7 +54,6 @@ const Parlamentar360Page = lazyComRecarga(() => import('./components/emendas/par
 const EmendasListaPage = lazyComRecarga(() => import('./components/emendas/emendas360/EmendasListaPage').then((m) => ({ default: m.EmendasListaPage })));
 const Emenda360Page = lazyComRecarga(() => import('./components/emendas/emendas360/Emenda360Page').then((m) => ({ default: m.Emenda360Page })));
 const GruposUasgsRoute = lazyComRecarga(() => import('./routes/GruposUasgsRoute').then((m) => ({ default: m.GruposUasgsRoute })));
-const ExportExcelModal = lazyComRecarga(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
 
 const AuthRedirectHandler: React.FC = () => {
   const navigate = useNavigate();
@@ -192,8 +190,6 @@ const ProtectedLayout: React.FC<{
 };
 
 const AppContent: React.FC = () => {
-  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
-  const { selectedArp, globalArps, globalItemsByAta } = useSelection();
   const { pathname } = useLocation();
   const isPublicAuthRoute = ['/login', '/definir-senha', '/redefinir-senha'].includes(pathname);
 
@@ -212,9 +208,7 @@ const AppContent: React.FC = () => {
           <Route
             element={
               <ProtectedLayout>
-                <AppShell
-                  onOpenExportModal={() => setIsExportModalOpen(true)}
-                />
+                <AppShell />
               </ProtectedLayout>
             }
           >
@@ -518,18 +512,6 @@ const AppContent: React.FC = () => {
         </Routes>
       </Suspense>
       </FalhaTelaBoundary>
-
-      {isExportModalOpen && (
-        <Suspense fallback={null}>
-          <ExportExcelModal
-            isOpen={isExportModalOpen}
-            onClose={() => setIsExportModalOpen(false)}
-            atas={globalArps}
-            itemsByAta={globalItemsByAta}
-            selectedAta={selectedArp}
-          />
-        </Suspense>
-      )}
 
       {!isPublicAuthRoute && <AppFooter />}
     </div>
