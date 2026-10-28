@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { formatPncpAtaPdfUrl } from '../pncpUtils';
-import { orgaosAcimaDaAtaAssinada, registradoAcimaDoSaldo } from '../registradoAcima';
+import { orgaosAcimaDaAtaAssinada, registradoAcimaDoSaldo, ataFoiProrrogada } from '../registradoAcima';
 
 describe('registrado acima do homologado (migration 142)', () => {
   it('PDF da ata no PNCP pelo número de controle', () => {
@@ -25,5 +25,13 @@ describe('registrado acima do homologado (migration 142)', () => {
         { uasg: '200334', ehSenasp: false, assinada: 272, registrado: 544, acima: 272 },
         { uasg: '200331', ehSenasp: true, assinada: 89, registrado: 96, acima: 7 }
       ]);
+  });
+});
+
+describe('ataFoiProrrogada (migration 223)', () => {
+  it('vigência de mais de um ano é prorrogada; um ano ou sem data, não', () => {
+    expect(ataFoiProrrogada('2024-12-12', '2026-12-11')).toBe(true);
+    expect(ataFoiProrrogada('2025-10-10', '2026-10-10')).toBe(false);
+    expect(ataFoiProrrogada(null, '2026-10-10')).toBe(false);
   });
 });

@@ -146,7 +146,7 @@ describe('QuantitativosTab', () => {
   };
   const mergulho = { quantitativos: MERGULHO, registradoSenasp: 96, baseSaldo: 89, contratadoSenasp: 64, alocado: 0, registradoAcima: AVISO, pregaoItem: 'Pregão 90023/2024 · item 5', pdfDaAta: 'https://pncp.gov.br/pncp-api/v1/orgaos/00394494000136/compras/2024/1130/atas/1/arquivos/1' };
 
-  it('registrado acima do homologado: aviso com órgãos acima, efeito no saldo e link do PDF; ✓ só para quem resolve', () => {
+  it('registrado acima do homologado: aviso com órgãos acima, efeito no saldo, link do PDF e as duas decisões (migration 223)', () => {
     const h = html({ ...mergulho, podeInformar: true });
     expect(h).toContain('data-testid="registrado-acima-aviso"');
     expect(h).toContain('Pregão 90023/2024 · item 5. Homologado <b>1.782</b> × soma do registrado no Compras.gov.br <b>2.081</b>');
@@ -159,16 +159,20 @@ describe('QuantitativosTab', () => {
     expect(h).toContain('O excedente dos participantes (292) não mexe no saldo da SENASP.');
     expect(h).toContain('Confira a IRP e o cadastro da ata no Compras.gov.br.');
     expect(h).toContain('arquivos/1');
-    expect(h).toContain('data-testid="registrado-acima-resolver"');
+    expect(h).toContain('data-testid="registrado-acima-manter"');
+    expect(h).toContain('Manter fora do saldo');
+    // Ata não prorrogada: aceitar desligado, com o motivo.
+    expect(h).toContain('Sem prorrogação não há termo que renove os quantitativos');
     expect(h).toContain('menor entre registrado (96) e ata assinada (89)');
     expect(h).toContain('7 acima da ata assinada fora do saldo');
   });
 
-  it('gestor de saldo vê o aviso sem o ✓', () => {
+  it('gestor de saldo: sem quadro vermelho nem botões, só o que fica fora do saldo (27/10/2026)', () => {
     const h = html({ ...mergulho, podeInformar: false });
-    expect(h).toContain('data-testid="registrado-acima-aviso"');
-    expect(h).not.toContain('data-testid="registrado-acima-resolver"');
-    expect(h).toContain('Quem confere, corrige e resolve este aviso é o gestor da ata.');
+    expect(h).not.toContain('data-testid="registrado-acima-aviso"');
+    expect(h).not.toContain('data-testid="registrado-acima-manter"');
+    expect(h).toContain('data-testid="registrado-acima-so-leitura"');
+    expect(h).toContain('7 da SENASP ficam fora do saldo. Quem confere é o gestor da ata.');
   });
 
   it('sem a ata assinada: desconto provisório de todo o excedente', () => {

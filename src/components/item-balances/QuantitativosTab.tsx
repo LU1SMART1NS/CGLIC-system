@@ -71,6 +71,8 @@ export interface QuantitativosTabProps {
   /** Ata do item: o aviso "registrado acima" mostra o termo de prorrogação dela (migration 222). */
   numeroAta?: string;
   uasgAta?: string;
+  /** Ata prorrogada (vigência de mais de um ano): só nela dá para aceitar o registrado (migration 223). */
+  ataProrrogada?: boolean;
   /** "Pregão 90023/2024 · item 5". */
   pregaoItem?: string;
   podeInformar: boolean;
@@ -553,6 +555,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
           nomeDe={nomeDe}
           numeroAta={p.numeroAta}
           uasg={p.uasgAta}
+          ataProrrogada={p.ataProrrogada}
         />
       )}
       {verRegistros && q.registros.length > 0 && (

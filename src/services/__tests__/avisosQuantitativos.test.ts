@@ -67,6 +67,11 @@ describe('Início — registrado acima do homologado', () => {
     expect(outraAta.items.filter((i) => i.category === 'REGISTRADO_ACIMA')).toHaveLength(1);
   });
 
+  it('aviso com decisão do gestor da ata (migration 223) sai da fila', () => {
+    const r = calculateAttentionSummary({ arpItems: [acima()], registradoAcimaDecididos: new Set(['SALDO::00065/2024-200331::5::REGISTRADO-ACIMA-2081.00-1782.00']), currentDate: new Date('2026-10-16T12:00:00') } as any);
+    expect(r.items.filter((i) => i.category === 'REGISTRADO_ACIMA')).toEqual([]);
+  });
+
   it('item sem excedente não gera aviso; o aviso de quantitativos não repete a soma acima', () => {
     expect(avisos([acima({ registrado_acima_chave: null })])).toEqual([]);
     expect(motivosDosQuantitativos(acima())).toEqual([]);

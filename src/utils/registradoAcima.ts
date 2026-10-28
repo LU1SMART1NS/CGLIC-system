@@ -58,3 +58,10 @@ export function orgaosAcimaDaAtaAssinada(orgaos: OrgaoQuantitativo[], gerenciado
   }
   return lista.sort((a, b) => b.acima - a.acima);
 }
+
+/** Ata prorrogada: vigência de mais de um ano (a inicial é de 1 ano, Lei 14.133 art. 84). */
+export function ataFoiProrrogada(inicio: string | null | undefined, fim: string | null | undefined): boolean {
+  if (!inicio || !fim) return false;
+  const dias = (Date.parse(fim.slice(0, 10)) - Date.parse(inicio.slice(0, 10))) / 86_400_000;
+  return Number.isFinite(dias) && dias > 400;
+}
