@@ -294,7 +294,7 @@ export const ROTULO_AVISO: Record<TipoAviso, string> = {
   semAutorizacao: 'Item sem empenho autorizado',
   semNota: 'Sem nota de empenho',
   semBeneficiario: 'Item sem beneficiário',
-  pedidoParado: `Parado há mais de ${AVISO_PARADO_DIAS} dias na etapa`
+  pedidoParado: `Parado há mais de ${AVISO_PARADO_DIAS} dias`
 };
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
