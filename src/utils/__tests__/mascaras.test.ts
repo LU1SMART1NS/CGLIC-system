@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { documentoSeiValido, lerValorBR, mascaraDocumentoSei, mascaraProcessoSei, mascaraValorBR, processoSeiValido } from '../mascaras';
+import {
+  documentoSeiValido,
+  lerValorBR,
+  mascaraCep,
+  mascaraCnpj,
+  mascaraDocumentoSei,
+  mascaraOrdemBancaria,
+  mascaraPercentual,
+  mascaraProcessoSei,
+  mascaraTelefone,
+  mascaraValorBR,
+  ordemBancariaValida,
+  processoSeiValido
+} from '../mascaras';
 
 describe('mascaraProcessoSei', () => {
   it('monta a máscara enquanto se digita', () => {
@@ -60,5 +73,50 @@ describe('mascaraValorBR', () => {
     expect(lerValorBR('1.200.000,50')).toBe(1200000.5);
     expect(lerValorBR('1.200')).toBe(1200);
     expect(lerValorBR('')).toBeNull();
+  });
+});
+
+describe('mascaraCnpj, mascaraCep e mascaraTelefone', () => {
+  it('CNPJ aos poucos e colado', () => {
+    expect(mascaraCnpj('123')).toBe('12.3');
+    expect(mascaraCnpj('123456789')).toBe('12.345.678/9');
+    expect(mascaraCnpj('12345678000195')).toBe('12.345.678/0001-95');
+    expect(mascaraCnpj('12.345.678/0001-95x9')).toBe('12.345.678/0001-95');
+  });
+  it('CEP', () => {
+    expect(mascaraCep('70064')).toBe('70064');
+    expect(mascaraCep('700649009')).toBe('70064-900');
+  });
+  it('telefone fixo, celular e com +55', () => {
+    expect(mascaraTelefone('6')).toBe('(6');
+    expect(mascaraTelefone('613')).toBe('(61) 3');
+    expect(mascaraTelefone('6133331111')).toBe('(61) 3333-1111');
+    expect(mascaraTelefone('61999990000')).toBe('(61) 99999-0000');
+    expect(mascaraTelefone('+55 61 99999-0000')).toBe('(61) 99999-0000');
+    expect(mascaraTelefone('')).toBe('');
+  });
+});
+
+describe('mascaraPercentual', () => {
+  it('ponto vira vírgula e limita as casas', () => {
+    expect(mascaraPercentual('4.44')).toBe('4,44');
+    expect(mascaraPercentual('4,724919')).toBe('4,72491');
+    expect(mascaraPercentual('123')).toBe('12');
+    expect(mascaraPercentual(',5')).toBe('0,5');
+    expect(mascaraPercentual('4,4,4')).toBe('4,44');
+  });
+});
+
+describe('mascaraOrdemBancaria', () => {
+  it('põe o OB depois do ano', () => {
+    expect(mascaraOrdemBancaria('202')).toBe('202');
+    expect(mascaraOrdemBancaria('2026')).toBe('2026OB');
+    expect(mascaraOrdemBancaria('2026ob800123')).toBe('2026OB800123');
+    expect(mascaraOrdemBancaria('2026800123')).toBe('2026OB800123');
+    expect(ordemBancariaValida('2026OB800123')).toBe(true);
+    expect(ordemBancariaValida('2026OB80012')).toBe(false);
+  });
+  it('apagar o OB volta ao ano', () => {
+    expect(mascaraOrdemBancaria('2026O', '2026OB')).toBe('202');
   });
 });

@@ -56,3 +56,61 @@ export function lerValorBR(texto: string): number | null {
   const n = Number(texto.replace(/\./g, '').replace(',', '.'));
   return Number.isFinite(n) ? n : null;
 }
+
+/** CNPJ montado enquanto se digita: 00.000.000/0000-00 (14 dígitos). */
+export function mascaraCnpj(texto: string): string {
+  const d = texto.replace(/\D/g, '').slice(0, 14);
+  let s = d.slice(0, 2);
+  if (d.length > 2) s += `.${d.slice(2, 5)}`;
+  if (d.length > 5) s += `.${d.slice(5, 8)}`;
+  if (d.length > 8) s += `/${d.slice(8, 12)}`;
+  if (d.length > 12) s += `-${d.slice(12)}`;
+  return s;
+}
+
+/** CEP: 00000-000. */
+export function mascaraCep(texto: string): string {
+  const d = texto.replace(/\D/g, '').slice(0, 8);
+  return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+}
+
+/**
+ * Telefone com DDD: (61) 9999-0000 ou (61) 99999-0000. O hífen anda para a posição do celular no 11º dígito;
+ * "+55" colado na frente é tirado.
+ */
+export function mascaraTelefone(texto: string): string {
+  let d = texto.replace(/\D/g, '');
+  if (d.length > 11 && d.startsWith('55')) d = d.slice(2);
+  d = d.slice(0, 11);
+  if (!d) return '';
+  if (d.length <= 2) return `(${d}`;
+  const ddd = `(${d.slice(0, 2)}) `;
+  const resto = d.slice(2);
+  if (resto.length <= 4) return ddd + resto;
+  const corte = resto.length === 9 ? 5 : 4;
+  return `${ddd}${resto.slice(0, corte)}-${resto.slice(corte)}`;
+}
+
+/** Percentual com vírgula: até 2 dígitos inteiros e 5 decimais (o PNCP publica índices como 4,72491). Ponto vira vírgula. */
+export function mascaraPercentual(texto: string): string {
+  const limpo = texto.replace(/\./g, ',').replace(/[^\d,]/g, '');
+  const virgula = limpo.indexOf(',');
+  const inteiro = (virgula >= 0 ? limpo.slice(0, virgula) : limpo).slice(0, 2);
+  if (virgula < 0) return inteiro;
+  return `${inteiro || '0'},${limpo.slice(virgula + 1).replace(/,/g, '').slice(0, 5)}`;
+}
+
+/**
+ * Ordem bancária no formato do Tesouro: 2026OB800123 (ano + OB + 6 dígitos). O "OB" entra sozinho depois do ano;
+ * com `anterior`, apagar o "B" volta ao ano em vez de recolocar o "OB".
+ */
+export function mascaraOrdemBancaria(texto: string, anterior = ''): string {
+  const d = texto.replace(/\D/g, '').slice(0, 10);
+  if (d.length < 4) return d;
+  if (d.length === 4 && texto.length < anterior.length) return d.slice(0, 3);
+  return `${d.slice(0, 4)}OB${d.slice(4)}`;
+}
+
+export function ordemBancariaValida(texto: string): boolean {
+  return /^\d{4}OB\d{6}$/.test(texto.trim());
+}

@@ -22,7 +22,7 @@ import {
   todayISO
 } from './paymentFormUtils';
 import { formatCurrency } from '../../../utils/format';
-import { documentoSeiValido, mascaraDocumentoSei, mascaraProcessoSei, processoSeiValido } from '../../../utils/mascaras';
+import { documentoSeiValido, mascaraDocumentoSei, mascaraOrdemBancaria, mascaraProcessoSei, ordemBancariaValida, processoSeiValido } from '../../../utils/mascaras';
 
 
 export const Field: React.FC<{ id: string; label: string; children: React.ReactNode; hint?: React.ReactNode }> = ({ id, label, children, hint }) => (
@@ -453,6 +453,7 @@ export const MarcoSimplesModal: React.FC<{
     e.preventDefault();
     if (!dataISO) return;
     if (marco === 'ENVIADO_COLOG' && !documentoSeiValido(sei)) return setError('Documento SEI: só números, de 7 a 10 dígitos.');
+    if (marco === 'RESULTADO_CGOFI' && resultado === 'PAGO' && !ordemBancariaValida(numeroOb)) return setError('A ordem bancária tem o ano, OB e 6 dígitos (ex.: 2026OB800123).');
     const comum = { cycleKey: cycle.cycleKey, data: dataISO, registradoPorNome };
     let input: RegisterPaymentMarcoInput;
     if (marco === 'RETORNO') {
@@ -524,7 +525,7 @@ export const MarcoSimplesModal: React.FC<{
         {marco === 'RESULTADO_CGOFI' && resultado === 'PAGO' && (
           <>
             <Field id="marco-ob" label="Número da ordem bancária *">
-              <input id="marco-ob" className="form-input" type="text" placeholder="Ex: 2026OB800123" value={numeroOb} onChange={(e) => setNumeroOb(e.target.value.toUpperCase())} required />
+              <input id="marco-ob" className="form-input" type="text" inputMode="numeric" placeholder="Ex: 2026OB800123" value={numeroOb} onChange={(e) => setNumeroOb(mascaraOrdemBancaria(e.target.value, numeroOb))} required />
             </Field>
             <Field id="marco-just-ob" label="Justificativa (só se a OB ainda não aparece no Tesouro)">
               <input id="marco-just-ob" className="form-input" type="text" value={justificativa} onChange={(e) => setJustificativa(e.target.value)} />

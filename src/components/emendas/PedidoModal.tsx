@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { mascaraTelefone } from '../../utils/mascaras';
 import { ChevronDown, Search } from 'lucide-react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
@@ -1180,10 +1181,9 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   placeholder="(00) 00000-0000"
                   value={contatoTelefone}
                   onChange={(e) => {
-                    setContatoTelefone(e.target.value);
+                    setContatoTelefone(mascaraTelefone(e.target.value));
                     setContatoSugerido(false);
                   }}
-                  onBlur={() => setContatoTelefone(formatarTelefone(contatoTelefone))}
                   data-testid="emendas-pedido-contato-telefone"
                 />
                 <AppInput label="E-mail" type="email" placeholder="nome@camara.leg.br" value={contatoEmail} onChange={(e) => setContatoEmail(e.target.value)} data-testid="emendas-pedido-contato-email" />
