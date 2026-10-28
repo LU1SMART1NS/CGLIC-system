@@ -142,7 +142,7 @@ export const HolidaysPage: React.FC = () => {
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Feriados"
-        subtitle="Datas sem expediente descontadas dos prazos em dias úteis."
+        subtitle="Datas sem expediente descontadas dos prazos em dias úteis. O sistema cadastra sozinho o ano corrente e o seguinte, se estiverem vazios; confira os pontos facultativos com a portaria do ano."
         icon={<CalendarOff size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
