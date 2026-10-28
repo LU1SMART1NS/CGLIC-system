@@ -189,3 +189,17 @@ describe('gestaoInstrumentosRowHelpers — chave de correlação (getLookupKey)'
     expect(getLookupKey(item)).toBe('200330-12/2026');
   });
 });
+
+describe('Cobrar resposta (plano automático, migration 225)', () => {
+  const base = { severity: 'URGENTE' as const, title: 'Pedir a anuência da contratada', description: 'pedido enviado', taskId: 't9', uasg: '200331' };
+
+  it('o motivo aparece como "Cobrar resposta" e o ✓ registra a resposta (contrato e ata)', async () => {
+    const { getAlvoResolucao, getMotivoInfo } = await import('../gestaoInstrumentosRowHelpers');
+    expect(getMotivoInfo('COBRAR_RESPOSTA').label).toBe('Cobrar resposta');
+    const contrato: AttentionItemWithUasg = { ...base, id: 'ATT-TASK-COBRAR-x', category: 'COBRAR_RESPOSTA', contractKey: '200331-00312-2026', numeroContrato: 'Contrato 312/2026' };
+    expect(getAlvoResolucao(contrato)).toMatchObject({ tipo: 'RESPOSTA_CONTRATO', taskId: 't9' });
+    const ata: AttentionItemWithUasg = { ...base, id: 'ATT-ATA-TASK-t9', category: 'COBRAR_RESPOSTA', arpKey: '00060/2025-200331', numeroAta: '00060/2025' };
+    expect(getAlvoResolucao(ata)).toMatchObject({ tipo: 'RESPOSTA_ATA', taskId: 't9' });
+    expect(getAcaoInfo(ata).label).toBe('Abrir tarefa');
+  });
+});

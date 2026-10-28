@@ -28,7 +28,8 @@ import { SeverityBadge } from '../../design-system/components/SeverityBadge';
 import { ActionButton, AppButton, DataTable, EmptyState, InfoHint, Modal, SummaryBar, useConfirmDialog } from '../../design-system';
 import { lerNumeroSei, descreverNumeroSei } from '../../utils/numeroSei';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
-import type { AtualizarModuloInput, MarcaTarefaInput } from '../../adapters/modeloGestaoRpcAdapter';
+import type { AtualizarModuloInput, MarcaTarefaInput, TarefaDoPregao } from '../../adapters/modeloGestaoRpcAdapter';
+import type { TaskPlanModuleRef } from '../../types';
 import {
   aguardandoResposta,
   formatarEsforco,
@@ -39,7 +40,18 @@ import {
   textoRegraResposta,
   type GrupoTarefa
 } from '../../utils/modeloGestao';
-import { AcaoEtiqueta, MarcaOrientarForm, ModuloDados, PlanoContadores, PregaoEtiqueta, RegraDetalhes, type ContagemGrupos } from './modeloGestaoPlano';
+import {
+  AcaoEtiqueta,
+  DispensarModuloModal,
+  FonteFechou,
+  MarcaOrientarForm,
+  ModuloDados,
+  ModuloOrigem,
+  PlanoContadores,
+  PregaoEtiqueta,
+  RegraDetalhes,
+  type ContagemGrupos
+} from './modeloGestaoPlano';
 import { GRUPO_INFO } from '../../utils/modeloGestao';
 
 /**
@@ -107,6 +119,12 @@ export interface TaskPlanController {
   useRegistrarResposta: (key: string) => PlanMutation<MarcaTarefaInput>;
   useAjustarPrazo: (key: string) => PlanMutation<{ taskId: string; prazo: string | null }>;
   useAtualizarModulo: (key: string) => PlanMutation<AtualizarModuloInput>;
+  /** Plano automático (migration 225): dispensar módulo, pergunta da etapa e tarefa do pregão. */
+  useDispensarModulo: (key: string) => PlanMutation<{ moduloId: string; justificativa: string }>;
+  useResponderPergunta: (key: string) => PlanMutation<{ taskId: string; aplica: boolean }>;
+  useConcluirPregao: (key: string) => PlanMutation<{ taskId: string; sei?: string | null }>;
+  /** Só na ata: a mesma tarefa aberta nas outras atas do pregão (concluir aqui conclui lá). */
+  buscarTarefasDoPregao?: (taskId: string) => Promise<TarefaDoPregao[]>;
   templates: TaskPlanTemplateOption[];
   loadingTemplates: boolean;
   applyTemplate: PlanAction<[templateId: string, onSuccess: () => void, moduloNome?: string]>;
@@ -158,16 +176,44 @@ const StatusSoLeitura: React.FC<{ status: ContractTaskStatusValue }> = ({ status
 /** Linha de uma tarefa do plano, igual em Contrato e Ata. */
 export type TaskPlanRowController = Pick<
   TaskPlanController,
-  'entityKey' | 'gestorNome' | 'labels' | 'useUpdateTask' | 'useDeleteTask' | 'useMarcarPedido' | 'useRegistrarResposta' | 'useAjustarPrazo' | 'somenteLeitura'
+  | 'entityKey'
+  | 'gestorNome'
+  | 'labels'
+  | 'useUpdateTask'
+  | 'useDeleteTask'
+  | 'useMarcarPedido'
+  | 'useRegistrarResposta'
+  | 'useAjustarPrazo'
+  | 'useResponderPergunta'
+  | 'useConcluirPregao'
+  | 'buscarTarefasDoPregao'
+  | 'somenteLeitura'
 >;
 
 export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowController; numero?: string }> = ({ task, controller, numero }) => {
-  const { entityKey, gestorNome, labels, useUpdateTask, useDeleteTask, useMarcarPedido, useRegistrarResposta, useAjustarPrazo, somenteLeitura = false } = controller;
+  const {
+    entityKey,
+    gestorNome,
+    labels,
+    useUpdateTask,
+    useDeleteTask,
+    useMarcarPedido,
+    useRegistrarResposta,
+    useAjustarPrazo,
+    useResponderPergunta,
+    useConcluirPregao,
+    buscarTarefasDoPregao,
+    somenteLeitura = false
+  } = controller;
   const updateMutation = useUpdateTask(entityKey);
   const deleteMutation = useDeleteTask(entityKey);
   const marcarPedido = useMarcarPedido(entityKey);
   const registrarResposta = useRegistrarResposta(entityKey);
   const ajustarPrazo = useAjustarPrazo(entityKey);
+  const responderPergunta = useResponderPergunta(entityKey);
+  const concluirPregao = useConcluirPregao(entityKey);
+  // Tarefa do pregão: a mesma tarefa aberta nas outras atas, achada ao clicar em Concluída.
+  const [irmas, setIrmas] = useState<TarefaDoPregao[]>([]);
   // Orientar: formulário da marca aberta (pedido enviado ou resposta recebida).
   const [marca, setMarca] = useState<'PEDIDO' | 'RESPOSTA' | null>(null);
   const [verRegra, setVerRegra] = useState(false);
@@ -213,6 +259,12 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
       setSeiConclusao(task.seiNumero || '');
       setPerguntandoSei(true);
       setExpanded(false);
+      setIrmas([]);
+      if (task.doPregao && buscarTarefasDoPregao) {
+        buscarTarefasDoPregao(task.id)
+          .then(setIrmas)
+          .catch(() => setIrmas([]));
+      }
       return;
     }
     setPerguntandoSei(false);
@@ -225,6 +277,10 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
     const lido = semNumero ? ({ tipo: 'VAZIO' } as const) : seiConclusaoLido;
     if (lido.tipo === 'INVALIDO') return;
     const numero = lido.tipo === 'VAZIO' ? null : lido.valor;
+    if (irmas.length > 0) {
+      concluirPregao.mutate({ taskId: task.id, sei: numero }, { onSuccess: () => setPerguntandoSei(false) });
+      return;
+    }
     updateMutation.mutate(
       // Sem número e nada guardado: só troca o status, como antes.
       { taskId: task.id, status: 'CONCLUIDA', sei: numero === null && !task.seiNumero ? undefined : numero },
@@ -371,6 +427,16 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
               Resposta recebida
             </AppButton>
           )}
+          {task.perguntaEtapa && isOpen && !somenteLeitura && (
+            <span role="group" aria-label={nomeTarefa} style={{ display: 'inline-flex', gap: '0.3rem' }}>
+              <AppButton type="button" variant="outline" size="sm" disabled={responderPergunta.isPending} onClick={() => responderPergunta.mutate({ taskId: task.id, aplica: true })}>
+                Sim
+              </AppButton>
+              <AppButton type="button" variant="outline" size="sm" disabled={responderPergunta.isPending} onClick={() => responderPergunta.mutate({ taskId: task.id, aplica: false })}>
+                Não
+              </AppButton>
+            </span>
+          )}
           {externalLinkUrl && (
             <a
               href={externalLinkUrl}
@@ -413,6 +479,16 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           )}
         </div>
       </div>
+
+      {task.status === 'CONCLUIDA' && task.fechadaPelaFonte && (
+        <FonteFechou
+          texto={task.fechadaPelaFonte}
+          podeReabrir={!somenteLeitura}
+          isPending={updateMutation.isPending}
+          onReabrir={() => updateMutation.mutate({ taskId: task.id, status: 'PENDENTE' })}
+        />
+      )}
+      <MutationError error={responderPergunta.error} />
 
       {verRegra && temDetalhes && (
         <RegraDetalhes
@@ -471,6 +547,13 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           <label htmlFor={`sei-conclusao-${task.id}`} style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>
             Esta tarefa tem número SEI? <span style={{ fontWeight: 400, color: '#64748b' }}>(opcional)</span>
           </label>
+          {irmas.length > 0 && (
+            <div data-testid="plan-pregao-irmas" style={{ fontSize: '0.8rem', color: '#1e3a8a', background: '#eef3fb', border: '1px solid #c7d7f2', borderRadius: '6px', padding: '0.4rem 0.65rem' }}>
+              <strong>Tarefa do pregão.</strong> Concluir aqui conclui também{' '}
+              {irmas.length === 1 ? 'na ARP ' : 'nas ARPs '}
+              {irmas.map((i) => i.numeroAta).join(', ')}, com o mesmo número SEI.
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
               id={`sei-conclusao-${task.id}`}
@@ -488,13 +571,13 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
             />
             <ActionButton
               action="salvar"
-              label="Concluir"
+              label={irmas.length > 0 ? `Concluir nas ${irmas.length + 1} atas` : 'Concluir'}
               type="submit"
               size="sm"
-              disabled={updateMutation.isPending || seiConclusaoLido.tipo === 'INVALIDO'}
-              isLoading={updateMutation.isPending}
+              disabled={updateMutation.isPending || concluirPregao.isPending || seiConclusaoLido.tipo === 'INVALIDO'}
+              isLoading={updateMutation.isPending || concluirPregao.isPending}
             />
-            <AppButton type="button" variant="link" size="sm" disabled={updateMutation.isPending} onClick={() => concluir(true)}>
+            <AppButton type="button" variant="link" size="sm" disabled={updateMutation.isPending || concluirPregao.isPending} onClick={() => concluir(true)}>
               Concluir sem número
             </AppButton>
             <ActionButton action="cancelar" type="button" size="sm" onClick={() => setPerguntandoSei(false)} />
@@ -508,7 +591,7 @@ export const TaskPlanRow: React.FC<{ task: PlanTask; controller: TaskPlanRowCont
           >
             {descreverNumeroSei(seiConclusaoLido)}
           </div>
-          <MutationError error={updateMutation.error} />
+          <MutationError error={updateMutation.error || concluirPregao.error} />
         </form>
       )}
 
@@ -654,6 +737,8 @@ export const TaskPlanSection: React.FC<{
   const { labels } = c;
   const confirm = useConfirmDialog();
   const atualizarModulo = c.useAtualizarModulo(c.entityKey);
+  const dispensarModulo = c.useDispensarModulo(c.entityKey);
+  const [moduloADispensar, setModuloADispensar] = useState<TaskPlanModuleRef | null>(null);
   // Contador clicado no topo: mostra só as tarefas daquele grupo.
   const [filtro, setFiltro] = useState<GrupoTarefa | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
@@ -861,6 +946,17 @@ export const TaskPlanSection: React.FC<{
         />
       </Modal>
 
+      <DispensarModuloModal
+        key={moduloADispensar?.id ?? 'nenhum'}
+        modulo={moduloADispensar}
+        isPending={dispensarModulo.isPending}
+        error={dispensarModulo.error}
+        onClose={() => setModuloADispensar(null)}
+        onConfirm={(justificativa) =>
+          moduloADispensar && dispensarModulo.mutate({ moduloId: moduloADispensar.id, justificativa }, { onSuccess: () => setModuloADispensar(null) })
+        }
+      />
+
       {/* Resumo do plano: progresso à esquerda, ações à direita */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div style={{ flex: '1 1 320px', minWidth: 0 }}>
@@ -988,6 +1084,9 @@ export const TaskPlanSection: React.FC<{
                   : undefined
               }
             />
+            {!collapsed && group.modulo && (group.modulo.origem === 'AUTO' || group.modulo.dispensadoEm) && (
+              <ModuloOrigem modulo={group.modulo} podeDispensar={!c.somenteLeitura} onDispensar={() => setModuloADispensar(group.modulo!)} />
+            )}
             {!collapsed && group.modulo && (group.modulo.processoTipo || group.modulo.ancoraData) && (
               <ModuloDados
                 key={`${group.modulo.id}-${group.modulo.processoSei ?? ''}-${group.modulo.ancoraData ?? ''}`}

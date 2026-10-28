@@ -6,7 +6,7 @@ import type {
   RegraTarefaGestao,
   TaskPlanModuleRef
 } from '../types';
-import { differenceInBusinessDays, parseDateBRT } from '../services/temporalEngineService';
+import { differenceInBusinessDays, formatDateBR, parseDateBRT } from '../services/temporalEngineService';
 
 /**
  * Modelo de gestão da CCGA (migrations 210 e 215): leitura das colunas novas, rótulos das
@@ -81,7 +81,10 @@ export function lerAndamentoTarefa(row: any): AndamentoTarefaGestao {
     pedidoEnviadoEm: data(row?.pedido_enviado_em),
     pedidoSei: str(row?.pedido_sei),
     respostaEm: data(row?.resposta_em),
-    respostaSei: str(row?.resposta_sei)
+    respostaSei: str(row?.resposta_sei),
+    perguntaEtapa: row?.pergunta_etapa === true ? true : undefined,
+    fechadaPelaFonte: str(row?.fechada_pela_fonte),
+    fonteBloqueada: row?.fonte_bloqueada === true ? true : undefined
   };
 }
 
@@ -108,7 +111,12 @@ export function completarModulo(modulo: TaskPlanModuleRef | undefined, linhas: M
     processoTipo: str(row.processo_tipo),
     processoSei: str(row.processo_sei),
     variante: str(row.variante),
-    ancoraData: data(row.ancora_data)
+    ancoraData: data(row.ancora_data),
+    origem: row.origem === 'AUTO' ? 'AUTO' : 'MANUAL',
+    motivoAuto: str(row.motivo_auto),
+    dispensadoEm: str(row.dispensado_em),
+    dispensadoPorNome: str(row.dispensado_por_nome),
+    dispensaJustificativa: str(row.dispensa_justificativa)
   };
 }
 
@@ -191,6 +199,18 @@ export function grupoDaTarefa(t: TarefaComAndamento): GrupoTarefa {
   }
   if (t.acao === 'ACOMPANHAR') return 'FONTE';
   return 'COMIGO';
+}
+
+/** "Cobrar resposta" no Início (D8, migration 225): fica crítico com 2 dias úteis de atraso. */
+export const COBRAR_CRITICO_DIAS = 2;
+
+/** Pedido enviado e resposta vencida: "Pedido em 04/11/2026 (SEI 36412207) · resposta era até 11/11/2026 · 2 dias úteis de atraso". */
+export function textoCobrarResposta(t: Pick<AndamentoTarefaGestao, 'pedidoEnviadoEm' | 'pedidoSei' | 'prazoResposta'>, diasAtraso: number): string {
+  const partes: string[] = [];
+  if (t.pedidoEnviadoEm) partes.push(`Pedido em ${formatDateBR(t.pedidoEnviadoEm)}${t.pedidoSei ? ` (SEI ${t.pedidoSei})` : ''}`);
+  if (t.prazoResposta) partes.push(`resposta era até ${formatDateBR(t.prazoResposta)}`);
+  partes.push(`${diasAtraso} ${diasAtraso === 1 ? 'dia útil' : 'dias úteis'} de atraso`);
+  return partes.join(' · ');
 }
 
 /** Rótulo da lista conforme a ação. */

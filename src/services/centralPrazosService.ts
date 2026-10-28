@@ -35,7 +35,7 @@ import {
 } from './temporalEngineService';
 import { classifyArpItemSaldo } from './balanceService';
 import { SALDO_RULES, TAREFA_RULES, VIGENCIA_RULES } from '../config/alertRules';
-import { prazoEfetivo } from '../utils/modeloGestao';
+import { aguardandoResposta, prazoEfetivo } from '../utils/modeloGestao';
 
 /**
  * Gera chave lógica determinística e canônica de idempotência.
@@ -187,6 +187,9 @@ export function buildCentralPrazosItems(
               tarefaId: task.id,
               tarefaStatus: task.status,
               observacoes: task.observacao,
+              aguardandoResposta: aguardandoResposta(task) || undefined,
+              pedidoEnviadoEm: task.pedidoEnviadoEm,
+              pedidoSei: task.pedidoSei,
 
               explicabilidade: {
                 dataBase: task.criadoEm ? task.criadoEm.split('T')[0] : (contract.dataAssinatura || prazoTarefa),

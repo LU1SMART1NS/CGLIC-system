@@ -630,6 +630,12 @@ export interface AndamentoTarefaGestao {
   pedidoSei?: string;
   respostaEm?: string;
   respostaSei?: string;
+  /** Pergunta que decide a etapa (migration 225): "Não" deixa as outras tarefas da etapa como não se aplica. */
+  perguntaEtapa?: boolean;
+  /** O que a fonte mostrou ao fechar a tarefa sozinha (migration 225). */
+  fechadaPelaFonte?: string;
+  /** Reaberta pelo gestor: a fonte não fecha mais. */
+  fonteBloqueada?: boolean;
 }
 
 /** Detalhes do módulo no modelo: quando entra, base, processo SEI e variantes. */
@@ -710,6 +716,12 @@ export interface TaskPlanModuleRef {
   processoSei?: string;
   variante?: string;
   ancoraData?: string;
+  /** Plano automático (migration 225): o módulo entrou sozinho pelo fato descrito em motivoAuto. */
+  origem?: 'MANUAL' | 'AUTO';
+  motivoAuto?: string;
+  dispensadoEm?: string;
+  dispensadoPorNome?: string;
+  dispensaJustificativa?: string;
 }
 
 export interface ContractTaskMacrotask {

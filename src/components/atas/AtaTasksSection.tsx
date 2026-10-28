@@ -15,7 +15,16 @@ import {
 } from '../../hooks/useAtaTaskPlanEditing';
 import { TaskPlanSection, type TaskPlanController, type TaskPlanLabels } from '../plan/TaskPlanSection';
 import { useAuth } from '../../context/AuthContext';
-import { useAjustarPrazoTarefa, useAtualizarModulo, useMarcarPedidoTarefa, useRegistrarRespostaTarefa } from '../../hooks/useModeloGestao';
+import {
+  useAjustarPrazoTarefa,
+  useAtualizarModulo,
+  useConcluirTarefaPregao,
+  useDispensarModulo,
+  useMarcarPedidoTarefa,
+  useRegistrarRespostaTarefa,
+  useResponderPerguntaEtapa
+} from '../../hooks/useModeloGestao';
+import { tarefasDoPregaoRpc } from '../../adapters/modeloGestaoRpcAdapter';
 import { podeConcluirTarefas } from '../../hooks/useAvisosResolvidos';
 
 interface AtaTasksSectionProps {
@@ -56,6 +65,10 @@ function useAtaPlanController(ataKey: string): TaskPlanController {
     useRegistrarResposta: (key) => useRegistrarRespostaTarefa('ata', key),
     useAjustarPrazo: (key) => useAjustarPrazoTarefa('ata', key),
     useAtualizarModulo: (key) => useAtualizarModulo('ata', key),
+    useDispensarModulo: (key) => useDispensarModulo('ata', key),
+    useResponderPergunta: (key) => useResponderPerguntaEtapa('ata', key),
+    useConcluirPregao: () => useConcluirTarefaPregao(),
+    buscarTarefasDoPregao: tarefasDoPregaoRpc,
     useDeleteTask: useDeleteAtaTask,
     // Só os modelos ativos entram no "Aplicar modelo" (os 7 genéricos ficaram inativos na migration 210).
     templates: templates

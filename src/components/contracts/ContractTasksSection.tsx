@@ -16,7 +16,15 @@ import {
 import { getContractManagementKey } from '../../services/contractManagementService';
 import { TaskPlanSection, type TaskPlanController, type TaskPlanLabels } from '../plan/TaskPlanSection';
 import { useAuth } from '../../context/AuthContext';
-import { useAjustarPrazoTarefa, useAtualizarModulo, useMarcarPedidoTarefa, useRegistrarRespostaTarefa } from '../../hooks/useModeloGestao';
+import {
+  useAjustarPrazoTarefa,
+  useAtualizarModulo,
+  useConcluirTarefaPregao,
+  useDispensarModulo,
+  useMarcarPedidoTarefa,
+  useRegistrarRespostaTarefa,
+  useResponderPerguntaEtapa
+} from '../../hooks/useModeloGestao';
 import { podeConcluirTarefas } from '../../hooks/useAvisosResolvidos';
 
 interface ContractTasksSectionProps {
@@ -61,6 +69,9 @@ function useContractPlanController(contract: ContractDashboardRecord): TaskPlanC
     useRegistrarResposta: (key) => useRegistrarRespostaTarefa('contrato', key),
     useAjustarPrazo: (key) => useAjustarPrazoTarefa('contrato', key),
     useAtualizarModulo: (key) => useAtualizarModulo('contrato', key),
+    useDispensarModulo: (key) => useDispensarModulo('contrato', key),
+    useResponderPergunta: (key) => useResponderPerguntaEtapa('contrato', key),
+    useConcluirPregao: () => useConcluirTarefaPregao(),
     useDeleteTask: useDeleteContractTask,
     // Só os modelos ativos entram no "Aplicar modelo" (os 7 genéricos ficaram inativos na migration 210).
     templates: templates

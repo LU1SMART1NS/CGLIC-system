@@ -7,7 +7,9 @@ import {
   prazoEfetivo,
   textoRegraPrazo,
   textoRegraResposta,
-  formatarEsforco
+  formatarEsforco,
+  completarModulo,
+  textoCobrarResposta
 } from '../modeloGestao';
 
 describe('modelo de gestão da CCGA: regra de prazo', () => {
@@ -70,5 +72,29 @@ describe('modelo de gestão da CCGA: contadores do plano', () => {
     expect(prazoEfetivo({ status: 'EM_ANDAMENTO', acao: 'ORIENTAR', prazo: '2026-10-01', pedidoEnviadoEm: '2026-10-01', prazoResposta: '2026-11-10' })).toBe('2026-11-10');
     expect(prazoEfetivo({ status: 'PENDENTE', acao: 'ORIENTAR', prazo: '2026-10-01', prazoResposta: '2026-11-10' })).toBe('2026-10-01');
     expect(prazoEfetivo({ status: 'CONCLUIDA', acao: 'ORIENTAR', prazo: '2026-10-01', pedidoEnviadoEm: '2026-10-01', prazoResposta: '2026-11-10' })).toBe('2026-10-01');
+  });
+});
+
+describe('plano automático (migration 225)', () => {
+  it('lê a fonte, o bloqueio e a pergunta da tarefa', () => {
+    const a = lerAndamentoTarefa({ fechada_pela_fonte: 'Publicado no PNCP', fonte_bloqueada: true, pergunta_etapa: true });
+    expect(a.fechadaPelaFonte).toBe('Publicado no PNCP');
+    expect(a.fonteBloqueada).toBe(true);
+    expect(a.perguntaEtapa).toBe(true);
+    expect(lerAndamentoTarefa({}).perguntaEtapa).toBeUndefined();
+  });
+
+  it('lê a origem, o motivo e a dispensa do módulo', () => {
+    const linhas = new Map([['mod1', { origem: 'AUTO', motivo_auto: 'Faltam 115 dias', dispensado_em: '2026-11-04T12:00:00Z', dispensado_por_nome: 'Maria', dispensa_justificativa: 'Já prorrogada' }]]);
+    const m = completarModulo({ id: 'mod1', nome: 'Prorrogação' }, linhas);
+    expect(m).toMatchObject({ origem: 'AUTO', motivoAuto: 'Faltam 115 dias', dispensadoPorNome: 'Maria', dispensaJustificativa: 'Já prorrogada' });
+    expect(completarModulo({ id: 'mod2', nome: 'X' }, new Map([['mod2', {}]]))?.origem).toBe('MANUAL');
+  });
+
+  it('texto do "Cobrar resposta"', () => {
+    expect(textoCobrarResposta({ pedidoEnviadoEm: '2026-11-04', pedidoSei: '36412207', prazoResposta: '2026-11-11' }, 2)).toBe(
+      'Pedido em 04/11/2026 (SEI 36412207) · resposta era até 11/11/2026 · 2 dias úteis de atraso'
+    );
+    expect(textoCobrarResposta({}, 1)).toBe('1 dia útil de atraso');
   });
 });

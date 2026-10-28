@@ -2,11 +2,13 @@ import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../../design-system/components/Modal';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { AppTextarea } from '../../design-system/components/FormFields';
+import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { useAvisosResolvidos } from '../../hooks/useAvisosResolvidos';
 import { updateAtaTaskRpc } from '../../adapters/ataManagementRpcAdapter';
 import { updateContractTaskRpc } from '../../adapters/contractManagementRpcAdapter';
+import { registrarRespostaTarefaRpc } from '../../adapters/modeloGestaoRpcAdapter';
+import { lerNumeroSei, descreverNumeroSei } from '../../utils/numeroSei';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import {
   JUSTIFICATIVA_MAX,
@@ -19,7 +21,9 @@ import {
 /** O que o ✓ resolve: um aviso com chave (saldo, reajuste, lembrete) ou uma tarefa do plano (concluir). */
 export type AlvoResolucao =
   | { tipo: 'AVISO'; chave: string; titulo: string; contexto?: string; /** Mais avisos resolvidos com a mesma justificativa (as notas de uma emenda). */ outrasChaves?: string[] }
-  | { tipo: 'TAREFA_ATA' | 'TAREFA_CONTRATO'; taskId: string; titulo: string; contexto?: string };
+  | { tipo: 'TAREFA_ATA' | 'TAREFA_CONTRATO'; taskId: string; titulo: string; contexto?: string }
+  /** Cobrar resposta (migration 225): o ✓ registra a resposta recebida, com o número SEI opcional. */
+  | { tipo: 'RESPOSTA_ATA' | 'RESPOSTA_CONTRATO'; taskId: string; titulo: string; contexto?: string };
 
 const REGRA: Record<AvisoResolvivelTipo, string> = {
   SALDO: 'O aviso volta se a situação do saldo piorar.',
@@ -33,6 +37,9 @@ const REGRA_VINCULO = 'Só esconde o aviso: o vínculo continua como está até 
 /** Registrado acima do homologado (migration 142): resolver devolve ao saldo a parte da SENASP. */
 const REGRA_REGISTRADO_ACIMA = 'Ao resolver, o excedente que está na SENASP volta a contar como saldo. O aviso volta se a soma do registrado ou o homologado mudarem.';
 const REGRA_TAREFA = 'A tarefa será marcada como concluída no plano, com a justificativa na observação.';
+const REGRA_RESPOSTA = 'A resposta fica registrada com a data de hoje, a tarefa é concluída e as seguintes andam.';
+const ehResposta = (a: AlvoResolucao | null): a is Extract<AlvoResolucao, { tipo: 'RESPOSTA_ATA' | 'RESPOSTA_CONTRATO' }> =>
+  !!a && (a.tipo === 'RESPOSTA_ATA' || a.tipo === 'RESPOSTA_CONTRATO');
 
 /** Junta a justificativa à observação que a tarefa já tinha (o RPC substitui a observação). */
 async function observacaoComJustificativa(tabela: 'ata_tasks' | 'contract_tasks', taskId: string, justificativa: string): Promise<string> {
@@ -72,6 +79,30 @@ export function useResolverAviso() {
 
   const confirmar = async () => {
     if (!alvo) return;
+    if (ehResposta(alvo)) {
+      const lido = lerNumeroSei(texto);
+      if (lido.tipo === 'INVALIDO') {
+        setErro(descreverNumeroSei(lido));
+        return;
+      }
+      setGravando(true);
+      setErro(null);
+      try {
+        const tipo = alvo.tipo === 'RESPOSTA_ATA' ? 'ata' : 'contrato';
+        await registrarRespostaTarefaRpc(tipo, { taskId: alvo.taskId, sei: lido.tipo === 'VAZIO' ? null : lido.valor });
+        void queryClient.invalidateQueries({ queryKey: [tipo === 'ata' ? 'ata-task-plan' : 'contract-task-plan'] });
+        void queryClient.invalidateQueries({ queryKey: ['management-dashboard'] });
+        const taskId = alvo.taskId;
+        setTarefasConcluidas((atual) => new Set(atual).add(taskId));
+        toast.success('Resposta registrada.');
+        setAlvo(null);
+      } catch (e) {
+        setErro(e instanceof Error && e.message ? e.message : 'Não foi possível gravar. Tente de novo.');
+      } finally {
+        setGravando(false);
+      }
+      return;
+    }
     const justificativa = texto.trim();
     if (justificativa.length < JUSTIFICATIVA_MIN) {
       setErro(`Escreva a justificativa com pelo menos ${JUSTIFICATIVA_MIN} caracteres.`);
@@ -108,7 +139,7 @@ export function useResolverAviso() {
     }
   };
 
-  const regra = alvo ? (alvo.tipo === 'AVISO' ? (alvo.chave.includes('::VINCULO-') ? REGRA_VINCULO : alvo.chave.includes('::REGISTRADO-ACIMA-') ? REGRA_REGISTRADO_ACIMA : REGRA[tipoDaChave(alvo.chave)]) : REGRA_TAREFA) : '';
+  const regra = ehResposta(alvo) ? REGRA_RESPOSTA : alvo ? (alvo.tipo === 'AVISO' ? (alvo.chave.includes('::VINCULO-') ? REGRA_VINCULO : alvo.chave.includes('::REGISTRADO-ACIMA-') ? REGRA_REGISTRADO_ACIMA : REGRA[tipoDaChave(alvo.chave)]) : REGRA_TAREFA) : '';
 
   const dialog = (
     <Modal
@@ -116,13 +147,13 @@ export function useResolverAviso() {
       onClose={fechar}
       dismissible={!gravando}
       size="sm"
-      title={alvo?.tipo === 'AVISO' ? 'Marcar aviso como resolvido' : 'Concluir tarefa'}
+      title={alvo?.tipo === 'AVISO' ? 'Marcar aviso como resolvido' : ehResposta(alvo) ? 'Resposta recebida' : 'Concluir tarefa'}
       testId="resolver-aviso-dialog"
       footer={
         <>
           <ActionButton action="cancelar" size="sm" onClick={fechar} disabled={gravando} />
           <ActionButton action="confirmar" size="sm" onClick={() => void confirmar()} disabled={gravando} data-testid="resolver-aviso-confirmar">
-            {gravando ? 'Gravando...' : alvo?.tipo === 'AVISO' ? 'Marcar como resolvido' : 'Concluir tarefa'}
+            {gravando ? 'Gravando...' : alvo?.tipo === 'AVISO' ? 'Marcar como resolvido' : ehResposta(alvo) ? 'Registrar resposta' : 'Concluir tarefa'}
           </ActionButton>
         </>
       }
@@ -134,6 +165,19 @@ export function useResolverAviso() {
             {alvo.contexto && <div style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '2px' }}>{alvo.contexto}</div>}
           </div>
           <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>{regra}</p>
+          {ehResposta(alvo) ? (
+            <AppInput
+              label="Número SEI da resposta (opcional)"
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="Ex.: 36412207"
+              error={erro ?? undefined}
+              autoFocus
+              data-testid="resolver-aviso-sei"
+            />
+          ) : (
           <AppTextarea
             label="Justificativa (obrigatória)"
             value={texto}
@@ -145,6 +189,7 @@ export function useResolverAviso() {
             autoFocus
             data-testid="resolver-aviso-justificativa"
           />
+          )}
         </div>
       )}
     </Modal>
