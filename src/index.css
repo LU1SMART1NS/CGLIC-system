@@ -2195,8 +2195,6 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .reserva-botoes { display: flex; gap: 0.5rem; }
 .reserva-falta { flex-basis: 100%; background: var(--color-danger-bg); color: var(--color-danger-text); border: 1px solid var(--color-danger-border); border-radius: 8px; padding: 0.45rem 0.75rem; font-size: 0.82rem; font-weight: 600; }
 .reserva-falta .reserva-link--falta { color: var(--color-danger-text); font-size: inherit; padding: 0; min-height: 0; height: auto; }
-.reserva-confirmar { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; background: var(--color-warning-bg); border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.82rem; }
-.reserva-confirmar > span { flex: 1; min-width: 200px; font-weight: 600; color: var(--color-warning-text); }
 @media (max-width: 860px) {
   .reserva-abas { display: flex; gap: 0.4rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--color-border, #e2e8f0); }
   .reserva-abas button { flex: 1; min-height: 40px; border: 1px solid var(--color-border, #cbd5e1); border-radius: 8px; background: var(--surface, #fff); font: inherit; font-weight: 700; cursor: pointer; }

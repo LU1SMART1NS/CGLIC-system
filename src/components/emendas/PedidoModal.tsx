@@ -209,7 +209,6 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const [todasUfs, setTodasUfs] = useState(false);
   const [abertas, setAbertas] = useState<ReadonlySet<string>>(new Set());
   const [recado, setRecado] = useState<{ texto: string; desfazer?: () => void } | null>(null);
-  const [confirmarSaida, setConfirmarSaida] = useState(false);
   const [tentou, setTentou] = useState(false);
   const [piscando, setPiscando] = useState<string | null>(null);
   const [rascunhoEm, setRascunhoEm] = useState<string | null>(null);
@@ -514,8 +513,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
 
   const pedirParaFechar = () => {
     if (salvar.isPending) return;
-    if (mudou) setConfirmarSaida(true);
-    else onClose();
+    descartar();
   };
   const descartar = () => {
     if (!pedido) guardarRascunho(null);
@@ -895,7 +893,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     <Modal
       isOpen
       onClose={pedirParaFechar}
-      dismissible={!salvar.isPending}
+      // Com mudanças, só o Cancelar fecha: sem caixa de confirmação, o clique fora ou o Esc não perdem o trabalho (29/10/2026).
+      dismissible={!salvar.isPending && !mudou}
       size="xxl"
       className="reserva-modal"
       testId="emendas-pedido-modal"
@@ -924,15 +923,6 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               .
             </div>
           )}
-          {confirmarSaida && (
-            <div className="reserva-confirmar" role="alertdialog" aria-label="Descartar a reserva" data-testid="emendas-pedido-confirmar-saida">
-              <span>{pedido ? 'Sair sem salvar? As mudanças neste pedido se perdem.' : `Descartar esta reserva? ${linhas.length ? `${linhas.length === 1 ? 'O item some' : `Os ${linhas.length} itens somem`} e nada fica reservado.` : ''}`}</span>
-              <AppButton type="button" variant="outline" size="sm" onClick={() => setConfirmarSaida(false)}>
-                Continuar editando
-              </AppButton>
-              <ActionButton action="descartar" type="button" size="sm" label={pedido ? 'Sair sem salvar' : undefined} onClick={descartar} data-testid="emendas-pedido-descartar" />
-            </div>
-          )}
           <div className="reserva-total" data-testid="emendas-pedido-total">
             <span className="reserva-total__rotulo">Total para a emenda</span> <b>{formatCurrency(total)}</b>
             <div className="reserva-mudo">
@@ -941,8 +931,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
             </div>
           </div>
           <div className="reserva-botoes">
-            {/* Com a confirmação aberta, ela já tem "Continuar editando" e "Descartar": sem o Cancelar repetido. */}
-            {!confirmarSaida && <ActionButton action="cancelar" type="button" onClick={pedirParaFechar} disabled={salvar.isPending} />}
+            <ActionButton action="cancelar" type="button" onClick={pedirParaFechar} disabled={salvar.isPending} data-testid="emendas-pedido-cancelar" />
             <AppButton type="submit" form="emendas-pedido-form" disabled={salvar.isPending} isLoading={salvar.isPending} data-testid="emendas-pedido-salvar">
               {pedido ? 'Salvar pedido' : linhas.length ? `Reservar ${linhas.length} ${linhas.length === 1 ? 'item' : 'itens'}` : 'Reservar'}
             </AppButton>
