@@ -94,8 +94,10 @@ export function sobraDasEmendas(opts: {
   encerrado?: boolean;
   /** Emendas registradas (emendas_siop): o valor da emenda no SIOP. */
   emendas?: EmendaSiop[];
+  /** Também as emendas registradas sem pedido (o valor inteiro fica a indicar). Parlamentares, 29/10/2026. */
+  incluirSemPedido?: boolean;
 }): SobraDaEmenda[] {
-  const { pedidos, ano, itens, notas, portal, precos, minimo, encerrado = false, emendas = [] } = opts;
+  const { pedidos, ano, itens, notas, portal, precos, minimo, encerrado = false, emendas = [], incluirSemPedido = false } = opts;
   const registradas = new Map(emendas.filter((e) => e.ano === ano).map((e) => [codigoDaEmenda(e.numero, ano), e]));
   const grupos = new Map<string, PedidoEmenda[]>();
   for (const p of pedidos) {
@@ -103,6 +105,7 @@ export function sobraDasEmendas(opts: {
     const c = codigoDaEmenda(p.siopEmenda, ano);
     grupos.set(c, [...(grupos.get(c) ?? []), p]);
   }
+  if (incluirSemPedido) for (const c of registradas.keys()) if (!grupos.has(c)) grupos.set(c, []);
   const resultado: SobraDaEmenda[] = [];
   for (const [codigo, ps] of grupos) {
     ps.sort((a, b) => a.numero - b.numero);
@@ -155,7 +158,7 @@ export function sobraDasEmendas(opts: {
       codigo,
       emenda: codigo.slice(4),
       ano,
-      autorId: ps[0].autorId,
+      autorId: ps[0]?.autorId ?? registrada?.autorId ?? null,
       pedidos: ps.map((p) => ({ id: p.id, numero: p.numero, nome: nomeDoPedido(p), etapa: p.etapa })),
       valor,
       valorLidoEm: registrada?.vistaEm ?? null,
