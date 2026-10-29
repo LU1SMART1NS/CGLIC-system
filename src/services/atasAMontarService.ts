@@ -126,7 +126,7 @@ export async function salvarRascunhoDaAta(controle: string, fornecedorNi: string
   return String((data as { atualizado_em?: string } | null)?.atualizado_em ?? new Date().toISOString());
 }
 
-/** Divisão planejada na montagem da ata, por item da ata publicada (v_divisao_da_ata_montada, migration 239). */
+/** Divisão planejada na montagem da ata, por item da ata publicada (v_divisao_da_ata_montada, migration 240). */
 export interface DivisaoDaAtaMontada {
   itemKey: string;
   unidades: Array<{ unidade: string; quantidade: number }>;

@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Versão: 20261029000239_divisao_da_ata_montada.sql
+-- Versão: 20261029000240_divisao_da_ata_montada.sql
 -- Atas a montar, entrega 3 (D5, decidida em 29/10/2026): a divisão do gerenciador entre as unidades internas, feita
 -- pelo gestor no Quadro 2 da montagem (atas_a_montar_rascunhos.dados, migration 238), vira SUGESTÃO de alocação
 -- quando a ata é publicada e chega ao banco. Nada é alocado sozinho: o coordenador ou o gestor de saldo usa a
@@ -63,6 +63,6 @@ SELECT p.numero_ata || '-' || p.codigo_uasg || '-' || p.numero_item AS item_key,
                     WHERE f.numero_controle_pncp = p.numero_controle_pncp
                       AND upper(btrim(f.fornecedor_identificador)) = upper(btrim(d.fornecedor_ni))));
 COMMENT ON VIEW public.v_divisao_da_ata_montada IS
-  'Divisão do gerenciador entre as unidades internas planejada na montagem da ata (migration 239), por item da ata publicada. Só sugestão: a alocação continua pelo save_allocations_atomic.';
+  'Divisão do gerenciador entre as unidades internas planejada na montagem da ata (migration 240), por item da ata publicada. Só sugestão: a alocação continua pelo save_allocations_atomic.';
 REVOKE ALL ON public.v_divisao_da_ata_montada FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.v_divisao_da_ata_montada TO authenticated, service_role;

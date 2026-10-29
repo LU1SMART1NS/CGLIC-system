@@ -136,7 +136,7 @@ export const ItensUnidadesPage: React.FC = () => {
         : null;
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
   const [alocando, setAlocando] = useState<ItemParaAlocar | null>(null);
-  // Divisão planejada na montagem da ata (migration 239): aparece no item ainda sem alocação.
+  // Divisão planejada na montagem da ata (migration 240): aparece no item ainda sem alocação.
   const divisoesPlanejadas = useDivisoesDasAtasMontadas();
   const porAta = filters.ver === 'ATA';
   // Abrir/fechar à mão vence a abertura automática da busca; "todos" mostra também os itens fora da situação escolhida.

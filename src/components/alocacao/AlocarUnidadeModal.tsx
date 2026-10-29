@@ -93,7 +93,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   };
   const { data: empenhoDoItem, isLoading: vinculosLoading } = useEmpenhoDoItem(itemKey);
   const { data: contratado, isLoading: contratadoLoading } = useContratadoDoItem(itemKey);
-  // Divisão planejada pelo gestor na montagem da ata (migration 239): sugestão, nunca gravada sozinha.
+  // Divisão planejada pelo gestor na montagem da ata (migration 240): sugestão, nunca gravada sozinha.
   const divisao = useDivisoesDasAtasMontadas().get(itemKey);
   const salvarAlocacoes = useSaveAllocations();
   const salvarLinks = useSaveEmpenhoLinks();

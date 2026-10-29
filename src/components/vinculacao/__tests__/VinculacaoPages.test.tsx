@@ -25,7 +25,7 @@ vi.mock('../../../hooks/useAvisosResolvidos', async (orig) => ({ ...(await orig<
 // Janelas: não abrem no render estático; os hooks delas não rodam.
 vi.mock('../VincularAosItensDialog', () => ({ VincularAosItensDialog: () => null }));
 vi.mock('../../alocacao/AlocarUnidadeModal', () => ({ AlocarUnidadeModal: () => null }));
-// Divisão planejada na montagem da ata (migration 239): o item "a" (sem alocação) tem uma.
+// Divisão planejada na montagem da ata (migration 240): o item "a" (sem alocação) tem uma.
 vi.mock('../../../hooks/useAtasAMontar', () => ({
   useDivisoesDasAtasMontadas: () => new Map([['a', { itemKey: 'a', unidades: [{ unidade: 'CAEP', quantidade: 50 }, { unidade: 'DFNSP', quantidade: 29 }], montadaPorNome: 'Alan', montadaEm: '2026-10-29' }]])
 }));

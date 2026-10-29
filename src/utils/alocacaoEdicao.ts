@@ -228,7 +228,7 @@ export function vinculosSemRemovidas(links: Record<string, string>, linhas: Linh
 }
 
 /**
- * Linhas da janela a partir da divisão planejada na montagem da ata (migration 239): só para item ainda sem alocação,
+ * Linhas da janela a partir da divisão planejada na montagem da ata (migration 240): só para item ainda sem alocação,
  * cada unidade como "adicionada". Unidade fora do catálogo ou desativada fica de fora (devolvida em `ignoradas`).
  */
 export function linhasDaDivisaoPlanejada(

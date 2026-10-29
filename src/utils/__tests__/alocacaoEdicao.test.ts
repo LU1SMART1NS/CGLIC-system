@@ -166,7 +166,7 @@ describe('folgaDasUnidades (decisão D5)', () => {
   });
 });
 
-describe('linhasDaDivisaoPlanejada (divisão da ata montada, migration 239)', () => {
+describe('linhasDaDivisaoPlanejada (divisão da ata montada, migration 240)', () => {
   const catalogo = [
     { sigla: 'CAEP', ativo: true },
     { sigla: 'DFNSP', ativo: true },
