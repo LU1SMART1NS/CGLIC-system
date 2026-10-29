@@ -7,6 +7,7 @@ import { formatDateBR } from '../../../services/temporalEngineService';
 import { ReajusteLinhaDoTempo } from './ReajusteLinhaDoTempo';
 import { InformarTermoModal } from './InformarTermoModal';
 import { InformarPercentualModal } from './InformarPercentualModal';
+import { InformarPrecoApostilamentoModal } from './InformarPrecoApostilamentoModal';
 import {
   avisoDaAba,
   dataBaseNaTela,
@@ -49,6 +50,7 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
   const [termoAberto, setTermoAberto] = React.useState(false);
   const [percentualDe, setPercentualDe] = React.useState<{ ciclo: CicloReajuste | null } | null>(null);
   const [mesesAbertos, setMesesAbertos] = React.useState<Set<number>>(new Set());
+  const [precoAberto, setPrecoAberto] = React.useState(false);
 
   if (isLoading && !dados.parametros) {
     return <div style={{ padding: '1rem', color: 'var(--text-secondary)' }}>Carregando o reajuste da ata…</div>;
@@ -62,7 +64,7 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
     );
   }
 
-  const { parametros, ciclos, itens, publicados } = dados;
+  const { parametros, ciclos, itens, publicados, apostilados } = dados;
   const ataId = dados.ataId;
   const origem = origemDaBase(parametros);
   const ultimo = ultimoReajuste(ciclos);
@@ -81,6 +83,10 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
   const abrirPercentual = (ciclo: CicloReajuste | null) => (podeEditar ? setPercentualDe({ ciclo }) : undefined);
 
   const descricao = (numeroItem: string) => itensDaAta.find((i) => Number(i.numeroItem) === Number(numeroItem));
+  // Preço do apostilamento (migration 247): os itens com o preço antigo e os já informados, para corrigir.
+  const apostiladoDe = (numeroItem: string) => apostilados.find((a) => Number(a.numeroItem) === Number(numeroItem));
+  const itensDoPreco = itens.filter((i) => i.situacao === 'PRECO_DESATUALIZADO' || apostiladoDe(i.numeroItem));
+  const ultimoPublicado = [...publicados].filter((p) => p.percentual != null).sort((a, b) => b.efeitoInicio.localeCompare(a.efeitoInicio))[0] ?? null;
 
   const colunasItens: Column<ItemReajuste>[] = [
     { key: 'item', header: 'Item', priority: 'primary', render: (i) => String(Number(i.numeroItem) || i.numeroItem), sortValue: (i) => Number(i.numeroItem) },
@@ -120,6 +126,11 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
         <>
           {formatCurrency(i.precoAtual)}
           <div style={sub}>{i.percentualNoPreco && i.percentualNoPreco > 0.005 ? `+${percentual(i.percentualNoPreco)} já aplicado` : 'sem reajuste'}</div>
+          {apostiladoDe(i.numeroItem) && (
+            <div style={sub} title={apostiladoDe(i.numeroItem)!.informadoPorNome ? `Informado por ${apostiladoDe(i.numeroItem)!.informadoPorNome}` : undefined}>
+              do apostilamento · SEI {apostiladoDe(i.numeroItem)!.seiApostilamento}
+            </div>
+          )}
         </>
       )
     },
@@ -251,6 +262,8 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
         action={
           podeEditar && aviso.acao === 'INFORMAR_PERCENTUAL' && cicloSemPercentual ? (
             <AppButton variant="primary" size="sm" onClick={() => abrirPercentual(cicloSemPercentual)} data-testid="reajuste-aviso-percentual">Informar percentual</AppButton>
+          ) : podeEditar && aviso.acao === 'INFORMAR_PRECO' && itensDoPreco.length > 0 ? (
+            <AppButton variant="primary" size="sm" onClick={() => setPrecoAberto(true)} data-testid="reajuste-aviso-preco">Informar preço do apostilamento</AppButton>
           ) : podeEditar && aviso.acao === 'INFORMAR_TERMO' ? (
             <AppButton variant="primary" size="sm" onClick={() => setTermoAberto(true)} data-testid="reajuste-aviso-termo">Informar termo</AppButton>
           ) : undefined
@@ -399,6 +412,21 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
             publicado={percentualDe?.ciclo ? publicadoDoCiclo(percentualDe.ciclo, publicados) : null}
             versao={parametros.versao}
             onFechar={() => setPercentualDe(null)}
+          />
+          <InformarPrecoApostilamentoModal
+            aberto={precoAberto}
+            ataId={ataId}
+            numeroAta={numeroAta}
+            uasg={uasg}
+            itens={itensDoPreco}
+            apostilados={apostilados}
+            publicado={ultimoPublicado}
+            descricao={(n) => {
+              const d = descricao(n)?.descricaoItem ?? '';
+              return d.length > 60 ? `${d.slice(0, 60)}…` : d;
+            }}
+            versao={parametros.versao}
+            onFechar={() => setPrecoAberto(false)}
           />
         </>
       )}

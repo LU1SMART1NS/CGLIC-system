@@ -78,9 +78,17 @@ describe('avisos do reajuste nos pedidos', () => {
     const perto = avisosDoReajuste(empenhado, '2027-03-01', new Map([[ESPINGARDA, preco(ESPINGARDA, { dataReajuste: '2027-03-26', origem: 'REAJUSTE' })]]), new Map());
     expect(perto[0]).toMatchObject({ tipo: 'reajusteProximo', curto: 'Reajuste em 25 dias' });
     expect(perto[0].texto).toContain('cobre a assinatura');
-    const mudou = avisosDoReajuste(empenhado, '2027-04-10', new Map([[ESPINGARDA, preco(ESPINGARDA, { precoAtual: 3860.12 })]]), new Map());
+    // Com nota: só avisa quando a nota ficou abaixo do preço novo (D6, 29/10/2026). 2 × 3.860,12 = 7.720,24 > 7.401,18.
+    const comNota = new Map([['l1', nota('l1', null)]]);
+    const mudou = avisosDoReajuste(empenhado, '2027-04-10', new Map([[ESPINGARDA, preco(ESPINGARDA, { precoAtual: 3860.12 })]]), comNota);
     expect(mudou[0]).toMatchObject({ tipo: 'reajusteAntesDoContrato' });
+    expect(mudou[0].texto).toContain('a nota 2026NE000001 (R$');
     expect(mudou[0].texto).toContain('Anule o empenho dos itens dela e volte à minuta');
+    const cobre = new Map([['l1', { ...nota('l1', null), valorEmpenhado: 7720.24 }]]);
+    expect(avisosDoReajuste(empenhado, '2027-04-10', new Map([[ESPINGARDA, preco(ESPINGARDA, { precoAtual: 3860.12 })]]), cobre)).toEqual([]);
+    // Reajuste devido: o preço novo é o reajustado.
+    expect(avisosDoReajuste(empenhado, '2027-04-10', new Map([[ESPINGARDA, preco(ESPINGARDA, { devido: true, origem: 'DEVIDO', precoDevido: 3900 })]]), comNota)[0].tipo).toBe('reajusteAntesDoContrato');
+    expect(avisosDoReajuste(empenhado, '2027-04-10', new Map([[ESPINGARDA, preco(ESPINGARDA, { devido: true, origem: 'DEVIDO', precoDevido: 3700.59 })]]), comNota)).toEqual([]);
     const devido = avisosDoReajuste({ ...empenhado, etapa: 'CONFERIDO' } as PedidoEmenda, '2027-03-30', new Map([[ESPINGARDA, preco(ESPINGARDA, { devido: true, origem: 'DEVIDO' })]]));
     expect(devido[0].texto).toContain('o ofício saiu com o preço antigo. Volte o pedido à minuta');
     // Contrato assinado: o preço do contrato está garantido, sem aviso.

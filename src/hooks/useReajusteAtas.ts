@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchReajusteDaAta,
   fetchResumoReajusteAtas,
+  informarPrecoApostilamento,
   informarReajusteAta,
   informarTermoConformidade,
   REAJUSTE_VAZIO,
@@ -53,5 +54,14 @@ export function useAcoesReajuste(numeroAta: string, uasg: string) {
     retry: 0,
     onSettled: aoTerminar
   });
-  return { informarTermo, informarPercentual };
+  const informarPreco = useMutation({
+    mutationFn: informarPrecoApostilamento,
+    retry: 0,
+    onSettled: () => {
+      aoTerminar();
+      // O preço da ata mudou: as Emendas e a Carteira releem os preços.
+      queryClient.invalidateQueries({ queryKey: ['emendas'] });
+    }
+  });
+  return { informarTermo, informarPercentual, informarPreco };
 }
