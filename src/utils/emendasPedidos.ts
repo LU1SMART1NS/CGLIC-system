@@ -596,21 +596,38 @@ export function avisosDoReajuste(p: PedidoEmenda, hoje: string, precos: Map<stri
     return avisos;
   }
   if (!DEPOIS_DO_OFICIO.has(p.etapa)) return avisos;
+  // Preço novo do item: com o reajuste devido, o reajustado; senão, o de hoje (já com o apostilamento informado).
+  const precoNovo = (k: string): number => {
+    const pr = precos.get(k);
+    return pr ? (pr.devido ? pr.precoDevido ?? pr.precoAtual : pr.precoAtual) : 0;
+  };
+  // O que a nota precisa cobrir pelo preço novo: as linhas do pedido ligadas a ela (D6, 29/10/2026).
+  const precisaDaNota = new Map<string, number>();
+  for (const l of ativas) {
+    const n = notas?.get(l.id)?.nota;
+    if (n) precisaDaNota.set(n, (precisaDaNota.get(n) ?? 0) + itensDaLinha(l).reduce((s, x) => s + x.quantidade * precoNovo(x.itemKey), 0));
+  }
   let antes: AvisoPedido | null = null;
   let perto: AvisoPedido | null = null;
   for (const l of ativas) {
-    if (notas?.get(l.id)?.contratoAssinadoEm) continue;
+    const nl = notas?.get(l.id);
+    if (nl?.contratoAssinadoEm) continue;
     for (const x of itensDaLinha(l)) {
       const pr = precos.get(x.itemKey);
       if (!pr) continue;
       const naMinuta = p.minutaPrecos?.[x.itemKey];
       const mudou = typeof naMinuta === 'number' && Math.abs(naMinuta - pr.precoAtual) > 0.004;
-      if (!antes && (pr.devido || mudou)) {
-        const oQue = pr.devido ? 'tem reajuste devido' : `mudou de preço depois da minuta (${formatCurrency(naMinuta!)} → ${formatCurrency(pr.precoAtual)})`;
+      // Com nota: só avisa quando a nota ficou abaixo do preço novo; sem nota: quando o ofício saiu com o preço antigo.
+      const precisa = nl?.nota ? precisaDaNota.get(nl.nota) ?? 0 : 0;
+      const notaAbaixo = Boolean(nl?.nota) && nl!.valorEmpenhado != null && nl!.valorEmpenhado + 0.01 < precisa;
+      if (!antes && (nl?.nota ? notaAbaixo : pr.devido || mudou)) {
+        const oQue = pr.devido ? 'tem reajuste devido' : mudou ? `mudou de preço depois da minuta (${formatCurrency(naMinuta!)} → ${formatCurrency(pr.precoAtual)})` : 'mudou de preço';
         antes = {
           tipo: 'reajusteAntesDoContrato',
           curto: 'Reajuste antes do contrato',
-          texto: `Ata ${ataDe(x.itemKey)} ${oQue} e o contrato do item não foi assinado: ${jaEmpenhado(p.etapa) ? 'o empenho fica abaixo do preço novo. Anule o empenho dos itens dela e volte à minuta' : 'o ofício saiu com o preço antigo. Volte o pedido à minuta'}`,
+          texto: nl?.nota
+            ? `Ata ${ataDe(x.itemKey)} ${oQue} e o contrato do item não foi assinado: a nota ${nl.nota} (${formatCurrency(nl.valorEmpenhado!)}) fica abaixo do preço novo (${formatCurrency(precisa)}). Anule o empenho dos itens dela e volte à minuta`
+            : `Ata ${ataDe(x.itemKey)} ${oQue} e o contrato do item não foi assinado: o ofício saiu com o preço antigo. Volte o pedido à minuta`,
           linhaId: l.id
         };
       } else if (!perto && pr.dataReajuste) {

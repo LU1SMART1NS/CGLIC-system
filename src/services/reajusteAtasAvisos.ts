@@ -3,8 +3,8 @@
  * (migrations 158 e 159). Pendência do gestor da ata e do coordenador: o recorte por gestor vem das atas que o
  * painel já recebe (escopo do perfil), como nos outros avisos de ata.
  *
- * Só aparece o que pede ação ou está perto: percentual a informar, reajuste devido, preço da ata sem o reajuste
- * publicado, Termo de Conformidade a informar quando o próximo reajuste está a até 90 dias, e reajuste (ou
+ * Só aparece o que pede ação ou está perto: percentual a informar, reajuste devido, preço do apostilamento a informar
+ * (urgente com reserva de emenda esperando, migration 247), preço da fonte diferente do informado, Termo de Conformidade a informar quando o próximo reajuste está a até 90 dias, e reajuste (ou
  * prorrogação com reajuste) na janela do radar (REAJUSTE_RULES.janelaAntesDias).
  */
 import { REAJUSTE_RULES } from '../config/alertRules';
@@ -65,12 +65,22 @@ export function avisosDoReajusteDasAtas(resumos: ResumoReajusteAta[], arps: ArpR
         motivoDetalhe: { chave: 'devido', label: 'Ata: reajuste devido' }
       };
     } else if (r.situacao === 'PRECO_DESATUALIZADO') {
+      // Urgente quando há reserva de emenda esperando o item (migration 247): sem o preço, ela não sai na minuta.
+      const esperam = r.reservasDeEmenda > 0 ? `; ${plural(r.reservasDeEmenda, 'reserva de emenda espera', 'reservas de emenda esperam')} o preço` : '';
+      aviso = {
+        severity: r.reservasDeEmenda > 0 ? 'URGENTE' : 'ATENCAO',
+        title: 'Informar o preço do apostilamento',
+        description: `Ata ${r.numeroAta}: reajuste publicado no PNCP, mas o Compras.gov.br ainda mostra o preço homologado (${plural(r.precoDesatualizado, 'item', 'itens')})${esperam}`,
+        badgeLabel: r.reservasDeEmenda > 0 ? plural(r.reservasDeEmenda, 'reserva', 'reservas') : 'informar preço',
+        motivoDetalhe: { chave: 'preco-sem-reajuste', label: 'Ata: preço do apostilamento a informar' }
+      };
+    } else if (r.fonteDiferente > 0) {
       aviso = {
         severity: 'ATENCAO',
-        title: 'Preço da ata sem o reajuste',
-        description: `Ata ${r.numeroAta}: reajuste publicado no PNCP, mas o preço no Compras.gov.br ainda é o homologado (${plural(r.precoDesatualizado, 'item', 'itens')})`,
+        title: 'Conferir o preço do apostilamento',
+        description: `Ata ${r.numeroAta}: o Compras.gov.br trouxe um preço novo, diferente do informado (${plural(r.fonteDiferente, 'item', 'itens')}); vale o informado`,
         badgeLabel: 'conferir preço',
-        motivoDetalhe: { chave: 'preco-sem-reajuste', label: 'Ata: preço sem o reajuste' }
+        motivoDetalhe: { chave: 'fonte-diferente', label: 'Ata: preço da fonte diferente do apostilamento' }
       };
     } else if (r.situacao === 'TERMO_A_INFORMAR' && marco && d !== null && d <= JANELA_TERMO_A_INFORMAR_DIAS) {
       aviso = {

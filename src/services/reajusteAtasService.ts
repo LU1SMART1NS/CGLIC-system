@@ -84,6 +84,23 @@ export interface ReajustePublicado {
   informadoEm: string | null;
 }
 
+/** Preço do apostilamento informado pelo gestor da ata (migration 247): vale no lugar do preço do Compras.gov.br. */
+export interface PrecoApostilado {
+  numeroItem: string;
+  preco: number;
+  /** Preço que a fonte tinha quando o gestor informou. */
+  precoAntes: number | null;
+  /** Último preço que a fonte mandou depois disso. */
+  fonteValor: number | null;
+  seiApostilamento: string;
+  informadoPorNome: string | null;
+  informadoEm: string;
+}
+
+/** A fonte trouxe um preço novo, diferente do antigo e do informado: o gestor da ata confere. */
+export const fonteDiferente = (a: PrecoApostilado): boolean =>
+  a.fonteValor != null && Math.abs(a.fonteValor - a.preco) > 0.004 && Math.abs(a.fonteValor - (a.precoAntes ?? a.fonteValor)) > 0.004;
+
 export interface IndiceDoMes {
   mes: string;
   variacao: number;
@@ -96,6 +113,8 @@ export interface ReajusteDaAta {
   ciclos: CicloReajuste[];
   itens: ItemReajuste[];
   publicados: ReajustePublicado[];
+  /** Preços do apostilamento informados pelo gestor da ata (migration 247). */
+  apostilados: PrecoApostilado[];
   /** Variação mensal do índice, do primeiro ao último mês dos ciclos (para "Ver os 12 meses"). */
   indices: IndiceDoMes[];
 }
@@ -121,9 +140,13 @@ export interface ResumoReajusteAta {
   proximoSituacao: SituacaoCiclo | null;
   proximoPercentual: number | null;
   situacao: SituacaoAtaReajuste;
+  /** Itens cujo preço do apostilamento difere de um preço novo da fonte (migration 247). */
+  fonteDiferente: number;
+  /** Reservas e minutas de emenda com itens da ata, quando há reajuste devido ou preço sem o reajuste (migration 247). */
+  reservasDeEmenda: number;
 }
 
-export const REAJUSTE_VAZIO: ReajusteDaAta = { ataId: null, parametros: null, ciclos: [], itens: [], publicados: [], indices: [] };
+export const REAJUSTE_VAZIO: ReajusteDaAta = { ataId: null, parametros: null, ciclos: [], itens: [], publicados: [], apostilados: [], indices: [] };
 
 const tabelaAusente = (error: any) =>
   error?.code === '42P01' || error?.code === 'PGRST205' || error?.code === 'PGRST202' || error?.code === '42883' ||
@@ -224,7 +247,9 @@ export function paraResumo(r: any): ResumoReajusteAta {
     proximoEfeito: data(r.proximo_efeito),
     proximoSituacao: r.proximo_situacao ?? null,
     proximoPercentual: num(r.proximo_percentual),
-    situacao: r.situacao
+    situacao: r.situacao,
+    fonteDiferente: Number(r.fonte_diferente) || 0,
+    reservasDeEmenda: Number(r.reservas_de_emenda) || 0
   };
 }
 
@@ -260,11 +285,14 @@ export async function fetchReajusteDaAta(numeroAta: string, uasg: string): Promi
     if (tabelaAusente(par.error)) return REAJUSTE_VAZIO;
     throw new Error(par.error.message);
   }
-  const [ciclos, itens, publicados] = await Promise.all([
+  const [ciclos, itens, publicados, apostilados] = await Promise.all([
     db.rpc('reajuste_ciclos_ata', { p_ata_id: ataId }),
     db.rpc('reajuste_itens_ata', { p_ata_id: ataId }),
-    db.from('ata_reajustes').select('*').eq('ata_id', ataId).order('efeito_inicio')
+    db.from('ata_reajustes').select('*').eq('ata_id', ataId).order('efeito_inicio'),
+    db.from('itens_ata_preco_apostilado').select('*').eq('ata_id', ataId)
   ]);
+  // Antes da migration 247 a tabela não existe: a aba funciona sem os preços informados.
+  if (apostilados.error && !tabelaAusente(apostilados.error)) throw new Error(apostilados.error.message);
   for (const r of [ciclos, itens, publicados]) {
     if (r.error) {
       if (tabelaAusente(r.error)) return REAJUSTE_VAZIO;
@@ -302,6 +330,17 @@ export async function fetchReajusteDaAta(numeroAta: string, uasg: string): Promi
     ciclos: listaCiclos,
     itens: ((itens.data ?? []) as any[]).map(paraItem),
     publicados: ((publicados.data ?? []) as any[]).map(paraPublicado),
+    apostilados: ((apostilados.data ?? []) as any[]).map(
+      (r): PrecoApostilado => ({
+        numeroItem: r.numero_item,
+        preco: Number(r.preco),
+        precoAntes: num(r.preco_antes),
+        fonteValor: num(r.fonte_valor),
+        seiApostilamento: r.sei_apostilamento,
+        informadoPorNome: r.informado_por_nome ?? null,
+        informadoEm: r.informado_em
+      })
+    ),
     indices
   };
 }
@@ -360,6 +399,18 @@ export async function informarReajusteAta(p: {
     p_periodo_inicio: p.periodoInicio,
     p_periodo_fim: p.periodoFim,
     p_efeito_inicio: p.efeitoInicio,
+    p_sei: p.sei.trim(),
+    ...versaoVista(p.versao)
+  });
+  if (error) throw erroDaGravacao(error);
+}
+
+/** Preço do apostilamento de cada item (número do item → R$), migration 247: gestor da ata ou coordenador. */
+export async function informarPrecoApostilamento(p: { ataId: string; reajusteId: string | null; precos: Record<string, number>; sei: string; versao?: number | null }): Promise<void> {
+  const { error } = await requireSupabase().rpc('informar_preco_apostilamento', {
+    p_ata_id: p.ataId,
+    p_reajuste_id: p.reajusteId,
+    p_precos: p.precos,
     p_sei: p.sei.trim(),
     ...versaoVista(p.versao)
   });

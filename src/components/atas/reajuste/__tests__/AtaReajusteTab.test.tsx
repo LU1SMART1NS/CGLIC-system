@@ -22,6 +22,7 @@ const ATA_93: ReajusteDaAta = {
     numeroItem: '00001', precoHomologado: 14695, homologadoLido: true, precoAtual: 15454.73, percentualNoPreco: 5.17, precoDevido: 15454.73,
     precoAplicado: 15454.73, situacao: 'EM_DIA', proximoEfeito: null, proximoSituacao: null, proximoPercentual: null, proximoMesesEstimados: null, precoProjetado: null
   }],
+  apostilados: [],
   publicados: [{
     id: 'r1', origem: 'PNCP', efeitoInicio: '2026-01-09', percentual: 5.17, periodoInicio: '2024-10-01', periodoFim: '2025-09-01', documentoSequencial: 2,
     documentoTitulo: 'PRIMEIRO TERMO ADITIVO DA ATA DE REGISTRO DE PREÇOS', documentoPublicadoEm: '2026-01-15', seiCitado: '29255776', seiApostilamento: null, informadoEm: null

@@ -13,7 +13,8 @@ import type {
   SituacaoCiclo,
   SituacaoItemReajuste
 } from '../../../services/reajusteAtasService';
-import { formatCurrencyCompact } from '../../../utils/format';
+import { fonteDiferente } from '../../../services/reajusteAtasService';
+import { formatCurrency, formatCurrencyCompact } from '../../../utils/format';
 import { formatDateBR } from '../../../services/temporalEngineService';
 
 export const ROTULO_SITUACAO_ITEM: Record<SituacaoItemReajuste, string> = {
@@ -167,7 +168,7 @@ export interface AvisoDaAba {
   tone: 'danger' | 'warning' | 'info' | 'success';
   texto: string;
   /** Ação principal sugerida pelo aviso. */
-  acao?: 'INFORMAR_PERCENTUAL' | 'INFORMAR_TERMO';
+  acao?: 'INFORMAR_PERCENTUAL' | 'INFORMAR_TERMO' | 'INFORMAR_PRECO';
 }
 
 /** Frase do topo da aba: a situação mais urgente da ata, em linguagem da CGLIC. */
@@ -202,7 +203,16 @@ export function avisoDaAba(dados: ReajusteDaAta, saldos: SaldoDoItem[], hoje: Da
     const ap = ultimoReajuste(dados.ciclos);
     return {
       tone: 'warning',
-      texto: `O reajuste${ap?.percentual != null ? ` de ${percentual(ap.percentual)}` : ''} está publicado no PNCP, mas o preço da ata no Compras.gov.br ainda é o homologado. Confira se o reajuste foi registrado na ata do Compras.gov.br; até lá, a conta usa o preço reajustado.`
+      texto: `O reajuste${ap?.percentual != null ? ` de ${percentual(ap.percentual)}` : ''} está publicado no PNCP, mas o Compras.gov.br ainda mostra o preço homologado. Enquanto isso, o item fica fora das reservas de Emendas, porque o ofício precisa do preço exato. Informe o preço do apostilamento.`,
+      acao: 'INFORMAR_PRECO'
+    };
+  }
+  const divergentes = dados.apostilados.filter(fonteDiferente);
+  if (divergentes.length) {
+    return {
+      tone: 'warning',
+      texto: `O Compras.gov.br trouxe um preço novo, diferente do preço do apostilamento informado (${divergentes.map((a) => `item ${Number(a.numeroItem)}: ${formatCurrency(a.fonteValor!)} na fonte, ${formatCurrency(a.preco)} informado`).join('; ')}). Vale o informado: confira e corrija se for o caso.`,
+      acao: 'INFORMAR_PRECO'
     };
   }
   if (pior === 'INDICE_INDISPONIVEL') {
@@ -227,7 +237,7 @@ export function quadroDoCartao(dados: ReajusteDaAta, saldos: SaldoDoItem[], hoje
   if (!origemDaBase(dados.parametros)) return { valor: 'Informar termo', hint: 'Falta a data-base', tone: 'warning' };
   if (pior === 'DEVIDO') return { valor: 'Devido', hint: `${formatCurrencyCompact(totaisDaAta(dados.itens, saldos).devido)} no saldo`, tone: 'danger' };
   if (pior === 'PERCENTUAL_A_INFORMAR') return { valor: 'Informar %', hint: 'Apostilamento sem percentual', tone: 'warning' };
-  if (pior === 'PRECO_DESATUALIZADO') return { valor: 'Conferir preço', hint: 'Reajuste publicado, preço antigo', tone: 'warning' };
+  if (pior === 'PRECO_DESATUALIZADO') return { valor: 'Informar preço', hint: 'Apostilamento sem o preço no sistema', tone: 'warning' };
   if (prox) return { valor: formatDateBR(prox.efeitoInicio), hint: `${percentual(prox.percentual)}${prox.mesesEstimados > 0 ? ' estimado' : ''}${prox.situacao === 'SE_PRORROGAR' ? ' · se prorrogar' : ''}` };
   return { valor: 'Em dia', hint: 'Sem novo reajuste na vigência' };
 }
