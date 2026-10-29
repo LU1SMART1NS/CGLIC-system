@@ -1,536 +1,628 @@
 import React, { useMemo, useState } from 'react';
 import { usePrecosParaEmenda } from '../../../hooks/useEmendasQuadro';
-import { Link } from 'react-router-dom';
-import { Check, ChevronDown, ChevronRight, Circle, CircleDashed, CircleDot, Minus, RotateCcw } from 'lucide-react';
-import { InfoHint } from '../../../design-system/components/InfoHint';
 import { AppButton } from '../../../design-system/components/AppButton';
-import { ActionButton } from '../../../design-system/components/ActionButton';
+import { InfoHint } from '../../../design-system/components/InfoHint';
 import { NoticeBar } from '../../../design-system/components/NoticeBar';
-import { ProgressBar } from '../../../design-system/components/ProgressBar';
 import { NumeroSeiEtiqueta } from '../../../design-system/components/NumeroSeiEtiqueta';
+import { CarteiraDetailLabel } from '../../carteira/CarteiraDetailLabel';
 import { carteiraDetalhe } from '../../carteira/carteiraStyles';
-import { AcaoEtiqueta, PlanoContadores } from '../../plan/modeloGestaoPlano';
-import type { GrupoTarefa } from '../../../utils/modeloGestao';
-import { numeroDaChave } from '../../../utils/contractKeyUtils';
-import { formatCurrency } from '../../../utils/format';
 import { dataBR } from '../../../utils/emendasKits';
-import { ataDoItem, contratosDoPedido, documentosDaEtapa, linhasAtivas, ETAPAS_COM_VARIOS_SEI, jaEmpenhado, rodadaDoPedido, seiDaEtapa, solicitacoesSemAta, avisoGrave, type AvisoPedido } from '../../../utils/emendasPedidos';
-import { andamentoDoPedido, grupoDaTarefaDoPedido, type EstadoDaTarefa, type TarefaDoAndamento } from '../../../utils/emendasAndamento';
-import type { ItemCaep, NotaDaLinha, PedidoEmenda } from '../../../services/emendasService';
-import { BotaoDaPendencia, RodadasDoPedido, type AoAgir } from '../PedidoAberto';
+import type { AvisoPedido } from '../../../utils/emendasPedidos';
+import { mesaDoPedido, PASSOS_DO_ITEM, LIMITE_COM_VOCE, type AcaoDaMesa, type GrupoDaMesa, type ItemDaMesa, type ItensDaMesa, type LinhaDaMesa, type MesaDoPedido } from '../../../utils/emendasMesa';
+import type { BeneficiarioEmenda, ItemCaep, NotaDaLinha, PedidoEmenda } from '../../../services/emendasService';
+import type { AoAgir } from '../PedidoAberto';
 import { proximaAcaoDaJanela } from '../proximaAcaoDaJanela';
 import type { AcaoDaJanela } from '../EtapaPedidoModal';
 import type { AcoesCcga } from './Pedido360Header';
-import { linhaContratada, temSituacaoNaCcga, textoDoMovimento } from '../../../utils/emendasCcga';
 
 interface Props {
   p: PedidoEmenda;
   itens: Map<string, ItemCaep>;
   notas: Map<string, NotaDaLinha>;
+  beneficiarios: Map<string, BeneficiarioEmenda>;
   avisos: AvisoPedido[];
   hoje: string;
   podeGerir: boolean;
-  podeVerContratos: boolean;
   onAcao: AoAgir;
   onAlterar: () => void;
   onAnular: () => void;
-  /** Envio à CCGA por ata, desfazer o envio e voltar etapa (migration 248). */
+  /** Envio à CCGA por ata e desfazer o envio (migration 248). */
   ccga?: AcoesCcga;
 }
 
-const ICONE: Record<EstadoDaTarefa, React.ReactNode> = {
-  FEITA: <Check size={14} aria-hidden="true" />,
-  COMIGO: <CircleDot size={14} aria-hidden="true" />,
-  COBRAR: <CircleDot size={14} aria-hidden="true" />,
-  AGUARDANDO: <CircleDot size={14} aria-hidden="true" />,
-  FONTE: <CircleDashed size={14} aria-hidden="true" />,
-  SEM_FONTE: <CircleDashed size={14} aria-hidden="true" />,
-  DEPOIS: <Circle size={12} aria-hidden="true" />,
-  NAO_HOUVE: <Minus size={14} aria-hidden="true" />
-};
-const COR: Record<EstadoDaTarefa, string> = {
-  FEITA: 'var(--color-success)',
-  COMIGO: 'var(--primary)',
-  COBRAR: 'var(--color-danger)',
-  AGUARDANDO: 'var(--color-warning)',
-  FONTE: '#64748b',
-  SEM_FONTE: '#94a3b8',
-  DEPOIS: '#cbd5e1',
-  NAO_HOUVE: '#cbd5e1'
-};
-const SITUACAO: Partial<Record<EstadoDaTarefa, string>> = {
-  COMIGO: 'com a CAEP',
-  COBRAR: 'cobrar resposta',
-  AGUARDANDO: 'aguardando resposta',
-  FONTE: 'fecha sozinha',
-  SEM_FONTE: 'sem fonte',
-  NAO_HOUVE: 'não houve'
+const COR_DO_TOM: Record<LinhaDaMesa['tom'], string> = {
+  vencido: 'var(--color-danger)',
+  eu: 'var(--primary)',
+  espera: 'var(--color-warning)'
 };
 
-const linhaDaTarefa: React.CSSProperties = {
+const lista: React.CSSProperties = {
+  border: '1px solid var(--border)',
+  borderRadius: '8px',
+  overflow: 'hidden'
+};
+const linhaDaLista: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '22px minmax(0, 1fr) auto',
-  gap: '0.25rem 0.6rem',
+  gridTemplateColumns: '12px minmax(0, 1fr)',
+  gap: '0.2rem 0.7rem',
   padding: '0.65rem 0.75rem',
   borderTop: '1px solid var(--border)',
   alignItems: 'start'
 };
+const bloco: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.4rem'
+};
+const marca = (tom: LinhaDaMesa['tom']): React.CSSProperties =>
+  tom === 'espera'
+    ? {
+        width: 10,
+        height: 10,
+        borderRadius: '50%',
+        border: `2px solid ${COR_DO_TOM[tom]}`,
+        marginTop: '0.3rem',
+        boxSizing: 'border-box'
+      }
+    : {
+        width: 10,
+        height: 10,
+        borderRadius: '50%',
+        background: COR_DO_TOM[tom],
+        marginTop: '0.3rem'
+      };
 
-/** Documentos SEI de uma etapa, com a data de cada um. */
-const Documentos: React.FC<{ p: PedidoEmenda; etapa: Parameters<typeof documentosDaEtapa>[1] }> = ({ p, etapa }) => {
-  const docs = documentosDaEtapa(p, etapa);
-  if (docs.length === 0) return null;
+/** O trilho de 6 passos do item (D5): feito em verde, onde está em azul, devolvido em vermelho. */
+const Trilho: React.FC<{ passo: number; devolvido: boolean }> = ({ passo, devolvido }) => (
+  <span role="img" aria-label={`Passo: ${devolvido ? 'devolvido pela CCGA' : passo < 0 ? 'sem nota' : PASSOS_DO_ITEM[passo]}`} style={{ display: 'inline-flex', gap: '3px', marginTop: '0.2rem' }}>
+    {PASSOS_DO_ITEM.map((nome, i) => {
+      const fim = passo === PASSOS_DO_ITEM.length - 1;
+      const cor = devolvido && i === 1 ? 'var(--color-danger)' : i < passo || (fim && i === passo) ? 'var(--color-success)' : i === passo ? 'var(--primary)' : 'var(--border)';
+      return <i key={nome} style={{ width: 16, height: 5, borderRadius: 3, background: cor }} />;
+    })}
+  </span>
+);
+
+const LinhaDoItem: React.FC<{ x: ItemDaMesa }> = ({ x }) => {
+  const passo = x.devolvido ? 'Devolvido' : x.passo < 0 ? 'Sem nota' : PASSOS_DO_ITEM[x.passo];
+  const cor = x.devolvido ? 'var(--color-danger-text)' : x.passo === PASSOS_DO_ITEM.length - 1 ? 'var(--color-success-text)' : undefined;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem 0.6rem', marginTop: '0.35rem' }} data-testid={`pedido360-docs-${etapa}`}>
-      {docs.map((d) => (
-        <span key={d.numero} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-          <NumeroSeiEtiqueta numero={d.numero} testId={`pedido360-sei-${etapa}`} />
-          <span style={carteiraDetalhe}>{d.data ? dataBR(d.data) : 'sem data'}</span>
-        </span>
-      ))}
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '0.2rem 1rem',
+        padding: '0.5rem 0.75rem 0.5rem 1.5rem',
+        borderTop: '1px dashed var(--border)'
+      }}
+      data-testid="pedido360-item"
+    >
+      <div style={{ minWidth: 0, fontSize: '0.85rem' }}>
+        <b>
+          {x.quantidade}× {x.nome}
+        </b>
+        {x.ata && <span style={carteiraDetalhe}> · Ata {x.ata}</span>}
+        {x.comVoce && (
+          <span
+            style={{
+              marginLeft: '0.4rem',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: 'var(--primary)'
+            }}
+          >
+            com você
+          </span>
+        )}
+      </div>
+      <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
+        <b style={{ color: cor }}>{passo}</b>
+        {x.onde && <span style={{ color: '#64748b' }}> · {x.onde}</span>}
+        <br />
+        <Trilho passo={x.passo} devolvido={x.devolvido} />
+      </div>
     </div>
   );
 };
 
-/** Situação de cada ata na CCGA (migration 248): na CCGA, devolvida, a enviar ou contratada. */
-const AtasNaCcga: React.FC<{ p: PedidoEmenda; notas: Map<string, NotaDaLinha> }> = ({ p, notas }) => {
-  const porAta = new Map<string, { enviadas: number; devolvidas: number; aEnviar: number; contratadas: number; sei: Set<string>; em: string | null; motivo: string | null }>();
-  for (const l of linhasAtivas(p)) {
-    if (!l.itemKey) continue;
-    const chave = ataDoItem(l.itemKey);
-    const a = porAta.get(chave) ?? { enviadas: 0, devolvidas: 0, aEnviar: 0, contratadas: 0, sei: new Set<string>(), em: null, motivo: null };
-    if (linhaContratada(l, notas)) a.contratadas++;
-    else if (l.ccgaSituacao === 'ENVIADA') {
-      a.enviadas++;
-      if (l.despachoDocumentoSei) a.sei.add(l.despachoDocumentoSei);
-      a.em = l.ccgaEm ?? a.em;
-    } else if (l.ccgaSituacao === 'DEVOLVIDA') {
-      a.devolvidas++;
-      a.motivo = l.ccgaMotivo ?? a.motivo;
-    } else a.aEnviar++;
-    porAta.set(chave, a);
-  }
-  if (porAta.size === 0) return null;
-  const partes = (a: NonNullable<ReturnType<typeof porAta.get>>) =>
-    [
-      a.enviadas ? `${a.enviadas} na CCGA${a.em ? ` desde ${dataBR(a.em)}` : ''}` : null,
-      a.devolvidas ? `${a.devolvidas} ${a.devolvidas === 1 ? 'devolvido' : 'devolvidos'}${a.motivo ? ` (${a.motivo})` : ''}` : null,
-      a.aEnviar ? `${a.aEnviar} a enviar` : null,
-      a.contratadas ? `${a.contratadas} ${a.contratadas === 1 ? 'contratado' : 'contratados'}` : null
-    ].filter(Boolean).join(' · ');
-  return (
-    <ul style={{ listStyle: 'none', margin: '0.35rem 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }} data-testid="pedido360-ccga-atas">
-      {[...porAta].sort((x, y) => x[0].localeCompare(y[0])).map(([chave, a]) => (
-        <li key={chave} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem 0.5rem', fontSize: '0.85rem', color: a.devolvidas ? 'var(--color-warning-text)' : undefined }}>
-          <b>Ata {chave.split('-')[0]}</b>
-          <span style={a.devolvidas ? undefined : carteiraDetalhe}>{partes(a)}</span>
-          {[...a.sei].map((n) => (
-            <NumeroSeiEtiqueta key={n} numero={n} testId="pedido360-sei-despacho-ata" />
+const Grupo: React.FC<{
+  g: GrupoDaMesa;
+  aberto: boolean;
+  contagem?: boolean;
+}> = ({ g, aberto, contagem }) => (
+  <details open={aberto} style={{ borderTop: '1px solid var(--border)' }} data-testid="pedido360-grupo">
+    <summary
+      style={{
+        cursor: 'pointer',
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: '0.2rem 1rem',
+        padding: '0.55rem 0.75rem',
+        background: 'var(--bg-page, #f8fafc)'
+      }}
+    >
+      <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>
+        {g.nome}
+        {g.nomeLongo && <span style={{ ...carteiraDetalhe, fontWeight: 400 }}> {g.nomeLongo}</span>}
+        {contagem && <span style={{ ...carteiraDetalhe, fontWeight: 400 }}> · {g.itens.reduce((n, x) => n + x.quantidade, 0)} itens</span>}
+      </span>
+      <span style={{ ...carteiraDetalhe, marginTop: 0 }}>{g.resumo}</span>
+    </summary>
+    {g.itens.map((x) => (
+      <LinhaDoItem key={x.chave} x={x} />
+    ))}
+  </details>
+);
+
+/** Onde está cada item (D5–D8): por beneficiário, um trilho por item; num pedido grande, fecha e filtra. */
+const OndeEstaCadaItem: React.FC<{ it: ItensDaMesa }> = ({ it }) => {
+  const [soPendentes, setSoPendentes] = useState(true);
+  const titulo = (
+    <CarteiraDetailLabel>
+      Onde está cada item{' '}
+      <InfoHint
+        label="Sobre os passos dos itens"
+        content="Nota, Na CCGA, Contrato, Faturado, Liquidado e Pago. Do contrato em diante, o sistema atualiza pelo Contratos.gov.br e pelo Tesouro."
+        testId="pedido360-itens-info"
+      />
+    </CarteiraDetailLabel>
+  );
+  if (it.uma)
+    return (
+      <section style={bloco} data-testid="pedido360-itens">
+        {titulo}
+        <div
+          style={{
+            ...lista,
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            gap: '0.4rem 1rem',
+            padding: '0.65rem 0.75rem',
+            fontSize: '0.88rem'
+          }}
+        >
+          <span>{it.uma.texto}</span>
+          <Trilho passo={it.uma.passo} devolvido={false} />
+        </div>
+      </section>
+    );
+  if (it.unico)
+    return (
+      <section style={bloco} data-testid="pedido360-itens">
+        {titulo}
+        <div style={{ ...lista, borderTop: 'none' }}>
+          {it.grupos[0].itens.map((x) => (
+            <LinhaDoItem key={x.chave} x={x} />
           ))}
-        </li>
-      ))}
-    </ul>
-  );
-};
-
-/** Histórico do vai e volta com a CCGA e das etapas voltadas (migration 248), do mais novo ao mais antigo. */
-const MovimentosDoPedido: React.FC<{ p: PedidoEmenda }> = ({ p }) => {
-  const movimentos = p.movimentos ?? [];
-  if (movimentos.length === 0) return null;
+        </div>
+      </section>
+    );
+  const pendentes = it.grupos.filter((g) => g.pendente);
+  const mostra = it.grande && soPendentes && pendentes.length ? pendentes : it.grupos;
+  const resto = it.grupos.length - mostra.length;
   return (
-    <details style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '0.55rem 0.75rem' }} data-testid="pedido360-movimentos">
-      <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
-        <RotateCcw size={13} aria-hidden="true" /> Envios, devoluções e etapas voltadas ({movimentos.length})
-      </summary>
-      <ul style={{ listStyle: 'none', margin: '0.5rem 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-        {[...movimentos].reverse().map((m) => {
-          const t = textoDoMovimento(m, m.linhaIds.length);
-          return (
-            <li key={m.id} style={{ borderLeft: `3px solid ${m.acao === 'ENVIO_CCGA' ? 'var(--primary)' : 'var(--color-warning)'}`, paddingLeft: '0.6rem' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem 0.5rem' }}>
-                <b style={{ fontSize: '0.85rem' }}>{t.titulo}</b>
-                {m.documentoSei && <NumeroSeiEtiqueta numero={m.documentoSei} testId="pedido360-sei-movimento" />}
-              </div>
-              <div style={carteiraDetalhe}>
-                {dataBR(m.data)}
-                {m.criadoPorNome ? ` · ${m.criadoPorNome}` : ''}
-                {t.detalhe ? ` · ${t.detalhe}` : ''}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </details>
-  );
-};
-
-/**
- * Aba Andamento do Pedido 360: as etapas como tarefas, no desenho do Plano de gestão das atas. Junta o "O que falta"
- * e a linha do tempo de antes; os botões abrem as mesmas janelas.
- */
-export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, hoje, podeGerir, podeVerContratos, onAcao, onAlterar, onAnular, ccga }) => {
-  const { precos } = usePrecosParaEmenda();
-  const andamento = useMemo(() => andamentoDoPedido(p, itens, notas, hoje, podeGerir, precos), [p, itens, notas, hoje, podeGerir, precos]);
-  const [filtro, setFiltro] = useState<GrupoTarefa | null>(null);
-  const [abertas, setAbertas] = useState<Record<string, boolean>>({});
-  const cancelado = p.etapa === 'CANCELADO';
-
-  const extras = (t: TarefaDoAndamento): React.ReactNode => {
-    switch (t.chave) {
-      case 'minuta': {
-        const rodada = rodadaDoPedido(p);
-        return (
-          <>
-            <div style={{ ...carteiraDetalhe, display: 'flex', flexWrap: 'wrap', gap: '0.2rem 0.9rem', marginTop: '0.3rem' }}>
-              <span>
-                {p.minutaEm ? '✓' : '○'} {rodada > 1 ? `${rodada}ª minuta` : 'Minuta'} {p.minutaEm ? `enviada em ${dataBR(p.minutaEm)}` : p.origem === 'PLANILHA' && t.estado === 'FEITA' ? 'sem data na planilha' : 'ainda não enviada'}
-              </span>
-              <span>
-                {p.oficioEm || t.estado === 'FEITA' ? '✓' : '○'} Ofício {p.oficioEm ? `recebido em ${dataBR(p.oficioEm)}` : t.estado === 'FEITA' ? 'recebido' : 'ainda não chegou'}
-              </span>
-            </div>
-            {p.oficioProcessoSei && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.3rem' }}>
-                <span style={carteiraDetalhe}>Processo</span>
-                <NumeroSeiEtiqueta numero={p.oficioProcessoSei} testId="pedido360-sei-processo" />
-              </div>
-            )}
-            {p.devolucoes.length > 0 && (
-              <details style={{ marginTop: '0.35rem' }} data-testid="pedido360-devolucoes">
-                <summary style={{ ...carteiraDetalhe, cursor: 'pointer' }}>
-                  <RotateCcw size={12} aria-hidden="true" /> {p.devolucoes.length === 1 ? 'Ofício devolvido uma vez' : `Ofício devolvido ${p.devolucoes.length} vezes`}
-                </summary>
-                <ul style={{ margin: '0.3rem 0 0', paddingLeft: '1.1rem' }}>
-                  {p.devolucoes.map((d) => (
-                    <li key={d.rodada} style={carteiraDetalhe}>
-                      {d.rodada}ª minuta {d.minutaEm ? `em ${dataBR(d.minutaEm)}` : 'sem data'} · ofício {d.oficioEm ? dataBR(d.oficioEm) : 'sem data'} · devolvido em {dataBR(d.devolvidoEm)}: {d.motivo}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-            {podeGerir && p.etapa === 'RESERVADO' && p.autorId && (
-              <div style={{ marginTop: '0.35rem' }}>
-                {/* Às vezes o parlamentar manda o ofício sem minuta da CAEP. */}
-                <ActionButton action="avancarEtapa" size="xs" label="Já chegou o ofício" onClick={() => onAcao('OFICIO')} />
-              </div>
-            )}
-          </>
-        );
-      }
-      case 'conferir':
-        return (
-          <>
-            {t.estado === 'FEITA' && p.siopEmenda && (
-              <div style={{ ...carteiraDetalhe, marginTop: '0.3rem' }}>
-                emenda {p.siopEmendaAno ? `${p.siopEmendaAno} · ` : ''}
-                {p.siopEmenda.slice(0, 4)} {p.siopEmenda.slice(4)}
-                {p.siopGnd ? ` · ${p.siopGnd}` : ''}
-                {p.oficioValor != null ? ` · ofício ${formatCurrency(p.oficioValor)}` : ' · valor do ofício a informar'}
-              </div>
-            )}
-            {podeGerir && p.etapa === 'OFICIO' && (
-              <div style={{ marginTop: '0.35rem' }}>
-                {/* O ofício com divergência volta para a minuta (migration 174). */}
-                <AppButton size="xs" variant="ghostDanger" onClick={() => onAcao('DIVERGENCIA')} data-testid={`emendas-pedido-divergencia-${p.id}`}>
-                  Ofício com divergência
-                </AppButton>
-              </div>
-            )}
-          </>
-        );
-      case 'solicitacao': {
-        const soltas = solicitacoesSemAta(p);
-        return (
-          <>
-            <Documentos p={p} etapa="SOLICITADO" />
-            {soltas.length > 0 && (
-              <div style={{ ...carteiraDetalhe, color: 'var(--color-warning-text)', marginTop: '0.3rem' }}>
-                {soltas.length === 1 ? 'Solicitação sem ata' : `${soltas.length} solicitações sem ata`}: {soltas.join(', ')}
-                {podeGerir && (
-                  <>
-                    {' '}
-                    <AppButton size="xs" variant="link" onClick={() => onAcao('SOLICITACAO_ATA', { numero: soltas[0] })}>
-                      Ligar a uma ata
-                    </AppButton>
-                  </>
-                )}
-              </div>
-            )}
-          </>
-        );
-      }
-      case 'cgofi':
-        return (
-          <>
-            <Documentos p={p} etapa="CGOFI" />
-            {/* Envio comprovado pela nota (migration 230): a CAEP completa o documento depois. */}
-            {podeGerir && jaEmpenhado(p.etapa) && !p.cgofiDocumentoSei && (
-              <AppButton size="xs" variant="link" onClick={() => onAcao('MAIS_CGOFI' as AcaoDaJanela)} data-testid="emendas-pedido-mais-sei-CGOFI">
-                Completar o número SEI
-              </AppButton>
-            )}
-            <div style={{ marginTop: '0.4rem' }}>
-              <RodadasDoPedido p={p} notas={notas} podeGerir={podeGerir} onAcao={onAcao} />
-            </div>
-          </>
-        );
-      case 'empenho':
-        return (
-          <>
-            <Documentos p={p} etapa="EMPENHADO" />
-            {podeGerir && jaEmpenhado(p.etapa) && ETAPAS_COM_VARIOS_SEI.has('EMPENHADO') && (
-              <AppButton size="xs" variant="link" onClick={() => onAcao('MAIS_EMPENHADO' as AcaoDaJanela)} data-testid="emendas-pedido-mais-sei-EMPENHADO">
-                {seiDaEtapa(p, 'EMPENHADO').length ? '+ número SEI' : 'Completar o número SEI'}
-              </AppButton>
-            )}
-          </>
-        );
-      case 'despacho':
-        return (
-          <>
-            <Documentos p={p} etapa="CONTRATACAO" />
-            {jaEmpenhado(p.etapa) && temSituacaoNaCcga(p) && <AtasNaCcga p={p} notas={notas} />}
-            {(ccga?.enviar || ccga?.desfazer) && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.35rem' }}>
-                {ccga.enviar && (
-                  <AppButton size="xs" variant="link" onClick={ccga.enviar} data-testid="emendas-pedido-ccga-enviar-atas">
-                    Enviar à CCGA
-                  </AppButton>
-                )}
-                {ccga.desfazer && (
-                  <AppButton size="xs" variant="link" onClick={ccga.desfazer} data-testid="emendas-pedido-ccga-desfazer">
-                    Desfazer envio
-                  </AppButton>
-                )}
-              </div>
-            )}
-            {podeGerir && p.etapa === 'CONTRATACAO' && !temSituacaoNaCcga(p) && (
-              <AppButton size="xs" variant="link" onClick={() => onAcao('MAIS_CONTRATACAO' as AcaoDaJanela)} data-testid="emendas-pedido-mais-sei-CONTRATACAO">
-                {seiDaEtapa(p, 'CONTRATACAO').length ? '+ número SEI' : 'Completar o número SEI'}
-              </AppButton>
-            )}
-          </>
-        );
-      case 'contrato': {
-        if (p.etapa !== 'CONTRATACAO') return null;
-        const contratos = contratosDoPedido(p, notas).contratos;
-        if (contratos.length === 0) return null;
-        return (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem 0.7rem', marginTop: '0.3rem' }}>
-            {contratos.map((chave) =>
-              podeVerContratos ? (
-                <Link key={chave} to={`/contratos/${encodeURIComponent(chave)}`} style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.85rem' }}>
-                  Contrato {numeroDaChave(chave)}
-                </Link>
-              ) : (
-                <span key={chave} style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                  Contrato {numeroDaChave(chave)}
-                </span>
-              )
-            )}
-          </div>
-        );
-      }
-      case 'ordem':
-        // Migration 245: a CAEP registra a data e o SEI; abre com o contrato assinado.
-        if (p.ordemFornecimentoDocumentoSei)
-          return (
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.35rem', marginTop: '0.3rem' }}>
-              <NumeroSeiEtiqueta numero={p.ordemFornecimentoDocumentoSei} testId="pedido360-sei-ordem-fornecimento" />
-              {podeGerir && (
-                <AppButton size="xs" variant="link" onClick={() => onAcao('ORDEM_FORNECIMENTO')} data-testid="emendas-pedido-ordem-fornecimento-corrigir">
-                  Corrigir
-                </AppButton>
-              )}
-            </div>
-          );
-        if (!podeGerir || t.estado === 'DEPOIS' || t.estado === 'NAO_HOUVE') return null;
-        return (
-          <div style={{ marginTop: '0.35rem' }}>
-            <AppButton
-              size={t.estado === 'COMIGO' ? 'sm' : 'xs'}
-              variant={t.estado === 'COMIGO' ? 'primary' : 'link'}
-              onClick={() => onAcao('ORDEM_FORNECIMENTO')}
-              data-testid="emendas-pedido-ordem-fornecimento"
-            >
-              {t.estado === 'COMIGO' ? 'Registrar as informações' : 'Completar o número SEI'}
+    <section style={bloco} data-testid="pedido360-itens">
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.4rem 1rem'
+        }}
+      >
+        {titulo}
+        {it.grande && pendentes.length > 0 && (
+          <div style={{ display: 'flex', gap: '0.5rem' }} role="group" aria-label="Quais beneficiários mostrar">
+            <AppButton size="xs" variant={soPendentes ? 'secondary' : 'ghost'} aria-pressed={soPendentes} onClick={() => setSoPendentes(true)} data-testid="pedido360-itens-pendentes">
+              Com pendência · {pendentes.length}
+            </AppButton>
+            <AppButton size="xs" variant={soPendentes ? 'ghost' : 'secondary'} aria-pressed={!soPendentes} onClick={() => setSoPendentes(false)} data-testid="pedido360-itens-todos">
+              Todos · {it.grupos.length}
             </AppButton>
           </div>
-        );
-      default:
-        return null;
+        )}
+      </div>
+      <div style={{ ...lista }}>
+        {mostra.map((g, i) => (
+          <div key={g.chave} style={i === 0 ? { marginTop: '-1px' } : undefined}>
+            <Grupo g={g} aberto={!it.grande || g.pendente} contagem={it.grande} />
+          </div>
+        ))}
+        {resto > 0 && (
+          <div
+            style={{
+              padding: '0.5rem 0.75rem',
+              borderTop: '1px solid var(--border)',
+              fontSize: '0.8rem',
+              color: '#64748b'
+            }}
+          >
+            E mais {resto === 1 ? '1 beneficiário' : `${resto} beneficiários`} sem pendência.{' '}
+            <AppButton size="xs" variant="link" onClick={() => setSoPendentes(false)}>
+              Ver todos
+            </AppButton>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+/** Caminho do pedido (D12): as 4 fases, os passos da fase atual e o histórico fechado. */
+const Caminho: React.FC<{ m: MesaDoPedido; onAcao: AoAgir }> = ({ m, onAcao }) => (
+  <section style={bloco} data-testid="pedido360-caminho">
+    <CarteiraDetailLabel>Caminho do pedido</CarteiraDetailLabel>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))',
+        gap: '0.4rem'
+      }}
+    >
+      {m.fases.map((f) => (
+        <div
+          key={f.id}
+          data-testid={`pedido360-fase-${f.id}`}
+          data-estado={f.estado}
+          style={{
+            border: `1px solid ${f.estado === 'atual' ? 'var(--primary)' : 'var(--border)'}`,
+            boxShadow: f.estado === 'atual' ? 'inset 0 3px 0 var(--primary)' : undefined,
+            borderRadius: '8px',
+            padding: '0.45rem 0.6rem',
+            minWidth: 0
+          }}
+        >
+          <div
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              color: f.estado === 'atual' ? 'var(--primary)' : '#64748b'
+            }}
+          >
+            {f.nome}
+          </div>
+          <div
+            style={{
+              fontSize: '0.8rem',
+              fontWeight: f.estado === 'feita' ? 600 : 400,
+              color: f.estado === 'feita' ? 'var(--color-success-text)' : f.estado === 'vem' ? '#94a3b8' : undefined
+            }}
+          >
+            {f.estado === 'feita' ? '✓ ' : ''}
+            {f.texto}
+          </div>
+        </div>
+      ))}
+    </div>
+    {m.passos.length > 0 && (
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.2rem 0.4rem',
+          fontSize: '0.78rem',
+          color: '#64748b'
+        }}
+        data-testid="pedido360-passos"
+      >
+        <span>Nesta fase:</span>
+        {m.passos.map((x, i) => (
+          <React.Fragment key={x.nome}>
+            {i > 0 && <span aria-hidden="true">›</span>}
+            <span
+              style={{
+                color: x.feito ? 'var(--color-success-text)' : x.atual ? 'var(--primary)' : undefined,
+                fontWeight: x.atual ? 700 : undefined
+              }}
+            >
+              {x.feito ? '✓ ' : ''}
+              {x.nome}
+            </span>
+          </React.Fragment>
+        ))}
+      </div>
+    )}
+    {m.historico.length > 0 && (
+      <details style={{ border: '1px solid var(--border)', borderRadius: '8px' }} data-testid="pedido360-historico">
+        <summary
+          style={{
+            cursor: 'pointer',
+            padding: '0.5rem 0.75rem',
+            fontWeight: 700,
+            fontSize: '0.85rem'
+          }}
+        >
+          Histórico <span style={{ ...carteiraDetalhe, fontWeight: 400 }}>· {m.historico.reduce((n, f) => n + f.registros.length, 0)} registros, por fase</span>
+        </summary>
+        <div
+          style={{
+            borderTop: '1px solid var(--border)',
+            padding: '0.2rem 0.75rem 0.6rem'
+          }}
+        >
+          {m.historico.map((f) => (
+            <div key={f.fase}>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: '#94a3b8',
+                  paddingTop: '0.55rem'
+                }}
+              >
+                {f.fase}
+              </div>
+              {f.registros.map((r) => (
+                <div
+                  key={r.chave}
+                  data-testid={`pedido360-historico-${r.chave}`}
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.2rem 0.8rem',
+                    padding: '0.3rem 0',
+                    borderBottom: '1px dashed var(--border)',
+                    fontSize: '0.83rem'
+                  }}
+                >
+                  <span
+                    style={{
+                      color: r.volta ? 'var(--color-danger-text)' : undefined,
+                      minWidth: 0
+                    }}
+                  >
+                    {r.texto}
+                  </span>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: '0.35rem'
+                    }}
+                  >
+                    {r.data && (
+                      <span
+                        style={{
+                          color: '#64748b',
+                          fontVariantNumeric: 'tabular-nums'
+                        }}
+                      >
+                        {r.data}
+                      </span>
+                    )}
+                    {r.sei.map((n) => (
+                      <NumeroSeiEtiqueta key={n} numero={n} testId={`pedido360-sei-${r.chave}`} />
+                    ))}
+                    {r.semSei && <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>sem SEI</span>}
+                    {r.maisSei && (
+                      <AppButton
+                        size="xs"
+                        variant="link"
+                        onClick={() => onAcao(r.maisSei as AcaoDaJanela)}
+                        data-testid={`emendas-pedido-mais-sei-${r.maisSei === 'MAIS_EMPENHADO' ? 'EMPENHADO' : 'CONTRATACAO'}`}
+                      >
+                        + número SEI
+                      </AppButton>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </details>
+    )}
+  </section>
+);
+
+/**
+ * Aba Andamento do Pedido 360 como mesa de trabalho (protótipo v7 aprovado em 29/10/2026): Com você · Com outros ·
+ * Onde está cada item · Caminho do pedido. Os botões de trabalho moram só em "Com você" (D1); o cartão do topo diz
+ * onde o pedido está. As linhas saem de `mesaDoPedido`, que só redistribui as regras de antes.
+ */
+export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, beneficiarios, avisos, hoje, podeGerir, onAcao, onAlterar, onAnular, ccga }) => {
+  const { precos } = usePrecosParaEmenda();
+  const m = useMemo(() => mesaDoPedido(p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos), [p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos]);
+  const [todasComVoce, setTodasComVoce] = useState(false);
+  const cancelado = p.etapa === 'CANCELADO';
+
+  const agir = (a: AcaoDaMesa) => {
+    const f = a.faz;
+    switch (f.tipo) {
+      case 'proxima':
+        return onAcao(proximaAcaoDaJanela(p));
+      case 'janela':
+        return onAcao(f.acao as AcaoDaJanela, f.numero ? { numero: f.numero } : undefined);
+      case 'ccgaEnviar':
+        return ccga?.enviar ? ccga.enviar() : onAcao('CONTRATACAO');
+      case 'ccgaDesfazer':
+        return ccga?.desfazer?.();
+      case 'anular':
+        return onAnular();
+      case 'pendencia': {
+        const b = f.tarefa.botao;
+        if (!b) return undefined;
+        if (b.tipo === 'proxima') return onAcao(proximaAcaoDaJanela(p));
+        if (b.tipo === 'solicitacao')
+          return onAcao('SOLICITACAO_ATA', {
+            ataKey: b.ataKey,
+            numero: b.numero,
+            troca: b.troca
+          });
+        if (b.tipo === 'envio') return onAcao('CGOFI');
+        return onAlterar();
+      }
     }
   };
 
-  const tarefaVisivel = (t: TarefaDoAndamento) => !filtro || grupoDaTarefaDoPedido(t) === filtro;
+  const linha = (l: LinhaDaMesa) => (
+    <div key={l.chave} style={linhaDaLista} data-testid={`pedido360-linha-${l.chave}`} data-tom={l.tom}>
+      <span style={marca(l.tom)} aria-hidden="true" />
+      {/* Texto e ações lado a lado; sem espaço (celular), as ações descem para baixo do texto. */}
+      <div
+        style={{
+          minWidth: 0,
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'flex-start',
+          gap: '0.4rem 0.8rem'
+        }}
+      >
+        <div style={{ minWidth: 0, flex: '1 1 260px' }}>
+          <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+            {l.quem && (
+              <span
+                style={{
+                  display: 'inline-block',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  padding: '0 0.35rem',
+                  marginRight: '0.4rem',
+                  color: '#64748b',
+                  verticalAlign: '1px'
+                }}
+              >
+                {l.quem}
+              </span>
+            )}
+            {l.titulo}
+          </div>
+          {l.detalhe && <div style={{ ...carteiraDetalhe, fontSize: '0.8rem' }}>{l.detalhe}</div>}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            gap: '0.3rem',
+            marginLeft: 'auto'
+          }}
+        >
+          {l.prazo && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.2rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+                color: l.vencido ? 'var(--color-danger-text)' : '#64748b'
+              }}
+            >
+              {l.vencido ? `venceu em ${l.prazo}` : `até ${l.prazo}`}
+              {l.regra && <InfoHint label="Regra do prazo" content={l.regra} testId={`pedido360-regra-${l.chave}`} />}
+            </span>
+          )}
+          {l.acoes.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              {l.acoes.map((a) => (
+                <AppButton
+                  key={a.testId}
+                  size={a.jeito === 'botao' ? 'sm' : 'xs'}
+                  variant={a.jeito === 'botao' ? 'primary' : a.jeito === 'perigo' ? 'ghostDanger' : 'link'}
+                  onClick={() => agir(a)}
+                  data-testid={a.testId}
+                >
+                  {a.rotulo}
+                </AppButton>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
+  const comVoce = todasComVoce ? m.comVoce : m.comVoce.slice(0, LIMITE_COM_VOCE);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }} data-testid={`pedido360-andamento-${p.id}`}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }} data-testid={`pedido360-andamento-${p.id}`}>
       {cancelado && (
         <NoticeBar tone="info" testId="pedido360-cancelado">
           Cancelado em {dataBR(p.canceladoEm)}: {p.canceladoMotivo}. A quantidade voltou ao saldo da CAEP.
         </NoticeBar>
       )}
-      {avisos
-        .filter((a) => a.tipo === 'empenhoAnulado')
-        .map((a) => (
-          <NoticeBar
-            key={a.tipo}
-            tone="danger"
-            testId={`emendas-pedido-aviso-faixa-${a.tipo}`}
-            action={
-              podeGerir ? (
-                <AppButton size="sm" onClick={onAnular} data-testid={`emendas-pedido-registrar-anulacao-${p.id}`}>
-                  Registrar anulação
-                </AppButton>
-              ) : undefined
-            }
-          >
-            <b>Empenho anulado.</b> {a.texto}. Se a nota foi refeita, o aviso some quando o sistema ligar a nota nova.
-          </NoticeBar>
-        ))}
       {p.pedidoOrigemId && (
         <NoticeBar tone="info" testId={`emendas-pedido-reaberto-${p.id}`}>
-          <b>Reaberto da anulação de empenho{p.pedidoOrigemNome ? ` do ${p.pedidoOrigemNome}` : ''}.</b> Combine com o parlamentar os itens e os beneficiários; depois seguem a minuta, o ofício e a conferência no SIOP, como num pedido novo.
-        </NoticeBar>
-      )}
-      {!p.autorId && !cancelado && (
-        <NoticeBar tone="warning" testId={`emendas-pedido-sem-autor-${p.id}`}>
-          Reserva feita a pedido do órgão, ainda sem parlamentar. Quando um parlamentar ou bancada assumir, use "Indicar o parlamentar" para seguir com a minuta.
-        </NoticeBar>
-      )}
-      {andamento.avisos.map((a) => (
-        <NoticeBar key={a.chave} tone={a.tom === 'atencao' && avisos.some((x) => avisoGrave(x) && a.titulo === x.curto) ? 'danger' : a.tom === 'espera' ? 'info' : 'warning'} testId={`pedido360-aviso-${a.chave}`}>
-          <b>{a.titulo}.</b> {a.detalhe}
-        </NoticeBar>
-      ))}
-
-      {!cancelado && <PlanoContadores contagem={andamento.contagem} ativo={filtro} onChange={setFiltro} />}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <span style={carteiraDetalhe}>
-          <b style={{ color: 'var(--text-primary, #0f172a)' }}>
-            {andamento.feitas} de {andamento.total}
+          <b>
+            Reaberto da anulação de empenho
+            {p.pedidoOrigemNome ? ` do ${p.pedidoOrigemNome}` : ''}.
           </b>{' '}
-          tarefas feitas
-        </span>
-        <div style={{ width: '160px', maxWidth: '40vw' }}>
-          <ProgressBar value={andamento.feitas} max={Math.max(andamento.total, 1)} showPercent={false} height="6px" colorScheme="primary" testId="pedido360-progresso" />
-        </div>
-        {filtro && (
-          <AppButton size="xs" variant="link" onClick={() => setFiltro(null)}>
-            Mostrar todas
-          </AppButton>
-        )}
-      </div>
+          Combine com o parlamentar os itens e os beneficiários; depois seguem a minuta, o ofício e a conferência no SIOP, como num pedido novo.
+        </NoticeBar>
+      )}
 
-      {andamento.fases.map((fase) => {
-        const visiveis = fase.tarefas.filter(tarefaVisivel);
-        if (filtro && visiveis.length === 0) return null;
-        const feitas = fase.tarefas.filter((t) => t.estado === 'FEITA').length;
-        const contaveis = fase.tarefas.filter((t) => t.estado !== 'NAO_HOUVE').length;
-        const completa = contaveis > 0 && feitas === contaveis;
-        const aberta = filtro ? true : (abertas[fase.id] ?? !completa);
-        return (
-          <section key={fase.id} style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }} data-testid={`pedido360-fase-${fase.id}`}>
-            <button
-              type="button"
-              aria-expanded={aberta}
-              onClick={() => setAbertas((a) => ({ ...a, [fase.id]: !aberta }))}
-              style={{
-                all: 'unset',
-                boxSizing: 'border-box',
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.55rem 0.75rem',
-                background: 'var(--bg-page, #f8fafc)',
-                cursor: 'pointer',
-                fontWeight: 700,
-                fontSize: '0.9rem'
-              }}
-            >
-              {aberta ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
-              {fase.nome}
-              <span style={{ ...carteiraDetalhe, marginLeft: 'auto', fontWeight: 600 }}>
-                {feitas} de {contaveis}
-                {completa ? ' · concluída' : ''}
-              </span>
-            </button>
-            {aberta &&
-              visiveis.map((t) => {
-                const situacao = SITUACAO[t.estado];
-                const apagada = t.estado === 'DEPOIS' || t.estado === 'NAO_HOUVE';
-                return (
-                  <div key={t.chave} style={{ ...linhaDaTarefa, opacity: apagada ? 0.6 : 1 }} data-testid={`pedido360-tarefa-${t.chave}`} data-estado={t.estado}>
-                    <span style={{ color: COR[t.estado], display: 'inline-flex', paddingTop: '0.15rem' }} title={situacao}>
-                      {ICONE[t.estado]}
-                    </span>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{t.nome}</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.25rem 0.6rem', marginTop: '0.2rem' }}>
-                        <AcaoEtiqueta acao={t.acao} comQuem={t.comQuem} />
-                        {t.progresso && <span style={carteiraDetalhe}>{t.progresso}</span>}
-                      </div>
-                      {t.regra && !apagada && t.estado !== 'FEITA' && <div style={{ ...carteiraDetalhe, color: '#94a3b8', marginTop: '0.2rem' }}>Regra: {t.regra}</div>}
-                      {extras(t)}
-                      {t.pendencias.length > 0 && (
-                        <ul style={{ listStyle: 'none', margin: '0.4rem 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                          {t.pendencias.map((x) => (
-                            <li
-                              key={x.chave}
-                              style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.3rem 0.6rem', borderLeft: '3px solid var(--border)', paddingLeft: '0.6rem' }}
-                              data-testid={`emendas-pedido-falta-${x.chave}`}
-                            >
-                              <div style={{ minWidth: 0, flex: '1 1 220px' }}>
-                                <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{x.titulo}</div>
-                                <div style={carteiraDetalhe}>{x.detalhe}</div>
-                              </div>
-                              {podeGerir && <BotaoDaPendencia p={p} t={x} onAcao={onAcao} onAlterar={onAlterar} />}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem', textAlign: 'right', fontSize: '0.8rem' }}>
-                      {t.estado === 'FEITA' ? (
-                        <>
-                          <span style={{ color: 'var(--color-success-text)', fontWeight: 700 }}>feita</span>
-                          {t.feito && <span style={{ fontWeight: 700 }}>{t.feito}</span>}
-                        </>
-                      ) : (
-                        <>
-                          {situacao && <span style={{ color: COR[t.estado], fontWeight: 700 }}>{situacao}</span>}
-                          {t.prazo && (
-                            <span style={{ color: t.vencido ? 'var(--color-danger-text)' : undefined, fontWeight: t.vencido ? 800 : 600 }}>
-                              {t.vencido ? `venceu em ${t.prazo}` : `prazo ${t.prazo}`}
-                            </span>
-                          )}
-                          {t.proxima && (
-                            <AppButton size="sm" variant={t.estado === 'AGUARDANDO' || t.estado === 'COBRAR' ? 'outline' : 'primary'} onClick={() => onAcao(proximaAcaoDaJanela(p))} data-testid={`emendas-pedido-proximo-${p.id}`}>
-                              {t.proxima}
-                            </AppButton>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-          </section>
-        );
-      })}
-      <MovimentosDoPedido p={p} />
+      {!cancelado && (
+        <section style={bloco} data-testid="pedido360-com-voce">
+          <CarteiraDetailLabel>Com você{m.comVoce.length ? ` · ${m.comVoce.length}` : ''}</CarteiraDetailLabel>
+          <div style={{ ...lista, borderLeft: '4px solid var(--primary)' }}>
+            <div style={{ marginTop: '-1px' }}>
+              {m.comVoce.length === 0 ? (
+                <div style={{ ...linhaDaLista, gridTemplateColumns: '1fr' }}>
+                  <span style={{ fontWeight: 600 }}>Nada com você agora.</span>
+                </div>
+              ) : (
+                comVoce.map(linha)
+              )}
+              {!todasComVoce && m.comVoce.length > LIMITE_COM_VOCE && (
+                <div
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    borderTop: '1px solid var(--border)'
+                  }}
+                >
+                  <AppButton size="xs" variant="link" onClick={() => setTodasComVoce(true)}>
+                    e mais {m.comVoce.length - LIMITE_COM_VOCE}
+                  </AppButton>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {m.comOutros.length > 0 && (
+        <section style={bloco} data-testid="pedido360-com-outros">
+          <CarteiraDetailLabel>Com outros · {m.comOutros.length}</CarteiraDetailLabel>
+          <div style={lista}>
+            <div style={{ marginTop: '-1px' }}>{m.comOutros.map(linha)}</div>
+          </div>
+        </section>
+      )}
+
+      {m.itens && <OndeEstaCadaItem it={m.itens} />}
+
+      <Caminho m={m} onAcao={onAcao} />
+
       {p.observacao && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
           <span style={carteiraDetalhe}>Observação</span>
           <InfoHint label="Ver a observação do pedido" content={p.observacao} testId={`emendas-pedido-observacao-${p.id}`} />
         </div>
       )}
-      {p.origem === 'PLANILHA' && (
-        <div style={carteiraDetalhe}>Pedido trazido do controle anterior da CAEP: as etapas sem data não tinham data registrada lá.</div>
-      )}
+      {p.origem === 'PLANILHA' && <div style={carteiraDetalhe}>Pedido trazido do controle anterior da CAEP: as etapas sem data não tinham data registrada lá.</div>}
     </div>
   );
 };

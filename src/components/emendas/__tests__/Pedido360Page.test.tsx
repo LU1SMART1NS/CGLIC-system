@@ -117,7 +117,9 @@ describe('Pedido 360: endereço e número do pedido (migration 217)', () => {
     const html = render('/emendas/pedidos/id/p4');
     expect(html).toContain('Reserva de 20/10/2026');
     expect(html).toContain('Parlamentar a definir');
-    expect(html).toContain('emendas-pedido-sem-autor-p4');
+    // Sem faixa solta (D2): indicar o parlamentar é uma linha de "Com você".
+    expect(html).toContain('pedido360-linha-pend-autor');
+    expect(html).toContain('Indicar o parlamentar');
   });
 
   it('cartão (28/10/2026): o pedido no título, o parlamentar embaixo, itens somados pelo nome e a próxima tarefa na etapa', () => {
@@ -154,52 +156,51 @@ describe('Pedido 360: cartão e Andamento', () => {
     }
   });
 
-  it('no ofício: etapa 3 de 13, a conferência é com a CAEP e o botão da próxima etapa está no cartão e na tarefa', () => {
+  it('no ofício: etapa 3 de 13, a conferência é a linha de Com você e o botão do passo só aparece ali (D1)', () => {
     const html = render('/emendas/pedidos/id/p1');
     expect(html).toContain('3 de 13');
-    expect(html).toContain('pedido360-proxima-p1');
-    expect(html).toContain('emendas-pedido-proximo-p1');
-    expect(html).toContain('Conferir o ofício');
-    expect(html).toMatch(/pedido360-tarefa-conferir" data-estado="COMIGO"/);
-    expect(html).toMatch(/pedido360-tarefa-minuta" data-estado="FEITA"/);
-    // A etiqueta da ação e os contadores do Plano de gestão das atas.
-    expect(html).toContain('plan-acao');
-    expect(html).toContain('plan-contadores');
-    expect(html).toContain('Comigo agora');
+    expect(html).toContain('2 com você');
+    expect(html).not.toContain('pedido360-proxima-p1');
+    expect(html.match(/emendas-pedido-proximo-p1/g)).toHaveLength(1);
+    expect(html).toMatch(/pedido360-linha-tarefa-conferir" data-tom="eu"/);
+    expect(html).toContain('emendas-pedido-divergencia-p1');
+    // Sem contadores nem barra na aba (D13); o caminho com a fase atual.
+    expect(html).not.toContain('plan-contadores');
+    expect(html).not.toContain('pedido360-progresso');
+    expect(html).toMatch(/pedido360-fase-EMPENHO" data-estado="atual"/);
+    // Alterar itens e Cancelar no menu "Mais" do cartão.
+    expect(html).toContain('pedido360-mais-p1');
   });
 
-  it('ofício devolvido: a 2ª minuta com a tentativa anterior e o aviso', () => {
+  it('ofício devolvido: a 2ª minuta com a tentativa anterior no histórico', () => {
     const html = render('/emendas/pedidos/id/dev');
-    expect(html).toContain('pedido360-devolucoes');
-    expect(html).toContain('Ofício devolvido uma vez');
     expect(html).toContain('Registrar a 2ª minuta');
-    expect(html).toContain('valor diferente');
+    expect(html).toContain('pedido360-historico-devolucao-1');
+    expect(html).toContain('Ofício devolvido (1ª minuta): valor diferente');
   });
 
-  it('na CCGA sem contrato: contrato fecha sozinho, fases concluídas recolhidas e sem cancelar nem alterar', () => {
+  it('na CCGA sem contrato: a CCGA em Com outros, o quadro dos itens numa linha e o SEI do despacho no histórico', () => {
     const html = render('/emendas/parlamentares/A1/pedidos/2026/1');
     expect(html).toContain('9 de 13');
-    expect(html).toMatch(/pedido360-tarefa-contrato" data-estado="FONTE"/);
-    expect(html).toContain('0 de 1 item com contrato');
-    expect(html).toContain('aria-expanded="false"');
-    expect(html).not.toContain('41000004');
+    expect(html).toContain('pedido360-com-outros');
+    expect(html).toMatch(/pedido360-linha-tarefa-contrato" data-tom="espera"/);
+    expect(html).toContain('pedido360-itens');
     expect(html).toContain('41000006');
     expect(html).toContain('emendas-pedido-mais-sei-CONTRATACAO');
+    expect(html).toContain('Nada com você agora.');
     expect(html).not.toContain('emendas-pedido-cancelar-ccga');
     expect(html).not.toContain('emendas-pedido-alterar-ccga');
-    // A fase Execução aparece; a entrega fecha pela fatura depois do contrato.
     expect(html).toContain('pedido360-fase-EXECUCAO');
   });
 
-  it('solicitação por ata: 1 de 2 atas e o envio à CGOFI com a data de cada documento', () => {
+  it('na CGOFI: a nota é com a CGOFI, em Com outros, e a solicitação que falta é com você', () => {
     const html = render('/emendas/pedidos/id/aut');
-    expect(html).toMatch(/pedido360-tarefa-solicitacao" data-estado="COMIGO"/);
-    expect(html).toContain('1 de 2 atas');
+    expect(html).toMatch(/pedido360-linha-tarefa-empenho" data-tom="(espera|vencido)"/);
+    expect(html).toContain('Informar a solicitação de empenho da ata 00048/2025');
     expect(html).toContain('37162877');
-    expect(html).toContain('29/09/2026');
   });
 
-  it('O que falta vira pendência da tarefa: assinatura com botão, próximo passo e beneficiário', () => {
+  it('pendências viram linhas de Com você: assinatura com botão, próximo passo e beneficiário', () => {
     const html = render('/emendas/pedidos/id/blocos');
     expect(html).toContain('Informar a assinatura da solicitação 37099000 · ata 00031/2025');
     expect(html).toContain('emendas-pedido-tarefa-ass-37099000');
