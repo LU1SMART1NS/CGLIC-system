@@ -250,7 +250,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   if (foraDoSaldo.length) pendencias.push('quantidade dentro do saldo livre da CAEP');
   if (semBeneficiario) pendencias.push(`beneficiário em ${semBeneficiario === 1 ? 'um item' : `${semBeneficiario} itens`} (use "Alterar itens")`);
   if (!(valorDoOficio != null && valorDoOficio > 0)) pendencias.push('valor do ofício');
-  if (conta && !cabe) pendencias.push('o pedido caber no que sobra da emenda (ajuste os itens ou gere nova minuta)');
+  if (conta && !cabe) pendencias.push('o pedido caber no valor a indicar da emenda (ajuste os itens ou gere nova minuta)');
   if (seiOficio.trim() && !documentoSeiDaEtapaValido(seiOficio.replace(/\D/g, ''))) pendencias.push('documento SEI do ofício (só números, 7 a 10 dígitos)');
   if (!emenda.trim()) pendencias.push('número da emenda');
   else if (!emendaLida) pendencias.push('nº da emenda com 8 dígitos (ex.: 4095 0004), ou 12 com o ano na frente');
@@ -259,7 +259,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
 
   const motivoSugerido = (): string => {
     if (conta && !cabe)
-      return `O previsto dos itens (${formatCurrency(total)}) passa do que sobra da emenda (${formatCurrency(conta.sobra)})${mudaram.length ? `: o preço mudou depois da minuta (${[...new Set(mudaram.map((m) => `ata ${m.numeroAta ?? '?'}`))].join(', ')})` : ''}.`;
+      return `O previsto dos itens (${formatCurrency(total)}) passa do valor a indicar da emenda (${formatCurrency(conta.sobra)})${mudaram.length ? `: o preço mudou depois da minuta (${[...new Set(mudaram.map((m) => `ata ${m.numeroAta ?? '?'}`))].join(', ')})` : ''}.`;
     return '';
   };
   const abrirDevolucao = () => {
@@ -627,7 +627,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
                 ·{' '}
                 {valorDoOficio - registrada.valor > 0.004
                   ? `o ofício pede ${formatCurrency(valorDoOficio - registrada.valor)} a mais que a emenda`
-                  : `sobra depois deste ofício: ${formatCurrency(registrada.valor - valorDoOficio)} (os outros pedidos da emenda também descontam)`}
+                  : `a indicar depois deste ofício: ${formatCurrency(registrada.valor - valorDoOficio)} (os outros pedidos da emenda também descontam)`}
               </>
             )}{' '}
             <AppButton type="button" variant="link" size="xs" onClick={() => setCorrigindoSiop((c) => !c)} data-testid="conferencia-corrigir-siop">
@@ -661,7 +661,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
               <small>{conta.outros > 0 ? `menos ${formatCurrency(conta.outros)} dos outros pedidos da emenda` : 'nenhum outro pedido da emenda'}</small>
             </div>
             <div className="conferencia-oficio__kpi">
-              <span>Sobra para este pedido</span>
+              <span>A indicar para este pedido</span>
               <b>{formatCurrency(conta.sobra)}</b>
               <small>previsto deste pedido: {formatCurrency(total)}</small>
             </div>

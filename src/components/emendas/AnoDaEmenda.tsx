@@ -60,7 +60,7 @@ export const AnoDaEmenda: React.FC<Props> = ({ valor, anoCorrente, anos, todos, 
           type="button"
           aria-pressed={valor === ANO_SEM}
           onClick={() => onChange(valor === ANO_SEM ? String(anoCorrente) : ANO_SEM)}
-          title="Com o número da emenda, mas sem o ano: sem ele, o sistema não lê o empenhado nem calcula a sobra. Informe o ano na conferência do pedido."
+          title="Com o número da emenda, mas sem o ano: sem ele, o sistema não lê o empenhado nem calcula o valor a indicar. Informe o ano na conferência do pedido."
           className="carteira-filter-btn"
           data-testid={`${testId}-sem-ano`}
           style={{

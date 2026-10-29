@@ -51,6 +51,7 @@ import { emendaDoEndereco } from './rotaDaEmenda';
 import { SobraDaEmendaCartao } from '../parlamentares/SobraDaEmendaCartao';
 import { TabelaDePedidos } from '../parlamentares/TabelaDePedidos';
 import { useSobraDasEmendas } from '../parlamentares/useSobraDasEmendas';
+import { SiopDaBancada } from './SiopDaBancada';
 
 type Aba = 'pedidos' | 'execucao' | 'contatos';
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
@@ -251,7 +252,7 @@ export const Emenda360Page: React.FC = () => {
                   </AppButton>
                 )}
                 {sobra?.situacao === 'sobra' ? (
-                  <ActionButton action="novo" size="sm" label="Novo pedido com a sobra" onClick={() => setNovoPedido(sobra)} data-testid="emenda-360-novo-com-sobra" />
+                  <ActionButton action="novo" size="sm" label="Novo pedido com o valor a indicar" onClick={() => setNovoPedido(sobra)} data-testid="emenda-360-novo-com-sobra" />
                 ) : registrada && semPedido(e) && !encerrada ? (
                   <ActionButton action="novo" size="sm" label="Criar pedido com esta emenda" onClick={() => setNovoPedido('emenda')} data-testid="emenda-360-criar-pedido" />
                 ) : null}
@@ -309,7 +310,7 @@ export const Emenda360Page: React.FC = () => {
         >
           <div data-testid="emenda-360-indicadores">
             <HealthTileGrid columns={4}>
-              <HealthTile label="Valor no SIOP" value={e.valor != null ? formatCurrency(e.valor) : '—'} hint={daEmenda.length === 0 ? 'nenhum pedido' : daEmenda.length === 1 ? '1 pedido' : `${daEmenda.length} pedidos`} compact onClick={() => goToTab('pedidos')} testId="emenda-360-valor" />
+              <HealthTile label="Valor no SIOP" value={e.valor != null ? formatCurrency(e.valor) : '—'} hint={autor?.tipo === 'BANCADA' ? 'compra direta (21BM, modalidade 90)' : daEmenda.length === 0 ? 'nenhum pedido' : daEmenda.length === 1 ? '1 pedido' : `${daEmenda.length} pedidos`} compact onClick={() => goToTab('pedidos')} testId="emenda-360-valor" />
               <HealthTile
                 label="Empenhado"
                 // Pelas notas sem nenhuma nota ligada: "—", como o Pago (não "R$ 0,00").
@@ -328,7 +329,7 @@ export const Emenda360Page: React.FC = () => {
                 testId="emenda-360-pago"
               />
               <HealthTile
-                label={encerrada ? 'Não empenhado' : 'Sobra'}
+                label={encerrada ? 'Não empenhado' : 'A indicar'}
                 // Sem valor do SIOP a sobra é desconhecida, não zero (antes: "R$ 0,00 · crédito perdido").
                 value={sobra && sobra.situacao !== 'semValor' ? formatCurrency(sobra.sobra) : '—'}
                 hint={
@@ -358,6 +359,7 @@ export const Emenda360Page: React.FC = () => {
           <InstrumentSection id="emenda-pedidos" title="Pedidos pagos por esta emenda" subtitle="Inclusive os cancelados; a linha abre o Pedido 360" icon={ListTodo}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               {sobra && <SobraDaEmendaCartao e={sobra} minimo={minimo} podeGerir={podeGerir} onNovoComSobra={setNovoPedido} />}
+              {registrada && autor?.tipo === 'BANCADA' && <SiopDaBancada e={registrada} />}
               {daEmenda.length === 0 ? (
                 <NoticeBar tone={e.urgente ? 'danger' : 'warning'} testId="emenda-360-sem-pedido">
                   Esta emenda ainda não tem pedido.{podeGerir ? ' Fale com a assessoria ou com a ASPAR (aba Contatos) e use "Criar pedido com esta emenda".' : ''}

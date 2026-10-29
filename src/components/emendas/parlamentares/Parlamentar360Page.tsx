@@ -291,13 +291,13 @@ export const Parlamentar360Page: React.FC = () => {
                 testId="parlamentar-360-pago"
               />
               <HealthTile
-                label={encerrado ? 'Não empenhado' : 'Sobra'}
+                label={encerrado ? 'Não empenhado' : 'A indicar'}
                 value={!filtroEhAno(filtroAno) || todasSemValor ? '—' : sobra ? formatCurrency(encerrado ? sobra.naoEmpenhado : sobra.sobra) : '—'}
                 hint={
                   todasSemValor && filtroEhAno(filtroAno)
                     ? 'sem valor do SIOP'
                     : filtroAno === ANO_TODOS
-                    ? 'escolha um ano para ver a sobra'
+                    ? 'escolha um ano para ver o valor a indicar'
                     : filtroAno === ANO_SEM
                       ? 'informe o ano no pedido'
                       : encerrado && (sobra?.situacao === 'conferir' || sobra?.situacao === 'informar' || sobra?.situacao === 'acima')
@@ -321,7 +321,7 @@ export const Parlamentar360Page: React.FC = () => {
 
       <Instrument360TabPanel idPrefix="parlamentar" activeTab={activeTab}>
         {activeTab === 'emendas' && (
-          <InstrumentSection id="parlamentar-emendas" title="Emendas" subtitle="Cada emenda com a sobra, os pedidos que ela paga, os contatos e as ações" icon={FileText}>
+          <InstrumentSection id="parlamentar-emendas" title="Emendas" subtitle="Cada emenda com o valor a indicar, os pedidos que ela paga, os contatos e as ações" icon={FileText}>
             {emendas.length === 0 ? (
               <NoticeBar tone="info" testId="parlamentar-360-sem-emendas">
                 {todasAsEmendas.length === 0
