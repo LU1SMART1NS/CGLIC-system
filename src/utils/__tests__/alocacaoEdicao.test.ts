@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { avaliarEdicao, folgaDasUnidades, linhasIniciais, listaParaGravar, presoDaUnidade, vinculosSemRemovidas, type LinhaAlocacao } from '../alocacaoEdicao';
+import { avaliarEdicao, folgaDasUnidades, linhasDaDivisaoPlanejada, linhasIniciais, listaParaGravar, presoDaUnidade, vinculosSemRemovidas, type LinhaAlocacao } from '../alocacaoEdicao';
 import type { AllocationExecution } from '../allocationExecution';
 
 const gravadas = [
@@ -163,5 +163,27 @@ describe('folgaDasUnidades (decisão D5)', () => {
       ['DIOPI', 120, 'contratado', 180],
       ['CAEP', 750, 'contratado_e_reserva', 50]
     ]);
+  });
+});
+
+describe('linhasDaDivisaoPlanejada (divisão da ata montada, migration 240)', () => {
+  const catalogo = [
+    { sigla: 'CAEP', ativo: true },
+    { sigla: 'DFNSP', ativo: true },
+    { sigla: 'DIOPI', ativo: false }
+  ];
+
+  it('cada unidade vira linha adicionada com a quantidade planejada, pela sigla do catálogo', () => {
+    const r = linhasDaDivisaoPlanejada([{ unidade: 'caep', quantidade: 540 }, { unidade: 'DFNSP', quantidade: 1000 }], catalogo, 1);
+    expect(r.ignoradas).toEqual([]);
+    expect(r.linhas.map((l) => [l.unitName, l.qtd, l.original, l.adicionada])).toEqual([['CAEP', 540, 0, true], ['DFNSP', 1000, 0, true]]);
+    // Entram na régua e na gravação como qualquer unidade acrescentada à mão.
+    expect(avaliarEdicao(r.linhas, 1540).podeSalvar).toBe(true);
+  });
+
+  it('unidade desativada ou fora do catálogo fica de fora e é avisada', () => {
+    const r = linhasDaDivisaoPlanejada([{ unidade: 'DIOPI', quantidade: 10 }, { unidade: 'XPTO', quantidade: 5 }, { unidade: 'CAEP', quantidade: 3 }], catalogo, 1);
+    expect(r.linhas.map((l) => l.unitName)).toEqual(['CAEP']);
+    expect(r.ignoradas).toEqual(['DIOPI', 'XPTO']);
   });
 });

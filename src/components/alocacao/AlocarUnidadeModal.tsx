@@ -11,10 +11,12 @@ import { useContratadoDoItem } from '../../hooks/useContratadoDoItem';
 import { alocacoesPorContrato, contratadoPorNomeDaUnidade } from '../../utils/contratadoPorUnidade';
 import { summarizeAllocationExecution } from '../../utils/allocationExecution';
 import { useReservaDoItem } from '../../hooks/useReservaDoItem';
-import { avaliarEdicao, linhasIniciais, listaParaGravar, normUnidade, ROTULO_MOTIVO_DO_MINIMO, UNIDADE_DAS_EMENDAS, vinculosSemRemovidas, type LinhaAlocacao } from '../../utils/alocacaoEdicao';
+import { avaliarEdicao, linhasDaDivisaoPlanejada, linhasIniciais, listaParaGravar, normUnidade, ROTULO_MOTIVO_DO_MINIMO, UNIDADE_DAS_EMENDAS, vinculosSemRemovidas, type LinhaAlocacao } from '../../utils/alocacaoEdicao';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
 import { MENSAGEM_CONFLITO_EDICAO } from '../../utils/conflitoEdicao';
 import { formatNumber } from '../item-balances/itemBalanceUtils';
+import { useDivisoesDasAtasMontadas } from '../../hooks/useAtasAMontar';
+import { formatDateBR } from '../../utils/format';
 
 export interface ItemParaAlocar {
   numeroAta: string;
@@ -91,6 +93,8 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   };
   const { data: empenhoDoItem, isLoading: vinculosLoading } = useEmpenhoDoItem(itemKey);
   const { data: contratado, isLoading: contratadoLoading } = useContratadoDoItem(itemKey);
+  // Divisão planejada pelo gestor na montagem da ata (migration 240): sugestão, nunca gravada sozinha.
+  const divisao = useDivisoesDasAtasMontadas().get(itemKey);
   const salvarAlocacoes = useSaveAllocations();
   const salvarLinks = useSaveEmpenhoLinks();
   const carregando = departmentsLoading || alocacoesLoading || linksLoading || vinculosLoading || contratadoLoading || reservadoQuery.isLoading;
@@ -126,6 +130,15 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   const alterar = (id: string, mudanca: Partial<LinhaAlocacao>) => setLinhas((ls) => ls.map((l) => (l.id === id ? { ...l, ...mudanca } : l)));
   const remover = (l: LinhaAlocacao) => (l.adicionada ? setLinhas((ls) => ls.filter((x) => x.id !== l.id)) : alterar(l.id, { removida: true }));
   const desfazer = (l: LinhaAlocacao) => alterar(l.id, { removida: false, qtd: l.original });
+
+  // A sugestão só preenche item ainda sem alocação; quem aloca confere na régua e grava em "Salvar alterações".
+  const podeUsarDivisao = !!divisao && (iniciais?.length ?? -1) === 0 && editadas === null;
+  const usarDivisao = () => {
+    if (!divisao) return;
+    const { linhas: planejadas, ignoradas } = linhasDaDivisaoPlanejada(divisao.unidades, departments);
+    setEditadas(planejadas);
+    setErro(ignoradas.length ? `Ficou de fora da divisão planejada (unidade fora do catálogo ou desativada): ${ignoradas.join(', ')}.` : null);
+  };
 
   const adicionar = () => {
     const n = Number(novaQtd);
@@ -233,6 +246,18 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
               item; se parte do registrado da SENASP for deles, a cota própria será menor que {formatNumber(item.quantitativoSenasp)}.
             </NoticeBar>
           ) : null}
+          {divisao && (
+            <NoticeBar
+              tone="info"
+              testId="alocar-divisao-planejada"
+              action={podeUsarDivisao ? <ActionButton action="aplicarSugestao" label="Usar esta divisão" size="sm" onClick={usarDivisao} data-testid="alocar-usar-divisao" /> : undefined}
+            >
+              <strong>Divisão planejada na montagem da ata</strong>
+              {divisao.montadaPorNome ? ` (${divisao.montadaPorNome}, ${formatDateBR(divisao.montadaEm)})` : ''}:{' '}
+              {divisao.unidades.map((u) => `${u.unidade} ${formatNumber(u.quantidade)}`).join(' · ')}.{' '}
+              {podeUsarDivisao ? 'Use, confira e salve.' : (iniciais?.length ?? 0) > 0 ? 'O item já tem alocação: fica só como referência.' : ''}
+            </NoticeBar>
+          )}
           {/* Régua: quantitativo SENASP, fatia de cada unidade e o que falta alocar */}
           <div data-testid="alocar-unidade-regua">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem 1.25rem', fontSize: '0.82rem', color: '#334155', marginBottom: '0.45rem', fontVariantNumeric: 'tabular-nums' }}>
