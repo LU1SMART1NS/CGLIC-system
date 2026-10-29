@@ -122,6 +122,8 @@ export interface KitEmenda {
   ativo: boolean;
   versao: number;
   itens: ItemDoKit[];
+  /** Pedidos com o kit, mesmo cancelados: com algum, o kit só se desativa (migration 251). */
+  pedidos: number;
   atualizadoPorNome: string | null;
   atualizadoEm: string | null;
 }
@@ -287,9 +289,10 @@ export async function fetchItensCaep(): Promise<ItemCaep[]> {
 }
 
 export async function fetchKitsEmendas(): Promise<KitEmenda[]> {
-  const [kits, itens] = await Promise.all([
+  const [kits, itens, linhas] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_kits').select('*').order('id').range(de, ate)),
-    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_kit_itens').select('kit_id, item_key, quantidade').order('kit_id').order('item_key').range(de, ate))
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_kit_itens').select('kit_id, item_key, quantidade').order('kit_id').order('item_key').range(de, ate)),
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('kit_id, pedido_id').not('kit_id', 'is', null).order('id').range(de, ate))
   ]);
   const porKit = new Map<string, ItemDoKit[]>();
   for (const i of itens) {
@@ -297,6 +300,8 @@ export async function fetchKitsEmendas(): Promise<KitEmenda[]> {
     lista.push({ itemKey: i.item_key, quantidade: num(i.quantidade) });
     porKit.set(i.kit_id, lista);
   }
+  const pedidosDoKit = new Map<string, Set<string>>();
+  for (const l of linhas) pedidosDoKit.set(l.kit_id, (pedidosDoKit.get(l.kit_id) ?? new Set()).add(l.pedido_id));
   return kits
     .map((k) => ({
       id: k.id,
@@ -305,6 +310,7 @@ export async function fetchKitsEmendas(): Promise<KitEmenda[]> {
       ativo: k.ativo,
       versao: k.versao,
       itens: porKit.get(k.id) ?? [],
+      pedidos: pedidosDoKit.get(k.id)?.size ?? 0,
       atualizadoPorNome: k.atualizado_por_nome ?? null,
       atualizadoEm: k.atualizado_em ?? null
     }))
@@ -333,6 +339,12 @@ export async function salvarKitEmenda(k: KitParaSalvar): Promise<{ id: string; v
   });
   if (error) throw new Error(mensagemDoBanco(error));
   return data as { id: string; versao: number };
+}
+
+/** Exclui o kit que nenhum pedido usa; o banco confere de novo (migration 251). */
+export async function excluirKitEmenda(k: Pick<KitEmenda, 'id' | 'versao'>): Promise<void> {
+  const { error } = await db().rpc('excluir_kit_emenda', { p_id: k.id, p_versao: k.versao });
+  if (error) throw new Error(mensagemDoBanco(error));
 }
 
 /** "CONFLITO: Outra pessoa…" → "Outra pessoa…": a mensagem do banco já é a frase para o usuário. */
