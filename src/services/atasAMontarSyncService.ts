@@ -5,10 +5,13 @@
  * Depois da homologação de um pregão de registro de preços da SENASP, a ata leva semanas para ser publicada. Nesse
  * meio-tempo o gestor monta os quadros da ata (protótipo aprovado em 28/10/2026). Em cada execução, dentro de um
  * orçamento de tempo:
- *   1. Compras: pregões de registro de preços das UASGs da CGLIC publicados no PNCP nos últimos 18 meses e com valor
- *      homologado (consulta pública /api/consulta/v1/contratacoes/publicacao).
+ *   1. Compras: pregões de registro de preços das UASGs da CGLIC publicados no PNCP (consulta pública
+ *      /api/consulta/v1/contratacoes/publicacao). A consulta é lenta (28/10/2026: 70 s para 1 ano, 10-13 s para
+ *      60 dias; o proxy corta em 30 s): cada execução busca os últimos 60 dias e mais uma fatia de 60 dias em rodízio,
+ *      e os 18 meses ficam cobertos a cada 16 horas. O que já foi achado fica no banco e é relido direto.
  *   2. Itens e resultados de cada compra ainda com fornecedor sem ata (o banco diz quais; as encerradas não são
- *      relidas). Releitura a cada RELEITURA_DOS_ITENS_MS: o pregão pode homologar mais itens depois.
+ *      relidas). Releitura a cada RELEITURA_DOS_ITENS_MS: o pregão pode homologar mais itens depois. Compra ainda sem
+ *      nenhum resultado não grava os itens: continua na fila e é relida a cada execução até a homologação.
  *   3. Minuta da ata do edital (Anexo III): uma vez por compra (2 tentativas). Descrição, CATMAT, gerenciador e
  *      participantes (minutaAtaParser.ts). O item só vale quando a soma dos órgãos fecha com o total do PNCP.
  * Cada compra é gravada assim que lida (gravar_ata_a_montar_compra); o que não couber fica para a próxima.
@@ -29,8 +32,14 @@ export const ORCAMENTO_ATAS_A_MONTAR_MS = 95_000;
 const VALIDADE_ATAS_A_MONTAR = '1 hour';
 /** Itens e resultados são relidos depois disso (o pregão pode homologar mais itens). */
 export const RELEITURA_DOS_ITENS_MS = 6 * 60 * 60 * 1000;
-/** Compras publicadas no PNCP nos últimos 18 meses (a consulta aceita no máximo 365 dias por pedido). */
-const DIAS_DE_BUSCA = 540;
+/** Cada pedido à consulta do PNCP cobre 60 dias (medido: 10-13 s; 1 ano levou 70 s, acima dos 30 s do proxy). */
+const DIAS_DA_FATIA = 60;
+/** Fatias antigas em rodízio, depois dos últimos 60 dias: 8 × 60 = 480 dias, 18 meses no total. */
+const FATIAS_ANTIGAS = 8;
+/** Uma fatia antiga por execução (agendamento de 2 em 2 horas). */
+const PASSO_DO_RODIZIO_MS = 2 * 60 * 60 * 1000;
+/** A busca de compras só começa um pedido novo com pelo menos isto de tempo (o resto é para itens e minutas). */
+const TEMPO_MINIMO_PARA_BUSCAR_MS = 55_000;
 /** CNPJ do Ministério da Justiça e Segurança Pública (órgão das UASGs da CGLIC no PNCP). */
 const CNPJ_MJSP = '00394494000136';
 const UASGS = ['200331', '200330'];
@@ -174,9 +183,9 @@ interface Rede {
   esperar: (ms: number) => Promise<void>;
 }
 
-async function pedir(url: string, rede: Rede, init?: RequestInit): Promise<Response> {
+async function pedir(url: string, rede: Rede, init?: RequestInit, tentativas = TENTATIVAS): Promise<Response> {
   let ultimoErro: unknown = null;
-  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+  for (let tentativa = 1; tentativa <= tentativas; tentativa++) {
     if (tentativa > 1) await rede.esperar(ESPERA_POR_TENTATIVA_MS * (tentativa - 1));
     try {
       const resposta = await rede.fetcher(url, init);
@@ -195,18 +204,18 @@ async function pedir(url: string, rede: Rede, init?: RequestInit): Promise<Respo
   throw ultimoErro;
 }
 
-async function pedirJson<T>(url: string, rede: Rede): Promise<T | null> {
-  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+async function pedirJson<T>(url: string, rede: Rede, tentativas = TENTATIVAS): Promise<T | null> {
+  for (let tentativa = 1; tentativa <= tentativas; tentativa++) {
     let texto: string;
     try {
-      texto = await (await pedir(url, rede)).text();
+      texto = await (await pedir(url, rede, undefined, tentativas)).text();
     } catch (err) {
       if (err instanceof NaoEncontrado) return null;
       throw err;
     }
     // Bloqueio: o PNCP devolve HTML com status 200.
     if (texto.trim().startsWith('<')) {
-      if (tentativa < TENTATIVAS) {
+      if (tentativa < tentativas) {
         await rede.esperar(ESPERA_POR_TENTATIVA_MS * tentativa);
         continue;
       }
@@ -288,21 +297,45 @@ const aaaammdd = (d: Date) => `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1
 /** "00394494000136-1-001664/2025" a partir do ano e sequencial. */
 export const controleDaCompra = (ano: number, sequencial: number) => `${CNPJ_MJSP}-1-${String(sequencial).padStart(6, '0')}/${ano}`;
 
-/** Pregões de registro de preços homologados das UASGs da CGLIC, publicados nos últimos 18 meses. */
-export async function buscarComprasHomologadas(rede: Rede, hoje: Date): Promise<CompraParaGravar[]> {
+/** "00394494000136-1-001664/2025" → ano e sequencial da compra. */
+export function partesDaCompra(controle: string): { ano: number; sequencial: number } | null {
+  const m = /^\d{14}-1-(\d{6})\/(\d{4})$/.exec(controle);
+  return m ? { ano: Number(m[2]), sequencial: Number(m[1]) } : null;
+}
+
+/** Fatias de 60 dias desta execução: a mais recente (0) e uma antiga em rodízio (1 a 8). */
+export const fatiasDaExecucao = (hoje: Date) => [0, 1 + (Math.floor(hoje.getTime() / PASSO_DO_RODIZIO_MS) % FATIAS_ANTIGAS)];
+
+/**
+ * Pregões de registro de preços divulgados das UASGs da CGLIC, publicados nas fatias pedidas. Entram também os ainda
+ * sem homologação: ficam no banco e são relidos até sair o resultado. Pedido que falha não para a busca (uma
+ * tentativa só: a próxima execução pega).
+ */
+export async function buscarCompras(
+  rede: Rede,
+  hoje: Date,
+  opts: { fatias?: number[]; restaMs?: () => number } = {}
+): Promise<{ compras: CompraParaGravar[]; falhas: string[] }> {
   const out = new Map<string, CompraParaGravar>();
-  const fim = new Date(hoje);
-  for (const uasg of UASGS) {
-    // Janelas de até 365 dias, da mais recente para a mais antiga.
-    for (let dias = 0; dias < DIAS_DE_BUSCA; dias += 365) {
-      const ate = new Date(fim.getTime() - dias * 86_400_000);
-      const de = new Date(ate.getTime() - Math.min(364, DIAS_DE_BUSCA - dias) * 86_400_000);
+  const falhas: string[] = [];
+  const restaMs = opts.restaMs ?? (() => Number.POSITIVE_INFINITY);
+  for (const fatia of opts.fatias ?? fatiasDaExecucao(hoje)) {
+    const ate = new Date(hoje.getTime() - fatia * DIAS_DA_FATIA * 86_400_000);
+    const de = new Date(ate.getTime() - (DIAS_DA_FATIA - 1) * 86_400_000);
+    for (const uasg of UASGS) {
       for (let pagina = 1; pagina <= 20; pagina++) {
+        if (restaMs() < TEMPO_MINIMO_PARA_BUSCAR_MS) return { compras: [...out.values()], falhas };
         const url = `${URL_CONSULTA}?dataInicial=${aaaammdd(de)}&dataFinal=${aaaammdd(ate)}&codigoModalidadeContratacao=${MODALIDADE_PREGAO}` +
           `&cnpj=${CNPJ_MJSP}&codigoUnidadeAdministrativa=${uasg}&pagina=${pagina}&tamanhoPagina=50`;
-        const r = await pedirJson<{ data?: CompraPncp[]; totalPaginas?: number }>(url, rede);
+        let r: { data?: CompraPncp[]; totalPaginas?: number } | null;
+        try {
+          r = await pedirJson<{ data?: CompraPncp[]; totalPaginas?: number }>(url, rede, 1);
+        } catch (err) {
+          falhas.push(`busca ${aaaammdd(de)}-${aaaammdd(ate)} UASG ${uasg}: ${mensagemDeErro(err)}`);
+          break;
+        }
         for (const c of r?.data ?? []) {
-          if (!c.srp || c.situacaoCompraId !== COMPRA_DIVULGADA || c.valorTotalHomologado == null) continue;
+          if (!c.srp || c.situacaoCompraId !== COMPRA_DIVULGADA) continue;
           const controle = controleDaCompra(c.anoCompra, c.sequencialCompra);
           out.set(controle, {
             numero_controle_compra: controle,
@@ -314,13 +347,12 @@ export async function buscarComprasHomologadas(rede: Rede, hoje: Date): Promise<
             objeto: c.objetoCompra ?? null
           });
         }
-        if (!r || pagina >= (r.totalPaginas ?? 1)) break;
         await rede.esperar(PAUSA_ENTRE_PEDIDOS_MS);
+        if (!r || pagina >= (r.totalPaginas ?? 1)) break;
       }
-      await rede.esperar(PAUSA_ENTRE_PEDIDOS_MS);
     }
   }
-  return [...out.values()];
+  return { compras: [...out.values()], falhas };
 }
 
 const moedaDe = (m: ResultadoPncp['moedaEstrangeira']) => (m == null ? null : typeof m === 'string' ? m : m.codigo ?? m.nome ?? null);
@@ -477,10 +509,19 @@ interface Contagem {
   falhas: string[];
 }
 
-async function processar(compras: CompraParaGravar[], fila: Map<string, CompraDaFila>, ctx: ContextoDaExecucao): Promise<Contagem> {
+async function processar(achadas: CompraParaGravar[], fila: Map<string, CompraDaFila>, ctx: ContextoDaExecucao): Promise<Contagem> {
+  // As achadas nesta busca e as que já estão no banco (gravadas em buscas anteriores).
+  const todas = new Map(achadas.map((x) => [x.numero_controle_compra, x]));
+  for (const controle of fila.keys()) {
+    const p = partesDaCompra(controle);
+    if (p && !todas.has(controle)) {
+      todas.set(controle, { numero_controle_compra: controle, codigo_uasg: '', ano_compra: p.ano, sequencial_compra: p.sequencial, numero_compra: null, processo: null, objeto: null });
+    }
+  }
+  const compras = [...todas.values()];
   const c: Contagem = { compras: compras.length, itensLidos: 0, minutasLidas: 0, pendentes: 0, falhas: [] };
   // As mais recentes primeiro: são as que estão sendo montadas.
-  const ordenadas = [...compras].sort((a, b) => b.ano_compra - a.ano_compra || b.sequencial_compra - a.sequencial_compra);
+  const ordenadas = compras.sort((a, b) => b.ano_compra - a.ano_compra || b.sequencial_compra - a.sequencial_compra);
   for (const compra of ordenadas) {
     const conhecida = fila.get(compra.numero_controle_compra);
     // Todos os fornecedores já têm ata: nada a montar.
@@ -499,10 +540,16 @@ async function processar(compras: CompraParaGravar[], fila: Map<string, CompraDa
         continue;
       }
       c.itensLidos++;
+      // Sem nenhum resultado ainda (pregão em andamento): grava só a compra, sem os itens; ela continua na fila e é
+      // relida a cada execução até a homologação.
+      if (!itens.some((i) => i.resultados.length > 0)) {
+        if (!conhecida) await ctx.banco.gravar(compra);
+        continue;
+      }
       await ctx.banco.gravar({ ...compra, itens });
       // A minuta só interessa enquanto houver fornecedor sem ata (as compras antigas, todas publicadas, não).
       const semAta = await ctx.banco.temFornecedorSemAta(compra.numero_controle_compra);
-      if (!precisaMinuta || !semAta || !itens.some((i) => i.resultados.length > 0)) continue;
+      if (!precisaMinuta || !semAta) continue;
       let minuta: CompraParaGravar['minuta'];
       try {
         const lida = await lerMinutaDaCompra(compra, itens, ctx);
@@ -542,10 +589,11 @@ function contexto(opts: OpcoesAtasAMontar): ContextoDaExecucao {
 export async function sincronizarAtasAMontar(opts: OpcoesAtasAMontar): Promise<ResultadoSincronizacao> {
   return executarComReserva(RECURSO_ATAS_A_MONTAR, UASG_TODAS, { forcar: opts.forcar, validade: VALIDADE_ATAS_A_MONTAR }, async () => {
     const ctx = contexto(opts);
-    const compras = await buscarComprasHomologadas(ctx, (opts.hoje ?? (() => new Date()))());
+    const busca = await buscarCompras(ctx, (opts.hoje ?? (() => new Date()))(), { restaMs: ctx.restaMs });
     const fila = new Map((await ctx.banco.fila()).map((f) => [f.numero_controle_compra, f]));
-    const c = await processar(compras, fila, ctx);
-    const mensagem = `${c.compras} pregão(ões) homologado(s); itens lidos em ${c.itensLidos}, minuta em ${c.minutasLidas}` +
+    const c = await processar(busca.compras, fila, ctx);
+    c.falhas.unshift(...busca.falhas);
+    const mensagem = `${busca.compras.length} pregão(ões) achado(s) na busca, ${c.compras} no total; itens lidos em ${c.itensLidos}, minuta em ${c.minutasLidas}` +
       (c.pendentes ? `; ${c.pendentes} para a próxima execução` : '') +
       (c.falhas.length ? `; falhas: ${c.falhas.join('; ')}` : '');
     return {
@@ -563,7 +611,10 @@ export async function sincronizarAtasAMontar(opts: OpcoesAtasAMontar): Promise<R
  */
 export async function testarAtasAMontar(opts: OpcoesAtasAMontar): Promise<Record<string, unknown>> {
   const ctx = contexto(opts);
-  const compras = await buscarComprasHomologadas(ctx, (opts.hoje ?? (() => new Date()))());
+  const hoje = (opts.hoje ?? (() => new Date()))();
+  // No teste, todas as fatias (sem rodízio), até onde o tempo der.
+  const busca = await buscarCompras(ctx, hoje, { fatias: Array.from({ length: FATIAS_ANTIGAS + 1 }, (_, i) => i), restaMs: ctx.restaMs });
+  const compras = busca.compras;
   let fila: CompraDaFila[] = [];
   try {
     fila = await ctx.banco.fila();
@@ -573,6 +624,7 @@ export async function testarAtasAMontar(opts: OpcoesAtasAMontar): Promise<Record
   const leituras: Array<Record<string, unknown>> = [];
   const banco: BancoDasAtasAMontar = { ...ctx.banco, gravar: async (x) => void leituras.push(resumo(x)), temFornecedorSemAta: async () => true };
   const c = await processar(compras, new Map(fila.map((f) => [f.numero_controle_compra, f])), { ...ctx, banco });
+  c.falhas.unshift(...busca.falhas);
   return { ...c, pregoes: compras.map((x) => `${x.numero_compra}/${x.ano_compra}`), naFila: fila.length, leituras };
 }
 

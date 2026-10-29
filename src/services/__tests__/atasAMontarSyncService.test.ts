@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  buscarComprasHomologadas,
+  buscarCompras,
+  fatiasDaExecucao,
   enderecoDoArquivo,
   leituraDoTexto,
   lerItensDaCompra,
@@ -49,17 +50,43 @@ const resultado = (ni: string, nome: string, q: number, vu: number, situacao = 1
   situacaoCompraItemResultadoId: situacao
 });
 
-describe('buscarComprasHomologadas', () => {
-  it('fica só com pregão de registro de preços divulgado e com valor homologado', async () => {
-    const compra = (seq: number, extra: object) => ({ anoCompra: 2026, sequencialCompra: seq, numeroCompra: String(90000 + seq), srp: true, situacaoCompraId: 1, valorTotalHomologado: 10, ...extra });
+describe('buscarCompras', () => {
+  const compra = (seq: number, extra: object) => ({ anoCompra: 2026, sequencialCompra: seq, numeroCompra: String(90000 + seq), srp: true, situacaoCompraId: 1, valorTotalHomologado: 10, ...extra });
+
+  it('fica com pregão de registro de preços divulgado, homologado ou não', async () => {
     const fetcher = fetcherDe([
       [/codigoUnidadeAdministrativa=200331/, () => json({ totalPaginas: 1, data: [compra(1, {}), compra(2, { srp: false }), compra(3, { situacaoCompraId: 4 }), compra(4, { valorTotalHomologado: null })] })],
-      [/codigoUnidadeAdministrativa=200330/, () => json({ totalPaginas: 1, data: [] })]
+      [/codigoUnidadeAdministrativa=200330/, () => new Response(null, { status: 204 })]
     ]);
-    const r = await buscarComprasHomologadas({ fetcher, esperar: semEspera }, new Date('2026-10-28T12:00:00Z'));
-    expect(r.map((c) => c.numero_controle_compra)).toEqual(['00394494000136-1-000001/2026']);
-    // 18 meses em janelas de até 365 dias: 2 pedidos por UASG.
+    const r = await buscarCompras({ fetcher, esperar: semEspera }, new Date('2026-10-28T12:00:00Z'), { fatias: [0] });
+    expect(r.compras.map((c) => c.numero_controle_compra)).toEqual(['00394494000136-1-000001/2026', '00394494000136-1-000004/2026']);
+    expect(r.falhas).toEqual([]);
+  });
+
+  it('cada pedido cobre 60 dias e a falha de um pedido não para a busca (uma tentativa só)', async () => {
+    const fetcher = fetcherDe([
+      [/dataInicial=20260830&dataFinal=20261028&.*200331/, () => new Response('', { status: 500 })],
+      [/200331/, () => json({ totalPaginas: 1, data: [compra(7, {})] })],
+      [/200330/, () => new Response(null, { status: 204 })]
+    ]);
+    const r = await buscarCompras({ fetcher, esperar: semEspera }, new Date('2026-10-28T12:00:00Z'), { fatias: [0, 3] });
+    expect(r.compras).toHaveLength(1);
+    expect(r.falhas).toEqual([expect.stringMatching(/^busca 20260830-20261028 UASG 200331/)]);
+    // 2 fatias × 2 UASGs, sem repetir o pedido que falhou.
     expect((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(4);
+  });
+
+  it('para de buscar quando falta tempo para ler itens e minutas', async () => {
+    const fetcher = fetcherDe([[/./, () => json({ totalPaginas: 1, data: [] })]]);
+    await buscarCompras({ fetcher, esperar: semEspera }, new Date('2026-10-28T12:00:00Z'), { fatias: [0, 1], restaMs: () => 30_000 });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('rodízio: a fatia antiga muda de 2 em 2 horas e cobre as 8 fatias', () => {
+    const base = Date.UTC(2026, 9, 28, 0, 0);
+    const antigas = new Set(Array.from({ length: 8 }, (_, i) => fatiasDaExecucao(new Date(base + i * 2 * 3600_000))[1]));
+    expect(fatiasDaExecucao(new Date(base))[0]).toBe(0);
+    expect([...antigas].sort()).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 });
 
@@ -166,5 +193,30 @@ describe('testarAtasAMontar (sem gravar)', () => {
       expect.objectContaining({ compra: '90035/2025', itens: 2, fornecedores: ['GOHOBBY'] }),
       expect.objectContaining({ compra: '90035/2025', minuta: expect.objectContaining({ estado: 'LIDA', modelo: 'B' }) })
     ]);
+  });
+
+  it('relê do banco a compra achada antes e guarda sem itens a que ainda não tem resultado', async () => {
+    const fetcher = fetcherDe([
+      [/contratacoes\/publicacao.*200331/, () => json({ totalPaginas: 1, data: [{ anoCompra: 2026, sequencialCompra: 900, numeroCompra: '90010', srp: true, situacaoCompraId: 1 }] })],
+      [/contratacoes\/publicacao/, () => new Response(null, { status: 204 })],
+      [/compras\/2026\/900\/itens\?pagina=1/, () => json([{ numeroItem: 1, quantidade: 5, temResultado: false }])],
+      [/compras\/2026\/797\/itens\/1\/resultados/, () => json([resultado('11111111000111', 'SPAIR', 10, 1)])],
+      [/compras\/2026\/797\/itens\?pagina=1/, () => json([{ numeroItem: 1, quantidade: 10, temResultado: true }])],
+      [/\/arquivos$/, () => json([])]
+    ]);
+    const banco: BancoDasAtasAMontar = {
+      fila: vi.fn(async () => [{ numero_controle_compra: '00394494000136-1-000797/2026', itens_lidos_em: null, minuta_estado: 'PENDENTE', minuta_tentativas: 0, tem_fornecedor_sem_ata: true }]),
+      gravar: vi.fn(async () => {}),
+      temFornecedorSemAta: vi.fn(async () => true)
+    };
+    const leitor: LeitorDeArquivos = { textoDoPdf: async () => '', arquivosDoZip: async () => [] };
+    let t = 0;
+    const r = await testarAtasAMontar({ leitor, banco, fetcher, esperar: semEspera, agora: () => (t += 10), hoje: () => new Date('2026-10-28T12:00:00Z') });
+    expect(r.leituras).toEqual(expect.arrayContaining([
+      // 797/2026 só estava no banco: relida e gravada com os itens.
+      expect.objectContaining({ compra: 'null/2026', itens: 1, fornecedores: ['SPAIR'] }),
+      // 90010/2026 sem resultado: gravada sem itens.
+      expect.objectContaining({ compra: '90010/2026', itens: undefined })
+    ]));
   });
 });
