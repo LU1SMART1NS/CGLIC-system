@@ -691,6 +691,8 @@ export interface PedidoEmenda {
   trocasDeEmenda?: TrocaDeEmenda[];
   /** Envios à CCGA, devoluções e etapas voltadas (migration 248), do mais antigo ao mais novo. */
   movimentos?: MovimentoDoPedido[];
+  /** Informação e Ordem de Fornecimento de cada contrato do pedido (migration 250). */
+  ordens?: OrdemDoContrato[];
 }
 
 export interface TrocaDeEmenda {
@@ -701,6 +703,19 @@ export interface TrocaDeEmenda {
   motivo: string;
   criadoPorNome: string | null;
   criadoEm: string;
+}
+
+/**
+ * Informação da ComprasSUSP para a Ordem de Fornecimento e a Ordem emitida pela SFC, por pedido e contrato
+ * (migration 250). Uma Informação por contrato, que pode valer para vários pedidos do mesmo contrato.
+ */
+export interface OrdemDoContrato {
+  id: string;
+  contractKey: string;
+  informacaoEm: string | null;
+  informacaoDocumentoSei: string | null;
+  ordemEm: string | null;
+  ordemDocumentoSei: string | null;
 }
 
 export interface OutraEmendaDoPedido {
@@ -715,7 +730,7 @@ export interface OutraEmendaDoPedido {
 }
 
 export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
-  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes, anulacoes, outras, trocas, movimentos] = await Promise.all([
+  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes, anulacoes, outras, trocas, movimentos, ordens] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedidos').select('*').order('numero').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_devolucoes').select('*').order('id').range(de, ate)),
@@ -740,8 +755,24 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
     // Vai e volta com a CCGA (migration 248). Antes da migration a tabela não existe: segue sem ela.
     lerTodasAsPaginas<Record<string, any>>((de, ate) =>
       db().from('emenda_pedido_movimentos').select('id, pedido_id, acao, ata_key, linha_ids, etapa_de, etapa_para, documento_sei, motivo, explicacao, data, criado_por_nome, criado_em').order('id').range(de, ate)
+    ).catch(() => []),
+    // Informação e Ordem de Fornecimento por contrato (migration 250). Antes da migration a tabela não existe: segue sem ela.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+      db().from('emenda_pedido_ordens').select('id, pedido_id, contract_key, informacao_em, informacao_documento_sei, ordem_em, ordem_documento_sei').order('id').range(de, ate)
     ).catch(() => [])
   ]);
+  const ordensPorPedido = new Map<string, OrdemDoContrato[]>();
+  for (const o of ordens) {
+    const ordem: OrdemDoContrato = {
+      id: o.id,
+      contractKey: o.contract_key,
+      informacaoEm: o.informacao_em ?? null,
+      informacaoDocumentoSei: o.informacao_documento_sei ?? null,
+      ordemEm: o.ordem_em ?? null,
+      ordemDocumentoSei: o.ordem_documento_sei ?? null
+    };
+    ordensPorPedido.set(o.pedido_id, [...(ordensPorPedido.get(o.pedido_id) ?? []), ordem]);
+  }
   const movimentosPorPedido = new Map<string, MovimentoDoPedido[]>();
   for (const m of movimentos) {
     const movimento: MovimentoDoPedido = {
@@ -968,7 +999,8 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       emendaId: p.emenda_id ?? null,
       outrasEmendas: (outrasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)),
       trocasDeEmenda: (trocasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)),
-      movimentos: (movimentosPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))
+      movimentos: (movimentosPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)),
+      ordens: (ordensPorPedido.get(p.id) ?? []).sort((a, b) => a.contractKey.localeCompare(b.contractKey))
     }))
     .sort((a, b) => b.numero - a.numero);
 }
@@ -1102,6 +1134,32 @@ export async function registrarOrdemFornecimento(v: { pedidoId: string; document
     p_id: v.pedidoId,
     p_documento_sei: v.documentoSei,
     p_data: v.data
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
+
+/** Um par pedido × contrato da Informação ou da Ordem de Fornecimento (migration 250). */
+export interface AlvoDaOrdem {
+  pedidoId: string;
+  contractKey: string;
+}
+
+/** A Informação da ComprasSUSP para a Ordem de Fornecimento (migration 250): um SEI para um ou mais pedidos × contratos. */
+export async function registrarInformacaoOrdem(v: { alvos: AlvoDaOrdem[]; data: string; documentoSei: string }): Promise<void> {
+  const { error } = await db().rpc('registrar_informacao_ordem', {
+    p_alvos: v.alvos.map((a) => ({ pedido_id: a.pedidoId, contract_key: a.contractKey })),
+    p_data: v.data,
+    p_documento_sei: v.documentoSei
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
+
+/** A Ordem de Fornecimento emitida pela SFC (migration 250), ou a correção dela. */
+export async function registrarOrdemDoContrato(v: { alvos: AlvoDaOrdem[]; data: string; documentoSei: string }): Promise<void> {
+  const { error } = await db().rpc('registrar_ordem_fornecimento_contrato', {
+    p_alvos: v.alvos.map((a) => ({ pedido_id: a.pedidoId, contract_key: a.contractKey })),
+    p_data: v.data,
+    p_documento_sei: v.documentoSei
   });
   if (error) throw new Error(mensagemDoBanco(error));
 }
