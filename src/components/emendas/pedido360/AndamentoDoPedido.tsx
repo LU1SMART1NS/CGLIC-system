@@ -28,6 +28,8 @@ interface Props {
   onAnular: () => void;
   /** Envio à CCGA por ata e desfazer o envio (migration 248). */
   ccga?: AcoesCcga;
+  /** Informação e Ordem de Fornecimento por contrato (migration 250). */
+  onOrdem?: (modo: 'INFORMACAO' | 'ORDEM', contratos: string[]) => void;
 }
 
 const COR_DO_TOM: Record<LinhaDaMesa['tom'], string> = {
@@ -432,7 +434,7 @@ const Caminho: React.FC<{ m: MesaDoPedido; onAcao: AoAgir }> = ({ m, onAcao }) =
  * Onde está cada item · Caminho do pedido. Os botões de trabalho moram só em "Com você" (D1); o cartão do topo diz
  * onde o pedido está. As linhas saem de `mesaDoPedido`, que só redistribui as regras de antes.
  */
-export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, beneficiarios, avisos, hoje, podeGerir, onAcao, onAlterar, onAnular, ccga }) => {
+export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, beneficiarios, avisos, hoje, podeGerir, onAcao, onAlterar, onAnular, ccga, onOrdem }) => {
   const { precos } = usePrecosParaEmenda();
   const m = useMemo(() => mesaDoPedido(p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos), [p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos]);
   const [todasComVoce, setTodasComVoce] = useState(false);
@@ -451,6 +453,8 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, beneficiar
         return ccga?.desfazer?.();
       case 'anular':
         return onAnular();
+      case 'ordem':
+        return onOrdem?.(f.modo, f.contratos);
       case 'pendencia': {
         const b = f.tarefa.botao;
         if (!b) return undefined;

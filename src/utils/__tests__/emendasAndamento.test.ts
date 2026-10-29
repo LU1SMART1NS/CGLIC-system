@@ -100,7 +100,7 @@ describe('Andamento do pedido: as etapas como tarefas', () => {
     expect(estado(p, 'entrega', semFatura)).toMatchObject({ estado: 'FONTE', progresso: '0 de 1 nota com fatura' });
   });
 
-  it('Ordem de Fornecimento (migration 245): abre com a CAEP no contrato assinado e fecha pelo registro ou pela entrega', () => {
+  it('Ordem de Fornecimento: abre com a CAEP no contrato assinado e fecha pelo registro antigo (migration 245) ou pela entrega', () => {
     const p = pedido({ etapa: 'CONTRATACAO', contratacaoEm: '2026-10-15', empenhadoEm: '2026-04-17' });
     // Sem contrato: depois.
     expect(estado(p, 'ordem', new Map([['l1', nota('l1', {})]])).estado).toBe('DEPOIS');
@@ -112,6 +112,14 @@ describe('Andamento do pedido: as etapas como tarefas', () => {
     // Já com fatura e sem registro: comprovada pela entrega.
     const faturado = new Map([['l1', nota('l1', { contractKey: '200331-00163-2026', faturas: 1, faturadoEm: '2026-07-20' })]]);
     expect(estado(p, 'ordem', faturado)).toMatchObject({ estado: 'FEITA', feito: 'comprovado pela entrega' });
+  });
+
+  it('Informação e Ordem por contrato (migration 250): Informação feita espera a SFC; Ordem emitida fecha', () => {
+    const p = pedido({ etapa: 'CONTRATACAO', contratacaoEm: '2026-10-15', empenhadoEm: '2026-04-17' });
+    const contratado = new Map([['l1', nota('l1', { contractKey: '200331-00163-2026' })]]);
+    const registro = { id: 'o', contractKey: '200331-00163-2026', informacaoEm: '2026-10-27', informacaoDocumentoSei: '37530982', ordemEm: null, ordemDocumentoSei: null };
+    expect(estado({ ...p, ordens: [registro] }, 'ordem', contratado)).toMatchObject({ estado: 'AGUARDANDO', comQuem: 'SFC' });
+    expect(estado({ ...p, ordens: [{ ...registro, ordemEm: '2026-10-28', ordemDocumentoSei: '37531586' }] }, 'ordem', contratado)).toMatchObject({ estado: 'FEITA', feito: '28/10/2026' });
   });
 
   it('cancelado: feito o que aconteceu, o resto não houve e nada entra nos contadores', () => {

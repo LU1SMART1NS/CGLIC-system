@@ -39,6 +39,7 @@ import { emendaDoPedidoNoQuadro } from '../../../utils/emendasQuadro';
 import { PedidoModal } from '../PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela, type ContextoDaJanela } from '../EtapaPedidoModal';
 import { AnulacaoModal } from '../AnulacaoModal';
+import { OrdemFornecimentoModal } from '../OrdemFornecimentoModal';
 import { AutorizacaoQuadrosModal } from '../AutorizacaoQuadrosModal';
 import { DesfazerEnvioCcgaModal, EnviarCcgaModal, VoltarEtapaModal } from '../CcgaModais';
 import { atasParaDesfazer, atasParaEnviar, temSituacaoNaCcga, voltaDaEtapa } from '../../../utils/emendasCcga';
@@ -90,6 +91,8 @@ export const Pedido360Page: React.FC = () => {
 
   const [editando, setEditando] = useState(false);
   const [anulando, setAnulando] = useState(false);
+  // Informação e Ordem de Fornecimento por contrato (migration 250).
+  const [ordem, setOrdem] = useState<{ modo: 'INFORMACAO' | 'ORDEM'; contratos: string[] } | null>(null);
   const [janela, setJanela] = useState<{ acao: AcaoDaJanela; contexto?: ContextoDaJanela } | null>(null);
   // Envio à CCGA por ata, desfazer o envio e voltar etapa (migration 248).
   const [ccga, setCcga] = useState<'ENVIAR' | 'DESFAZER' | 'VOLTAR' | null>(null);
@@ -238,6 +241,7 @@ export const Pedido360Page: React.FC = () => {
                 onAlterar={() => setEditando(true)}
                 onAnular={() => setAnulando(true)}
                 ccga={acoesCcga}
+                onOrdem={(modo, contratos) => setOrdem({ modo, contratos })}
               />
             </InstrumentSection>
           )}
@@ -304,6 +308,17 @@ export const Pedido360Page: React.FC = () => {
           ultimoContato={ultimoContatoPorAutor(pedidos)}
           hoje={hoje}
           onClose={() => setEditando(false)}
+        />
+      )}
+      {ordem && (
+        <OrdemFornecimentoModal
+          modo={ordem.modo}
+          pedido={p}
+          pedidos={pedidos}
+          notas={notas}
+          contratos={ordem.contratos}
+          nomeDoOutro={(q) => `${nomeDoPedido(q)} · ${(q.autorId && autorPorId.get(q.autorId)?.nome) || AUTOR_A_DEFINIR}`}
+          onClose={() => setOrdem(null)}
         />
       )}
       {anulando && <AnulacaoModal pedido={p} itens={itens} notas={notas} nomeDoAutor={nomeDoAutor} onClose={() => setAnulando(false)} />}
