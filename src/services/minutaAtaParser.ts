@@ -375,7 +375,8 @@ export function lerParticipantesDaMinuta(texto: string, totais: Record<number, n
     }
     const fecham = Object.keys(alvo)
       .map(Number)
-      .filter((k) => r.part[k]?.length && r.part[k].reduce((s, x) => s + x.quantidade, 0) === alvo[k]);
+      // Sem participantes no item (tudo para o gerenciador), a soma esperada é 0 e fecha sem nenhuma linha.
+      .filter((k) => (r.part[k] ?? []).reduce((s, x) => s + x.quantidade, 0) === alvo[k] && (alvo[k] === 0 || (r.part[k]?.length ?? 0) > 0));
     const linhasLidas = Object.values(r.part).reduce((s, v) => s + v.length, 0);
     return { modelo, ...r, fecham, linhasLidas };
   });
@@ -446,7 +447,9 @@ export function lerItensDaMinuta(texto: string, quantidades: Record<number, numb
     const corte = palavras.findIndex(
       (w, idx) => idx > 0 && (/^\d{5,6}$/.test(w) || (LIXO_DA_TABELA.test(w) && !/^[-–]$/.test(w)) || (NUM.test(w) && !ehTexto(palavras[idx + 1])))
     );
+    // Tabela com a coluna "Grupo" antes do item ("1" / "1 Locação de..."): o número repetido não é descrição.
     const desc = juntar((corte > 0 ? palavras.slice(0, corte) : texto).filter((w) => !LIXO_DA_TABELA.test(w) || /^[-–]$/.test(w)).join(' '))
+      .replace(new RegExp(`^${k}\\s+(?=[A-Za-zÀ-ú])`), '')
       .replace(/^[-–]\s*/, '')
       .replace(/\s*[-–]$/, '');
     const atual = out[k];

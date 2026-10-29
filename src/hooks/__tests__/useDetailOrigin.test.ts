@@ -43,6 +43,12 @@ describe('originLabel: nome do destino do Voltar', () => {
     expect(originLabel('/instrumentos')).toBe('Início');
   });
 
+  it('atas a montar: a tela recebe a origem e o Voltar leva à lista "Atas a montar"', () => {
+    expect(isDetailPath('/atas/montar/2026/797/42841176000116')).toBe(true);
+    expect(originLabel('/atas?ver=montar')).toBe('Atas a montar');
+    expect(originLabel('/atas?ver=montar&ordem=valor:desc')).toBe('Atas a montar');
+  });
+
   it('nomeia as páginas de Emendas e o Pedido 360', () => {
     expect(originLabel('/emendas/pedidos?aviso=grave')).toBe('Pedidos');
     expect(originLabel('/emendas/inicio?gaveta=notasSemPedido')).toBe('Início');
