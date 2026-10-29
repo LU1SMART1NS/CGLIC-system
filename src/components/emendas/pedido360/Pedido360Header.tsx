@@ -1,7 +1,7 @@
 import React from 'react';
 import { Instrument360Hero } from '../../instrument360/Instrument360Hero';
 import { HealthTile, HealthTileGrid } from '../../instrument360/HealthStripParts';
-import { ActionButton } from '../../../design-system/components/ActionButton';
+import { RowActionsMenu } from '../../../design-system/components/RowActionsMenu';
 import { AppButton } from '../../../design-system/components/AppButton';
 import { ProgressBar } from '../../../design-system/components/ProgressBar';
 import { formatCurrency } from '../../../utils/format';
@@ -15,7 +15,6 @@ import {
   jaEmpenhado,
   linhasAtivas,
   ORDEM_ETAPA,
-  PODE_ANULAR_EMPENHO,
   proximaAcao,
   resumoDasLinhas,
   rodadaDoPedido,
@@ -41,10 +40,10 @@ interface Props {
   valor: { valor: number; fonte: 'OFICIO' | 'PREVISTO' };
   podeGerir: boolean;
   back: { label: string; back: () => void };
-  onProxima: () => void;
   onAlterar: () => void;
   onCancelar: () => void;
-  onAnular: () => void;
+  /** Quantas linhas há em "Com você" na aba Andamento: o indicador Etapa leva até lá. */
+  comVoce: number;
   /** Ofício retificador (migration 249): só antes do empenho, para quem gere emendas. */
   onRetificador?: () => void;
   /** Envio à CCGA por ata, desfazer o envio e voltar etapa (migration 248): cada um só quando cabe. */
@@ -82,7 +81,7 @@ const LIMITE_DO_NOME = 40;
  * mais grave em selo, o contato da assessoria e as datas ao lado, quatro indicadores e, no pé, o processo SEI, a
  * emenda (abre a Emenda 360) e o GND. A próxima tarefa é o botão principal.
  */
-export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onProxima, onAlterar, onCancelar, onAnular, onRetificador, ccga, onAba, onAbrirParlamentar, onAbrirEmenda, verMais }) => {
+export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onAlterar, onCancelar, onRetificador, comVoce, ccga, onAba, onAbrirParlamentar, onAbrirEmenda, verMais }) => {
   const cancelado = p.etapa === 'CANCELADO';
   const ativas = linhasAtivas(p);
   const atas = atasDoPedido(p, itens);
@@ -93,7 +92,6 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
   const situacao = cancelado ? 'Cancelado' : rotuloDaEtapaDoPedido(p, notas);
   const grave = avisos.find(avisoGrave) ?? null;
   const seguinte = !cancelado && p.autorId ? proximaAcao(p.etapa, rodadaDoPedido(p)) : null;
-  const prox = podeGerir ? seguinte : null;
   const resumo = resumoDasLinhas(p, notas);
 
   const beneficiariosDoPedido = [
@@ -174,44 +172,20 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
       onBack={back.back}
       backTestId="pedido-360-back-btn"
       actions={
-        <>
-          {podeGerir && PODE_ANULAR_EMPENHO.has(p.etapa) && (
-            <AppButton size="sm" variant="link" onClick={onAnular} data-testid={`emendas-pedido-anular-${p.id}`}>
-              Registrar anulação de empenho
-            </AppButton>
-          )}
-          {podeGerir && !cancelado && !jaEmpenhado(p.etapa) && (
-            <>
-              <ActionButton action="cancelarCiclo" size="sm" label="Cancelar pedido" onClick={onCancelar} data-testid={`emendas-pedido-cancelar-${p.id}`} />
-              <ActionButton action="editar" size="sm" label={!p.autorId ? 'Indicar o parlamentar' : !p.siopEmenda && !p.emendaId ? 'Informar a emenda' : 'Alterar itens'} onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
-            </>
-          )}
-          {onRetificador && (
-            <AppButton size="sm" variant="link" onClick={onRetificador} data-testid={`emendas-pedido-retificador-${p.id}`}>
-              Registrar ofício retificador
-            </AppButton>
-          )}
-          {ccga?.voltar && (
-            <AppButton size="sm" variant="link" onClick={ccga.voltar} data-testid={`emendas-pedido-voltar-etapa-${p.id}`}>
-              Voltar etapa
-            </AppButton>
-          )}
-          {ccga?.desfazer && (
-            <AppButton size="sm" variant="link" onClick={ccga.desfazer} data-testid={`emendas-pedido-desfazer-ccga-${p.id}`}>
-              Desfazer envio
-            </AppButton>
-          )}
-          {ccga?.enviar && (
-            <AppButton size="sm" onClick={ccga.enviar} data-testid={`emendas-pedido-enviar-ccga-${p.id}`}>
-              Enviar à CCGA
-            </AppButton>
-          )}
-          {prox && p.etapa !== 'CONTRATACAO' && (
-            <AppButton size="sm" onClick={onProxima} data-testid={`pedido360-proxima-${p.id}`}>
-              {prox.rotulo}
-            </AppButton>
-          )}
-        </>
+        // D1 (protótipo v7, 29/10/2026): os botões de trabalho moram só em "Com você" da aba Andamento; no cartão, só o
+        // que muda o pedido inteiro e não é do dia a dia, no menu "Mais".
+        <RowActionsMenu
+          label={`Mais ações do ${nomeDoPedido(p).toLowerCase()}`}
+          testId={`pedido360-mais-${p.id}`}
+          actions={[
+            ...(podeGerir && !cancelado && !jaEmpenhado(p.etapa)
+              ? [{ label: !p.autorId ? 'Indicar o parlamentar' : !p.siopEmenda && !p.emendaId ? 'Informar a emenda' : 'Alterar itens', onClick: onAlterar, testId: `emendas-pedido-alterar-${p.id}` }]
+              : []),
+            ...(onRetificador ? [{ label: 'Registrar ofício retificador', onClick: onRetificador, testId: `emendas-pedido-retificador-${p.id}` }] : []),
+            ...(ccga?.voltar ? [{ label: 'Voltar etapa', onClick: ccga.voltar, testId: `emendas-pedido-voltar-etapa-${p.id}` }] : []),
+            ...(podeGerir && !cancelado && !jaEmpenhado(p.etapa) ? [{ label: 'Cancelar pedido', onClick: onCancelar, danger: true, testId: `emendas-pedido-cancelar-${p.id}` }] : [])
+          ]}
+        />
       }
       title={nomeDoPedido(p)}
       eyebrow={eyebrow}
@@ -257,7 +231,7 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
           <HealthTile
             label="Etapa"
             value={cancelado ? 'Cancelado' : `${posicao} de ${TOTAL_ETAPAS_PEDIDO}`}
-            hint={
+            hint={`${podeGerir && comVoce > 0 ? `${comVoce} com você · ` : ''}${
               contratos && !contratado
                 ? `${contratos.itensContratados} de ${contratos.itens} ${contratos.itens === 1 ? 'item contratado' : 'itens contratados'}`
                 : resumo.divergem
@@ -265,7 +239,7 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
                   : seguinte
                     ? `próximo: ${seguinte.rotulo.charAt(0).toLowerCase()}${seguinte.rotulo.slice(1)}`
                     : situacao
-            }
+            }`}
             onClick={() => onAba('andamento')}
             testId="pedido-360-etapa"
           >

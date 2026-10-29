@@ -31,8 +31,8 @@ import { avisosDoPedido, linhasAtivas, reservadoPorItem, ultimoContatoPorAutor, 
 import { nomeDoPedido, rotaDoPedido } from '../../../utils/emendasNomeDoPedido';
 import type { AutorEmenda, NotaDaLinha } from '../../../services/emendasService';
 import type { CredorNoPedido } from '../../../utils/emendasConferenciaNota';
-import { LinhasPorAta } from '../PedidoAberto';
-import { proximaAcaoDaJanela } from '../proximaAcaoDaJanela';
+import { LinhasPorAta, RodadasDoPedido } from '../PedidoAberto';
+import { mesaDoPedido } from '../../../utils/emendasMesa';
 import { pedidoDoEndereco } from './pedidoDoEndereco';
 import { QuadroGabinete } from '../QuadroGabinete';
 import { emendaDoPedidoNoQuadro } from '../../../utils/emendasQuadro';
@@ -143,6 +143,8 @@ export const Pedido360Page: React.FC = () => {
   const autor = p.autorId ? autorPorId.get(p.autorId) : undefined;
   const nomeDoAutor = autor?.nome ?? (p.autorId ?? AUTOR_A_DEFINIR);
   const avisos = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id), precos);
+  // Só para o número do indicador Etapa ("2 com você"); a aba monta a mesma mesa.
+  const mesa = mesaDoPedido(p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos);
   const valor = valorDoPedidoNaEtapa(p, itens, precos);
   const captacao = fatiasDaCaptacao([p], gruposDosBeneficiarios, itens, precos);
   // Com a migration 248, o envio para contratação é por ata (cada uma vai ao seu gestor); sem ela, o pedido inteiro.
@@ -179,10 +181,9 @@ export const Pedido360Page: React.FC = () => {
           valor={valor}
           podeGerir={podeGerir}
           back={back}
-          onProxima={() => onAcao(proximaAcaoDaJanela(p))}
           onAlterar={() => setEditando(true)}
           onCancelar={() => onAcao('CANCELAR')}
-          onAnular={() => setAnulando(true)}
+          comVoce={mesa.comVoce.length}
           onRetificador={podeRetificar && !naConferencia ? () => setRetificando(true) : undefined}
           ccga={acoesCcga}
           onAba={irPara}
@@ -223,15 +224,15 @@ export const Pedido360Page: React.FC = () => {
       ) : (
         <Instrument360TabPanel idPrefix="pedido" activeTab={activeTab}>
           {activeTab === 'andamento' && (
-            <InstrumentSection id="pedido-andamento" title="Andamento" subtitle="As etapas do pedido como tarefas: o que já foi feito, o que é com a CAEP e o que depende de outra unidade" icon={ListTodo}>
+            <InstrumentSection id="pedido-andamento" title="Andamento" subtitle="O que é com você, o que está com outros e onde está cada item" icon={ListTodo}>
               <AndamentoDoPedido
                 p={p}
                 itens={itens}
                 notas={notas}
+                beneficiarios={beneficiarios}
                 avisos={avisos}
                 hoje={hoje}
                 podeGerir={podeGerir}
-                podeVerContratos={podeVerContratos}
                 onAcao={onAcao}
                 onAlterar={() => setEditando(true)}
                 onAnular={() => setAnulando(true)}
@@ -255,6 +256,10 @@ export const Pedido360Page: React.FC = () => {
                 conferencia={conferenciaPorItem}
                 resolvidos={resolvidos}
               />
+              {/* As rodadas de empenho saíram do Andamento (protótipo v7); o envio à CGOFI fica só em "Com você". */}
+              <div style={{ marginTop: '1rem' }}>
+                <RodadasDoPedido p={p} notas={notas} podeGerir={false} onAcao={onAcao} />
+              </div>
               {(() => {
                 const tiradas = p.linhas.filter((l) => l.cancelada);
                 if (!tiradas.length) return null;
