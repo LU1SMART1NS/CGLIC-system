@@ -726,7 +726,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         <div className="reserva-linha__pe">
           {noReajuste && (
             <span className="reserva-alerta" title={noReajuste.detalhe ?? undefined} data-testid={`emendas-pedido-reajuste-${l.chave}`}>
-              {noReajuste.rotulo}: não aumenta
+              {noReajuste.avisoNaReserva}
             </span>
           )}
           {tambem.length > 0 && <span className="reserva-etiqueta reserva-etiqueta--propria">Também em {tambem.join(', ')}</span>}

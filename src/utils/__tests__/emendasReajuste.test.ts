@@ -19,19 +19,22 @@ describe('situação do item pela data do reajuste (protótipo de 29/10/2026)', 
     expect(esm).toMatchObject({ situacao: 'ESMAECIDO', rotulo: 'Reajuste na prorrogação, 26/03/2027' });
     expect(esm.detalhe).toBe('Saiu da reserva em 25/01/2027 (60 dias antes). O pedido já reservado ainda vai na minuta até 09/02/2027, com o prazo do ofício mais curto.');
     expect([podeReservar(esm), podeIrNaMinuta(esm)]).toEqual([false, true]);
+    expect(esm.avisoNaReserva).toBe('Reajuste na prorrogação, 26/03/2027: a quantidade não pode subir. A minuta sai até 09/02/2027.');
     const fora = reajusteDoItem(p, '2027-02-15');
     expect(fora.situacao).toBe('FORA_DA_MINUTA');
     expect(fora.detalhe).toContain('Faltam 39 dias, menos que os 45 até o contrato assinado');
     expect([podeReservar(fora), podeIrNaMinuta(fora)]).toEqual([false, false]);
+    expect(fora.avisoNaReserva).toMatch(/^Item suspenso: reajuste na prorrogação, .+\. Retire-o para a minuta sair\.$/);
   });
 
   it('reajuste devido bloqueia até o apostilamento; ata sem data-base usa o fim da vigência; sem leitura, livre', () => {
     const devido = reajusteDoItem(preco(CAMIONETA, { precoAtual: 355230, devido: true, origem: 'DEVIDO', precoDevido: 371002.21 }), HOJE);
     expect(devido).toMatchObject({ situacao: 'DEVIDO', rotulo: 'Reajuste devido, aguarda o apostilamento' });
     expect(devido.detalhe).toContain('com o reajuste, R$');
+    expect(devido.avisoNaReserva).toBe('Item suspenso: aguarda o apostilamento do reajuste. Retire-o para a minuta sair.');
     expect(podeIrNaMinuta(devido)).toBe(false);
     const semBase = preco('00062/2025-200331-00003', { dataReajuste: '2026-11-03', origem: 'FIM_DA_VIGENCIA' });
-    expect(reajusteDoItem(semBase, HOJE)).toMatchObject({ situacao: 'FORA_DA_MINUTA', rotulo: 'Ata sem data-base termina em 03/11/2026' });
+    expect(reajusteDoItem(semBase, HOJE)).toMatchObject({ situacao: 'FORA_DA_MINUTA', rotulo: 'Ata sem data-base termina em 03/11/2026', avisoNaReserva: 'Item suspenso: a ata termina em 03/11/2026. Retire-o para a minuta sair.' });
     expect(rotuloDoReajuste(preco('x', { dataReajuste: '2027-01-10', origem: 'REAJUSTE' }))).toBe('Reajuste em 10/01/2027');
     expect(reajusteDoItem(undefined, HOJE).situacao).toBe('LIVRE');
   });

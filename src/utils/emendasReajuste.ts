@@ -34,9 +34,20 @@ export interface ReajusteDoItem {
   rotulo: string | null;
   /** O porquê, para a linha de baixo. */
   detalhe: string | null;
+  /** Aviso da linha já reservada no pedido: "Item suspenso: … Retire-o para a minuta sair." (29/10/2026). */
+  avisoNaReserva: string | null;
 }
 
-const LIVRE: ReajusteDoItem = { situacao: 'LIVRE', data: null, rotulo: null, detalhe: null };
+const LIVRE: ReajusteDoItem = { situacao: 'LIVRE', data: null, rotulo: null, detalhe: null, avisoNaReserva: null };
+const primeiraMaiuscula = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
+const RETIRE = 'Retire-o para a minuta sair.';
+
+/** Por que o item parou: o fim da ata (sem data-base) ou o reajuste. */
+function motivoDaData(p: PrecoDoItem, data: string): string {
+  if (p.origem === 'FIM_DA_VIGENCIA') return `a ata termina em ${br(data)}`;
+  if (p.origem === 'PRORROGACAO') return `reajuste na prorrogação, ${br(data)}`;
+  return `reajuste em ${br(data)}`;
+}
 
 /** "Reajuste em 26/03/2027", "Reajuste na prorrogação, 10/09/2027" ou "Ata sem data-base termina em 03/11/2026". */
 export function rotuloDoReajuste(p: PrecoDoItem): string | null {
@@ -57,7 +68,8 @@ export function reajusteDoItem(p: PrecoDoItem | undefined, hoje: string): Reajus
       situacao: 'DEVIDO',
       data: null,
       rotulo: 'Reajuste devido, aguarda o apostilamento',
-      detalhe: `O preço do banco ainda é o antigo (${reais(p.precoAtual)}${p.precoDevido ? `; com o reajuste, ${reais(p.precoDevido)}` : ''}). O item volta com o preço novo quando o apostilamento for lido.`
+      detalhe: `O preço do banco ainda é o antigo (${reais(p.precoAtual)}${p.precoDevido ? `; com o reajuste, ${reais(p.precoDevido)}` : ''}). O item volta com o preço novo quando o apostilamento for lido.`,
+      avisoNaReserva: `Item suspenso: aguarda o apostilamento do reajuste. ${RETIRE}`
     };
   }
   if (!p.dataReajuste) return LIVRE;
@@ -69,14 +81,17 @@ export function reajusteDoItem(p: PrecoDoItem | undefined, hoje: string): Reajus
       situacao: 'FORA_DA_MINUTA',
       data: p.dataReajuste,
       rotulo,
-      detalhe: `Faltam ${Math.max(faltam, 0)} dias, menos que os ${tramiteAteContratoDias()} até o contrato assinado: a minuta não sai com ele. Troque ou retire o item, ou espere o apostilamento.`
+      detalhe: `Faltam ${Math.max(faltam, 0)} dias, menos que os ${tramiteAteContratoDias()} até o contrato assinado: a minuta não sai com ele. Troque ou retire o item, ou espere o apostilamento.`,
+      avisoNaReserva: `Item suspenso: ${motivoDaData(p, p.dataReajuste)}. ${RETIRE}`
     };
   }
   return {
     situacao: 'ESMAECIDO',
     data: p.dataReajuste,
     rotulo,
-    detalhe: `Saiu da reserva em ${br(somarDias(p.dataReajuste, -corteReajusteDias()))} (${corteReajusteDias()} dias antes). O pedido já reservado ainda vai na minuta até ${br(somarDias(p.dataReajuste, -tramiteAteContratoDias()))}, com o prazo do ofício mais curto.`
+    detalhe: `Saiu da reserva em ${br(somarDias(p.dataReajuste, -corteReajusteDias()))} (${corteReajusteDias()} dias antes). O pedido já reservado ainda vai na minuta até ${br(somarDias(p.dataReajuste, -tramiteAteContratoDias()))}, com o prazo do ofício mais curto.`,
+    // Ainda vai na minuta: só não aumenta.
+    avisoNaReserva: `${primeiraMaiuscula(motivoDaData(p, p.dataReajuste))}: a quantidade não pode subir. A minuta sai até ${br(somarDias(p.dataReajuste, -tramiteAteContratoDias()))}.`
   };
 }
 
