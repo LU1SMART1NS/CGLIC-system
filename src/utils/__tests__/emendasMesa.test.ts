@@ -330,3 +330,53 @@ describe('Mesa do pedido: cada ação numa linha só', () => {
     expect(antes.fases.map((f) => f.estado)).toEqual(['feita', 'atual', 'vem', 'vem']);
   });
 });
+
+describe('Mesa do pedido: Informação e Ordem de Fornecimento por contrato (migration 250)', () => {
+  const C1 = '200331-00057-2026';
+  const C2 = '200331-00041-2026';
+  const contratados = () => {
+    const ls = [linha('l1', { ccgaSituacao: 'ENVIADA' }), linha('l2', { ccgaSituacao: 'ENVIADA', itemKey: `${B}-00001`, beneficiarioId: 'b2' })];
+    const notas = new Map([
+      ['l1', nota('l1', { contractKey: C1 })],
+      ['l2', nota('l2', { nota: '2026NE000104', contractKey: C2 })]
+    ]);
+    return { ls, notas };
+  };
+
+  it('contratos sem Informação: uma linha em Com você com os contratos; nada em Com outros', () => {
+    const { ls, notas } = contratados();
+    const m = mesaDoPedido(pedido({ linhas: ls }), itens, notas, [], HOJE, true, beneficiarios);
+    const l = m.comVoce.find((x) => x.chave === 'ordem-informacao')!;
+    expect(l.titulo).toBe('Fazer a Informação para a Ordem de Fornecimento · 2 contratos (00041/2026, 00057/2026)');
+    expect(l.acoes[0].faz).toEqual({ tipo: 'ordem', modo: 'INFORMACAO', contratos: [C2, C1] });
+    expect(m.comOutros.some((x) => x.chave.startsWith('ordem-sfc'))).toBe(false);
+  });
+
+  it('com a Informação, a Ordem é com a SFC; com a Ordem, some e vai para o histórico', () => {
+    const { ls, notas } = contratados();
+    const ordens = [
+      { id: 'o1', contractKey: C1, informacaoEm: '2026-10-27', informacaoDocumentoSei: '37530982', ordemEm: null, ordemDocumentoSei: null },
+      { id: 'o2', contractKey: C2, informacaoEm: '2026-10-20', informacaoDocumentoSei: '37500000', ordemEm: '2026-10-22', ordemDocumentoSei: '37510000' }
+    ];
+    const m = mesaDoPedido(pedido({ linhas: ls, ordens }), itens, notas, [], HOJE, true, beneficiarios);
+    expect(m.comVoce.some((x) => x.chave === 'ordem-informacao')).toBe(false);
+    const sfc = m.comOutros.filter((x) => x.chave.startsWith('ordem-sfc'));
+    expect(sfc).toHaveLength(1);
+    expect(sfc[0]).toMatchObject({ quem: 'SFC', titulo: 'Emitir a Ordem de Fornecimento · Contrato 00057/2026', detalhe: 'Informação de 27/10/2026.' });
+    const execucao = m.historico.find((f) => f.fase === 'Execução')!;
+    expect(execucao.registros.map((r) => r.texto)).toContain('Ordem de Fornecimento · Contrato 00041/2026');
+    // O item do contrato com Ordem mostra a data dela.
+    const itensDoPedido = m.itens!.grupos.flatMap((g) => g.itens);
+    expect(itensDoPedido.some((x) => x.onde?.includes('Ordem de Fornecimento em 22/10/2026'))).toBe(true);
+  });
+
+  it('contrato já faturado sem registro fica comprovado pela entrega e não pede nada', () => {
+    const { ls } = contratados();
+    const notas = new Map([
+      ['l1', nota('l1', { contractKey: C1, faturas: 1, faturadoEm: '2026-10-25' })],
+      ['l2', nota('l2', { nota: '2026NE000104', contractKey: C2, faturas: 1 })]
+    ]);
+    const m = mesaDoPedido(pedido({ linhas: ls }), itens, notas, [], HOJE, true, beneficiarios);
+    expect(m.comVoce.some((x) => x.chave === 'ordem-informacao')).toBe(false);
+  });
+});

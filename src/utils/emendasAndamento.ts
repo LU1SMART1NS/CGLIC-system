@@ -12,6 +12,7 @@ import type { GrupoTarefa } from './modeloGestao';
 import type { EtapaPedido, ItemCaep, NotaDaLinha, PedidoEmenda } from '../services/emendasService';
 import type { PrecoDoItem } from '../services/emendasQuadroService';
 import { corteIndicacaoDias, dataBR, diasEntre } from './emendasKits';
+import { ordensDoPedido } from './emendasOrdem';
 import {
   AVISO_SEM_OFICIO_DIAS,
   atasDoPedido,
@@ -310,17 +311,31 @@ export function andamentoDoPedido(
   const execucao = jaEmpenhado(p.etapa) ? execucaoDoPedido(p, notas) : null;
   const temNotas = Boolean(execucao && execucao.notas > 0);
   const contratado = Boolean(contratos?.contratado);
-  // Migration 245 (29/10/2026): a CAEP reúne as informações para a Ordem de Fornecimento depois do contrato e registra
-  // a data e o SEI. Pedido que já tem fatura sem esse registro fica comprovado pela entrega.
-  const ordem = base('ordem', 'EXECUCAO', null, 'Reunir as informações para a Ordem de Fornecimento', 'FAZER', 'CAEP');
-  ordem.regra = 'abre com o contrato assinado; fecha quando a CAEP registra a data e o documento SEI';
+  // Migration 250 (leitura do SEI em 29/10/2026): por contrato, a ComprasSUSP faz a Informação e a SFC emite a Ordem de
+  // Fornecimento. Abre com o primeiro contrato do pedido. Contrato já faturado sem registro fica comprovado pela entrega.
+  // O registro único da migration 245 (nenhum pedido o usou) ainda fecha a tarefa.
+  const ordem = base('ordem', 'EXECUCAO', null, 'Informação e Ordem de Fornecimento', 'FAZER', 'CAEP');
+  ordem.regra = 'por contrato: a ComprasSUSP junta a Informação ao processo do contrato e o Setor de Fiscalização de Contratos emite a Ordem';
+  const ordens = ordensDoPedido(p, notas);
   if (p.ordemFornecimentoEm) {
     ordem.estado = 'FEITA';
     ordem.feito = dataBR(p.ordemFornecimentoEm);
-  } else if (contratado && execucao) {
-    const entregue = execucao.notasFaturadas > 0;
-    ordem.estado = entregue ? 'FEITA' : 'COMIGO';
-    if (entregue) ordem.feito = 'comprovado pela entrega';
+  } else if (ordens.length) {
+    const prontas = ordens.filter((o) => o.estado === 'EMITIDA' || o.estado === 'COMPROVADO').length;
+    ordem.progresso = ordens.length > 1 ? `${prontas} de ${plural(ordens.length, 'contrato', 'contratos')}` : null;
+    if (ordens.some((o) => o.estado === 'A_INFORMAR')) ordem.estado = 'COMIGO';
+    else if (ordens.some((o) => o.estado === 'NA_SFC')) {
+      ordem.estado = 'AGUARDANDO';
+      ordem.comQuem = 'SFC';
+    } else {
+      ordem.estado = 'FEITA';
+      const ultima = ordens
+        .map((o) => o.registro?.ordemEm)
+        .filter((d): d is string => Boolean(d))
+        .sort()
+        .pop();
+      ordem.feito = ultima ? dataBR(ultima) : 'comprovado pela entrega';
+    }
   }
   // Migration 231: a fatura no Contratos.gov.br mostra que o fornecedor entregou e o fiscal atestou.
   const entrega = base('entrega', 'EXECUCAO', null, 'Entrega e fatura', 'ACOMPANHAR', 'fornecedor e fiscal do contrato');

@@ -37,6 +37,8 @@ import {
   informarSolicitacaoDaAta,
   registrarEnvioCgofi,
   registrarOrdemFornecimento,
+  registrarInformacaoOrdem,
+  registrarOrdemDoContrato,
   enviarPedidoCcga,
   devolverItensCcga,
   desfazerEnvioCcga,
@@ -331,6 +333,17 @@ export function useEmendasAContratar({ enabled = true }: LeituraOpcional = {}) {
 export function useRegistrarOrdemFornecimento() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: registrarOrdemFornecimento, retry: 0, onSettled: invalidar });
+}
+
+/** Informação da ComprasSUSP e Ordem de Fornecimento por contrato (migration 250). */
+export function useRegistrarInformacaoOrdem() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: registrarInformacaoOrdem, retry: 0, onSettled: invalidar });
+}
+
+export function useRegistrarOrdemDoContrato() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: registrarOrdemDoContrato, retry: 0, onSettled: invalidar });
 }
 
 /** Execução de cada emenda pelo Portal da Transparência (migration 204), lida uma vez por dia pelo servidor. */

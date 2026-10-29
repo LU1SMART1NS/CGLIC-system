@@ -25,6 +25,7 @@ import {
   type TarefaDoPedido
 } from './emendasPedidos';
 import { andamentoDoPedido, type FaseDoAndamento, type TarefaDoAndamento } from './emendasAndamento';
+import { ordensDoPedido } from './emendasOrdem';
 import { atasParaDesfazer, atasParaEnviar, linhaContratada, linhasDevolvidas, temSituacaoNaCcga, textoDoMovimento } from './emendasCcga';
 
 /** O que um botão da mesa faz; a tela traduz cada um para a janela de hoje. */
@@ -38,7 +39,9 @@ export type FazDaMesa =
   | { tipo: 'pendencia'; tarefa: TarefaDoPedido }
   | { tipo: 'ccgaEnviar' }
   | { tipo: 'ccgaDesfazer' }
-  | { tipo: 'anular' };
+  | { tipo: 'anular' }
+  /** Informação da ComprasSUSP ou Ordem emitida pela SFC, para os contratos (migration 250). */
+  | { tipo: 'ordem'; modo: 'INFORMACAO' | 'ORDEM'; contratos: string[] };
 
 export interface AcaoDaMesa {
   rotulo: string;
@@ -180,7 +183,17 @@ export function passoDoItem(p: PedidoEmenda, l: LinhaPedido, notas: Map<string, 
     return {
       passo: 2,
       devolvido: false,
-      onde: [`Contrato ${numeroDaChave(n.contractKey!)}`, n.contratoAssinadoEm ? dataBR(n.contratoAssinadoEm) : null].filter(Boolean).join(' · ')
+      // Com a Ordem de Fornecimento emitida (migration 250), o item espera a entrega a partir dela.
+      onde: [
+        `Contrato ${numeroDaChave(n.contractKey!)}`,
+        n.contratoAssinadoEm ? dataBR(n.contratoAssinadoEm) : null,
+        (() => {
+          const o = p.ordens?.find((x) => x.contractKey === n.contractKey);
+          return o?.ordemEm ? `Ordem de Fornecimento em ${dataBR(o.ordemEm)}` : null;
+        })()
+      ]
+        .filter(Boolean)
+        .join(' · ')
     };
   }
   if (l.ccgaSituacao === 'DEVOLVIDA')
@@ -380,6 +393,8 @@ export function mesaDoPedido(
       if (t.estado === 'COMIGO') {
         // Despacho com envio por ata: uma linha "Enviar à CCGA" com as atas (D3, D10).
         if (t.chave === 'despacho' && porAta) continue;
+        // Informação e Ordem por contrato: linhas próprias abaixo (migration 250).
+        if (t.chave === 'ordem' && !p.ordemFornecimentoEm) continue;
         const acoes: AcaoDaMesa[] = [];
         if (t.chave === 'minuta' && p.etapa === 'RESERVADO' && p.autorId)
           acoes.push(
@@ -501,6 +516,45 @@ export function mesaDoPedido(
       }
     }
 
+    // Informação e Ordem de Fornecimento por contrato (migration 250): a Informação é com a ComprasSUSP; a Ordem, com a SFC.
+    if (!p.ordemFornecimentoEm) {
+      const ordens = ordensDoPedido(p, notas);
+      const aInformar = ordens.filter((o) => o.estado === 'A_INFORMAR');
+      if (aInformar.length)
+        comVoce.push({
+          chave: 'ordem-informacao',
+          tom: 'eu',
+          titulo: `Fazer a Informação para a Ordem de Fornecimento · ${aInformar.length === 1 ? `Contrato ${aInformar[0].numero}` : `${aInformar.length} contratos (${aInformar.map((o) => o.numero).join(', ')})`}`,
+          detalhe: 'No processo do contrato: item, emenda, beneficiário, CNPJ e local de entrega. Depois o Setor de Fiscalização de Contratos emite a Ordem.',
+          prazo: null,
+          vencido: false,
+          regra: null,
+          acoes: se(true, {
+            rotulo: 'Registrar a Informação',
+            jeito: 'botao',
+            faz: { tipo: 'ordem', modo: 'INFORMACAO', contratos: aInformar.map((o) => o.contractKey) },
+            testId: `emendas-pedido-ordem-informacao-${p.id}`
+          })
+        });
+      for (const o of ordens.filter((x) => x.estado === 'NA_SFC'))
+        comOutros.push({
+          chave: `ordem-sfc-${o.contractKey}`,
+          tom: 'espera',
+          quem: 'SFC',
+          titulo: `Emitir a Ordem de Fornecimento · Contrato ${o.numero}`,
+          detalhe: `Informação de ${dataBR(o.registro!.informacaoEm)}.`,
+          prazo: null,
+          vencido: false,
+          regra: null,
+          acoes: se(true, {
+            rotulo: 'Registrar a Ordem',
+            jeito: 'link',
+            faz: { tipo: 'ordem', modo: 'ORDEM', contratos: [o.contractKey] },
+            testId: `emendas-pedido-ordem-emitida-${o.contractKey}`
+          })
+        });
+    }
+
     // Solicitação sem ata: ligar a uma ata.
     const soltas = solicitacoesSemAta(p);
     if (soltas.length && jaEmpenhado(p.etapa) === false && podeGerir) {
@@ -601,6 +655,7 @@ export function mesaDoPedido(
     // Com outros (D4): a tarefa que espera outra unidade, com prazo. O que vem das fontes fica no trilho dos itens.
     for (const t of tarefas) {
       if (t.estado !== 'AGUARDANDO' && t.estado !== 'COBRAR') continue;
+      if (t.chave === 'ordem') continue;
       comOutros.push({
         chave: `tarefa-${t.chave}`,
         tom: t.estado === 'COBRAR' ? 'vencido' : 'espera',
@@ -699,6 +754,8 @@ export function mesaDoPedido(
   const docs = (e: EtapaPedido) => documentosDaEtapa(p, e);
   const registro = (t: TarefaDoAndamento): RegistroDaMesa | null => {
     if (t.estado !== 'FEITA') return null;
+    // Informação e Ordem por contrato: registros próprios na Execução (migration 250).
+    if (t.chave === 'ordem' && !p.ordemFornecimentoEm) return null;
     const e = t.etapa;
     const sei = e ? docs(e).map((d) => d.numero) : t.chave === 'ordem' && p.ordemFornecimentoDocumentoSei ? [p.ordemFornecimentoDocumentoSei] : [];
     const temDocumento = e === 'SOLICITADO' || e === 'CGOFI' || e === 'EMPENHADO' || (e === 'CONTRATACAO' && !porAta) || t.chave === 'ordem';
@@ -744,6 +801,14 @@ export function mesaDoPedido(
           });
         }
       }
+      if (f.id === 'EXECUCAO')
+        for (const o of p.ordens ?? []) {
+          const numero = numeroDaChave(o.contractKey);
+          if (o.informacaoEm)
+            registros.push({ chave: `informacao-${o.contractKey}`, texto: `Informação para a Ordem de Fornecimento · Contrato ${numero}`, data: dataBR(o.informacaoEm), sei: o.informacaoDocumentoSei ? [o.informacaoDocumentoSei] : [], semSei: false });
+          if (o.ordemEm)
+            registros.push({ chave: `ordem-${o.contractKey}`, texto: `Ordem de Fornecimento · Contrato ${numero}`, data: dataBR(o.ordemEm), sei: o.ordemDocumentoSei ? [o.ordemDocumentoSei] : [], semSei: false });
+        }
       if (f.id === 'CONTRATACAO')
         for (const m of p.movimentos ?? []) {
           if (m.acao === 'VOLTOU_ETAPA' || m.acao === 'RETIFICADOR') continue;
