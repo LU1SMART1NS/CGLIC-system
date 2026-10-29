@@ -766,6 +766,8 @@ h1, h2, h3, h4 {
 }
 .area-subtab:hover { color: #0f172a; text-decoration: none; }
 .area-subtab[data-active='true'] { color: var(--primary); border-bottom-color: var(--primary); font-weight: 800; }
+.area-tab-count { margin-left: 0.4rem; color: #7b8798; font-weight: 700; font-variant-numeric: tabular-nums; }
+[data-active='true'] > .area-tab-count { color: var(--primary); }
 .app-rail-link:hover,
 .area-tab:hover { text-decoration: none; }
 .area-tab[data-active='true'] { color: var(--primary); border-bottom-color: var(--primary); font-weight: 800; }

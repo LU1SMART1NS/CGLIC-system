@@ -9,16 +9,13 @@ interface ArpPortfolioHeaderProps {
   isSyncing?: boolean;
   syncProgress?: { step: string; percent: number; current?: number; total?: number } | null;
   onTriggerSync?: () => void;
-  /** Seletor "Ver: Registradas · A montar" (gestor e coordenador). */
-  seletor?: React.ReactNode;
 }
 
 export const ArpPortfolioHeader: React.FC<ArpPortfolioHeaderProps> = ({
   syncInfo,
   isSyncing = false,
   syncProgress,
-  onTriggerSync,
-  seletor
+  onTriggerSync
 }) => {
   return (
     <PageHeader
@@ -27,7 +24,6 @@ export const ArpPortfolioHeader: React.FC<ArpPortfolioHeaderProps> = ({
       icon={<Package size={26} color="var(--primary)" aria-hidden="true" />}
       actions={
         <>
-          {seletor}
           {/* Sem onTriggerSync (perfis que não sincronizam), fica só a data da última sincronização. */}
           {(onTriggerSync || syncInfo?.ultimoSyncEm) && (
           <HeaderRefreshAction

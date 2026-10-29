@@ -32,6 +32,7 @@ export function originLabel(path: string): string | null {
   switch (pathname) {
     case '/instrumentos': return 'Início';
     case '/atas': return new URLSearchParams(path.split('?')[1] ?? '').get('ver') === 'montar' ? 'Atas a montar' : 'Carteira';
+    case '/atas/montar': return 'Atas a montar';
     case '/contratos': return 'Carteira';
     case '/itens': return 'Carteira';
     case '/atas/distribuicao': return 'Distribuição';

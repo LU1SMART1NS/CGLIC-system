@@ -17,17 +17,12 @@ import { ehEstrangeiro } from '../../../utils/ataAMontarQuadros';
 import { pregaoDaAta, rotaDaAtaAMontar } from './ataAMontarRotas';
 
 const chave = (a: AtaAMontar) => `${a.numeroControleCompra}|${a.fornecedorNi}`;
-interface Props {
-  /** Seletor "Ver: Registradas · A montar" (fica no cabeçalho, como na Alocação). */
-  seletor: React.ReactNode;
-}
-
 /**
- * Carteira › Atas › A montar (protótipo aprovado em 28/10/2026, D1): uma linha por fornecedor vencedor de pregão de
+ * Carteira › Atas › A montar (/atas/montar; protótipo aprovado em 28/10/2026, D1): uma linha por fornecedor vencedor de pregão de
  * registro de preços homologado no PNCP que ainda não tem ata. A linha some quando a ata é publicada e chega pela
  * sincronização. A linha abre a montagem dos quadros da ata.
  */
-export const AtasAMontarLista: React.FC<Props> = ({ seletor }) => {
+export const AtasAMontarLista: React.FC = () => {
   const { data: atas = [], isLoading, isError, error, refetch } = useAtasAMontar();
   const navegar = useNavigateWithOrigin();
   const [busca, setBusca] = useState('');
@@ -127,7 +122,6 @@ export const AtasAMontarLista: React.FC<Props> = ({ seletor }) => {
         subtitle="Pregões homologados no PNCP que ainda não têm ata: monte os quadros da ata para colar no SEI."
         hint="Uma linha por fornecedor vencedor. O sistema lê o resultado do pregão e a minuta da ata no edital (PNCP) de 2 em 2 horas; a linha sai sozinha quando a ata é publicada."
         icon={<Package size={26} color="var(--primary)" aria-hidden="true" />}
-        actions={seletor}
       />
       <CarteiraFilterBar
         busca={busca}

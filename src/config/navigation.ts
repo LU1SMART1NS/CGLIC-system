@@ -56,6 +56,10 @@ export interface NavItem {
   allowedRoles?: AppRole[];
   /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Ajustes → Gestão · Emendas · Acesso). */
   group?: string;
+  /** Número ao lado da aba (ex.: Atas › A montar mostra quantas atas faltam montar). */
+  contagem?: 'atas-a-montar';
+  /** A aba tem filtros próprios: não leva os filtros em comum da Carteira ao ser aberta. */
+  filtrosProprios?: boolean;
   /** 'bottom' = área fica no pé do menu chave (ex.: Ajustes). */
   placement?: 'bottom';
 }
@@ -66,7 +70,7 @@ export interface NavItem {
  * como abas no topo da página (`AreaTabs`). As rotas são as mesmas de antes.
  * - Início, em dois grupos como Ajustes: Atas e Contratos (Painel /instrumentos · Distribuição /atas/distribuicao) e
  *   Emendas (/emendas/inicio, coordenador e consulta). O gestor de emendas tem o Painel dele em /emendas/inicio.
- * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
+ * - Carteira: Atas (Registradas /atas · A montar /atas/montar) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
  * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
@@ -138,14 +142,30 @@ export const navigationConfig: NavItem[] = [
     status: 'active',
     children: [
       {
+        // Atas em duas linhas, como o Início (pedido de 29/10/2026): "Atas · Contratos · Itens" e, embaixo da aba
+        // Atas, "Registradas · A montar". Quem não monta ata vê só a primeira linha.
         id: 'atas-consulta',
-        label: 'Atas',
+        label: 'Registradas',
         icon: Package,
         route: '/atas',
         status: 'active',
         matchPrefixes: ['/atas', '/atas/detalhe'],
-        excludePrefixes: ['/atas/distribuicao'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor']
+        excludePrefixes: ['/atas/distribuicao', '/atas/montar'],
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor'],
+        group: 'Atas'
+      },
+      {
+        // Pregões homologados sem ata (migration 238): quem monta a ata é o gestor da ata ou o coordenador (D8).
+        id: 'atas-a-montar',
+        label: 'A montar',
+        icon: FileSignature,
+        route: '/atas/montar',
+        status: 'active',
+        matchPrefixes: ['/atas/montar'],
+        allowedRoles: ['admin', 'gestor'],
+        group: 'Atas',
+        contagem: 'atas-a-montar',
+        filtrosProprios: true
       },
       {
         id: 'contratos-acompanhamento',
@@ -155,7 +175,8 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/contratos'],
         // Gestor de saldo cuida da alocação: sem contratos (o empenhado por unidade fica na Alocação e no Item).
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'leitor'],
+        group: 'Contratos'
       },
       {
         id: 'itens-carteira',
@@ -164,7 +185,8 @@ export const navigationConfig: NavItem[] = [
         route: '/itens',
         status: 'active',
         matchPrefixes: ['/itens'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor'],
+        group: 'Itens'
       }
     ]
   },
@@ -471,6 +493,7 @@ export interface BreadcrumbEntry {
 const staticRouteLabels: Record<string, string> = {
   '/instrumentos': 'Início',
   '/atas': 'Carteira de Atas',
+  '/atas/montar': 'Atas a montar',
   '/itens': 'Carteira de Itens',
   '/atas/distribuicao': 'Central de Distribuição',
   '/contratos': 'Carteira de Contratos',
