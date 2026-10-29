@@ -26,7 +26,7 @@ const nota = (linhaId: string): NotaDaLinha => ({
 
 const ITENS = [
   item('longe', { alocado: 100 }),
-  item('perto', { numeroAta: '00051/2024', vigenciaFinal: '2026-12-10', alocado: 50 }),
+  item('perto', { numeroAta: '00051/2024', vigenciaFinal: '2027-01-10', alocado: 50 }),
   item('corte', { numeroAta: '00024/2024', vigenciaFinal: '2026-10-25', alocado: 30 }),
   item('fim', { numeroAta: '00020/2025', vigenciaFinal: '2026-05-28', ataEncerrada: true, alocado: 40 })
 ];
@@ -80,14 +80,14 @@ describe('Início do gestor de emendas', () => {
   it('saldo da CAEP só nas atas vigentes e o livre perto do fim', () => {
     // longe: 100 − (3 empenhadas + 20) = 77; perto: 50 − 10 = 40; corte: 30 − 30 = 0
     expect([r.itensVigentes, r.alocado, r.reservado, r.livre]).toEqual([3, 180, 63, 117]);
-    expect(r.livrePertoDoFim.map((x) => [x.item.itemKey, x.livre, x.diasParaVencer, x.indicarAte, x.passouDoCorte])).toEqual([['perto', 40, 48, '2026-11-05', false]]);
+    expect(r.livrePertoDoFim.map((x) => [x.item.itemKey, x.livre, x.diasParaVencer, x.indicarAte, x.passouDoCorte])).toEqual([['perto', 40, 79, '2026-11-11', false]]);
   });
 
   it('prazo curto de cada aviso', () => {
     const [encerrada, corte, vencendo, empenhado] = r.pedidosComAviso;
     expect(prazoDoAviso(encerrada.avisos[0], encerrada.itemDoAviso, HOJE)).toBe('encerrou em 28/05/2026');
     expect(prazoDoAviso(corte.avisos[0], corte.itemDoAviso, HOJE)).toBe('ata termina em 2 dias');
-    expect(prazoDoAviso(vencendo.avisos[0], vencendo.itemDoAviso, HOJE)).toBe('indicar até 05/11/2026');
+    expect(prazoDoAviso(vencendo.avisos[0], vencendo.itemDoAviso, HOJE)).toBe('indicar até 11/11/2026');
     expect(prazoDoAviso(empenhado.avisos[0], null, HOJE)).toBe('procurar a nota pelo contrato');
   });
 

@@ -97,7 +97,7 @@ export const CaptacaoNoTopo: React.FC<{ fatias: FatiasComBeneficiarios; benefici
             <div className="pn-gaveta-head">
               <h2 id="gaveta-captacao-titulo">Captação por grupo</h2>
               <span className="pn-gaveta-sub">
-                Quanto cada grupo recebe neste pedido, em valor: quantidade × preço previsto de cada linha, pelo grupo do beneficiário. Linhas sem
+                Quanto cada grupo recebe neste pedido, em valor: quantidade × preço de hoje de cada linha, pelo grupo do beneficiário. Linhas sem
                 beneficiário ficam fora.
               </span>
               <ActionButton action="fechar" size="sm" onClick={onFechar} data-testid="captacao-fechar" />

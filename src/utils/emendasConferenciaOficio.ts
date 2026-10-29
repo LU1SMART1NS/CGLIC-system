@@ -1,10 +1,12 @@
 /**
  * Conferência do ofício (protótipo aprovado em 28/10/2026, migration 234): a CAEP confere se o ofício pede os itens do
- * pedido, ajusta o pedido ao ofício (quantidade, item tirado ou acrescentado) e confere a emenda no SIOP. O previsto do
- * pedido (com o reajuste projetado e a folga de Ajustes) tem de caber no que sobra da emenda.
+ * pedido, ajusta o pedido ao ofício (quantidade, item tirado ou acrescentado) e confere a emenda no SIOP. Desde
+ * 29/10/2026 (migration 246) o ofício tem de ser igual ao pedido pelo preço de hoje, centavo a centavo, chegar no prazo
+ * da minuta e com o preço que a minuta levou; senão, nova minuta com o preço do dia. O pedido também tem de caber no que
+ * sobra da emenda.
  */
 import type { ItemCaep, ItemDoKit, LinhaPedido, LinhaParaSalvar, PedidoEmenda } from '../services/emendasService';
-import type { PrecoPrevisto } from '../services/emendasQuadroService';
+import type { PrecoDoItem } from '../services/emendasQuadroService';
 import { itensDaLinha, linhasAtivas, precoParaEmenda, valorDoPedidoNaEtapa } from './emendasPedidos';
 
 /** O que se confere no SIOP. Na compra direta o beneficiário no SIOP é o próprio MJ e não há objeto. */
@@ -69,38 +71,38 @@ export function linhasParaConferir(p: PedidoEmenda): LinhaConferida[] {
 
 type ComoLinha = Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitComposicao'>;
 
-/** Preço de uma unidade da linha (um item, ou um kit inteiro) pelo preço previsto de hoje. */
-export function precoUnitarioDeHoje(l: ComoLinha, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): number {
-  return centavos(itensDaLinha({ ...l, quantidade: 1 }).reduce((s, x) => s + x.quantidade * precoParaEmenda(x.itemKey, itens, precos).previsto, 0));
+/** Preço de uma unidade da linha (um item, ou um kit inteiro) pelo preço de hoje. */
+export function precoUnitarioDeHoje(l: ComoLinha, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoDoItem>): number {
+  return centavos(itensDaLinha({ ...l, quantidade: 1 }).reduce((s, x) => s + x.quantidade * precoParaEmenda(x.itemKey, itens, precos).valor, 0));
 }
 
-/** Previsto do pedido ajustado: o preço previsto de hoje (reajuste projetado e folga de Ajustes) das linhas que ficam. */
-export function valorPrevisto(linhas: LinhaConferida[], itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): number {
+/** Valor do pedido ajustado: o preço de hoje das linhas que ficam (o que o ofício tem de pedir). */
+export function valorDosItens(linhas: LinhaConferida[], itens: Map<string, ItemCaep>, precos?: Map<string, PrecoDoItem>): number {
   return centavos(linhas.filter((l) => !l.retirada).reduce((s, l) => s + centavos(l.quantidade * precoUnitarioDeHoje(l, itens, precos)), 0));
 }
 
 /**
  * O que sobra da emenda para este pedido (decisão de 28/10/2026): o valor da emenda no SIOP menos os outros pedidos da
- * mesma emenda (pelo valor do ofício, ou pelo previsto quando o ofício ainda não foi informado). O pedido confere quando o
- * previsto cabe aqui; o valor do ofício deixa de travar a conferência.
+ * mesma emenda (pelo valor do ofício, ou pelo dos itens quando o ofício ainda não foi informado). O pedido confere quando
+ * cabe aqui.
  */
 export function sobraDaEmendaParaOPedido(
   valorDaEmenda: number,
   outros: PedidoEmenda[],
   itens: Map<string, ItemCaep>,
-  precos?: Map<string, PrecoPrevisto>
+  precos?: Map<string, PrecoDoItem>
 ): { outros: number; sobra: number } {
   const usado = centavos(outros.reduce((s, o) => s + valorDoPedidoNaEtapa(o, itens, precos).valor, 0));
   return { outros: usado, sobra: centavos(valorDaEmenda - usado) };
 }
 
-/** O previsto cabe no que sobra da emenda (menor ou igual, ao centavo). */
+/** O pedido cabe no que sobra da emenda (menor ou igual, ao centavo). */
 export const cabeNaEmenda = (previsto: number, sobra: number): boolean => previsto <= sobra + 0.004;
 
 /** Os preços unitários que a minuta guardou para cada item: os que o quadro mostra hoje (vão no registro da minuta). */
-export function precosDaMinuta(p: PedidoEmenda, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): Record<string, number> {
+export function precosDaMinuta(p: PedidoEmenda, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoDoItem>): Record<string, number> {
   const r: Record<string, number> = {};
-  for (const l of linhasAtivas(p)) for (const x of itensDaLinha(l)) r[x.itemKey] = precoParaEmenda(x.itemKey, itens, precos).previsto;
+  for (const l of linhasAtivas(p)) for (const x of itensDaLinha(l)) r[x.itemKey] = precoParaEmenda(x.itemKey, itens, precos).valor;
   return r;
 }
 
@@ -111,12 +113,12 @@ export interface PrecoQueMudou {
   hoje: number;
 }
 
-/** Itens cujo preço previsto mudou depois da minuta (só informa: o que trava é o pedido não caber na emenda). */
+/** Itens cujo preço mudou depois da minuta: o ofício saiu com o preço antigo e o pedido volta para nova minuta. */
 export function precosQueMudaram(
   linhas: LinhaConferida[],
   p: Pick<PedidoEmenda, 'minutaPrecos'>,
   itens: Map<string, ItemCaep>,
-  precos?: Map<string, PrecoPrevisto>
+  precos?: Map<string, PrecoDoItem>
 ): PrecoQueMudou[] {
   if (!p.minutaPrecos) return [];
   const vistos = new Map<string, PrecoQueMudou>();
@@ -125,7 +127,7 @@ export function precosQueMudaram(
     for (const x of itensDaLinha({ ...l, quantidade: 1 })) {
       const naMinuta = p.minutaPrecos[x.itemKey];
       if (typeof naMinuta !== 'number' || vistos.has(x.itemKey)) continue;
-      const hoje = precoParaEmenda(x.itemKey, itens, precos).previsto;
+      const hoje = precoParaEmenda(x.itemKey, itens, precos).valor;
       if (!mesmoValor(naMinuta, hoje))
         vistos.set(x.itemKey, {
           itemKey: x.itemKey,
@@ -177,3 +179,7 @@ export function passaDoSaldo(l: LinhaConferida, livre: (itemKey: string) => numb
   if (l.retirada || l.quantidade <= l.original) return false;
   return itensDaLinha(l).some((x) => livre(x.itemKey) < 0);
 }
+
+/** O ofício chegou depois do prazo gravado na minuta (minuta_valida_ate, migration 246)? */
+export const oficioForaDoPrazo = (p: Pick<PedidoEmenda, 'oficioEm' | 'minutaValidaAte'>): boolean =>
+  Boolean(p.minutaValidaAte && p.oficioEm && p.oficioEm.slice(0, 10) > p.minutaValidaAte);

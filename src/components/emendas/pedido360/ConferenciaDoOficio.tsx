@@ -24,17 +24,19 @@ import {
   mesmoValor,
   passaDoSaldo,
   PONTOS_SIOP,
+  oficioForaDoPrazo,
   precosQueMudaram,
   precoUnitarioDeHoje,
   sobraDaEmendaParaOPedido,
-  valorPrevisto,
+  valorDosItens,
   type LinhaConferida
 } from '../../../utils/emendasConferenciaOficio';
-import { curto, diasEntre, passouDoCorte } from '../../../utils/emendasKits';
+import { curto, dataBR, diasEntre, passouDoCorte } from '../../../utils/emendasKits';
+import { podeReservar, reajusteDoItem } from '../../../utils/emendasReajuste';
 import { daUfDoParlamentar } from '../../../utils/emendasBeneficiarios';
 import { lerValorBR, mascaraValorBR } from '../../../utils/mascaras';
 import { rotuloBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type PedidoEmenda } from '../../../services/emendasService';
-import type { PrecoPrevisto } from '../../../services/emendasQuadroService';
+import type { PrecoDoItem } from '../../../services/emendasQuadroService';
 import { BeneficiarioDaLinha } from '../emendasPartes';
 
 interface Props {
@@ -46,7 +48,7 @@ interface Props {
   beneficiariosLista: BeneficiarioEmenda[];
   autor: AutorEmenda | undefined;
   nomeDoAutor: string;
-  precos: Map<string, PrecoPrevisto> | undefined;
+  precos: Map<string, PrecoDoItem> | undefined;
   reservadoFora: Map<string, number>;
   hoje: string;
   /** Aberta pelo "Ofício com divergência": já começa no pedido da nova minuta. */
@@ -65,7 +67,9 @@ const valorBR = (v: number) =>
 /**
  * Conferência do ofício (protótipo aprovado em 28/10/2026): dentro do Pedido 360, numa área larga. (1) O ofício pede o
  * que está no pedido? Cada item com ✓, e o pedido se ajusta ao ofício (quantidade, retirar, acrescentar). (2) A emenda
- * no SIOP bate? Os 6 pontos que o SIOP mostra, e o previsto do pedido (com a folga) cabe no que sobra da emenda.
+ * no SIOP bate? Os 6 pontos que o SIOP mostra, e o pedido cabe no que sobra da emenda. Desde 29/10/2026 (migration 246)
+ * o ofício tem de pedir o valor do pedido pelo preço de hoje, centavo a centavo, chegar no prazo da minuta e com o preço
+ * que a minuta levou; o banco confere o prazo e o preço.
  * No fim, "Tudo confere" grava os ajustes e a conferência juntos; "Não bate: gerar nova minuta" grava os ajustes e
  * devolve o ofício (o pedido volta para a reserva e o quadro sai com o preço de hoje). As marcas não ficam gravadas.
  */
@@ -168,8 +172,8 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   const nomeParaHistorico = (l: LinhaConferida) => `${nomeDoItem(l)} → ${siglaDe(l.beneficiarioId)}`;
 
   const livre = useMemo(() => livrePorItem(linhas, itens, reservadoFora), [linhas, itens, reservadoFora]);
-  // O previsto do pedido (reajuste projetado e folga de Ajustes) tem de caber no que sobra da emenda (28/10/2026).
-  const total = valorPrevisto(linhas, itens, precos);
+  // O pedido pelo preço de hoje tem de caber no que sobra da emenda (28/10/2026) e ser o valor do ofício (29/10/2026).
+  const total = valorDosItens(linhas, itens, precos);
   const conta = valorDaEmenda != null && valorDaEmenda > 0 ? sobraDaEmendaParaOPedido(valorDaEmenda, conferenciaDaEmenda?.mesmaEmenda ?? [], itens, precos) : null;
   // Pedido completado com outra emenda (migration 211): o sistema não tem o valor dela, então não trava; a CAEP confere.
   const comOutraEmenda = pedido.outrasEmendas.length > 0;
@@ -180,6 +184,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   const conferidas = linhas.filter((l) => l.retirada || l.confere).length;
   const pontosMarcados = PONTOS_SIOP.filter((x) => pontos[x.chave]).length;
   const oficioIgual = valorDoOficio != null && valorDoOficio > 0 && mesmoValor(valorDoOficio, total);
+  const foraDoPrazo = oficioForaDoPrazo(pedido);
   const semBeneficiario = ficam.filter((l) => !l.beneficiarioId).length;
   const foraDoSaldo = linhas.filter((l) => passaDoSaldo(l, livre));
   const rodada = rodadaDoPedido(pedido);
@@ -203,7 +208,13 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   const itensParaAcrescentar = useMemo(
     () =>
       itensLista
-        .filter((i) => !i.ataEncerrada && !(i.vigenciaFinal && passouDoCorte(diasEntre(hoje, i.vigenciaFinal))) && livre(i.itemKey) > 0)
+        .filter(
+          (i) =>
+            !i.ataEncerrada &&
+            !(i.vigenciaFinal && passouDoCorte(diasEntre(hoje, i.vigenciaFinal))) &&
+            podeReservar(reajusteDoItem(precos?.get(i.itemKey), hoje)) &&
+            livre(i.itemKey) > 0
+        )
         .sort(
           (a, b) =>
             a.numeroAta.localeCompare(b.numeroAta) ||
@@ -211,7 +222,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
               numeric: true
             })
         ),
-    [itensLista, hoje, livre]
+    [itensLista, hoje, livre, precos]
   );
   const beneficiariosParaAcrescentar = useMemo(() => {
     const doPedido = new Set(linhas.map((l) => l.beneficiarioId).filter(Boolean));
@@ -258,6 +269,9 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   if (foraDoSaldo.length) pendencias.push('quantidade dentro do saldo livre da CAEP');
   if (semBeneficiario) pendencias.push(`beneficiário em ${semBeneficiario === 1 ? 'um item' : `${semBeneficiario} itens`} (use "Alterar itens")`);
   if (!(valorDoOficio != null && valorDoOficio > 0)) pendencias.push('valor do ofício');
+  else if (!oficioIgual) pendencias.push('valor do ofício igual ao do pedido, centavo a centavo (ajuste os itens ou gere nova minuta)');
+  if (foraDoPrazo) pendencias.push(`ofício dentro do prazo da minuta (${dataBR(pedido.minutaValidaAte)}): gere nova minuta`);
+  if (mudaram.length) pendencias.push('o preço da minuta (mudou depois dela): gere nova minuta');
   if (conta && !cabe) pendencias.push('o pedido caber no valor a indicar da emenda (ajuste os itens ou gere nova minuta)');
   if (seiOficio.trim() && !documentoSeiDaEtapaValido(seiOficio.replace(/\D/g, ''))) pendencias.push('documento SEI do ofício (só números, 7 a 10 dígitos)');
   if (!emenda.trim()) pendencias.push('número da emenda');
@@ -267,8 +281,12 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   if (pontosMarcados < PONTOS_SIOP.length) pendencias.push('marcar os 6 pontos do SIOP');
 
   const motivoSugerido = (): string => {
+    if (foraDoPrazo) return `O ofício chegou em ${dataBR(pedido.oficioEm)}, depois do prazo da minuta (${dataBR(pedido.minutaValidaAte)}). Nova minuta com o preço do dia.`;
+    if (mudaram.length)
+      return `O preço mudou depois da minuta (${[...new Set(mudaram.map((m) => `ata ${m.numeroAta ?? '?'}`))].join(', ')}). Nova minuta com o preço do dia.`;
+    if (valorDoOficio != null && valorDoOficio > 0 && !oficioIgual) return `O ofício pede ${formatCurrency(valorDoOficio)} e os itens somam ${formatCurrency(total)}.`;
     if (conta && !cabe)
-      return `O previsto dos itens (${formatCurrency(total)}) passa do valor a indicar da emenda (${formatCurrency(conta.sobra)})${mudaram.length ? `: o preço mudou depois da minuta (${[...new Set(mudaram.map((m) => `ata ${m.numeroAta ?? '?'}`))].join(', ')})` : ''}.`;
+      return `O valor dos itens (${formatCurrency(total)}) passa do valor a indicar da emenda (${formatCurrency(conta.sobra)})${mudaram.length ? `: o preço mudou depois da minuta (${[...new Set(mudaram.map((m) => `ata ${m.numeroAta ?? '?'}`))].join(', ')})` : ''}.`;
     return '';
   };
   const abrirDevolucao = () => {
@@ -391,7 +409,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
                       <th>Item</th>
                       <th>Beneficiário</th>
                       <th className="conferencia-oficio__n">Quantidade</th>
-                      <th className="conferencia-oficio__n">Preço previsto</th>
+                      <th className="conferencia-oficio__n">Preço de hoje</th>
                       <th className="conferencia-oficio__n">Total</th>
                       <th />
                     </tr>
@@ -499,7 +517,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
                       itemKey: i.itemKey,
                       kitNome: null
                     })}{' '}
-                    · ata {i.numeroAta} · {formatCurrency(precoParaEmenda(i.itemKey, itens, precos).previsto)} · {formatNumber(livre(i.itemKey))} livres
+                    · ata {i.numeroAta} · {formatCurrency(precoParaEmenda(i.itemKey, itens, precos).valor)} · {formatNumber(livre(i.itemKey))} livres
                   </option>
                 ))}
               </AppSelect>
@@ -546,9 +564,9 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
 
         <div className="conferencia-oficio__soma">
           <div className="conferencia-oficio__kpi">
-            <span>Previsto do pedido{ajustes.length ? ' ajustado' : ''}</span>
+            <span>Valor do pedido{ajustes.length ? ' ajustado' : ''}</span>
             <b data-testid="conferencia-total">{formatCurrency(total)}</b>
-            <small>com o reajuste projetado e a folga</small>
+            <small>pelo preço de hoje das atas</small>
           </div>
           <AppInput
             label="Valor deste ofício (R$) *"
@@ -571,14 +589,20 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
           <input type="checkbox" checked={retificador} onChange={(e) => setRetificador(e.target.checked)} /> Ofício retificador (o valor substitui o do ofício anterior)
         </label>
         {valorDoOficio != null && valorDoOficio > 0 && !oficioIgual && (
-          <div className="conferencia-oficio__aviso conferencia-oficio__aviso--atencao" role="status" data-testid="conferencia-oficio-diferente">
-            O ofício pede {formatCurrency(valorDoOficio)} e os itens somam hoje {formatCurrency(total)} ({valorDoOficio > total ? 'ofício acima' : 'ofício abaixo'} em{' '}
-            {formatCurrency(Math.abs(valorDoOficio - total))}). Não trava a conferência: o que vale é o pedido caber na emenda.
+          <div className="conferencia-oficio__aviso conferencia-oficio__aviso--erro" role="status" data-testid="conferencia-oficio-diferente">
+            O ofício pede {formatCurrency(valorDoOficio)} e os itens somam {formatCurrency(total)} ({valorDoOficio > total ? 'ofício acima' : 'ofício abaixo'} em{' '}
+            {formatCurrency(Math.abs(valorDoOficio - total))}). O ofício precisa ser igual ao pedido, centavo a centavo: se o parlamentar mudou algum item, ajuste o pedido acima;
+            senão, gere nova minuta.
+          </div>
+        )}
+        {foraDoPrazo && (
+          <div className="conferencia-oficio__aviso conferencia-oficio__aviso--erro" role="status" data-testid="conferencia-fora-do-prazo">
+            O ofício chegou em {dataBR(pedido.oficioEm)}, depois do prazo da minuta ({dataBR(pedido.minutaValidaAte)}). Gere uma nova minuta com o preço do dia.
           </div>
         )}
         {mudaram.length > 0 && (
-          <div className="conferencia-oficio__aviso conferencia-oficio__aviso--info" role="status" data-testid="conferencia-preco-mudou">
-            O preço mudou depois da minuta:{' '}
+          <div className="conferencia-oficio__aviso conferencia-oficio__aviso--erro" role="status" data-testid="conferencia-preco-mudou">
+            O preço mudou depois da minuta e o ofício saiu com o preço antigo: gere uma nova minuta.{' '}
             {mudaram
               .map(
                 (m) => `${nomeDoItem({ tipo: 'ITEM', itemKey: m.itemKey, kitNome: null })} (ata ${m.numeroAta ?? '?'}): ${formatCurrency(m.naMinuta)} → ${formatCurrency(m.hoje)}`
@@ -706,7 +730,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
             <div className="conferencia-oficio__kpi">
               <span>A indicar para este pedido</span>
               <b>{formatCurrency(conta.sobra)}</b>
-              <small>previsto deste pedido: {formatCurrency(total)}</small>
+              <small>este pedido: {formatCurrency(total)}</small>
             </div>
             <div className="conferencia-oficio__kpi">
               <span>Cabe na emenda?</span>
@@ -714,14 +738,14 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
                 {cabe ? 'Cabe' : 'Não cabe'}
               </b>
               <small>
-                {cabe ? (comOutraEmenda ? 'confira também a outra emenda' : `folga de ${formatCurrency(conta.sobra - total)}`) : `faltam ${formatCurrency(total - conta.sobra)}`}
+                {cabe ? (comOutraEmenda ? 'confira também a outra emenda' : `sobram ${formatCurrency(conta.sobra - total)}`) : `faltam ${formatCurrency(total - conta.sobra)}`}
               </small>
             </div>
           </div>
         )}
         {conta && !cabe && (
           <div className="conferencia-oficio__aviso conferencia-oficio__aviso--erro" role="status" data-testid="conferencia-nao-cabe">
-            O previsto dos itens passa do que sobra da emenda{mudaram.length ? ', porque o preço mudou depois da minuta' : ''}. Se o parlamentar tirou ou diminuiu algum item,
+            O valor dos itens passa do que sobra da emenda{mudaram.length ? ', porque o preço mudou depois da minuta' : ''}. Se o parlamentar tirou ou diminuiu algum item,
             ajuste o pedido acima; senão, gere nova minuta.
           </div>
         )}

@@ -175,7 +175,7 @@ export const EmendasPedidosPage: React.FC = () => {
           ...p,
           valor: v.valor,
           fonteDoValor: v.fonte,
-          avisos: avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id)),
+          avisos: avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id), precos),
           captacao: fatiasDaCaptacao([p], gruposDosBeneficiarios, itens, precos)
         };
       }),

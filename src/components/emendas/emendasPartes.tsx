@@ -8,6 +8,7 @@ import { carteiraDescricaoItem, carteiraDetalhe, carteiraIdentificacao, carteira
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
+import type { ReajusteDoItem } from '../../utils/emendasReajuste';
 import { AUTOR_A_DEFINIR, chaveDoContratoDaEmenda, ORDEM_SITUACAO_LINHA, ROTULO_MOTIVO_SEM_NOTA, ROTULO_REGRA_DA_NOTA, type ExecucaoDoPedido, type SituacaoDaLinha } from '../../utils/emendasPedidos';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { formatCurrency } from '../../utils/format';
@@ -263,24 +264,21 @@ export const ExecucaoDoPedidoResumo: React.FC<{ execucao: ExecucaoDoPedido }> = 
 );
 
 /**
- * Valor pelo preço previsto para a emenda (o mesmo do quadro do parlamentar), com o de hoje embaixo quando muda e o
- * motivo ao passar o mouse.
+ * Preço de hoje para a emenda (o mesmo do quadro do parlamentar) e, embaixo, quando o item já não entra em reserva por
+ * causa do reajuste da ata (migration 246), o motivo; o detalhe ao passar o mouse.
  */
-export const ValorPrevisto: React.FC<{ previsto: number; hoje: number; nota?: string | null; marca?: string; testId?: string }> = ({ previsto, hoje, nota, marca, testId }) => (
-  <span title={nota ?? undefined} data-testid={testId} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-    <span style={carteiraNumero}>
-      {formatCurrency(previsto)}
-      {marca}
-    </span>
-    {Math.abs(previsto - hoje) > 0.004 && <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>hoje {formatCurrency(hoje)}</span>}
+export const PrecoDaEmenda: React.FC<{ valor: number; reajuste?: ReajusteDoItem; testId?: string }> = ({ valor, reajuste, testId }) => (
+  <span title={reajuste?.detalhe ?? undefined} data-testid={testId} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+    <span style={carteiraNumero}>{formatCurrency(valor)}</span>
+    {reajuste?.rotulo && <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap', color: 'var(--color-warning-text, #8a5300)' }}>{reajuste.rotulo}</span>}
   </span>
 );
 
 /** Valor do pedido: o do ofício depois de informado; antes, o previsto pelos itens (ver valorDoPedidoNaEtapa). */
 export const ValorDoPedido: React.FC<{ valor: number; fonte: 'OFICIO' | 'PREVISTO' }> = ({ valor, fonte }) => (
-  <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }} title={fonte === 'OFICIO' ? 'Valor pedido no ofício do parlamentar' : 'Previsto pelos itens, com o reajuste das atas (o mesmo do quadro do parlamentar)'}>
+  <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }} title={fonte === 'OFICIO' ? 'Valor pedido no ofício do parlamentar' : 'Pelos itens, ao preço de hoje das atas (o mesmo do quadro do parlamentar)'}>
     <span style={carteiraNumero}>{formatCurrency(valor)}</span>
-    <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{fonte === 'OFICIO' ? 'do ofício' : 'previsto'}</span>
+    <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{fonte === 'OFICIO' ? 'do ofício' : 'pelos itens'}</span>
   </span>
 );
 

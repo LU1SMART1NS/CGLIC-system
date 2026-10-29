@@ -5,7 +5,7 @@
  * quando o ofício ainda não foi informado).
  */
 import type { EmendaSiop, ItemCaep, PedidoEmenda } from '../services/emendasService';
-import type { PrecoPrevisto } from '../services/emendasQuadroService';
+import type { PrecoDoItem } from '../services/emendasQuadroService';
 import { sobraDaEmendaParaOPedido } from './emendasConferenciaOficio';
 
 export interface EmendaParaAReserva {
@@ -31,7 +31,7 @@ export function emendasParaAReserva(opts: {
   emendas: EmendaSiop[];
   pedidos: PedidoEmenda[];
   itens: Map<string, ItemCaep>;
-  precos?: Map<string, PrecoPrevisto>;
+  precos?: Map<string, PrecoDoItem>;
 }): EmendaParaAReserva[] {
   const { autorId, pedidoId, emendas, pedidos, itens, precos } = opts;
   if (!autorId) return [];

@@ -30,8 +30,8 @@ import {
 } from '../../utils/emendasPedidos';
 import type { BeneficiarioEmenda, ConferenciaEmpenho, ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
 import { chaveAvisoEmpenho, etiquetaDaConferencia, type EtiquetaConferencia } from '../../utils/emendasEmpenho';
-import type { PrecoPrevisto } from '../../services/emendasQuadroService';
-import { BeneficiarioDaLinha, LinhaDoPedido, SituacaoDaLinhaEtiqueta, ValorPrevisto } from './emendasPartes';
+import type { PrecoDoItem } from '../../services/emendasQuadroService';
+import { BeneficiarioDaLinha, LinhaDoPedido, SituacaoDaLinhaEtiqueta, PrecoDaEmenda } from './emendasPartes';
 import type { AcaoDaJanela, ContextoDaJanela } from './EtapaPedidoModal';
 import { podeMontarQuadros } from '../../utils/emendasAutorizacao';
 import { proximaAcaoDaJanela } from './proximaAcaoDaJanela';
@@ -76,7 +76,7 @@ interface BlocosProps {
   itens: Map<string, ItemCaep>;
   beneficiarios: Map<string, BeneficiarioEmenda>;
   notas: Map<string, NotaDaLinha>;
-  precos?: Map<string, PrecoPrevisto>;
+  precos?: Map<string, PrecoDoItem>;
   podeGerir: boolean;
   podeVerContratos: boolean;
   hoje: string;
@@ -153,7 +153,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
     },
     { key: 'ben', header: 'Beneficiário', render: (l) => <BeneficiarioDaLinha linha={l} beneficiarios={beneficiarios} /> },
     { key: 'qtd', header: 'Qtd.', align: 'right', nowrap: true, render: (l) => <span style={carteiraNumero}>{formatNumber(l.quantidade)}</span> },
-    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => <ValorPrevisto previsto={valorDaLinha(l, itens, precos)} hoje={valorDaLinha(l, itens)} nota="Previsto para a emenda, com o reajuste das atas (o mesmo do quadro do parlamentar)" /> },
+    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => <PrecoDaEmenda valor={valorDaLinha(l, itens, precos)} /> },
     {
       key: 'situacao',
       header: 'Situação',

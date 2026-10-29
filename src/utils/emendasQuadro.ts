@@ -6,18 +6,15 @@
  * item) · VALOR UNIT. (R$) · VALOR TOTAL (R$), uma linha por item e beneficiário, kit aberto nos seus itens e somado ao
  * mesmo item avulso, fechando com TOTAL A EMPENHAR (R$). O local de entrega saiu do quadro. O mesmo item para vários
  * beneficiários sai junto, com o nome e o valor unitário uma vez só (células juntadas na tabela). O valor
- * unitário é o preço previsto pelo reajuste da ata (emendas_precos_previstos), para a emenda nascer com folga; cada
- * preço que não é o de hoje ganha uma nota (¹, ², ...). Quando o pedido mistura investimento e custeio, sai o total de
- * cada GND antes do TOTAL A EMPENHAR (no SIOP cada emenda tem um só GND).
+ * unitário é o preço de hoje da ata, o mesmo que vai ao ofício e ao empenho, centavo a centavo (decisão de 29/10/2026,
+ * migration 246: sem projeção do reajuste e sem notas de preço). Quando o pedido mistura investimento e custeio, sai o
+ * total de cada GND antes do TOTAL A EMPENHAR (no SIOP cada emenda tem um só GND).
  */
 import { formatarCep, localDoBeneficiario, type AutorEmenda, type BeneficiarioEmenda, type ItemCaep, type LinhaPedido } from '../services/emendasService';
-import type { GndItem, IpcaDozeMeses, PrecoPrevisto } from '../services/emendasQuadroService';
+import type { GndItem, PrecoDoItem } from '../services/emendasQuadroService';
 import { descricaoItemEmFrase } from './textCase';
 import { dataBR, limiteDaIndicacao } from './emendasKits';
-import { AVISO_SEM_OFICIO_DIAS } from './emendasPedidos';
-import { EMENDAS_RULES } from '../config/alertRules';
-
-const MARCAS = ['¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
+import { prazoDoOficioPelaMinuta } from './emendasReajuste';
 
 /** "do Estado de São Paulo", como no título do Anexo das bancadas. */
 const ESTADO: Record<string, string> = {
@@ -37,13 +34,13 @@ export interface EntradaQuadro {
   linhas: LinhaDoPedidoNoQuadro[];
   itens: Map<string, ItemCaep>;
   beneficiarios: Map<string, BeneficiarioEmenda>;
-  precos: Map<string, PrecoPrevisto>;
+  precos: Map<string, PrecoDoItem>;
   /** Data da reserva (AAAA-MM-DD). */
   data: string;
-  /** Ofício devolvido: o prazo do novo ofício conta da devolução, como o aviso "sem ofício". */
-  devolvidoEm?: string | null;
-  /** IPCA dos 12 últimos meses, só para o texto da nota da folga. */
-  ipca?: IpcaDozeMeses | null;
+  /** Dia em que a minuta sai (hoje): o prazo do ofício conta daqui. */
+  hoje: string;
+  /** Prazo do ofício gravado quando a minuta foi registrada (minuta_valida_ate); vale no lugar da conta. */
+  prazoGravado?: string | null;
   /** Emenda do pedido (8 dígitos e o ano): sai na coluna EMENDA e no texto do WhatsApp. */
   emenda?: { numero: string; ano: number } | null;
 }
@@ -62,11 +59,7 @@ export interface LinhaQuadro {
   endereco: string | null;
   quantidade: number;
   unitario: number;
-  hoje: number;
   total: number;
-  totalHoje: number;
-  /** Nota do preço (¹, ², ...) ou vazio quando é o preço de hoje. */
-  marca: string;
   gnd: GndItem | null;
   semNomeCurto: boolean;
   /**
@@ -84,15 +77,13 @@ export interface Quadro {
   /** Data da reserva (AAAA-MM-DD). */
   data: string;
   /**
-   * Até quando o ofício deve chegar: o que vier primeiro entre a reserva (ou a devolução do ofício) + 30 dias (depois
-   * disso o pedido entra no aviso "sem ofício") e o prazo de indicação da ata que termina antes (fim da ata − corte de
-   * Ajustes, quando o banco passa a recusar), menos 5 dias para a CAEP registrar o ofício.
+   * Até quando o ofício deve chegar (migration 246): o que vier primeiro entre os dias úteis de validade da minuta, o
+   * reajuste da ata menos o tempo até o contrato e o prazo de indicação da ata que termina antes (fim da ata − corte de
+   * Ajustes), menos 5 dias para a CAEP registrar o ofício. Com a minuta registrada, vale o prazo gravado.
    */
-  prazoDoOficio: { data: string; pela: 'RESERVA' | 'ATA'; ata: string | null } | null;
+  prazoDoOficio: { data: string; pela: 'MINUTA' | 'REAJUSTE' | 'ATA'; ata: string | null } | null;
   linhas: LinhaQuadro[];
-  notas: string[];
   total: number;
-  totalHoje: number;
   /** Total por GND, só quando o pedido mistura GND-3 e GND-4 (com a linha "sem GND" quando falta informar). */
   porGnd: { gnd: GndItem | null; rotulo: string; total: number }[];
   /** Linhas cujo item ainda não tem GND informado (o total por GND não sai completo). */
@@ -119,8 +110,11 @@ export function enderecoDeEntrega(b: BeneficiarioEmenda): string | null {
 
 const mesmoNome = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }) === 0;
 
-const pct = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
-const mesAno = (iso: string) => dataBR(iso).slice(3);
+const somarDias = (iso: string, dias: number): string => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+};
 
 /** Nome do item no quadro: o nome na ata assinada; sem ele, o começo da descrição do catálogo. */
 export function nomeDoItem(item: ItemCaep | undefined, itemKey: string): string {
@@ -141,98 +135,29 @@ export function tituloDoAnexo(autor: AutorEmenda | null | undefined): string {
   return `Tabela 1 – Indicação ${cargo} ${autor.nome}${autor.uf ? ` (${autor.uf})` : ''}`;
 }
 
-/** Dias entre o quadro e o empenho provável (estimativa da CAEP): reajuste depois disso não entra no preço. */
-export const PRAZO_ATE_O_EMPENHO_DIAS = 90;
-
-const somarDias = (iso: string, dias: number): string => {
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + dias);
-  return d.toISOString().slice(0, 10);
-};
-
-/**
- * Preço do quadro pelo empenho provável (hoje + prazo), para a emenda não ficar abaixo do preço do dia do empenho:
- * - reajuste devido: sempre o preço reajustado;
- * - próximo reajuste até o empenho provável: o preço projetado; depois dele: o preço de hoje (FORA_DO_PRAZO);
- * - sem base para calcular: preço de hoje mais o IPCA dos últimos 12 meses (FOLGA_IPCA), porque o reajuste pode cair
- *   antes do empenho.
- * O reajuste projetado (PREVISTO, SE_PRORROGAR, FOLGA_IPCA) ganha ainda a folga de Ajustes (decisão de 28/10/2026):
- * se o IPCA vier um pouco maior que o projetado, a emenda ainda cobre o empenho. O reajuste devido já é conhecido.
- */
-export function aplicarPrazoDoEmpenho(
-  precos: Map<string, PrecoPrevisto>,
-  hoje: string,
-  ipca: IpcaDozeMeses | null | undefined,
-  prazoDias = PRAZO_ATE_O_EMPENHO_DIAS,
-  folgaPct = EMENDAS_RULES.folgaReajustePct
-): Map<string, PrecoPrevisto> {
-  const limite = somarDias(hoje, prazoDias);
-  const comFolga = (p: PrecoPrevisto): PrecoPrevisto => (folgaPct > 0 ? { ...p, precoPrevisto: centavos(p.precoPrevisto * (1 + folgaPct / 100)), folga: folgaPct } : p);
-  const m = new Map<string, PrecoPrevisto>();
-  for (const [k, p] of precos) {
-    if ((p.motivo === 'PREVISTO' || p.motivo === 'SE_PRORROGAR') && p.efeito && p.efeito > limite && !p.devido) {
-      m.set(k, { ...p, precoPrevisto: p.precoAtual, motivo: 'FORA_DO_PRAZO' });
-    } else if (p.motivo === 'SEM_PREVISAO' && ipca) {
-      m.set(k, comFolga({ ...p, precoPrevisto: centavos(p.precoAtual * (1 + ipca.percentual / 100)), motivo: 'FOLGA_IPCA', percentual: ipca.percentual, efeito: null, mesesEstimados: null }));
-    } else if (p.motivo === 'PREVISTO' || p.motivo === 'SE_PRORROGAR') {
-      m.set(k, comFolga(p));
-    } else m.set(k, p);
-  }
-  return m;
-}
-
-/** Texto da nota de um preço que não é o de hoje; null quando vale o preço de hoje. */
-export function notaDoPreco(p: PrecoPrevisto | undefined, ipca?: IpcaDozeMeses | null): string | null {
-  if (!p) return null;
-  const focus = p.mesesEstimados ? `, ${p.mesesEstimados} ${p.mesesEstimados === 1 ? 'mês' : 'meses'} pela projeção do Focus` : '';
-  const junto = (p.devido ? '; inclui o reajuste já devido' : '') + (p.folga ? `; mais a folga de ${p.folga.toLocaleString('pt-BR')}% se o IPCA vier maior` : '');
-  switch (p.motivo) {
-    case 'DEVIDO':
-      return 'Reajuste do IPCA já devido, ainda não aplicado na ata.';
-    case 'PREVISTO':
-      return `Reajuste previsto a partir de ${p.efeito ? mesAno(p.efeito) : 'a próxima data-base'} (IPCA de ${pct(p.percentual ?? 0)}${focus})${junto}.`;
-    case 'SE_PRORROGAR':
-      return `Se a ata for prorrogada em ${p.efeito ? mesAno(p.efeito) : 'seu vencimento'} (IPCA previsto de ${pct(p.percentual ?? 0)}${focus})${junto}.`;
-    case 'SEM_PREVISAO':
-      return 'Sem previsão de reajuste (falta base para o cálculo): considerar folga.';
-    case 'FOLGA_IPCA':
-      return `Ata sem data-base de reajuste informada: folga do IPCA dos últimos 12 meses (${pct(p.percentual ?? 0)}${ipca ? `, ${mesAno(ipca.de)} a ${mesAno(ipca.ate)}` : ''})${junto}.`;
-    default:
-      return null;
-  }
-}
-
 /** Dias a menos no prazo da ata da mensagem: a CAEP precisa de tempo para registrar o ofício antes de o banco recusar. */
 export const FOLGA_PARA_REGISTRAR_OFICIO_DIAS = 5;
 
+const chavesDasLinhas = (linhas: LinhaDoPedidoNoQuadro[]): string[] =>
+  linhas.flatMap((l) => (l.tipo === 'KIT' ? (l.kitComposicao ?? []).map((c) => c.itemKey) : l.itemKey ? [l.itemKey] : []));
+
 /** Prazo do ofício do quadro (ver Quadro.prazoDoOficio). */
 function prazoDoOficio(e: EntradaQuadro): Quadro['prazoDoOficio'] {
-  if (!e.data) return null;
-  let prazo: NonNullable<Quadro['prazoDoOficio']> = { data: somarDias(e.devolvidoEm ?? e.data, AVISO_SEM_OFICIO_DIAS), pela: 'RESERVA', ata: null };
-  for (const l of e.linhas) {
-    const chaves = l.tipo === 'KIT' ? (l.kitComposicao ?? []).map((c) => c.itemKey) : l.itemKey ? [l.itemKey] : [];
-    for (const k of chaves) {
-      const item = e.itens.get(k);
-      if (!item?.vigenciaFinal) continue;
-      const limite = somarDias(limiteDaIndicacao(item.vigenciaFinal), -FOLGA_PARA_REGISTRAR_OFICIO_DIAS);
-      if (limite < prazo.data) prazo = { data: limite, pela: 'ATA', ata: item.numeroAta };
-    }
+  if (e.prazoGravado) return { data: e.prazoGravado, pela: 'MINUTA', ata: null };
+  if (!e.hoje) return null;
+  const chaves = chavesDasLinhas(e.linhas);
+  const pelaMinuta = prazoDoOficioPelaMinuta(e.hoje, chaves, e.precos);
+  let prazo: NonNullable<Quadro['prazoDoOficio']> = { data: pelaMinuta.data, pela: pelaMinuta.pela === 'REAJUSTE' ? 'REAJUSTE' : 'MINUTA', ata: pelaMinuta.ata };
+  for (const k of chaves) {
+    const item = e.itens.get(k);
+    if (!item?.vigenciaFinal) continue;
+    const limite = somarDias(limiteDaIndicacao(item.vigenciaFinal), -FOLGA_PARA_REGISTRAR_OFICIO_DIAS);
+    if (limite < prazo.data) prazo = { data: limite, pela: 'ATA', ata: item.numeroAta };
   }
   return prazo;
 }
 
 export function montarQuadro(e: EntradaQuadro): Quadro {
-  const notas: string[] = [];
-  const marcaDe = (texto: string | null): string => {
-    if (!texto) return '';
-    let i = notas.indexOf(texto);
-    if (i < 0) {
-      notas.push(texto);
-      i = notas.length - 1;
-    }
-    return MARCAS[i] ?? `(${i + 1})`;
-  };
-
   // Um grupo por item (e preço), na ordem em que o item aparece pela primeira vez no pedido; dentro dele, uma linha por
   // beneficiário. O item que vem de kit soma com o mesmo item avulso: o Anexo e o empenho são por item da ata.
   const grupos = new Map<string, Map<string, LinhaQuadro>>();
@@ -246,18 +171,14 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
     const ben = l.beneficiarioId ? e.beneficiarios.get(l.beneficiarioId) : undefined;
     for (const p of partes) {
       const item = e.itens.get(p.itemKey);
-      const preco = e.precos.get(p.itemKey);
-      const hoje = preco?.precoAtual ?? item?.valorUnitario ?? 0;
-      const unitario = preco?.precoPrevisto ?? hoje;
-      const marca = marcaDe(notaDoPreco(preco, e.ipca));
-      const chave = [p.itemKey, unitario, hoje, marca].join('|');
+      const unitario = e.precos.get(p.itemKey)?.precoAtual ?? item?.valorUnitario ?? 0;
+      const chave = [p.itemKey, unitario].join('|');
       if (!grupos.has(chave)) grupos.set(chave, new Map());
       const doItem = grupos.get(chave)!;
       const jaTem = doItem.get(l.beneficiarioId ?? '');
       if (jaTem) {
         jaTem.quantidade += p.quantidade;
         jaTem.total = centavos(jaTem.quantidade * unitario);
-        jaTem.totalHoje = centavos(jaTem.quantidade * hoje);
         continue;
       }
       doItem.set(l.beneficiarioId ?? '', {
@@ -271,10 +192,7 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
         endereco: ben ? enderecoDeEntrega(ben) : null,
         quantidade: p.quantidade,
         unitario,
-        hoje,
         total: centavos(p.quantidade * unitario),
-        totalHoje: centavos(p.quantidade * hoje),
-        marca,
         gnd: item?.gnd ?? null,
         semNomeCurto: !item?.nomeCurto?.trim(),
         linhasDoItem: 0
@@ -283,9 +201,8 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
   }
   const linhas: LinhaQuadro[] = [...grupos.values()].flatMap((g) => [...g.values()].map((l, i, todos) => ({ ...l, linhasDoItem: i === 0 ? todos.length : 0 })));
 
-  const soma = (xs: LinhaQuadro[], k: 'total' | 'totalHoje') => centavos(xs.reduce((s, x) => s + x[k], 0));
-  const total = soma(linhas, 'total');
-  const totalHoje = soma(linhas, 'totalHoje');
+  const soma = (xs: LinhaQuadro[]) => centavos(xs.reduce((s, x) => s + x.total, 0));
+  const total = soma(linhas);
   const gnds = new Set(linhas.map((l) => l.gnd).filter((g): g is GndItem => Boolean(g)));
   const semGnd = linhas.filter((l) => !l.gnd);
   const porGnd: Quadro['porGnd'] =
@@ -294,12 +211,11 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
           ...(['GND-4', 'GND-3'] as const).map((g) => ({
             gnd: g,
             rotulo: g === 'GND-4' ? 'Total GND-4 · Investimento' : 'Total GND-3 · Custeio',
-            total: soma(linhas.filter((l) => l.gnd === g), 'total')
+            total: soma(linhas.filter((l) => l.gnd === g))
           })),
-          ...(semGnd.length ? [{ gnd: null, rotulo: 'Total sem GND informado', total: soma(semGnd, 'total') }] : [])
+          ...(semGnd.length ? [{ gnd: null, rotulo: 'Total sem GND informado', total: soma(semGnd) }] : [])
         ]
       : [];
-  const rodape = total !== totalHoje ? [`Valores com previsão de reajuste pelo IPCA, conforme a regra de cada ata. Pelo preço de hoje o total seria ${brl(totalHoje)}.`] : [];
 
   return {
     titulo: tituloDoAnexo(e.autor),
@@ -308,9 +224,7 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
     data: e.data,
     prazoDoOficio: prazoDoOficio(e),
     linhas,
-    notas: [...notas.map((n, i) => `${MARCAS[i] ?? `(${i + 1})`} ${n}`), ...rodape],
     total,
-    totalHoje,
     porGnd,
     semGnd: semGnd.length,
     semBeneficiario: linhas.filter((l) => !l.beneficiario).length,

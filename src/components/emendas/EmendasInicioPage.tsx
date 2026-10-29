@@ -149,7 +149,8 @@ export const EmendasInicioPage: React.FC = () => {
     [emendasSiop, pedidos, contatosDasEmendas, hoje]
   );
   const contaSemPedido = contaEmendasSemPedido(emendasSemPedido);
-  const r = useMemo(() => resumoInicioEmendas(pedidos, itensLista, notas, hoje, diferencas, credor), [pedidos, itensLista, notas, hoje, diferencas, credor]);
+  const { precos } = usePrecosParaEmenda();
+  const r = useMemo(() => resumoInicioEmendas(pedidos, itensLista, notas, hoje, diferencas, credor, precos), [pedidos, itensLista, notas, hoje, diferencas, credor, precos]);
   // Notas sem pedido agrupadas por emenda (migration 211): as notas da mesma emenda vão juntas para o mesmo pedido.
   const semPedidoPorEmenda = useMemo(() => notasSemPedidoPorEmenda(notasSemPedido, resolvidos), [notasSemPedido, resolvidos]);
   const semPedido = useMemo(() => semPedidoPorEmenda.flatMap((g) => g.notas), [semPedidoPorEmenda]);
@@ -160,7 +161,6 @@ export const EmendasInicioPage: React.FC = () => {
   const aConferir = useMemo(() => emendasAConferir(conferencia, itens), [conferencia, itens]);
   const pedidoPorId = useMemo(() => new Map(pedidos.map((p) => [p.id, p])), [pedidos]);
   // Sobra das emendas do ano (migration 204): as que compram pelo menos o item mais barato que a CAEP ainda oferece.
-  const { precos } = usePrecosParaEmenda();
   const { data: portal = SEM_PORTAL } = useExecucaoEmendas();
   const sobras = useMemo(() => {
     const minimo = menorPrecoDisponivel(itens, reservadoPorItem(pedidos), precos);

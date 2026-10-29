@@ -149,23 +149,31 @@ export const SINCRONIZACAO_RULES = {
 // -----------------------------------------------------------------------------
 export const EMENDAS_RULES = {
   /** A partir de N dias antes do fim da ata, o pedido e o kit avisam que o contrato precisa ser assinado até lá. */
-  avisoIndicacaoAntesDias: 60,
+  avisoIndicacaoAntesDias: 90,
   /**
    * A menos de N dias do fim da ata não se recebe indicação (nova reserva nem ofício): depois do empenho a CCGA ainda
-   * minuta e assina o contrato. Medição de 23/10/2026: mediana de 35 dias do despacho à assinatura. O banco lê o
-   * mesmo valor (alert_settings, migration 162).
+   * minuta e assina o contrato. Era 35 (migration 162); passou a 60 em 29/10/2026, igual ao corte do reajuste, porque
+   * do ofício ao contrato assinado são uns 45 dias. O banco lê o mesmo valor (alert_settings, migration 246).
    */
-  corteIndicacaoAntesDias: 35,
+  corteIndicacaoAntesDias: 60,
+  /**
+   * Minuta pelo preço de hoje (decisão de 29/10/2026, migration 246): a N dias do próximo reajuste da ata o item sai
+   * da reserva (fica esmaecido), para o contrato ser assinado pelo preço do ofício.
+   */
+  corteReajusteAntesDias: 60,
+  /**
+   * Tempo do ofício ao contrato assinado (conferência, solicitação, autorização, CGOFI, nota e assinatura; mediana
+   * medida de 42 dias em 28/10/2026). A minuta não sai com item a menos disso do reajuste e o prazo do ofício termina
+   * esse tempo antes do reajuste.
+   */
+  tramiteAteContratoDias: 45,
+  /** Dias úteis para o gabinete devolver o ofício depois da minuta. */
+  validadeMinutaDiasUteis: 5,
   /**
    * Emenda vista no SIOP e ainda sem pedido (decisão de 26/10/2026): avisa desde o dia em que é registrada e fica
    * urgente quando passa N dias sem contato registrado com a assessoria do parlamentar ou com a ASPAR dos órgãos.
    */
-  semPedidoDiasSemContato: 7,
-  /**
-   * Folga (%) somada ao preço dos itens com reajuste projetado (decisão de 28/10/2026): se o IPCA vier um pouco maior
-   * que o projetado, a emenda ainda cobre o empenho. Entra no preço previsto de todas as telas e do quadro.
-   */
-  folgaReajustePct: 2
+  semPedidoDiasSemContato: 7
 };
 
 export type TarefaPrazoNivel = 'VENCIDA' | 'URGENTE' | 'PROXIMA' | 'DISTANTE';
@@ -264,7 +272,9 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
 
   { key: 'emendas.avisoIndicacaoAntesDias', group: 'emendas', label: 'Avisar a ata da emenda a partir de', hint: 'Dias antes do fim da ata: pedidos e kits avisam que o contrato precisa ser assinado até lá.', unit: 'dias', min: 1, max: 365 },
   { key: 'emendas.corteIndicacaoAntesDias', group: 'emendas', label: 'Não receber indicação a menos de', hint: 'Dias antes do fim da ata. O sistema recusa nova reserva e novo ofício com itens da ata.', unit: 'dias', min: 0, max: 365 },
-  { key: 'emendas.folgaReajustePct', group: 'emendas', label: 'Folga no preço previsto', hint: 'Somada ao preço dos itens com reajuste projetado, para a emenda cobrir o empenho se o IPCA vier maior que o projetado.', unit: '%', min: 0, max: 20 },
+  { key: 'emendas.corteReajusteAntesDias', group: 'emendas', label: 'Item sai da reserva antes do reajuste da ata', hint: 'Dias antes do próximo reajuste (ou do fim da vigência, na ata sem data-base). O item fica esmaecido e o sistema recusa nova reserva com ele.', unit: 'dias', min: 0, max: 365 },
+  { key: 'emendas.tramiteAteContratoDias', group: 'emendas', label: 'Tempo do ofício até o contrato assinado', hint: 'A minuta não sai com item a menos disso do reajuste, e o prazo do ofício termina esse tempo antes do reajuste.', unit: 'dias', min: 0, max: 365 },
+  { key: 'emendas.validadeMinutaDiasUteis', group: 'emendas', label: 'Validade da minuta', hint: 'Prazo para o gabinete devolver o ofício. Depois dele, o pedido volta para nova minuta com o preço do dia.', unit: 'dias úteis', min: 1, max: 60 },
   { key: 'emendas.semPedidoDiasSemContato', group: 'emendas', label: 'Emenda sem pedido fica urgente após', hint: 'Dias sem contato registrado com a assessoria do parlamentar ou com a ASPAR dos órgãos. O aviso aparece desde o dia em que a emenda é registrada.', unit: 'dias', min: 1, max: 60 },
 
   { key: 'sincronizacao.quantidadeContratadaVencidaEmHoras', group: 'sincronizacao', label: 'Reler a quantidade contratada após', unit: 'horas', min: 1, max: 168 }
@@ -342,6 +352,9 @@ export function validateAlertRuleValues(values: Record<string, number>): Record<
   order('atencaoNivel.criticoAteDias', 'atencaoNivel.atencaoAteDias', 'O prazo de atenção deve ser maior que o crítico.');
   order('pagamento.criticoAteDiasUteis', 'pagamento.atencaoAteDiasUteis', 'O prazo de atenção deve ser maior que o crítico.');
   order('emendas.corteIndicacaoAntesDias', 'emendas.avisoIndicacaoAntesDias', 'O aviso deve começar antes do corte da indicação.');
+  if (!errors['emendas.tramiteAteContratoDias'] && !errors['emendas.corteReajusteAntesDias'] && values['emendas.tramiteAteContratoDias'] > values['emendas.corteReajusteAntesDias']) {
+    errors['emendas.tramiteAteContratoDias'] = 'O tempo até o contrato não pode passar do corte do reajuste.';
+  }
   order('prorrogacao.prazoCriticoAteDias', 'prorrogacao.marcoProximoAteDias', 'O marco próximo deve ser maior que o prazo crítico.');
   if (!errors['reajuste.urgenteAteDias'] && !errors['reajuste.janelaAntesDias'] && values['reajuste.urgenteAteDias'] >= values['reajuste.janelaAntesDias']) {
     errors['reajuste.urgenteAteDias'] = 'O limite urgente deve ser menor que a janela antes do marco.';

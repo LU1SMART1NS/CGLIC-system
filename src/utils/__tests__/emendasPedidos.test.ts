@@ -3,7 +3,7 @@ import { avisosDeEmpenho } from '../emendasEmpenho';
 import { avisoGrave, ROTULO_AVISO, TIPOS_AVISO, GRAVIDADE_DO_AVISO, atasDoPedido, avisosDoPedido, linhasComEmpenhoAnulado, contaDosItens, faltaEnvioCgofi, rodadasDoPedido, notasEmitidasDepoisDaAnulacao, notaEmitidaSemRegistro, conferirNumeroDaEmenda, lerNumeroDaEmenda, numeroDaEmendaEmTexto, documentosDaEtapa, intervaloDeDatas, itensDaLinha, linhasDaLista, linhasPorAta, numerosSei, precoParaEmenda, itensSemEmpenhoAutorizado, proximaAcao, reservadoPorItem, reservaDoItem, resumoDasLinhas, rodadaDoPedido, seiDaEtapa, situacaoDaLinha, solicitacoesSemAta, tarefasDoPedido, valorDaLinha, valorDoPedido, valorDoPedidoNaEtapa } from '../emendasPedidos';
 import type { ConferenciaEmpenho, NotaDaLinha } from '../../services/emendasService';
 import { calcularKit } from '../emendasKits';
-import type { PrecoPrevisto } from '../../services/emendasQuadroService';
+import type { PrecoDoItem } from '../../services/emendasQuadroService';
 import type { ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
 
 const HOJE = '2026-10-23';
@@ -59,23 +59,21 @@ describe('pedidos das emendas', () => {
     expect(reservadoPorItem([p1, p2], p1.id).size).toBe(0);
   });
 
-  it('valor pelo preço previsto para a emenda quando vêm os preços (o mesmo do quadro), e pelo de hoje sem eles', () => {
-    const precos = new Map<string, PrecoPrevisto>([
-      ['a', { itemKey: 'a', precoAtual: 100, precoPrevisto: 104.02, motivo: 'PREVISTO', devido: false, efeito: '2026-12-01', percentual: 4.02, mesesEstimados: null }]
-    ]);
-    expect(precoParaEmenda('a', itens, precos)).toMatchObject({ previsto: 104.02, hoje: 100 });
-    // Item sem preço previsto: vale o de hoje.
-    expect(precoParaEmenda('b', itens, precos)).toMatchObject({ previsto: 10, hoje: 10 });
-    expect(valorDaLinha(kit, itens, precos)).toBe(10 * 104.02 + 20 * 10);
+  it('valor pelo preço de hoje lido com o reajuste (migration 246), e pelo da lista de itens sem a leitura', () => {
+    const precos = new Map<string, PrecoDoItem>([['a', { itemKey: 'a', precoAtual: 101.5, dataReajuste: '2027-06-01', origem: 'REAJUSTE', devido: false, precoDevido: null }]]);
+    expect(precoParaEmenda('a', itens, precos)).toMatchObject({ valor: 101.5 });
+    // Item sem a leitura: o preço da lista de itens.
+    expect(precoParaEmenda('b', itens, precos)).toMatchObject({ valor: 10 });
+    expect(valorDaLinha(kit, itens, precos)).toBe(10 * 101.5 + 20 * 10);
     expect(valorDaLinha(kit, itens)).toBe(10 * 100 + 20 * 10);
-    expect(calcularKit({ ativo: true, itens: kit.kitComposicao! }, itens, HOJE, (i) => i.alocado, precos)).toMatchObject({ valorPorKit: 124.02, valorPorKitHoje: 120 });
+    expect(calcularKit({ ativo: true, itens: kit.kitComposicao! }, itens, HOJE, (i) => i.alocado, precos)).toMatchObject({ valorPorKit: 121.5 });
   });
 
   it('valor do pedido nas telas: o do ofício depois de informado; antes, o previsto (migration 232)', () => {
-    const precos = new Map<string, PrecoPrevisto>([['a', { itemKey: 'a', precoAtual: 100, precoPrevisto: 110, motivo: 'DEVIDO', devido: true, efeito: null, percentual: 10, mesesEstimados: null }]]);
+    const precos = new Map<string, PrecoDoItem>([['a', { itemKey: 'a', precoAtual: 100, dataReajuste: null, origem: 'DEVIDO', devido: true, precoDevido: 110 }]]);
     const p = pedido({ linhas: [linha({ itemKey: 'a', quantidade: 3 })] });
-    expect(valorDoPedidoNaEtapa(p, itens, precos)).toEqual({ valor: 330, fonte: 'PREVISTO' });
-    expect(valorDoPedidoNaEtapa({ ...p, etapa: 'CONFERIDO', siopValor: 320 }, itens, precos)).toEqual({ valor: 330, fonte: 'PREVISTO' });
+    expect(valorDoPedidoNaEtapa(p, itens, precos)).toEqual({ valor: 300, fonte: 'PREVISTO' });
+    expect(valorDoPedidoNaEtapa({ ...p, etapa: 'CONFERIDO', siopValor: 320 }, itens, precos)).toEqual({ valor: 300, fonte: 'PREVISTO' });
     expect(valorDoPedidoNaEtapa({ ...p, etapa: 'CONFERIDO', siopValor: 320, oficioValor: 300 }, itens, precos)).toEqual({ valor: 300, fonte: 'OFICIO' });
   });
 
@@ -90,7 +88,7 @@ describe('pedidos das emendas', () => {
     expect(avisosDoPedido(devolvido, itens, HOJE).map((a) => [a.tipo, a.texto])).toEqual([['divergencia', 'Ofício devolvido em 20/10/2026: valor diferente']]);
     expect(avisosDoPedido({ ...devolvido, devolvidoEm: '2026-09-10' }, itens, HOJE).map((a) => a.curto)).toEqual(['Ofício devolvido', '43 dias sem ofício']);
     expect(avisosDoPedido(pedido({ etapa: 'CGOFI', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)[0].tipo).toBe('ataVencida');
-    expect(avisosDoPedido(pedido({ linhas: [kit] }), itens, HOJE)[0].texto).toContain('Ata 00061/2024 vence em 57 dias');
+    expect(avisosDoPedido(pedido({ linhas: [kit] }), itens, HOJE)[0].texto).toContain('Ata 00061/2024 termina em 57 dias');
     expect(avisosDoPedido(pedido({ etapa: 'CONFERIDO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)[0].texto).toBe('Ata 00020/2025 encerrada em 28/05/2026: trocar o item ou tirá-lo do pedido');
     expect(avisosDoPedido(pedido({ etapa: 'EMPENHADO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)).toEqual([]);
     expect(avisosDoPedido(pedido({ etapa: 'CONTRATACAO', linhas: [linha({ itemKey: 'v' })] }), itens, HOJE)).toEqual([]);
@@ -159,13 +157,13 @@ describe('pedidos que vieram das planilhas da CAEP (migration 160)', () => {
 });
 
 describe('prazo de indicação nos pedidos (migration 162)', () => {
-  it('antes do empenho, ata a menos de 35 dias pede confirmação com a CCGA; o aviso de 60 dias fala do contrato', () => {
-    const its = new Map([item('t', { numeroAta: '00003/2026', vigenciaFinal: '2026-11-22' }), item('q', { numeroAta: '00002/2026', vigenciaFinal: '2026-12-02' })].map((i) => [i.itemKey, i]));
+  it('antes do empenho, ata a menos de 60 dias pede confirmação com a CCGA; o aviso de 90 dias fala do contrato', () => {
+    const its = new Map([item('t', { numeroAta: '00003/2026', vigenciaFinal: '2026-12-12' }), item('q', { numeroAta: '00002/2026', vigenciaFinal: '2027-01-02' })].map((i) => [i.itemKey, i]));
     const p = pedido({ etapa: 'OFICIO', linhas: [linha({ itemKey: 'q' }), linha({ itemKey: 't' })] });
     const a = avisosDoPedido(p, its, HOJE);
     expect(a[0].tipo).toBe('ataNoCorte');
-    expect(a[0].texto).toContain('passou do prazo de indicação (35 dias); confirmar com a CCGA');
-    expect(avisosDoPedido(pedido({ etapa: 'OFICIO', linhas: [linha({ itemKey: 'q' })] }), its, HOJE)[0].texto).toBe('Ata 00002/2026 vence em 40 dias (02/12/2026): contrato assinado até lá');
+    expect(a[0].texto).toContain('passou do prazo de indicação (60 dias); confirmar com a CCGA');
+    expect(avisosDoPedido(pedido({ etapa: 'OFICIO', linhas: [linha({ itemKey: 'q' })] }), its, HOJE)[0].texto).toBe('Ata 00002/2026 vence em 71 dias (02/01/2027): contrato assinado até lá');
     expect(avisosDoPedido(pedido({ etapa: 'EMPENHADO', linhas: [linha({ itemKey: 't' })] }), its, HOJE)).toEqual([]);
   });
 });

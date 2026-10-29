@@ -19,7 +19,7 @@ import { hojeEmBrasilia, useItensCaep, usePedidosEmendas, usePodeGerirEmendas } 
 import { formatCurrencyCompact, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, rotuloItemDaAta } from '../../utils/emendasKits';
-import { ItemDaAta, ValorPrevisto, VigenciaDaAta } from './emendasPartes';
+import { ItemDaAta, PrecoDaEmenda, VigenciaDaAta } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { DadosItemModal } from './DadosItemModal';
 import { itemComSaldo, montarLinhasItensCaep, type LinhaItemCaep } from '../../utils/emendasItensSaldo';
@@ -42,7 +42,7 @@ const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
   alocado: { value: (l) => l.alocado, firstDir: 'desc' },
   reservado: { value: (l) => l.reservado, firstDir: 'desc' },
   saldo: { value: (l) => l.saldo, firstDir: 'desc' },
-  valor: { value: (l) => l.previsto, firstDir: 'desc' }
+  valor: { value: (l) => l.preco, firstDir: 'desc' }
 };
 
 interface Props {
@@ -63,7 +63,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, exportar }
   const { data: itens = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = useItensCaep();
   const { data: pedidos = [], refetch: recarregarPedidos } = usePedidosEmendas();
   const hoje = hojeEmBrasilia();
-  const { precos, ipca } = usePrecosParaEmenda();
+  const { precos } = usePrecosParaEmenda();
   // Interesse por GTI de cada item (migration 139): a mesma coluna da Carteira › Itens.
   const { fatias: fatiasItens, consulta: fatiasItensQuery } = useFatiasItensGtiLeitura();
   const leituras = useLeiturasComFalha([{ rotulo: ROTULO_GTI_ITENS, query: fatiasItensQuery }]);
@@ -75,7 +75,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, exportar }
   const [editando, setEditando] = useState<ItemCaep | null>(null);
   const navigate = useNavigateWithOrigin();
 
-  const linhas: Linha[] = useMemo(() => montarLinhasItensCaep(itens, pedidos, precos, ipca, fatiasItens), [itens, pedidos, precos, ipca, fatiasItens]);
+  const linhas: Linha[] = useMemo(() => montarLinhasItensCaep(itens, pedidos, precos, hoje, fatiasItens), [itens, pedidos, precos, hoje, fatiasItens]);
 
   const situacao = (l: Linha): Segmento => (l.ataEncerrada ? 'encerrada' : itemComSaldo(l) ? 'com' : 'sem');
   const contagem = useMemo(() => {
@@ -88,9 +88,9 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, exportar }
   const filtradas = (buscarItensCaep(doSegmento, busca) as Linha[]).sort((a, b) => descricaoItemEmFrase(a.descricao).localeCompare(descricaoItemEmFrase(b.descricao), 'pt-BR'));
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ORDEM);
   const vigentes = linhas.filter((l) => !l.ataEncerrada);
-  // O alocado é o que a CAEP tem hoje (preço de hoje); o reservado vai para as emendas (preço previsto, o do quadro).
-  const valorAlocado = vigentes.reduce((s, l) => s + l.alocado * l.hoje, 0);
-  const valorReservado = vigentes.reduce((s, l) => s + Math.min(l.reservado, l.alocado) * l.previsto, 0);
+  // Alocado e reservado pelo preço de hoje, o mesmo do quadro do parlamentar.
+  const valorAlocado = vigentes.reduce((s, l) => s + l.alocado * l.preco, 0);
+  const valorReservado = vigentes.reduce((s, l) => s + Math.min(l.reservado, l.alocado) * l.preco, 0);
 
   // Vindo do kit: o trilho vai para a situação do item e a busca deixa só ele.
   const alvo = abrir ? linhas.find((l) => l.itemKey === abrir) : undefined;
@@ -165,7 +165,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, exportar }
       sortFirstDir: 'desc',
       render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero, color: l.saldo <= 0 ? 'var(--text-muted)' : undefined }}>{formatNumber(l.saldo)}</span>
     },
-    { key: 'valor', header: 'Valor previsto', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <ValorPrevisto previsto={l.previsto} hoje={l.hoje} nota={l.nota} /> }
+    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <PrecoDaEmenda valor={l.preco} reajuste={l.reajuste} /> }
   ];
 
   return (
@@ -173,7 +173,7 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, exportar }
       <PageHeader
         title="Itens"
         subtitle="Quanto de cada item alocado à CAEP já foi reservado a parlamentares."
-        hint="Saldo = alocado à CAEP − reservado nos pedidos não cancelados (kits abertos nos itens). O valor é o previsto para a emenda, com o reajuste da ata (o mesmo do quadro do parlamentar); o reservado soma pelo preço previsto e o alocado pelo preço de hoje."
+        hint="Saldo = alocado à CAEP − reservado nos pedidos não cancelados (kits abertos nos itens). O valor é o preço de hoje da ata, o mesmo do quadro do parlamentar e do empenho. Perto do reajuste da ata o item sai da reserva e o motivo aparece embaixo do valor."
         icon={<Boxes size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={seletor}
         actions={

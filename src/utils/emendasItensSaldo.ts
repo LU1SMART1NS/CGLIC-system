@@ -1,23 +1,23 @@
 import type { ItemCaep, KitEmenda, PedidoEmenda } from '../services/emendasService';
-import type { IpcaDozeMeses, PrecoPrevisto } from '../services/emendasQuadroService';
+import type { PrecoDoItem } from '../services/emendasQuadroService';
 import { chaveItemGti, type FatiasDaAta } from '../config/gruposGti';
 import { itensDaLinha, linhasAtivas, precoParaEmenda } from './emendasPedidos';
-import { notaDoPreco } from './emendasQuadro';
+import { reajusteDoItem, type ReajusteDoItem } from './emendasReajuste';
 import { calcularKit, type CalculoDoKit } from './emendasKits';
 
-/** previsto/hoje: preço unitário para a emenda (o do quadro do parlamentar) e o de hoje; nota: por que mudou. pedidos: quantos pedidos reservam o item. fatias: interesse de cada GTI no item (o mesmo da Carteira › Itens). */
-export type LinhaItemCaep = ItemCaep & { reservado: number; saldo: number; pedidos: number; previsto: number; hoje: number; nota: string | null; fatias: FatiasDaAta | undefined };
+/** preco: preço de hoje, o do quadro do parlamentar; reajuste: se o item ainda entra em reserva (migration 246). pedidos: quantos pedidos reservam o item. fatias: interesse de cada GTI no item (o mesmo da Carteira › Itens). */
+export type LinhaItemCaep = ItemCaep & { reservado: number; saldo: number; pedidos: number; preco: number; reajuste: ReajusteDoItem; fatias: FatiasDaAta | undefined };
 export type LinhaKitCaep = KitEmenda & { calculo: CalculoDoKit };
 
 /**
  * Linhas de Emendas › Itens › Por item: reservado nos pedidos não cancelados (kits abertos nos itens), saldo = alocado −
- * reservado e o preço previsto para a emenda. A tela e a exportação para o Excel usam a mesma conta.
+ * reservado e o preço de hoje (o da emenda). A tela e a exportação para o Excel usam a mesma conta.
  */
 export function montarLinhasItensCaep(
   itens: ItemCaep[],
   pedidos: PedidoEmenda[],
-  precos: Map<string, PrecoPrevisto> | undefined,
-  ipca: IpcaDozeMeses | null | undefined,
+  precos: Map<string, PrecoDoItem> | undefined,
+  hoje: string,
   fatias: Map<string, FatiasDaAta>
 ): LinhaItemCaep[] {
   const reservado = new Map<string, number>();
@@ -40,9 +40,8 @@ export function montarLinhasItensCaep(
       reservado: r,
       saldo: i.alocado - r,
       pedidos: pedidosDoItem.get(i.itemKey)?.size ?? 0,
-      previsto: preco.previsto,
-      hoje: preco.hoje,
-      nota: notaDoPreco(preco.preco, ipca),
+      preco: preco.valor,
+      reajuste: reajusteDoItem(preco.preco, hoje),
       fatias: fatias.get(chaveItemGti(i.numeroAta, i.codigoUasg, i.numeroItem))
     };
   });
@@ -60,7 +59,7 @@ export function montarLinhasKitsCaep(
   itens: ItemCaep[],
   hoje: string,
   reservado: Map<string, number> | undefined,
-  precos: Map<string, PrecoPrevisto> | undefined
+  precos: Map<string, PrecoDoItem> | undefined
 ): LinhaKitCaep[] {
   const porChave = new Map(itens.map((i) => [i.itemKey, i]));
   const saldoDoItem = saldoDoItemParaKits(reservado);

@@ -30,8 +30,8 @@ export const COLUNAS_ITENS: ColunaDoExcel<LinhaItemCaep, string>[] = [
   { id: 'reservado', titulo: 'Reservado', largura: 12, formato: 'inteiro', valor: (l) => l.reservado },
   { id: 'pedidos', titulo: 'Pedidos', largura: 9, formato: 'inteiro', valor: (l) => l.pedidos },
   { id: 'saldo', titulo: 'Saldo', largura: 12, formato: 'inteiro', valor: (l) => l.saldo },
-  { id: 'preco', titulo: 'Valor unitário previsto', largura: 16, formato: 'reais', valor: (l) => l.previsto },
-  { id: 'valorSaldo', titulo: 'Valor do saldo', largura: 18, formato: 'reais', valor: (l) => Math.round(l.saldo * l.previsto * 100) / 100 }
+  { id: 'preco', titulo: 'Valor unitário', largura: 16, formato: 'reais', valor: (l) => l.preco },
+  { id: 'valorSaldo', titulo: 'Valor do saldo', largura: 18, formato: 'reais', valor: (l) => Math.round(l.saldo * l.preco * 100) / 100 }
 ];
 
 const comItem = (i: NonNullable<LinhaKitCaep['calculo']['componentes'][number]['item']>) => `${rotuloItemDaAta(i)} · ${descricaoItemEmFrase(i.descricao)}`;

@@ -10,6 +10,7 @@
 import type { AcaoGestor } from '../types';
 import type { GrupoTarefa } from './modeloGestao';
 import type { EtapaPedido, ItemCaep, NotaDaLinha, PedidoEmenda } from '../services/emendasService';
+import type { PrecoDoItem } from '../services/emendasQuadroService';
 import { corteIndicacaoDias, dataBR, diasEntre } from './emendasKits';
 import {
   AVISO_SEM_OFICIO_DIAS,
@@ -157,7 +158,8 @@ export function andamentoDoPedido(
   itens: Map<string, ItemCaep>,
   notas: Map<string, NotaDaLinha>,
   hoje: string,
-  podeGerir: boolean
+  podeGerir: boolean,
+  precos?: Map<string, PrecoDoItem>
 ): AndamentoDoPedido {
   const cancelado = p.etapa === 'CANCELADO';
   const o = ORDEM_ETAPA[p.etapa];
@@ -168,7 +170,7 @@ export function andamentoDoPedido(
   const doPlanilha = p.origem === 'PLANILHA';
 
   // Pendências de hoje ("O que falta"), distribuídas pelas tarefas; o resto é aviso.
-  const pendentes = tarefasDoPedido(p, itens, notas, hoje, podeGerir);
+  const pendentes = tarefasDoPedido(p, itens, notas, hoje, podeGerir, precos);
   const porTarefa = new Map<ChaveDaTarefa, TarefaDoPedido[]>();
   const avisos: TarefaDoPedido[] = [];
   for (const t of pendentes) {

@@ -10,13 +10,13 @@
  *   tabela empenhos (migration 205; o empenhado do Portal é o da emenda inteira, de todos os órgãos). Sem os documentos
  *   lidos, o das notas ligadas às linhas no sistema. Fica "a confirmar" se alguma linha empenhada ainda não tem nota
  *   ou se alguma nota da SENASP ainda não está no sistema.
- * - Em andamento: as linhas sem nota dos pedidos antes do empenho, pelo preço previsto (o do quadro do parlamentar).
+ * - Em andamento: as linhas sem nota dos pedidos antes do empenho, pelo preço de hoje (o do quadro do parlamentar).
  * Regras aprovadas: só emendas do ano corrente; uma emenda por pedido; aviso quando a sobra compra o item mais barato.
  * Ano encerrado (28/10/2026): o que não foi empenhado até 31/12 perdeu o crédito. Não há "em andamento" nem pedido
  * novo; o resto (valor − empenhado) fica como "Não empenhado".
  */
 import type { EmendaSiop, ItemCaep, NotaDaLinha, PedidoEmenda } from '../services/emendasService';
-import type { PrecoPrevisto } from '../services/emendasQuadroService';
+import type { PrecoDoItem } from '../services/emendasQuadroService';
 import { jaEmpenhado, linhasAtivas, precoParaEmenda, valorDaLinha } from './emendasPedidos';
 import { nomeDoPedido } from './emendasNomeDoPedido';
 
@@ -70,12 +70,12 @@ const arredondar = (v: number) => Math.round(v * 100) / 100;
 /** Código do Portal da emenda: ano + nº. */
 export const codigoDaEmenda = (emenda: string, ano: number) => `${ano}${emenda}`;
 
-/** Menor preço previsto entre os itens que a CAEP ainda pode oferecer (ata vigente e saldo livre). */
-export function menorPrecoDisponivel(itens: Map<string, ItemCaep>, reservado: Map<string, number>, precos?: Map<string, PrecoPrevisto>): number | null {
+/** Menor preço de hoje entre os itens que a CAEP ainda pode oferecer (ata vigente e saldo livre). */
+export function menorPrecoDisponivel(itens: Map<string, ItemCaep>, reservado: Map<string, number>, precos?: Map<string, PrecoDoItem>): number | null {
   let menor: number | null = null;
   for (const i of itens.values()) {
     if (i.ataEncerrada || i.alocado - (reservado.get(i.itemKey) ?? 0) <= 0) continue;
-    const p = precoParaEmenda(i.itemKey, itens, precos).previsto;
+    const p = precoParaEmenda(i.itemKey, itens, precos).valor;
     if (p > 0 && (menor == null || p < menor)) menor = p;
   }
   return menor;
@@ -87,7 +87,7 @@ export function sobraDasEmendas(opts: {
   itens: Map<string, ItemCaep>;
   notas: Map<string, NotaDaLinha>;
   portal: Map<string, ExecucaoNoPortal>;
-  precos?: Map<string, PrecoPrevisto>;
+  precos?: Map<string, PrecoDoItem>;
   /** Sobra mínima para virar "sobra": o item mais barato disponível. Sem ele, qualquer valor acima de um centavo. */
   minimo: number | null;
   /** Ano já encerrado: sem "em andamento" e sem sobra; o resto fica "Não empenhado". */

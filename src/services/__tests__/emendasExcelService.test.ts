@@ -16,7 +16,7 @@ const kit = (id: string, nome: string, itens: KitEmenda['itens'], ativo = true) 
 const KITS = [kit('k1', 'Kit bom', [{ itemKey: 'a', quantidade: 2 }]), kit('k2', 'Kit sem saldo', [{ itemKey: 'b', quantidade: 1 }]), kit('k3', 'Kit desativado', [{ itemKey: 'a', quantidade: 1 }], false)];
 const FATIAS = new Map([['00031/2025-200331-00001', resumirFatias([{ grupo: 'CNCG', quantidade: 70, orgaos: 3 }, { grupo: 'LIGABOM', quantidade: 30, orgaos: 1 }])]]);
 
-const planilhas = () => planilhasDeSaldo(montarLinhasItensCaep(ITENS, [], undefined, null, FATIAS), montarLinhasKitsCaep(KITS, ITENS, HOJE, new Map([['a', 40]]), undefined), HOJE);
+const planilhas = () => planilhasDeSaldo(montarLinhasItensCaep(ITENS, [], undefined, HOJE, FATIAS), montarLinhasKitsCaep(KITS, ITENS, HOJE, new Map([['a', 40]]), undefined), HOJE);
 
 describe('Excel de Emendas › Itens: itens e kits com saldo', () => {
   it('só entra item com saldo e ata vigente, e kit ativo que ainda cabe', () => {
@@ -40,7 +40,7 @@ describe('Excel de Emendas › Itens: itens e kits com saldo', () => {
   });
 
   it('só as colunas escolhidas, e aba sem colunas fica de fora', () => {
-    const itensSaldo = montarLinhasItensCaep(ITENS, [], undefined, null, FATIAS);
+    const itensSaldo = montarLinhasItensCaep(ITENS, [], undefined, HOJE, FATIAS);
     const kitsSaldo = montarLinhasKitsCaep(KITS, ITENS, HOJE, new Map([['a', 40]]), undefined);
     const [itens, ...resto] = planilhasDeSaldo(itensSaldo, kitsSaldo, HOJE, { itens: ['saldo', 'ata'], kits: [] });
     expect(resto).toEqual([]);

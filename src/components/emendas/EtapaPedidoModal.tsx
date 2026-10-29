@@ -36,6 +36,7 @@ import type { AcaoPedido, ItemCaep, LinhaPedido, PedidoEmenda } from '../../serv
 import { curto } from '../../utils/emendasKits';
 import { mascaraProcessoSei, processoSeiValido } from '../../utils/mascaras';
 import { precosDaMinuta } from '../../utils/emendasConferenciaOficio';
+import { podeIrNaMinuta, reajusteDoItem, tramiteAteContratoDias } from '../../utils/emendasReajuste';
 
 /**
  * MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa.
@@ -224,6 +225,14 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
           .find((i): i is ItemCaep => Boolean(i?.vigenciaFinal) && passouDoCorte(diasEntre(hojeEmBrasilia(), i!.vigenciaFinal!)))
       : undefined;
 
+  // Minuta com item perto do reajuste da ata (ou com o devido): o banco recusa (migration 246).
+  const foraDaMinuta =
+    modo === 'MINUTA'
+      ? [...new Set(linhas.flatMap((l) => itensDaLinha(l)).map((x) => x.itemKey))]
+          .map((k) => ({ ata: k.split('-')[0], r: reajusteDoItem(precos?.get(k), data) }))
+          .filter((x) => !podeIrNaMinuta(x.r))
+      : [];
+
   const pendencias: string[] = [];
   if (variasAtas) {
     if (numerosPorAta.length === 0) pendencias.push('o documento SEI da solicitação de pelo menos uma ata');
@@ -246,7 +255,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const enviar = async (ev: React.FormEvent) => {
     ev.preventDefault();
     setTentou(true);
-    if (pendencias.length || ataForaDoPrazo) return;
+    if (pendencias.length || ataForaDoPrazo || foraDaMinuta.length) return;
     try {
       if (modo === 'CGOFI') {
         await registrarEnvio.mutateAsync({ pedidoId: pedido.id, documentoSei: numeros[0], enviadoEm: data, solicitacoes: [...paraEnviar] });
@@ -332,6 +341,13 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
           <div style={aviso('erro')} role="alert" data-testid="emendas-etapa-fora-do-prazo">
             A ata {ataForaDoPrazo.numeroAta} termina em {dataBR(ataForaDoPrazo.vigenciaFinal)} e passou do prazo de indicação ({corteIndicacaoDias()} dias antes do fim), para dar tempo
             de empenhar e assinar o contrato. Troque o item em "Alterar itens" ou cancele o pedido.
+          </div>
+        )}
+
+        {foraDaMinuta.length > 0 && (
+          <div style={aviso('erro')} role="alert" data-testid="emendas-etapa-fora-da-minuta">
+            A minuta não pode sair com {foraDaMinuta.map((x) => `a ata ${x.ata} (${x.r.rotulo?.toLowerCase()})`).join(', ')}: não dá tempo de assinar o contrato pelo preço de hoje
+            ({tramiteAteContratoDias()} dias do ofício ao contrato). Troque ou retire o item em "Alterar itens".
           </div>
         )}
 
@@ -474,7 +490,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
         )}
 
         {modo === 'MINUTA' && (
-          <QuadroGabinete autor={autores.find((a) => a.id === pedido.autorId)} linhas={linhasAtivas(pedido)} data={pedido.reservadoEm} devolvidoEm={pedido.devolvidoEm} emenda={emendaDoPedidoNoQuadro(pedido)} testId="emendas-etapa-quadro" />
+          <QuadroGabinete autor={autores.find((a) => a.id === pedido.autorId)} linhas={linhasAtivas(pedido)} data={pedido.reservadoEm} minutaValidaAte={pedido.minutaValidaAte} emenda={emendaDoPedidoNoQuadro(pedido)} testId="emendas-etapa-quadro" />
         )}
 
         {modo === 'AUTORIZADO' && (
