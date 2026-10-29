@@ -44,7 +44,7 @@ interface Props {
   onCancelar: () => void;
   /** Quantas linhas há em "Com você" na aba Andamento: o indicador Etapa leva até lá. */
   comVoce: number;
-  /** Ofício retificador (migrations 249 e 250): da conferência no SIOP em diante, para quem gere emendas. */
+  /** Ofício retificador (migrations 249 e 251): da conferência no SIOP em diante, para quem gere emendas. */
   onRetificador?: () => void;
   /** Envio à CCGA por ata, desfazer o envio e voltar etapa (migration 248): cada um só quando cabe. */
   ccga?: AcoesCcga;

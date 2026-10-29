@@ -103,7 +103,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   const [dataRetificador, setDataRetificador] = useState(hojeEmBrasilia());
   const [naoConfere, setNaoConfere] = useState(false);
   const oficioQueVale = pedido.oficioValorDocumentoSei ?? pedido.oficioDocumentoSei;
-  // Depois do empenho (migration 250): os itens empenhados não descem nem saem; o que sobe ou entra é complementar.
+  // Depois do empenho (migration 251): os itens empenhados não descem nem saem; o que sobe ou entra é complementar.
   const depoisDoEmpenho = retificador && jaEmpenhado(pedido.etapa);
   const emDiaNaTela = usePedidoEmDiaNaTela();
   const { data: emendasSiop } = useEmendasSiop();

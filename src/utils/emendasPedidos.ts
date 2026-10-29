@@ -1103,7 +1103,7 @@ export function solicitacaoDaLinha(p: PedidoEmenda, l: LinhaPedido): DocumentoSe
   const sols = solicitacoesComAta(p);
   const direta = sols.find((d) => d.linhas.some((x) => x.linhaId === l.id));
   if (direta) return direta;
-  // O item complementar do retificador (migration 250) espera a sua própria solicitação: a antiga da ata não o cobre.
+  // O item complementar do retificador (migration 251) espera a sua própria solicitação: a antiga da ata não o cobre.
   if (l.complementar) return null;
   for (const ata of [...new Set(itensDaLinha(l).map((x) => ataDoItem(x.itemKey)))]) {
     const daAta = sols.filter((d) => d.ataKey === ata);
@@ -1386,7 +1386,7 @@ export function tarefasDoPedido(
         });
       }
       const semSolicitacao = daAta.filter((l) => situacoes.get(l.id)!.situacao === 'SOLICITACAO_A_INFORMAR');
-      // Item do retificador depois do empenho (migration 250): nova solicitação só para ele, e depois nova rodada.
+      // Item do retificador depois do empenho (migration 251): nova solicitação só para ele, e depois nova rodada.
       const complementares = semSolicitacao.filter((l) => l.complementar);
       if (complementares.length && a.solicitacoes.length > 0) {
         t.push({

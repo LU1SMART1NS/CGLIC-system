@@ -127,7 +127,7 @@ describe('conferência do ofício no Pedido 360 (protótipo aprovado em 28/10/20
     expect(html).toContain('Tudo confere com o ofício SEI 37091178 (R$');
   });
 
-  it('retificador depois do empenho (migration 250): soma = ofício anterior + acréscimos; empenhado não sai nem desce', () => {
+  it('retificador depois do empenho (migration 251): soma = ofício anterior + acréscimos; empenhado não sai nem desce', () => {
     const html = renderToStaticMarkup(
       <ConferenciaDoOficio
         pedido={pedido({ etapa: 'EMPENHADO', oficioValor: 1234.56, oficioValorDocumentoSei: '37091178' })}

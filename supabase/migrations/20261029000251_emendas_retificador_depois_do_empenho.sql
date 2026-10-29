@@ -18,7 +18,7 @@
 -- 1) Item complementar -----------------------------------------------------------------------------------------
 ALTER TABLE public.emenda_pedido_linhas ADD COLUMN IF NOT EXISTS complementar BOOLEAN NOT NULL DEFAULT FALSE;
 COMMENT ON COLUMN public.emenda_pedido_linhas.complementar IS
-  'Item acrescentado pelo ofício retificador depois do empenho (migration 250): pede empenho complementar; a solicitação que já existia na ata não o cobre.';
+  'Item acrescentado pelo ofício retificador depois do empenho (migration 251): pede empenho complementar; a solicitação que já existia na ata não o cobre.';
 
 -- 2) Retificador depois do empenho -------------------------------------------------------------------------------
 -- p_dados: documento_sei, data, valor_oficio (o ofício anterior mais os acréscimos, conferido pela CAEP), ajustes e,
@@ -65,7 +65,7 @@ BEGIN
       WHEN v_p.etapa = 'CANCELADO' THEN 'O pedido está cancelado.'
       ELSE 'Antes da conferência, o ofício mais novo é o que se confere.' END USING ERRCODE = '22023';
   END IF;
-  -- Migration 250: depois do empenho os itens empenhados não mudam (para baixar, anula-se a nota antes); o que o
+  -- Migration 251: depois do empenho os itens empenhados não mudam (para baixar, anula-se a nota antes); o que o
   -- retificador acrescenta entra como item novo, complementar, e o pedido fica na etapa.
   v_empenhado := v_p.etapa IN ('EMPENHADO', 'CONTRATACAO');
   IF v_empenhado AND p_linhas IS NOT NULL THEN
@@ -169,7 +169,7 @@ $$;
 REVOKE ALL ON FUNCTION public.registrar_oficio_retificador(UUID, INTEGER, JSONB, JSONB) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.registrar_oficio_retificador(UUID, INTEGER, JSONB, JSONB) TO authenticated;
 COMMENT ON FUNCTION public.registrar_oficio_retificador(UUID, INTEGER, JSONB, JSONB) IS
-  'Ofício retificador (migrations 249 e 250): antes do empenho ajusta os itens; depois, acrescenta itens complementares sem mexer nos empenhados. Grava a soma conferida como valor do ofício e guarda o ofício anterior no histórico.';
+  'Ofício retificador (migrations 249 e 251): antes do empenho ajusta os itens; depois, acrescenta itens complementares sem mexer nos empenhados. Grava a soma conferida como valor do ofício e guarda o ofício anterior no histórico.';
 
 -- 3) Ligação das notas: o item complementar espera a sua solicitação --------------------------------------------
 ALTER TABLE public.emenda_linha_notas DROP CONSTRAINT IF EXISTS emenda_linha_notas_motivo;
@@ -516,7 +516,7 @@ BEGIN
              WHERE l2.pedido_id = l.pedido_id AND NOT l2.cancelada AND l2.item_key <> l.item_key
                AND abs(i2.valor_unitario - s.valor_unitario) <= 0.01));
 
-  -- Migration 250: o item complementar (acrescentado pelo retificador depois do empenho) só fica com nota depois de ter
+  -- Migration 251: o item complementar (acrescentado pelo retificador depois do empenho) só fica com nota depois de ter
   -- a sua própria solicitação assinada. Antes disso a nota do pedido é a dos itens de antes (ensaio de 29/10/2026: a
   -- 2026NE000462 ia para o item novo). Com a solicitação assinada vale a nota nova ou o reforço da mesma nota.
   UPDATE tmp_emenda_notas t SET empenho_id = NULL, regra = NULL, motivo = 'COMPLEMENTAR'

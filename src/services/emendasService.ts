@@ -508,7 +508,7 @@ export interface LinhaPedido {
   ccgaMotivo?: string | null;
   ccgaExplicacao?: string | null;
   ccgaPorNome?: string | null;
-  /** Item acrescentado pelo ofício retificador depois do empenho (migration 250): pede empenho complementar. */
+  /** Item acrescentado pelo ofício retificador depois do empenho (migration 251): pede empenho complementar. */
   complementar?: boolean;
 }
 
@@ -1780,7 +1780,7 @@ export async function registrarOficioRetificador(v: {
   valorOficio: number;
   ajustes: string[];
   linhas: LinhaParaSalvar[] | null;
-  /** Depois do empenho (migration 250): os itens novos, complementares; os empenhados não mudam. */
+  /** Depois do empenho (migration 251): os itens novos, complementares; os empenhados não mudam. */
   acrescimos?: Array<{ itemKey: string; quantidade: number; beneficiarioId: string }>;
 }): Promise<{ id: string; versao: number }> {
   const { data, error } = await db().rpc('registrar_oficio_retificador', {
