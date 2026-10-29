@@ -10,6 +10,7 @@ import {
   conferirNumeroDaEmenda,
   documentoSeiDaEtapaValido,
   identificacaoDoPedido,
+  jaEmpenhado,
   lerNumeroDaEmenda,
   numeroDaEmendaEmTexto,
   precoParaEmenda,
@@ -102,6 +103,8 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   const [dataRetificador, setDataRetificador] = useState(hojeEmBrasilia());
   const [naoConfere, setNaoConfere] = useState(false);
   const oficioQueVale = pedido.oficioValorDocumentoSei ?? pedido.oficioDocumentoSei;
+  // Depois do empenho (migration 251): os itens empenhados não descem nem saem; o que sobe ou entra é complementar.
+  const depoisDoEmpenho = retificador && jaEmpenhado(pedido.etapa);
   const emDiaNaTela = usePedidoEmDiaNaTela();
   const { data: emendasSiop } = useEmendasSiop();
   const { data: autores = [] } = useAutoresEmendas();
@@ -181,7 +184,21 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
 
   const livre = useMemo(() => livrePorItem(linhas, itens, reservadoFora), [linhas, itens, reservadoFora]);
   // O pedido pelo preço de hoje tem de caber no que sobra da emenda (28/10/2026) e ser o valor do ofício (29/10/2026).
-  const total = valorDosItens(linhas, itens, precos);
+  const valorDosItensDoPedido = valorDosItens(linhas, itens, precos);
+  // Acréscimos depois do empenho: a quantidade a mais de cada item e os itens novos, pelo preço de hoje.
+  const acrescimos = depoisDoEmpenho
+    ? linhas
+        .filter((l) => !l.retirada && l.quantidade > l.original)
+        .map((l) => ({ linha: l, quantidade: l.quantidade - l.original, valor: (l.quantidade - l.original) * precoUnitarioDeHoje(l, itens, precos) }))
+    : [];
+  // A soma depois do empenho é o ofício anterior mais os acréscimos (decisão de 29/10/2026: o sistema não tem o preço
+  // de cada item na nota). Antes do empenho, os itens pelo preço de hoje.
+  const total = depoisDoEmpenho
+    ? Math.round(((pedido.oficioValor ?? valorDosItens(linhasParaConferir(pedido), itens, precos)) + acrescimos.reduce((s, a) => s + a.valor, 0)) * 100) / 100
+    : valorDosItensDoPedido;
+  // Anulação registrada depois do ofício que vale: o valor anterior pode incluir itens que saíram.
+  const desdeOOficio = [...(pedido.movimentos ?? [])].reverse().find((m) => m.acao === 'RETIFICADOR')?.data ?? pedido.oficioEm;
+  const anuladoDepois = depoisDoEmpenho && (pedido.anulacoes ?? []).some((a) => !desdeOOficio || a.anuladoEm >= desdeOOficio.slice(0, 10));
   const conta = valorDaEmenda != null && valorDaEmenda > 0 ? sobraDaEmendaParaOPedido(valorDaEmenda, conferenciaDaEmenda?.mesmaEmenda ?? [], itens, precos) : null;
   // Pedido completado com outra emenda (migration 211): o sistema não tem o valor dela, então não trava; a CAEP confere.
   const comOutraEmenda = pedido.outrasEmendas.length > 0;
@@ -295,6 +312,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   if (ficam.length === 0) pendenciasDoRetificador.push('pelo menos um item no pedido');
   if (foraDoSaldo.length) pendenciasDoRetificador.push('quantidade dentro do saldo livre da CAEP');
   if (semBeneficiario) pendenciasDoRetificador.push(`beneficiário em ${semBeneficiario === 1 ? 'um item' : `${semBeneficiario} itens`}`);
+  if (acrescimos.some((a) => a.linha.tipo === 'KIT')) pendenciasDoRetificador.push('kit não aumenta depois do empenho (acrescente os itens da ata)');
 
   const confereRetificador = async () => {
     setTentou(true);
@@ -307,7 +325,10 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
         data: dataRetificador,
         valorOficio: total,
         ajustes,
-        linhas: linhasParaSalvar(linhas)
+        linhas: depoisDoEmpenho ? null : linhasParaSalvar(linhas),
+        ...(depoisDoEmpenho
+          ? { acrescimos: acrescimos.map((a) => ({ itemKey: a.linha.itemKey!, quantidade: a.quantidade, beneficiarioId: a.linha.beneficiarioId! })) }
+          : {})
       });
       toast.success(
         `${nomeDoAutor}: ofício retificador SEI ${seiDoRetificador} registrado (${formatCurrency(total)})${ajustes.length ? `, com ${ajustes.length === 1 ? '1 ajuste' : `${ajustes.length} ajustes`} nos itens` : ''}.`
@@ -422,8 +443,9 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
           <div className="conferencia-oficio__parte-cab">
             <h3 id="retificador-parte-0">Qual é o ofício retificador?</h3>
             <span className="conferencia-oficio__dica">
-              Ele substitui o ofício anterior, que fica no histórico do pedido. Se os itens mudarem, o pedido volta para "Conferido no SIOP" e a solicitação de empenho é
-              refeita.
+              {depoisDoEmpenho
+                ? 'Ele substitui o ofício anterior, que fica no histórico do pedido. O pedido continua na etapa; os itens empenhados não mudam e o que o retificador acrescenta pede empenho complementar (nova solicitação).'
+                : 'Ele substitui o ofício anterior, que fica no histórico do pedido. Se os itens mudarem, o pedido volta para "Conferido no SIOP" e a solicitação de empenho é refeita.'}
             </span>
           </div>
           <div className="conferencia-oficio__grade">
@@ -446,7 +468,9 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
           {!retificador && <span className="conferencia-oficio__num">1</span>}
           <h3 id="conferencia-parte-1">{retificador ? 'Ajuste os itens ao retificador' : 'O ofício pede o que está no pedido?'}</h3>
           <span className="conferencia-oficio__dica">
-            {retificador
+            {depoisDoEmpenho
+              ? 'Aumente ou acrescente itens como o retificador pede. Os itens empenhados não diminuem: para baixar, registre a anulação antes.'
+              : retificador
               ? 'Mude as quantidades, retire ou acrescente itens como o retificador pede.'
               : 'Marque cada item que bate com o ofício. Se o ofício mudou a quantidade, ajuste; se tirou um item, retire; se pediu outro, acrescente.'}
           </span>
@@ -528,9 +552,9 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
                                 <AppButton
                                   size="xs"
                                   variant="ghost"
-                                  onClick={() => mudar(l.chave, (x) => ({ ...x, quantidade: Math.max(1, x.quantidade - 1) }))}
+                                  onClick={() => mudar(l.chave, (x) => ({ ...x, quantidade: Math.max(depoisDoEmpenho ? Math.max(1, x.original) : 1, x.quantidade - 1) }))}
                                   aria-label="Diminuir"
-                                  disabled={l.quantidade <= 1}
+                                  disabled={l.quantidade <= (depoisDoEmpenho ? Math.max(1, l.original) : 1)}
                                 >
                                   −
                                 </AppButton>
@@ -540,13 +564,19 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
                                   onChange={(e) =>
                                     mudar(l.chave, (x) => ({
                                       ...x,
-                                      quantidade: Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1)
+                                      quantidade: Math.max(depoisDoEmpenho ? Math.max(1, x.original) : 1, Number(e.target.value.replace(/\D/g, '')) || 1)
                                     }))
                                   }
                                   aria-label={`Quantidade de ${nomeDoItem(l)}`}
                                   data-testid={`conferencia-qtd-${l.chave}`}
                                 />
-                                <AppButton size="xs" variant="ghost" onClick={() => mudar(l.chave, (x) => ({ ...x, quantidade: x.quantidade + 1 }))} aria-label="Aumentar">
+                                <AppButton
+                                  size="xs"
+                                  variant="ghost"
+                                  onClick={() => mudar(l.chave, (x) => ({ ...x, quantidade: x.quantidade + 1 }))}
+                                  aria-label="Aumentar"
+                                  disabled={depoisDoEmpenho && l.tipo === 'KIT'}
+                                >
                                   +
                                 </AppButton>
                               </span>
@@ -557,6 +587,8 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
                           <td className="conferencia-oficio__n">
                             {l.retirada ? (
                               <ActionButton action="desfazer" size="xs" onClick={() => mudar(l.chave, (x) => ({ ...x, retirada: false }))} />
+                            ) : depoisDoEmpenho && l.original > 0 ? (
+                              <span className="conferencia-oficio__nota">empenhado</span>
                             ) : (
                               <AppButton size="xs" variant="link" onClick={() => retirar(l)} data-testid={`conferencia-retirar-${l.chave}`}>
                                 Retirar
@@ -633,9 +665,9 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
 
         <div className="conferencia-oficio__soma">
           <div className="conferencia-oficio__kpi conferencia-oficio__kpi--destaque">
-            <span>Os itens somam{ajustes.length ? ' (ajustado)' : ''}</span>
+            <span>{depoisDoEmpenho ? 'Ofício anterior + acréscimos' : `Os itens somam${ajustes.length ? ' (ajustado)' : ''}`}</span>
             <b data-testid="conferencia-total">{formatCurrency(total)}</b>
-            <small>pelo preço de hoje das atas</small>
+            <small>{depoisDoEmpenho ? 'acréscimos pelo preço de hoje das atas' : 'pelo preço de hoje das atas'}</small>
           </div>
           {retificador ? (
             <div className="conferencia-oficio__kpi">
@@ -656,6 +688,11 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
             ? 'O retificador tem de pedir exatamente esta soma, centavo a centavo: ela vira o valor do ofício. Confira com o valor escrito nele.'
             : 'O ofício tem de pedir exatamente esta soma, centavo a centavo: ela vira o valor do ofício. Se o parlamentar mudou algum item, ajuste acima; se o valor do ofício é outro, gere nova minuta.'}
         </span>
+        {anuladoDepois && (
+          <div className="conferencia-oficio__aviso conferencia-oficio__aviso--atencao" role="status" data-testid="retificador-anulado-depois">
+            Houve anulação de empenho depois do ofício anterior: o valor dele pode incluir itens que saíram do pedido. Confira a soma com o retificador com mais cuidado.
+          </div>
+        )}
         {retificador && naoConfere && (
           <div className="conferencia-oficio__aviso conferencia-oficio__aviso--atencao" role="status" data-testid="retificador-nao-confere">
             Nada foi gravado. Se o retificador pede outras quantidades ou outros itens, ajuste acima até a soma bater. Se ele usa um preço diferente do preço de hoje da

@@ -127,6 +127,33 @@ describe('conferência do ofício no Pedido 360 (protótipo aprovado em 28/10/20
     expect(html).toContain('Tudo confere com o ofício SEI 37091178 (R$');
   });
 
+  it('retificador depois do empenho (migration 251): soma = ofício anterior + acréscimos; empenhado não sai nem desce', () => {
+    const html = renderToStaticMarkup(
+      <ConferenciaDoOficio
+        pedido={pedido({ etapa: 'EMPENHADO', oficioValor: 1234.56, oficioValorDocumentoSei: '37091178' })}
+        pedidos={[]}
+        itens={itens}
+        itensLista={itensLista}
+        beneficiarios={new Map()}
+        beneficiariosLista={[]}
+        autor={undefined}
+        nomeDoAutor="Deputado"
+        precos={undefined}
+        reservadoFora={new Map()}
+        hoje="2026-10-28"
+        retificador
+        onSair={() => {}}
+        onNovaMinuta={() => {}}
+      />
+    );
+    expect(html).toContain('Ofício anterior + acréscimos');
+    expect(html).toContain('1.234,56');
+    expect(html).toContain('os itens empenhados não mudam');
+    expect(html).not.toContain('conferencia-retirar-l1');
+    expect(html).toContain('>empenhado<');
+    expect(html).toContain('conferencia-abrir-acrescentar');
+  });
+
   it('retificador: pede o SEI, mostra o ofício anterior e esconde o SIOP e as marcas', () => {
     const html = renderToStaticMarkup(
       <ConferenciaDoOficio

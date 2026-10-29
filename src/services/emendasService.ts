@@ -520,6 +520,8 @@ export interface LinhaPedido {
   ccgaMotivo?: string | null;
   ccgaExplicacao?: string | null;
   ccgaPorNome?: string | null;
+  /** Item acrescentado pelo ofício retificador depois do empenho (migration 251): pede empenho complementar. */
+  complementar?: boolean;
 }
 
 export type SituacaoNaCcga = 'ENVIADA' | 'DEVOLVIDA';
@@ -947,7 +949,8 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       ccgaEm: l.ccga_em ?? null,
       ccgaMotivo: l.ccga_motivo ?? null,
       ccgaExplicacao: l.ccga_explicacao ?? null,
-      ccgaPorNome: l.ccga_por_nome ?? null
+      ccgaPorNome: l.ccga_por_nome ?? null,
+      complementar: l.complementar === true
     });
     porPedido.set(l.pedido_id, lista);
   }
@@ -1365,7 +1368,7 @@ export async function fetchReservadoPorItem(): Promise<Map<string, number>> {
  */
 export type RegraDaNota = 'SEI' | 'CONTRATO' | 'ITEM' | 'FORNECEDOR' | 'AUTOR';
 /** Por que a linha empenhada ainda não tem nota. */
-export type MotivoSemNota = 'SEM_CONTRATO' | 'CONTRATO_FORA' | 'CONTRATO_SEM_NOTA' | 'OUTRAS_EMENDAS' | 'VARIAS' | 'SEM_EMENDA' | 'FORA_DA_NOTA';
+export type MotivoSemNota = 'SEM_CONTRATO' | 'CONTRATO_FORA' | 'CONTRATO_SEM_NOTA' | 'OUTRAS_EMENDAS' | 'VARIAS' | 'SEM_EMENDA' | 'FORA_DA_NOTA' | 'COMPLEMENTAR';
 
 export interface NotaDaLinha {
   linhaId: string;
@@ -1789,11 +1792,19 @@ export async function registrarOficioRetificador(v: {
   valorOficio: number;
   ajustes: string[];
   linhas: LinhaParaSalvar[] | null;
+  /** Depois do empenho (migration 251): os itens novos, complementares; os empenhados não mudam. */
+  acrescimos?: Array<{ itemKey: string; quantidade: number; beneficiarioId: string }>;
 }): Promise<{ id: string; versao: number }> {
   const { data, error } = await db().rpc('registrar_oficio_retificador', {
     p_id: v.id,
     p_versao: v.versao,
-    p_dados: { documento_sei: v.documentoSei, data: v.data, valor_oficio: v.valorOficio, ajustes: v.ajustes },
+    p_dados: {
+      documento_sei: v.documentoSei,
+      data: v.data,
+      valor_oficio: v.valorOficio,
+      ajustes: v.ajustes,
+      ...(v.acrescimos ? { acrescimos: v.acrescimos.map((a) => ({ tipo: 'ITEM', item_key: a.itemKey, quantidade: a.quantidade, beneficiario_id: a.beneficiarioId })) } : {})
+    },
     p_linhas: v.linhas
       ? v.linhas.map((l) => ({ id: l.id ?? null, tipo: l.tipo, item_key: l.itemKey ?? null, kit_id: l.kitId ?? null, quantidade: l.quantidade, beneficiario_id: l.beneficiarioId }))
       : null

@@ -415,6 +415,18 @@ describe('situação por linha (migration 180): a solicitação cobre itens de u
   const semNotas = new Map<string, NotaDaLinha>();
   const nota = (linhaId: string, n: string | null, contractKey: string | null): NotaDaLinha => ({ linhaId, nota: n, regra: n ? 'SEI' : null, motivo: n ? null : 'CONTRATO_SEM_NOTA', contractKey, empenhoId: n ? 'e' : null, valorEmpenhado: null, valorLiquidado: null, valorPago: null, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: null, atualizadoEm: null });
 
+  it('item complementar do retificador (migration 251): a solicitação antiga da ata não o cobre e pede o empenho complementar', () => {
+    const lc = linha({ id: 'lc', itemKey: `${A}-00001`, quantidade: 2, complementar: true });
+    const p = pedido({ etapa: 'EMPENHADO', linhas: [l1, lc], documentos: [doc('d1', '35272441', A, '2026-04-17', ['l1'])] });
+    expect(situacaoDaLinha(p, lc, semNotas).situacao).toBe('SOLICITACAO_A_INFORMAR');
+    // Sem a marca, a solicitação única da ata cobre a linha, como antes.
+    expect(situacaoDaLinha({ ...p, linhas: [l1, { ...lc, complementar: false }] }, { ...lc, complementar: false }, semNotas).situacao).not.toBe('SOLICITACAO_A_INFORMAR');
+    const t = tarefasDoPedido(p, itens, semNotas, HOJE, true).find((x) => x.chave === `sol-complementar-${A}`);
+    expect(t?.titulo).toContain('Solicitar o empenho complementar');
+    expect(t?.botao).toMatchObject({ tipo: 'solicitacao', ataKey: A });
+    expect(tarefasDoPedido(p, itens, semNotas, HOJE, true).some((x) => x.chave === `marcar-${A}`)).toBe(false);
+  });
+
   it('antes da solicitação, a situação é a etapa do pedido', () => {
     expect(situacaoDaLinha(pedido({ etapa: 'OFICIO', linhas: [l1] }), l1, semNotas)).toMatchObject({ situacao: 'ANTES', rotulo: 'Ofício recebido' });
   });

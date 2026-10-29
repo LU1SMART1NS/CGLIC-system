@@ -709,7 +709,8 @@ export const ROTULO_MOTIVO_SEM_NOTA: Record<MotivoSemNota, string> = {
   VARIAS: 'há mais de uma nota possível',
   SEM_EMENDA: 'o pedido não tem o número da emenda',
   /** Migration 241: a nota do fornecedor não tem este item na lista do SIAFI. */
-  FORA_DA_NOTA: 'a nota do fornecedor não tem este item (SIAFI)'
+  FORA_DA_NOTA: 'a nota do fornecedor não tem este item (SIAFI)',
+  COMPLEMENTAR: 'item do retificador: aguarda a solicitação do empenho complementar'
 };
 
 /** Nota da linha: a achada pelo sistema (a nota não é mais digitada; migrations 174 e 177). */
@@ -1102,6 +1103,8 @@ export function solicitacaoDaLinha(p: PedidoEmenda, l: LinhaPedido): DocumentoSe
   const sols = solicitacoesComAta(p);
   const direta = sols.find((d) => d.linhas.some((x) => x.linhaId === l.id));
   if (direta) return direta;
+  // O item complementar do retificador (migration 251) espera a sua própria solicitação: a antiga da ata não o cobre.
+  if (l.complementar) return null;
   for (const ata of [...new Set(itensDaLinha(l).map((x) => ataDoItem(x.itemKey)))]) {
     const daAta = sols.filter((d) => d.ataKey === ata);
     if (daAta.length === 1) return daAta[0];
@@ -1383,7 +1386,18 @@ export function tarefasDoPedido(
         });
       }
       const semSolicitacao = daAta.filter((l) => situacoes.get(l.id)!.situacao === 'SOLICITACAO_A_INFORMAR');
-      if (semSolicitacao.length && a.solicitacoes.length > 1) {
+      // Item do retificador depois do empenho (migration 251): nova solicitação só para ele, e depois nova rodada.
+      const complementares = semSolicitacao.filter((l) => l.complementar);
+      if (complementares.length && a.solicitacoes.length > 0) {
+        t.push({
+          chave: `sol-complementar-${a.ataKey}`,
+          titulo: `Solicitar o empenho complementar · ata ${a.numeroAta}`,
+          detalhe: `${nomes(complementares)}, ${complementares.length === 1 ? 'acrescentado' : 'acrescentados'} pelo ofício retificador. Informe a nova solicitação e marque só ${complementares.length === 1 ? 'este item' : 'estes itens'}.`,
+          tom: 'acao',
+          botao: { tipo: 'solicitacao', rotulo: 'Informar a solicitação', ataKey: a.ataKey }
+        });
+      }
+      if (semSolicitacao.length > complementares.length && a.solicitacoes.length > 1) {
         const ultima = a.solicitacoes[a.solicitacoes.length - 1];
         t.push({
           chave: `marcar-${a.ataKey}`,
