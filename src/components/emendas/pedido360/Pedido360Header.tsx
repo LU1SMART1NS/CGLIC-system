@@ -45,6 +45,8 @@ interface Props {
   onAlterar: () => void;
   onCancelar: () => void;
   onAnular: () => void;
+  /** Envio à CCGA por ata, desfazer o envio e voltar etapa (migration 248): cada um só quando cabe. */
+  ccga?: AcoesCcga;
   onAba: (aba: Pedido360Aba) => void;
   /** Abre o Parlamentar 360 (com origem: o Voltar de lá traz de volta a este pedido). */
   onAbrirParlamentar?: () => void;
@@ -52,6 +54,12 @@ interface Props {
   onAbrirEmenda?: () => void;
   /** Botão "Captação principal:" abaixo dos indicadores (migration 218), como o "Interesse por GTI:" da Ata 360. */
   verMais?: React.ReactNode;
+}
+
+export interface AcoesCcga {
+  enviar?: () => void;
+  desfazer?: () => void;
+  voltar?: () => void;
 }
 
 const emendaEmTexto = (numero: string) => (/^\d{8}$/.test(numero) ? `${numero.slice(0, 4)} ${numero.slice(4)}` : numero);
@@ -72,7 +80,7 @@ const LIMITE_DO_NOME = 40;
  * mais grave em selo, o contato da assessoria e as datas ao lado, quatro indicadores e, no pé, o processo SEI, a
  * emenda (abre a Emenda 360) e o GND. A próxima tarefa é o botão principal.
  */
-export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onProxima, onAlterar, onCancelar, onAnular, onAba, onAbrirParlamentar, onAbrirEmenda, verMais }) => {
+export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onProxima, onAlterar, onCancelar, onAnular, ccga, onAba, onAbrirParlamentar, onAbrirEmenda, verMais }) => {
   const cancelado = p.etapa === 'CANCELADO';
   const ativas = linhasAtivas(p);
   const atas = atasDoPedido(p, itens);
@@ -175,6 +183,21 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
               <ActionButton action="cancelarCiclo" size="sm" label="Cancelar pedido" onClick={onCancelar} data-testid={`emendas-pedido-cancelar-${p.id}`} />
               <ActionButton action="editar" size="sm" label={!p.autorId ? 'Indicar o parlamentar' : !p.siopEmenda && !p.emendaId ? 'Informar a emenda' : 'Alterar itens'} onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
             </>
+          )}
+          {ccga?.voltar && (
+            <AppButton size="sm" variant="link" onClick={ccga.voltar} data-testid={`emendas-pedido-voltar-etapa-${p.id}`}>
+              Voltar etapa
+            </AppButton>
+          )}
+          {ccga?.desfazer && (
+            <AppButton size="sm" variant="link" onClick={ccga.desfazer} data-testid={`emendas-pedido-desfazer-ccga-${p.id}`}>
+              Desfazer envio
+            </AppButton>
+          )}
+          {ccga?.enviar && (
+            <AppButton size="sm" onClick={ccga.enviar} data-testid={`emendas-pedido-enviar-ccga-${p.id}`}>
+              Enviar à CCGA
+            </AppButton>
           )}
           {prox && p.etapa !== 'CONTRATACAO' && (
             <AppButton size="sm" onClick={onProxima} data-testid={`pedido360-proxima-${p.id}`}>

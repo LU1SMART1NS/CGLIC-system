@@ -8,7 +8,7 @@
  * reserva do CEP). Nada disso é sincronização: o que a pessoa confere é o que grava.
  */
 import type { ExecucaoNoPortal } from '../utils/emendasSobra';
-import { pedidoEmTexto } from '../utils/emendasNomeDoPedido';
+import { nomeDoPedido, pedidoEmTexto } from '../utils/emendasNomeDoPedido';
 import { supabase } from './supabaseClient';
 import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { mensagemDeErro } from './sincronizacaoFontesService';
@@ -500,6 +500,43 @@ export interface LinhaPedido {
   contratoNumero: string | null;
   /** Documento SEI do despacho para contratação da nota desta linha (planilha de execução). */
   despachoDocumentoSei: string | null;
+  /** Item na CCGA (migration 248): enviado ao gestor da ata ou devolvido por ele à CAEP; nulo = não enviado; indefinido = banco sem a migration. */
+  ccgaSituacao?: SituacaoNaCcga | null;
+  /** Dia do envio ou da devolução. */
+  ccgaEm?: string | null;
+  /** Motivo e explicação da devolução, e quem enviou ou devolveu. */
+  ccgaMotivo?: string | null;
+  ccgaExplicacao?: string | null;
+  ccgaPorNome?: string | null;
+}
+
+export type SituacaoNaCcga = 'ENVIADA' | 'DEVOLVIDA';
+
+/** Motivos da devolução à CAEP (migration 248, D4): os mesmos do banco (emendas_motivos_devolucao_ccga). */
+export const MOTIVOS_DEVOLUCAO_CCGA = [
+  'Item sem saldo na ata',
+  'Preço reajustado ou apostilado',
+  'Ata vencida ou perto de vencer',
+  'Fornecedor não aceita',
+  'Despacho ou documento com erro',
+  'Outro'
+] as const;
+
+/** Vai e volta com a CCGA e etapas voltadas pela CAEP (migration 248), do mais antigo ao mais novo. */
+export interface MovimentoDoPedido {
+  id: string;
+  acao: 'ENVIO_CCGA' | 'DEVOLUCAO_CCGA' | 'DESFEITO_CCGA' | 'VOLTOU_ETAPA';
+  /** Ata como nas telas de Emendas ("NÚMERO-UASG"), no vai e volta com a CCGA. */
+  ataKey: string | null;
+  linhaIds: string[];
+  etapaDe: EtapaPedido | null;
+  etapaPara: EtapaPedido | null;
+  documentoSei: string | null;
+  motivo: string | null;
+  explicacao: string | null;
+  data: string;
+  criadoPorNome: string | null;
+  criadoEm: string;
 }
 
 /** Etapa dos documentos SEI do pedido (migration 177): AUTORIZACAO é a solicitação de empenho, que a DGFNSP assina. */
@@ -652,6 +689,8 @@ export interface PedidoEmenda {
   outrasEmendas: OutraEmendaDoPedido[];
   /** Trocas da emenda na conferência com o SIOP, com o motivo (migration 243), da mais antiga à mais nova. */
   trocasDeEmenda?: TrocaDeEmenda[];
+  /** Envios à CCGA, devoluções e etapas voltadas (migration 248), do mais antigo ao mais novo. */
+  movimentos?: MovimentoDoPedido[];
 }
 
 export interface TrocaDeEmenda {
@@ -676,7 +715,7 @@ export interface OutraEmendaDoPedido {
 }
 
 export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
-  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes, anulacoes, outras, trocas] = await Promise.all([
+  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes, anulacoes, outras, trocas, movimentos] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedidos').select('*').order('numero').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_devolucoes').select('*').order('id').range(de, ate)),
@@ -697,8 +736,30 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
     // Outras emendas dos pedidos (migration 211). Antes da migration a tabela não existe: segue sem ela.
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_emendas').select('*').order('id').range(de, ate)).catch(() => []),
     // Trocas da emenda na conferência (migration 243). Antes da migration a tabela não existe: segue sem ela.
-    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_trocas_emenda').select('*').order('id').range(de, ate)).catch(() => [])
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_trocas_emenda').select('*').order('id').range(de, ate)).catch(() => []),
+    // Vai e volta com a CCGA (migration 248). Antes da migration a tabela não existe: segue sem ela.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+      db().from('emenda_pedido_movimentos').select('id, pedido_id, acao, ata_key, linha_ids, etapa_de, etapa_para, documento_sei, motivo, explicacao, data, criado_por_nome, criado_em').order('id').range(de, ate)
+    ).catch(() => [])
   ]);
+  const movimentosPorPedido = new Map<string, MovimentoDoPedido[]>();
+  for (const m of movimentos) {
+    const movimento: MovimentoDoPedido = {
+      id: m.id,
+      acao: m.acao,
+      ataKey: m.ata_key ?? null,
+      linhaIds: Array.isArray(m.linha_ids) ? m.linha_ids : [],
+      etapaDe: m.etapa_de ?? null,
+      etapaPara: m.etapa_para ?? null,
+      documentoSei: m.documento_sei ?? null,
+      motivo: m.motivo ?? null,
+      explicacao: m.explicacao ?? null,
+      data: m.data,
+      criadoPorNome: m.criado_por_nome ?? null,
+      criadoEm: m.criado_em
+    };
+    movimentosPorPedido.set(m.pedido_id, [...(movimentosPorPedido.get(m.pedido_id) ?? []), movimento]);
+  }
   const trocasPorPedido = new Map<string, TrocaDeEmenda[]>();
   for (const t of trocas) {
     const troca: TrocaDeEmenda = {
@@ -837,7 +898,13 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       canceladaMotivo: semNumeroInterno(l.cancelada_motivo ?? null),
       empenhoDocumentoSei: l.empenho_documento_sei ?? null,
       contratoNumero: l.contrato_numero ?? null,
-      despachoDocumentoSei: l.despacho_documento_sei ?? null
+      despachoDocumentoSei: l.despacho_documento_sei ?? null,
+      // Sem a coluna (antes da migration 248), fica indefinido: as telas seguem a etapa do pedido, como antes.
+      ccgaSituacao: !('ccga_situacao' in l) ? undefined : l.ccga_situacao === 'ENVIADA' || l.ccga_situacao === 'DEVOLVIDA' ? l.ccga_situacao : null,
+      ccgaEm: l.ccga_em ?? null,
+      ccgaMotivo: l.ccga_motivo ?? null,
+      ccgaExplicacao: l.ccga_explicacao ?? null,
+      ccgaPorNome: l.ccga_por_nome ?? null
     });
     porPedido.set(l.pedido_id, lista);
   }
@@ -900,7 +967,8 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       anulacoes: (anulacoesPorPedido.get(p.id) ?? []).sort((a, b) => a.anuladoEm.localeCompare(b.anuladoEm)),
       emendaId: p.emenda_id ?? null,
       outrasEmendas: (outrasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)),
-      trocasDeEmenda: (trocasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))
+      trocasDeEmenda: (trocasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)),
+      movimentos: (movimentosPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))
     }))
     .sort((a, b) => b.numero - a.numero);
 }
@@ -1060,6 +1128,84 @@ export async function registrarAnulacaoEmpenho(v: {
   if (error) throw new Error(mensagemDoBanco(error));
   const r = data as Record<string, any>;
   return { id: r.id, versao: r.versao, total: Boolean(r.total), novoPedidoId: r.novo_pedido_id ?? null, novoNumero: r.novo_numero ?? null };
+}
+
+/** Envio à CCGA por ata (migration 248): cada ata vai ao seu gestor, com o despacho SEI dela. */
+export async function enviarPedidoCcga(v: { id: string; versao: number; data: string; envios: Array<{ ataKey: string; documentoSei: string }> }): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('enviar_pedido_ccga', {
+    p_id: v.id,
+    p_versao: v.versao,
+    p_dados: { data: v.data, envios: v.envios.map((e) => ({ ata_key: e.ataKey, documento_sei: e.documentoSei })) }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/** O gestor da ata (ou o coordenador) devolve itens à CAEP, com motivo e explicação (migration 248). */
+export async function devolverItensCcga(v: { pedidoId: string; linhas: string[]; motivo: string; explicacao: string }): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('devolver_itens_ccga', { p_pedido_id: v.pedidoId, p_linha_ids: v.linhas, p_motivo: v.motivo, p_explicacao: v.explicacao });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/** A CAEP tira itens da CCGA sem esperar o gestor da ata, ou encerra uma devolução (migration 248). */
+export async function desfazerEnvioCcga(v: { id: string; versao: number; linhas: string[]; motivo: string }): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('desfazer_envio_ccga', { p_id: v.id, p_versao: v.versao, p_linha_ids: v.linhas, p_motivo: v.motivo });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/** Desfaz o último passo do pedido, até o envio à CGOFI (migration 248). */
+export async function voltarEtapaPedido(v: { id: string; versao: number; motivo: string }): Promise<{ id: string; versao: number; etapa: EtapaPedido }> {
+  const { data, error } = await db().rpc('voltar_etapa_pedido', { p_id: v.id, p_versao: v.versao, p_motivo: v.motivo });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number; etapa: EtapaPedido };
+}
+
+/** Uma linha do que o gestor da ata tem a contratar pelas emendas, ou um envio que a CAEP desfez (migration 248). */
+export interface EmendaAContratar {
+  tipo: 'A_CONTRATAR' | 'DESFEITO';
+  pedidoId: string;
+  pedidoNome: string;
+  autorNome: string | null;
+  autorUf: string | null;
+  /** "NÚMERO-UASG", como nas telas de Emendas. */
+  ataKey: string;
+  gestorUserId: string | null;
+  gestorNome: string | null;
+  linhaId: string | null;
+  itemKey: string | null;
+  quantidade: number;
+  nota: string | null;
+  documentoSei: string | null;
+  data: string | null;
+  /** No envio desfeito: o motivo da CAEP. */
+  motivo: string | null;
+  porNome: string | null;
+}
+
+/** O que o gestor vê no Início (o coordenador recebe todas as atas; a tela escolhe). */
+export async function fetchEmendasAContratar(): Promise<EmendaAContratar[]> {
+  const { data, error } = await db().rpc('emendas_a_contratar');
+  if (error) throw new Error(mensagemDoBanco(error));
+  return ((data ?? []) as Record<string, any>[]).map((r) => ({
+    tipo: r.tipo === 'DESFEITO' ? 'DESFEITO' : 'A_CONTRATAR',
+    pedidoId: r.pedido_id,
+    pedidoNome: nomeDoPedido({ numeroNoAno: r.numero_no_ano ?? null, anoDoNumero: r.ano_do_numero ?? null, siopEmenda: r.siop_emenda ?? null, reservadoEm: r.reservado_em, origem: r.origem }),
+    autorNome: r.autor_nome ?? null,
+    autorUf: r.autor_uf ?? null,
+    ataKey: r.ata_key,
+    gestorUserId: r.gestor_user_id ?? null,
+    gestorNome: r.gestor_nome ?? null,
+    linhaId: r.linha_id ?? null,
+    itemKey: r.item_key ?? null,
+    quantidade: num(r.quantidade),
+    nota: r.nota ?? null,
+    documentoSei: r.documento_sei ?? null,
+    data: r.data ?? null,
+    motivo: r.motivo ?? null,
+    porNome: r.por_nome ?? null
+  }));
 }
 
 export async function cancelarPedidoEmenda(id: string, versao: number, motivo: string): Promise<{ id: string; versao: number }> {

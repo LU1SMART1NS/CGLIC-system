@@ -72,3 +72,16 @@ describe('pendenciasDoMenu: Atas e Contratos', () => {
     expect(pendenciasDoMenu({ ...base, atasAMontar: null }).carteira).toBeUndefined();
   });
 });
+
+describe('pendenciasDoMenu: Início', () => {
+  it('gestor da ata: pedidos de emenda a contratar abrem a gaveta do Início (migration 248)', () => {
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, emendasAContratar: 2 })['visao-geral']).toEqual({ contagem: 2, destino: '/instrumentos?gaveta=emendasAContratar' });
+  });
+  it('coordenador: soma com as atas sem gestor, que abrem primeiro a Distribuição', () => {
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras: { ...extras, atasSemGestor: 3 }, emendasAContratar: 1 })['visao-geral']).toEqual({ contagem: 4, destino: '/atas/distribuicao' });
+  });
+  it('sem nada (ou sem a contagem), o Início fica sem número', () => {
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, emendasAContratar: 0 })['visao-geral']).toBeUndefined();
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, emendasAContratar: null })['visao-geral']).toBeUndefined();
+  });
+});

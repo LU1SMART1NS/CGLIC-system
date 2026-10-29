@@ -9,6 +9,8 @@ vi.mock('../../financeiro/useContagemFinanceiro', () => ({ useContagemFinanceiro
 vi.mock('../../admin/useContagemGruposUasgs', () => ({ useContagemGruposUasgs: vi.fn(() => null) }));
 vi.mock('../../emendas/useContagemEmendas', () => ({ useContagemEmendas: vi.fn(() => null) }));
 vi.mock('../../emendas/useContagemGruposBeneficiarios', () => ({ useContagemGruposBeneficiarios: vi.fn(() => null) }));
+vi.mock('../../emendas/useContagemEmendasAContratar', () => ({ useContagemEmendasAContratar: vi.fn(() => null) }));
+vi.mock('../../atas/montar/useContagemAtasAMontar', () => ({ useContagemAtasAMontar: vi.fn(() => null) }));
 // O espião do cache e os cálculos pesados não rodam no render estático: o que interessa aqui é o número no ícone.
 vi.mock('../ContagensDaCarteira', () => ({ ContagensDaCarteira: () => null }));
 

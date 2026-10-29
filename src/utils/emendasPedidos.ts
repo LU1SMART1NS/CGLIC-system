@@ -284,6 +284,7 @@ export type TipoAviso =
   | 'empenhoAnulado'
   | 'semOficio'
   | 'divergencia'
+  | 'devolvidoCcga'
   | 'ataVencida'
   | 'ataNoCorte'
   | 'ataVencendo'
@@ -320,18 +321,19 @@ export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = {
   reajusteFora: 4,
   empenhoAMais: 5,
   divergencia: 6,
-  prazoDoOficio: 7,
-  semOficio: 8,
-  reajusteProximo: 9,
-  ataVencendo: 10,
-  semEnvioCgofi: 11,
-  credorDiferente: 12,
-  notaEmitida: 13,
-  empenhoAMenos: 14,
-  semAutorizacao: 15,
-  semNota: 16,
-  pedidoParado: 17,
-  semBeneficiario: 18
+  devolvidoCcga: 7,
+  prazoDoOficio: 8,
+  semOficio: 9,
+  reajusteProximo: 10,
+  ataVencendo: 11,
+  semEnvioCgofi: 12,
+  credorDiferente: 13,
+  notaEmitida: 14,
+  empenhoAMenos: 15,
+  semAutorizacao: 16,
+  semNota: 17,
+  pedidoParado: 18,
+  semBeneficiario: 19
 };
 
 /** Os tipos de aviso do mais grave ao mais leve (ordem de GRAVIDADE_DO_AVISO): trilhos, filtros e cartões percorrem esta lista. */
@@ -346,6 +348,7 @@ export const ROTULO_AVISO: Record<TipoAviso, string> = {
   empenhoAMais: 'Empenhado a mais',
   reajusteFora: 'Item fora da minuta pelo reajuste',
   divergencia: 'Ofício devolvido',
+  devolvidoCcga: 'Devolvido pela CCGA',
   prazoDoOficio: 'Prazo do ofício vencido',
   semOficio: `Sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias`,
   reajusteProximo: 'Reajuste da ata próximo',
@@ -491,6 +494,18 @@ export function avisosDoPedido(
     if (p.divergencia && p.devolvidoEm) {
       avisos.push({ tipo: 'divergencia', curto: 'Ofício devolvido', texto: `Ofício devolvido em ${dataBR(p.devolvidoEm)}: ${p.divergencia}` });
     }
+  }
+  // Itens devolvidos pelo gestor da ata (migration 248): a CAEP reenvia com novo despacho ou registra a anulação.
+  const devolvidas =
+    p.etapa === 'EMPENHADO' || p.etapa === 'CONTRATACAO' ? linhasAtivas(p).filter((l) => l.ccgaSituacao === 'DEVOLVIDA' && !notas?.get(l.id)?.contractKey) : [];
+  if (devolvidas.length) {
+    const d = devolvidas[0];
+    avisos.push({
+      tipo: 'devolvidoCcga',
+      curto: 'Devolvido pela CCGA',
+      texto: `${devolvidas.length === 1 ? '1 item devolvido' : `${devolvidas.length} itens devolvidos`} pelo gestor da ata em ${dataBR(d.ccgaEm)}: ${d.ccgaMotivo ?? 'sem motivo'}${d.ccgaExplicacao ? ` (${d.ccgaExplicacao})` : ''}. Reenvie à CCGA ou registre a anulação`,
+      linhaId: d.id
+    });
   }
   const semAutorizacao = itensSemEmpenhoAutorizado(p);
   if (semAutorizacao) avisos.push(semAutorizacao);
@@ -1120,6 +1135,13 @@ export function situacaoDaLinha(p: PedidoEmenda, l: LinhaPedido, notas: Map<stri
   if (p.etapa === 'CONTRATACAO') {
     if (nota?.contractKey) {
       return { situacao: 'CONTRATADO', rotulo: `Contratado · ${numeroDaChave(nota.contractKey)}`, detalhe: notaLigada, pendente: !temNota, solicitacao };
+    }
+    // Envio por ata (migration 248): o item devolvido ou ainda não enviado espera a CAEP.
+    if (l.ccgaSituacao === 'DEVOLVIDA') {
+      return { situacao: 'EMPENHADO', rotulo: 'Devolvido pela CCGA', detalhe: `${dataBR(l.ccgaEm)} · ${l.ccgaMotivo ?? 'sem motivo'}${l.ccgaExplicacao ? `: ${l.ccgaExplicacao}` : ''}`, pendente: true, solicitacao };
+    }
+    if (l.ccgaSituacao === null) {
+      return { situacao: 'EMPENHADO', rotulo: ROTULO_SITUACAO_LINHA.EMPENHADO.etiqueta, detalhe: `${notaLigada} · aguarda o envio à CCGA`, pendente: true, solicitacao };
     }
     return { situacao: 'NA_CCGA', rotulo: ROTULO_SITUACAO_LINHA.NA_CCGA.etiqueta, detalhe: `aguarda o contrato no Contratos.gov.br${temNota ? '' : ' · sem nota ligada'}`, pendente: !temNota, solicitacao };
   }

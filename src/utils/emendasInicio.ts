@@ -207,6 +207,8 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
       return 'cobrar o ofício do parlamentar';
     case 'divergencia':
       return 'fazer a nova minuta';
+    case 'devolvidoCcga':
+      return 'reenviar à CCGA ou anular';
     case 'semAutorizacao':
       return 'informar a solicitação ou a assinatura de cada item';
     case 'empenhoAMais':
