@@ -49,8 +49,9 @@ import { ConferenciaDoOficio } from './ConferenciaDoOficio';
 import { PEDIDO360_ABAS, type Pedido360Aba } from './pedido360Abas';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
-// Entrega 1 do ofício retificador (migration 249): da conferência no SIOP ao envio à CGOFI, antes do empenho.
-const ETAPAS_DO_RETIFICADOR = new Set(['CONFERIDO', 'SOLICITADO', 'AUTORIZADO', 'CGOFI']);
+// Ofício retificador: da conferência no SIOP ao envio à CGOFI (migration 249) e, depois do empenho, com acréscimos
+// complementares (migration 250).
+const ETAPAS_DO_RETIFICADOR = new Set(['CONFERIDO', 'SOLICITADO', 'AUTORIZADO', 'CGOFI', 'EMPENHADO', 'CONTRATACAO']);
 const SEM_CREDOR: CredorNoPedido[] = [];
 const IDS_DAS_ABAS = PEDIDO360_ABAS.map((a) => a.id);
 
