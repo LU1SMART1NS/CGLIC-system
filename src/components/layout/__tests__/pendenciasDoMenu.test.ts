@@ -56,3 +56,19 @@ describe('pendenciasDoMenu: Emendas', () => {
     expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, emendas: null }).emendas).toBeUndefined();
   });
 });
+
+describe('pendenciasDoMenu: Atas e Contratos', () => {
+  const base = { empenhos: null, financeiro: null, extras };
+  it('atas a montar: número vermelho e abre Atas em "A montar"', () => {
+    expect(pendenciasDoMenu({ ...base, atasAMontar: 3 }).carteira).toEqual({
+      contagem: 3,
+      vermelho: true,
+      motivoVermelho: 'atas a montar',
+      destino: '/atas?ver=montar'
+    });
+  });
+  it('sem ata a montar (ou sem a contagem), fica sem número', () => {
+    expect(pendenciasDoMenu({ ...base, atasAMontar: 0 }).carteira).toBeUndefined();
+    expect(pendenciasDoMenu({ ...base, atasAMontar: null }).carteira).toBeUndefined();
+  });
+});

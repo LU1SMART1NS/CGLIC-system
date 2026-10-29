@@ -5,6 +5,8 @@ import type { ContagensExtras } from '../vinculacao/contagemExtras';
 export interface PendenciaDaArea {
   contagem: number;
   vermelho?: boolean;
+  /** Por que o número está vermelho, para o leitor de tela (padrão: prazo vencido ou erro). */
+  motivoVermelho?: string;
   destino: string;
 }
 
@@ -21,19 +23,25 @@ export interface FontesDoMenu {
    * coordenador e o gestor de emendas recebem número. `semPedido` diz quantas do total são emendas sem pedido.
    */
   emendas?: { total: number; urgentes: number; semPedido?: number } | null;
+  /** Fornecedores vencedores de pregão ainda sem ata (Atas › A montar); só gestor e coordenador recebem número. */
+  atasAMontar?: number | null;
 }
 
 /**
  * Regras dos números do menu (só pendências que o perfil resolve; quem calcula cada parte já filtra pelo perfil). Com
  * número, a área abre direto na página e no segmento da pendência; sem número, o menu volta à última página usada.
  */
-export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
+export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
   const r: Record<string, PendenciaDaArea | undefined> = {};
 
   // Início (coordenador): as filas da Central de Distribuição.
   const atas = extras.atasSemGestor ?? 0;
   const diverg = extras.gestorDiferente ?? 0;
   if (atas + diverg > 0) r['visao-geral'] = { contagem: atas + diverg, destino: atas > 0 ? '/atas/distribuicao' : '/atas/distribuicao?aba=DIVERGENCIAS' };
+
+  // Atas e Contratos: atas a montar, sempre em vermelho (a ata precisa ir ao SEI); abre a Carteira de Atas em "A montar".
+  if (atasAMontar && atasAMontar > 0)
+    r.carteira = { contagem: atasAMontar, vermelho: true, motivoVermelho: 'atas a montar', destino: '/atas?ver=montar' };
 
   // Alocação: itens sem alocação ou alocados em parte.
   if ((extras.itensAAlocar ?? 0) > 0) r.alocacao = { contagem: extras.itensAAlocar!, destino: ROTA_ALOCACAO };

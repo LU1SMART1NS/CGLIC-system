@@ -9,6 +9,7 @@ import { useContagemFinanceiro } from '../financeiro/useContagemFinanceiro';
 import { useContagemGruposUasgs } from '../admin/useContagemGruposUasgs';
 import { useContagemEmendas } from '../emendas/useContagemEmendas';
 import { useContagemGruposBeneficiarios } from '../emendas/useContagemGruposBeneficiarios';
+import { useContagemAtasAMontar } from '../atas/montar/useContagemAtasAMontar';
 import { pendenciasDoMenu, type PendenciaDaArea } from './pendenciasDoMenu';
 
 interface SidebarProps {
@@ -82,7 +83,7 @@ const AreaItem: React.FC<{ area: NavItem; pathname: string; pendencia?: Pendenci
         {contagem ? (
           <span
             className={`app-rail-count${pendencia?.vermelho ? ' app-rail-count--urgente' : ''}`}
-            aria-label={`${contagem} ${contagem === 1 ? 'pendência' : 'pendências'}${pendencia?.vermelho ? ', com prazo vencido ou erro' : ''}`}
+            aria-label={`${contagem} ${contagem === 1 ? 'pendência' : 'pendências'}${pendencia?.vermelho ? `, ${pendencia.motivoVermelho ?? 'com prazo vencido ou erro'}` : ''}`}
             data-testid={`rail-count-${area.id}`}
           >
             {contagem > 999 ? '999+' : contagem}
@@ -106,9 +107,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
   const gruposUasgs = useContagemGruposUasgs();
   const gruposBeneficiarios = useContagemGruposBeneficiarios();
   const emendas = useContagemEmendas();
+  const atasAMontar = useContagemAtasAMontar();
   const pendencias = useMemo(
-    () => pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas }),
-    [empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas]
+    () => pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar }),
+    [empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar]
   );
 
   // Registra antes de montar os links, para o da área atual já apontar para a página aberta (idempotente).
