@@ -941,7 +941,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
             </div>
           </div>
           <div className="reserva-botoes">
-            <ActionButton action="cancelar" type="button" onClick={pedirParaFechar} disabled={salvar.isPending} />
+            {/* Com a confirmação aberta, ela já tem "Continuar editando" e "Descartar": sem o Cancelar repetido. */}
+            {!confirmarSaida && <ActionButton action="cancelar" type="button" onClick={pedirParaFechar} disabled={salvar.isPending} />}
             <AppButton type="submit" form="emendas-pedido-form" disabled={salvar.isPending} isLoading={salvar.isPending} data-testid="emendas-pedido-salvar">
               {pedido ? 'Salvar pedido' : linhas.length ? `Reservar ${linhas.length} ${linhas.length === 1 ? 'item' : 'itens'}` : 'Reservar'}
             </AppButton>
