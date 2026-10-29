@@ -125,3 +125,31 @@ export async function salvarRascunhoDaAta(controle: string, fornecedorNi: string
   if (error) throw new Error(mensagemDeErro(error).replace(/^INVALID_PAYLOAD:\s*|^UNAUTHORIZED:\s*/, ''));
   return String((data as { atualizado_em?: string } | null)?.atualizado_em ?? new Date().toISOString());
 }
+
+/** Divisão planejada na montagem da ata, por item da ata publicada (v_divisao_da_ata_montada, migration 239). */
+export interface DivisaoDaAtaMontada {
+  itemKey: string;
+  unidades: Array<{ unidade: string; quantidade: number }>;
+  montadaPorNome: string | null;
+  montadaEm: string;
+}
+
+export async function fetchDivisoesDasAtasMontadas(): Promise<Map<string, DivisaoDaAtaMontada>> {
+  const { data, error } = await banco().from('v_divisao_da_ata_montada').select('item_key, unidades, montada_por_nome, montada_em');
+  if (error) {
+    // Migration 239 ainda não aplicada: sem sugestões.
+    if (error.code === '42P01' || error.code === 'PGRST205') return new Map();
+    throw new Error(mensagemDeErro(error));
+  }
+  return new Map(
+    (data ?? []).map((r: Record<string, any>) => [
+      String(r.item_key),
+      {
+        itemKey: String(r.item_key),
+        unidades: (Array.isArray(r.unidades) ? r.unidades : []).map((u: Record<string, unknown>) => ({ unidade: String(u.unidade), quantidade: Number(u.quantidade) })),
+        montadaPorNome: r.montada_por_nome ?? null,
+        montadaEm: r.montada_em
+      }
+    ])
+  );
+}

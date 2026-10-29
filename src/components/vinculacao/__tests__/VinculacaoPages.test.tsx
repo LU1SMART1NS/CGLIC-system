@@ -25,6 +25,10 @@ vi.mock('../../../hooks/useAvisosResolvidos', async (orig) => ({ ...(await orig<
 // Janelas: não abrem no render estático; os hooks delas não rodam.
 vi.mock('../VincularAosItensDialog', () => ({ VincularAosItensDialog: () => null }));
 vi.mock('../../alocacao/AlocarUnidadeModal', () => ({ AlocarUnidadeModal: () => null }));
+// Divisão planejada na montagem da ata (migration 239): o item "a" (sem alocação) tem uma.
+vi.mock('../../../hooks/useAtasAMontar', () => ({
+  useDivisoesDasAtasMontadas: () => new Map([['a', { itemKey: 'a', unidades: [{ unidade: 'CAEP', quantidade: 50 }, { unidade: 'DFNSP', quantidade: 29 }], montadaPorNome: 'Alan', montadaEm: '2026-10-29' }]])
+}));
 vi.mock('@tanstack/react-query', async (orig) => ({ ...(await orig<typeof import('@tanstack/react-query')>()), useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 
 import { useAuth } from '../../../context/AuthContext';
@@ -356,6 +360,8 @@ describe('Alocação → Itens às unidades', () => {
     expect(html).not.toContain('Capacete balístico');
     expect(html).toContain('vinc-itens-alocar-a');
     expect(html).not.toContain('ainda sem unidade');
+    // Sem alocação e com divisão planejada na montagem da ata: a linha mostra a sugestão.
+    expect(html).toContain('Planejado na montagem: CAEP 50 · DFNSP 29');
   });
 
   it('parcialmente alocados mostram o que falta e as unidades', () => {

@@ -35,6 +35,7 @@ import { formatNumber } from '../item-balances/itemBalanceUtils';
 import { Boxes } from 'lucide-react';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AlocarUnidadeModal, type ItemParaAlocar } from './AlocarUnidadeModal';
+import { useDivisoesDasAtasMontadas } from '../../hooks/useAtasAMontar';
 import { carteiraDaAta } from '../../utils/ataIdentidade';
 import { formatDateBR } from '../../utils/format';
 import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
@@ -135,6 +136,8 @@ export const ItensUnidadesPage: React.FC = () => {
         : null;
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
   const [alocando, setAlocando] = useState<ItemParaAlocar | null>(null);
+  // Divisão planejada na montagem da ata (migration 239): aparece no item ainda sem alocação.
+  const divisoesPlanejadas = useDivisoesDasAtasMontadas();
   const porAta = filters.ver === 'ATA';
   // Abrir/fechar à mão vence a abertura automática da busca; "todos" mostra também os itens fora da situação escolhida.
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
@@ -300,7 +303,15 @@ export const ItensUnidadesPage: React.FC = () => {
           <AlocadoBar alocado={r.alocado} senasp={r.quantitativoSenasp} />
         </td>
         <td data-label="Unidades" style={{ ...carteiraTd, fontSize: '0.8rem' }}>
-          {unidadesDoItem.length > 0 ? unidadesDoItem.map(([u, q]) => `${nomeUnidade(u)} ${formatNumber(q)}`).join(' · ') : <span style={{ color: '#94a3b8' }}>—</span>}
+          {unidadesDoItem.length > 0 ? (
+            unidadesDoItem.map(([u, q]) => `${nomeUnidade(u)} ${formatNumber(q)}`).join(' · ')
+          ) : divisoesPlanejadas.get(r.key) ? (
+            <span style={{ color: 'var(--color-info-text-strong)' }} title="Divisão feita pelo gestor na montagem da ata: abra Alocar para usar" data-testid={`alocacao-divisao-planejada-${r.key}`}>
+              Planejado na montagem: {divisoesPlanejadas.get(r.key)!.unidades.map((x) => `${x.unidade} ${formatNumber(x.quantidade)}`).join(' · ')}
+            </span>
+          ) : (
+            <span style={{ color: '#94a3b8' }}>—</span>
+          )}
         </td>
         <td data-label="Contratado" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
           {r.contratada != null && r.contratada > 0 ? (

@@ -226,3 +226,26 @@ export function vinculosSemRemovidas(links: Record<string, string>, linhas: Linh
   const restantes = Object.fromEntries(Object.entries(links).filter(([, id]) => !removidas.has(id)));
   return Object.keys(restantes).length === Object.keys(links).length ? null : restantes;
 }
+
+/**
+ * Linhas da janela a partir da divisão planejada na montagem da ata (migration 239): só para item ainda sem alocação,
+ * cada unidade como "adicionada". Unidade fora do catálogo ou desativada fica de fora (devolvida em `ignoradas`).
+ */
+export function linhasDaDivisaoPlanejada(
+  unidades: Array<{ unidade: string; quantidade: number }>,
+  ativas: Array<{ sigla: string; ativo: boolean }>,
+  agora: number = Date.now()
+): { linhas: LinhaAlocacao[]; ignoradas: string[] } {
+  const ok = new Map(ativas.filter((d) => d.ativo).map((d) => [normUnidade(d.sigla), d.sigla]));
+  const linhas: LinhaAlocacao[] = [];
+  const ignoradas: string[] = [];
+  unidades.forEach((u, i) => {
+    const sigla = ok.get(normUnidade(u.unidade));
+    if (!sigla || !(u.quantidade > 0)) {
+      ignoradas.push(u.unidade);
+      return;
+    }
+    linhas.push({ id: `planejada-${agora}-${i}`, unitName: sigla, original: 0, qtd: u.quantidade, empenhado: 0, contratado: 0, vinculados: 0, removida: false, adicionada: true });
+  });
+  return { linhas, ignoradas };
+}
