@@ -36,7 +36,7 @@ export const SiopDaBancada: React.FC<{ e: EmendaSiop }> = ({ e }) => {
                 21BM · modalidade 90 (compra direta)
                 <div style={carteiraDetalhe}>é o valor da emenda nas telas</div>
               </td>
-              <td style={celula}>{formatCurrency(e.valor)}</td>
+              <td style={celula}>{e.valor != null ? formatCurrency(e.valor) : '—'}</td>
               <td style={celula}>—</td>
               <td style={celula}>{e.bloqueadoControle != null ? formatCurrency(e.bloqueadoControle) : '—'}</td>
               <td style={celula}>{e.bloqueadoProgramacao != null ? formatCurrency(e.bloqueadoProgramacao) : '—'}</td>

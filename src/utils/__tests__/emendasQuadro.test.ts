@@ -38,7 +38,7 @@ const linhas: LinhaDoPedidoNoQuadro[] = [
   { tipo: 'KIT', itemKey: null, kitNome: 'Kit Academia', kitComposicao: [{ itemKey: 'mesa', quantidade: 1 }, { itemKey: 'leg', quantidade: 2 }], quantidade: 2, beneficiarioId: null },
   { tipo: 'ITEM', itemKey: 'colchonete', kitNome: null, kitComposicao: null, quantidade: 100, beneficiarioId: null }
 ];
-const q = montarQuadro({ autor, linhas, itens, beneficiarios: new Map([['b1', pm], ['b2', cbm]]), precos, data: '2026-10-23' });
+const q = montarQuadro({ autor, linhas, itens, beneficiarios: new Map([['b1', pm], ['b2', cbm]]), precos, data: '2026-10-23', emenda: { numero: '43600002', ano: 2026 } });
 
 describe('quadro da reserva (Anexo)', () => {
   it('uma linha por item, kit aberto nos seus itens com a quantidade de kits', () => {
@@ -61,7 +61,6 @@ describe('quadro da reserva (Anexo)', () => {
     expect(q.linhas[2]).toMatchObject({ beneficiario: 'Corpo de Bombeiros Militar', sigla: 'CBMERJ', razaoSocial: null, entrega: 'RJ', endereco: null });
     const igual = montarQuadro({ autor, linhas: [linhas[0]], itens, beneficiarios: new Map([['b1', { ...pm, razaoSocial: '10º BATALHÃO DE POLÍCIA MILITAR', entregaLogradouro: null }]]), precos, data: '2026-10-23' });
     expect(igual.linhas[0]).toMatchObject({ razaoSocial: null, endereco: null });
-    expect(q.semEndereco).toBe(1);
     expect(q.semBeneficiario).toBe(3);
     expect(q.semNomeCurto).toBe(0);
   });
@@ -92,18 +91,21 @@ describe('quadro da reserva (Anexo)', () => {
     expect(so4.porGnd).toEqual([]);
   });
 
-  it('Tabela (Word e SEI): 6 colunas, item com ata embaixo, beneficiário com sigla e razão social, entrega com endereço e TOTAL A EMPENHAR', () => {
+  it('Tabela (Word e SEI, modelo de 29/10/2026): EMENDA numa célula só, beneficiário com sigla e razão social, item com ata embaixo, sem local de entrega, TOTAL A EMPENHAR (R$)', () => {
     const html = htmlDaTabela(q);
-    for (const h of ['OBJETO', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL', 'TOTAL A EMPENHAR', 'Total GND-3 · Custeio']) expect(html).toContain(h);
+    for (const h of ['EMENDA', 'BENEFICIÁRIO', 'QUANT.', 'ITEM (OBJETO)', 'VALOR UNIT. (R$)', 'VALOR TOTAL (R$)', 'TOTAL A EMPENHAR (R$)', 'Total GND-3 · Custeio']) expect(html).toContain(h);
+    expect(html).toContain(`<td rowspan="${q.linhas.length}" style="border:1px solid #000;padding:4px 6px;text-align:center;"><b>43600002</b></td>`);
+    expect(html).not.toContain('LOCAL DE ENTREGA');
+    expect(html).not.toContain('Rua X');
     expect(html.match(/<th /g)).toHaveLength(6);
     // Título embaixo da tabela; sem fonte, notas nem a marca da nota no preço.
     expect(html.startsWith('<table')).toBe(true);
     expect(html.endsWith('</tbody></table><p style="text-align:left;font-size:9pt;margin:2px 0 0">Tabela 1 – Indicação do(a) Senador(a) Romário (RJ)</p>')).toBe(true);
-    expect(html).toContain('R$ 1.598,76</td>');
+    expect(html).toContain('>1.598,76</td>');
+    expect(html).not.toContain('R$ 1.598,76');
     expect(html).not.toContain('Kit Academia');
     expect(html).toContain('<b>Tablet</b><br><span style="font-size:8pt">Ata 00043/2026 · item 00005</span>');
     expect(html).toContain('<b>10º Batalhão de Polícia Militar</b> · <span style="white-space:nowrap">10º BPM</span><br><span style="font-size:8pt">RJ GOV POLICIA MILITAR</span>');
-    expect(html).toContain('<b>Rio de Janeiro - RJ</b><br><span style="font-size:8pt">Rua X, 100 · Centro · CEP 20000-000</span>');
     expect(html).not.toContain('MUNICÍPIO');
     expect(html).not.toContain('ÓRGÃO');
     expect(html.match(/colspan="5"/g)).toHaveLength(3);
@@ -112,7 +114,7 @@ describe('quadro da reserva (Anexo)', () => {
 
   it('WhatsApp: numerado por beneficiário com o valor dele; sem título, ata, endereço nem notas; a definir no fim', () => {
     const t = textoParaWhatsapp(q);
-    expect(t.startsWith('📋 *Reserva de itens · ComprasSUSP/Senasp/MJSP · 23/10/2026*\n⏳ *Enviar o ofício até 22/11/2026*\n\n1️⃣ *10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ: *R$ 975.045,70*\n• 5 Camioneta/SUV médio: R$ 959.058,10\n• 10 Tablet: R$ 15.987,60\n\n')).toBe(true);
+    expect(t.startsWith('📋 *Reserva de itens · ComprasSUSP/Senasp/MJSP · 23/10/2026*\n🏷️ *Emenda 4360 0002 / 2026*\n⏳ *Enviar o ofício até 22/11/2026*\n\n1️⃣ *10º Batalhão de Polícia Militar · 10º BPM* · Rio de Janeiro - RJ: *R$ 975.045,70*\n• 5 Camioneta/SUV médio: R$ 959.058,10\n• 10 Tablet: R$ 15.987,60\n\n')).toBe(true);
     expect(t).toContain('2️⃣ *Corpo de Bombeiros Militar · CBMERJ* · RJ: *R$ 94.317,66*\n• 2 Drone: R$ 94.317,66\n\n');
     expect(t).toContain('3️⃣ *Beneficiário a definir*');
     for (const fora of ['Tabela 1', 'Ata ', 'Rua X', 'IPCA', '¹']) expect(t).not.toContain(fora);

@@ -76,7 +76,7 @@ type Segmento = 'graves' | 'atencao' | 'todas';
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 const SEM_NOTAS_SEM_PEDIDO: NotaSemPedido[] = [];
 const POR_PAGINA = 25;
-const GAVETAS: PainelGavetaId[] = ['emendasSemPedido', 'emendasSemAno', 'saldoLivre', 'empenhoAConferir', 'notasSemPedido', 'sobraEmenda', 'semNomeCurto'];
+const GAVETAS: PainelGavetaId[] = ['emendasSemPedido', 'reservaSemEmenda', 'emendasSemAno', 'saldoLivre', 'empenhoAConferir', 'notasSemPedido', 'sobraEmenda', 'semNomeCurto'];
 const SEM_PORTAL: ExecucaoNoPortal[] = [];
 const chave = (l: PedidoComAviso) => l.pedido.id;
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -171,6 +171,21 @@ export const EmendasInicioPage: React.FC = () => {
   const [tipoDoAIndicar, setTipoDoAIndicar] = useState<'todas' | 'individuais' | 'bancadas'>('todas');
   const ehBancada = useCallback((e: SobraDaEmenda) => (e.autorId ? autorPorId.get(e.autorId)?.tipo === 'BANCADA' : false), [autorPorId]);
   const sobrasDoTipo = tipoDoAIndicar === 'todas' ? sobras : sobras.filter((e) => ehBancada(e) === (tipoDoAIndicar === 'bancadas'));
+  // Reservas de antes da regra de 29/10/2026 (migration 243), sem a emenda: a CAEP informa a emenda ou cancela.
+  const semEmenda = useMemo(() => pedidos.filter((p) => p.etapa !== 'CANCELADO' && !p.emendaId && !p.siopEmenda), [pedidos]);
+  const colunasSemEmenda: Column<PedidoEmenda>[] = [
+    {
+      key: 'autor',
+      header: 'Parlamentar',
+      priority: 'primary',
+      width: LARGURA_AUTOR,
+      minWidth: LARGURA_AUTOR,
+      render: (p) => (p.autorId ? <AutorDoPedido autor={autorPorId.get(p.autorId)} autorId={p.autorId} /> : <span style={carteiraDetalhe}>sem parlamentar</span>)
+    },
+    { key: 'reserva', header: 'Reserva', nowrap: true, render: (p) => <span style={carteiraValor}>{p.origem === 'PLANILHA' ? 'da planilha' : dataBR(p.reservadoEm)}</span> },
+    { key: 'itens', header: 'Itens', align: 'right', nowrap: true, render: (p) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(p.linhas.filter((l) => !l.cancelada).length)}</span> },
+    { key: 'etapa', header: 'Etapa', nowrap: true, render: (p) => <StatusBadge label={ROTULO_ETAPA[p.etapa]} variant={VARIANTE_ETAPA[p.etapa]} size="sm" dot={false} /> }
+  ];
   // Pedidos com o nº da emenda e sem o ano (28/10/2026): não entram em nenhum ano, nem na sobra nem no Portal.
   const semAno = useMemo(() => pedidos.filter((p) => p.etapa !== 'CANCELADO' && anoDoPedido(p) === ANO_SEM), [pedidos]);
   const colunasSemAno: Column<PedidoEmenda>[] = [
@@ -540,6 +555,15 @@ export const EmendasInicioPage: React.FC = () => {
                 : `${plural(contaSemPedido.total, 'emenda', 'emendas')}${contaSemPedido.urgentes ? ` · ${formatNumber(contaSemPedido.urgentes)} ${contaSemPedido.urgentes === 1 ? 'urgente' : 'urgentes'}` : ''}`,
             atencao: contaSemPedido.total > 0
           },
+          ...(semEmenda.length > 0
+            ? [
+                {
+                  id: 'reservaSemEmenda' as const,
+                  resumo: carregando ? undefined : plural(semEmenda.length, 'reserva', 'reservas'),
+                  atencao: true
+                }
+              ]
+            : []),
           ...(semAno.length > 0
             ? [
                 {
@@ -601,6 +625,23 @@ export const EmendasInicioPage: React.FC = () => {
               rowOpen={(e) => () => navigate(rotaDaEmenda(e))}
             />
           )}
+        </PainelGaveta>
+      )}
+      {gavetaAberta === 'reservaSemEmenda' && (
+        <PainelGaveta
+          id="reservaSemEmenda"
+          subtitulo="Clique na linha para abrir a reserva e informar a emenda (ou cancelar)."
+          hint="Desde 29/10/2026 todo pedido nasce com a emenda, que sai na minuta do ofício. Estas reservas são de antes e ainda não têm emenda: no pedido, use Informar a emenda; na Emenda 360, a reserva do mesmo parlamentar aparece para ligar. Sem a emenda, a reserva não pode ser alterada."
+          onFechar={fecharGaveta}
+        >
+          <DataTable<PedidoEmenda>
+            testId="emendas-inicio-sem-emenda"
+            className="data-table-container--flush"
+            data={semEmenda}
+            keyExtractor={(p) => p.id}
+            columns={colunasSemEmenda}
+            rowOpen={(p) => () => navigate(rotaDoPedido(p))}
+          />
         </PainelGaveta>
       )}
       {gavetaAberta === 'emendasSemAno' && (

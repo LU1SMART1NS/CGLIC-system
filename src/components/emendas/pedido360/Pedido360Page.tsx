@@ -35,6 +35,7 @@ import { LinhasPorAta } from '../PedidoAberto';
 import { proximaAcaoDaJanela } from '../proximaAcaoDaJanela';
 import { pedidoDoEndereco } from './pedidoDoEndereco';
 import { QuadroGabinete } from '../QuadroGabinete';
+import { emendaDoPedidoNoQuadro } from '../../../utils/emendasQuadro';
 import { PedidoModal } from '../PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela, type ContextoDaJanela } from '../EtapaPedidoModal';
 import { AnulacaoModal } from '../AnulacaoModal';
@@ -250,7 +251,7 @@ export const Pedido360Page: React.FC = () => {
           )}
           {activeTab === 'quadro' && (
             <InstrumentSection id="pedido-quadro" title="Quadro do ofício" subtitle="O quadro da minuta do ofício, para copiar" icon={FileText}>
-              <QuadroGabinete autor={autor} linhas={linhasAtivas(p)} data={p.reservadoEm} devolvidoEm={p.devolvidoEm} testId="pedido360-quadro" />
+              <QuadroGabinete autor={autor} linhas={linhasAtivas(p)} data={p.reservadoEm} devolvidoEm={p.devolvidoEm} emenda={emendaDoPedidoNoQuadro(p)} testId="pedido360-quadro" />
             </InstrumentSection>
           )}
         </Instrument360TabPanel>

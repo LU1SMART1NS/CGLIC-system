@@ -1,9 +1,10 @@
 /**
  * Quadro da reserva para o parlamentar (migration 165), fora da tela para poder testar.
  *
- * Formato do Anexo que a CAEP já usa, em 6 colunas: OBJETO (nome, e embaixo a ata e o item) · BENEFICIÁRIO FINAL (nome e
- * sigla, e embaixo a razão social) · LOCAL DE ENTREGA (cidade, e embaixo o endereço) · QTD · VR UNITÁRIO · VR TOTAL, uma
- * linha por item e beneficiário, kit aberto nos seus itens e somado ao mesmo item avulso, fechando com TOTAL A EMPENHAR. O mesmo item para vários
+ * Formato do Anexo no modelo da CAEP (migration 243, 29/10/2026), em 6 colunas: EMENDA (o nº, uma vez só para todas as
+ * linhas) · BENEFICIÁRIO (nome e sigla, e embaixo a razão social) · QUANT. · ITEM (OBJETO) (nome, e embaixo a ata e o
+ * item) · VALOR UNIT. (R$) · VALOR TOTAL (R$), uma linha por item e beneficiário, kit aberto nos seus itens e somado ao
+ * mesmo item avulso, fechando com TOTAL A EMPENHAR (R$). O local de entrega saiu do quadro. O mesmo item para vários
  * beneficiários sai junto, com o nome e o valor unitário uma vez só (células juntadas na tabela). O valor
  * unitário é o preço previsto pelo reajuste da ata (emendas_precos_previstos), para a emenda nascer com folga; cada
  * preço que não é o de hoje ganha uma nota (¹, ², ...). Quando o pedido mistura investimento e custeio, sai o total de
@@ -43,6 +44,8 @@ export interface EntradaQuadro {
   devolvidoEm?: string | null;
   /** IPCA dos 12 últimos meses, só para o texto da nota da folga. */
   ipca?: IpcaDozeMeses | null;
+  /** Emenda do pedido (8 dígitos e o ano): sai na coluna EMENDA e no texto do WhatsApp. */
+  emenda?: { numero: string; ano: number } | null;
 }
 
 export interface LinhaQuadro {
@@ -75,6 +78,8 @@ export interface LinhaQuadro {
 
 export interface Quadro {
   titulo: string;
+  /** Nº da emenda (8 dígitos) e o ano; nulo no pedido antigo ainda sem emenda. */
+  emenda: { numero: string; ano: number } | null;
   subtitulo: string;
   /** Data da reserva (AAAA-MM-DD). */
   data: string;
@@ -94,8 +99,6 @@ export interface Quadro {
   semGnd: number;
   /** Linhas sem beneficiário escolhido. */
   semBeneficiario: number;
-  /** Beneficiários (distintos) sem endereço de entrega: o quadro sai só com a cidade. */
-  semEndereco: number;
   /** Itens sem o nome da ata assinada (sai o começo da descrição do catálogo). */
   semNomeCurto: number;
 }
@@ -300,6 +303,7 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
 
   return {
     titulo: tituloDoAnexo(e.autor),
+    emenda: e.emenda ?? null,
     subtitulo: `CAEP/SENASP · reserva de ${dataBR(e.data)}`,
     data: e.data,
     prazoDoOficio: prazoDoOficio(e),
@@ -310,14 +314,23 @@ export function montarQuadro(e: EntradaQuadro): Quadro {
     porGnd,
     semGnd: semGnd.length,
     semBeneficiario: linhas.filter((l) => !l.beneficiario).length,
-    semEndereco: new Set(linhas.filter((l) => l.beneficiario && !l.endereco).map((l) => `${l.beneficiario}|${l.entrega}`)).size,
     semNomeCurto: new Set(linhas.filter((l) => l.semNomeCurto).map((l) => l.descricao)).size
   };
 }
 
 const escapar = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const A_DEFINIR = 'a definir';
-export const COLUNAS = ['OBJETO', 'BENEFICIÁRIO FINAL', 'LOCAL DE ENTREGA', 'QTD', 'VR UNITÁRIO', 'VR TOTAL'];
+export const COLUNAS = ['EMENDA', 'BENEFICIÁRIO', 'QUANT.', 'ITEM (OBJETO)', 'VALOR UNIT. (R$)', 'VALOR TOTAL (R$)'];
+
+/** Valor nas colunas em R$ do quadro: "5.578,90" (o "R$" está no cabeçalho). */
+export const reais = (v: number): string => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Emenda do pedido para o quadro: o nº e o ano gravados; nulo sem eles. */
+export const emendaDoPedidoNoQuadro = (p: { siopEmenda: string | null; siopEmendaAno: number | null } | null | undefined): { numero: string; ano: number } | null =>
+  p?.siopEmenda && p.siopEmendaAno ? { numero: p.siopEmenda, ano: p.siopEmendaAno } : null;
+
+/** Célula EMENDA: os 8 dígitos, como no SIOP; sem emenda, "a informar". */
+export const emendaNoQuadro = (q: Pick<Quadro, 'emenda'>): string => q.emenda?.numero ?? 'a informar';
 
 /** "Ata 00043/2026 · item 00005", a linha de baixo da coluna OBJETO. */
 export const ataEItem = (l: Pick<LinhaQuadro, 'ata' | 'item'>): string | null => (l.ata ? `Ata ${l.ata} · item ${l.item}` : null);
@@ -335,23 +348,24 @@ export function htmlDaTabela(q: Quadro): string {
   const abaixo = (s: string | null) => (s ? `<br><span style="font-size:8pt">${escapar(s)}</span>` : '');
   // O item e o valor unitário só na primeira linha do grupo, ocupando as linhas dos outros beneficiários.
   const juntar = (l: LinhaQuadro) => (l.linhasDoItem > 1 ? ` rowspan="${l.linhasDoItem}"` : '');
-  const linha = (l: LinhaQuadro) =>
+  // A emenda numa célula só, ocupando todas as linhas dos itens.
+  const linha = (l: LinhaQuadro, i: number) =>
     '<tr>' +
-    (l.linhasDoItem ? `<td${juntar(l)} style="${td}"><b>${escapar(l.descricao)}</b>${abaixo(ataEItem(l))}</td>` : '') +
+    (i === 0 ? `<td rowspan="${q.linhas.length}" style="${td}"><b>${escapar(emendaNoQuadro(q))}</b></td>` : '') +
     `<td style="${td}">${l.beneficiario ? `<b>${escapar(l.beneficiario)}</b>${l.sigla ? ` · <span style="white-space:nowrap">${escapar(l.sigla)}</span>` : ''}${abaixo(l.razaoSocial)}` : A_DEFINIR}</td>` +
-    `<td style="${td}">${l.entrega ? `<b>${escapar(l.entrega)}</b>` : A_DEFINIR}${abaixo(l.endereco)}</td>` +
     `<td style="${td}">${l.quantidade}</td>` +
-    (l.linhasDoItem ? `<td${juntar(l)} style="${tdValor}">${brl(l.unitario)}</td>` : '') +
-    `<td style="${tdValor}">${brl(l.total)}</td>` +
+    (l.linhasDoItem ? `<td${juntar(l)} style="${td}"><b>${escapar(l.descricao)}</b>${abaixo(ataEItem(l))}</td>` : '') +
+    (l.linhasDoItem ? `<td${juntar(l)} style="${tdValor}">${reais(l.unitario)}</td>` : '') +
+    `<td style="${tdValor}">${reais(l.total)}</td>` +
     '</tr>';
-  const subtotal = (rotulo: string, v: number) => `<tr><td colspan="${COLUNAS.length - 1}" style="${td}text-align:right"><b>${rotulo}</b></td><td style="${tdValor}"><b>${brl(v)}</b></td></tr>`;
+  const subtotal = (rotulo: string, v: number) => `<tr><td colspan="${COLUNAS.length - 1}" style="${td}text-align:right"><b>${rotulo}</b></td><td style="${tdValor}"><b>${reais(v)}</b></td></tr>`;
   return (
     '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
     COLUNAS.map((h) => `<th style="${th}">${h}</th>`).join('') +
     '</tr></thead><tbody>' +
     q.linhas.map(linha).join('') +
     q.porGnd.map((g) => subtotal(g.rotulo, g.total)).join('') +
-    `<tr><td colspan="${COLUNAS.length - 1}" style="${td}background:#d9d9d9;padding:10px 6px"><b>TOTAL A EMPENHAR</b></td><td style="${tdValor}background:#d9d9d9"><b>${brl(q.total)}</b></td></tr>` +
+    `<tr><td colspan="${COLUNAS.length - 1}" style="${td}background:#d9d9d9;padding:10px 6px;text-align:right"><b>TOTAL A EMPENHAR (R$)</b></td><td style="${tdValor}background:#d9d9d9"><b>${reais(q.total)}</b></td></tr>` +
     '</tbody></table>' +
     // O título vai embaixo da tabela.
     `<p style="text-align:left;font-size:9pt;margin:2px 0 0">${escapar(q.titulo)}</p>`
@@ -384,7 +398,10 @@ export function textoParaWhatsapp(q: Quadro): string {
     const itens = ls.map((l) => `• ${l.quantidade} ${l.descricao}: ${brl(l.total)}`);
     return [`${numeroEmEmoji(i + 1)} ${quem}: *${total}*`, ...itens].join('\n');
   });
-  const cabecalho = [`📋 *Reserva de itens · ComprasSUSP/Senasp/MJSP · ${dataBR(q.data)}*`, ...(q.prazoDoOficio ? [`⏳ *Enviar o ofício até ${dataBR(q.prazoDoOficio.data)}*`] : [])];
+  const cabecalho = [
+    `📋 *Reserva de itens · ComprasSUSP/Senasp/MJSP · ${dataBR(q.data)}*`,
+    ...(q.emenda ? [`🏷️ *Emenda ${q.emenda.numero.slice(0, 4)} ${q.emenda.numero.slice(4)} / ${q.emenda.ano}*`] : []),
+    ...(q.prazoDoOficio ? [`⏳ *Enviar o ofício até ${dataBR(q.prazoDoOficio.data)}*`] : [])];
   return [
     ...cabecalho,
     '',

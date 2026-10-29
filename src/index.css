@@ -2135,6 +2135,11 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 @media (max-width: 900px) { .emendas-autorizacao { grid-template-columns: minmax(0, 1fr); } }
 .reserva-teto { display: flex; flex-direction: column; gap: 0.35rem; background: var(--bg-page, #f8fafc); border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.6rem 0.75rem; font-size: 0.82rem; }
 .reserva-teto--passa { border-color: var(--color-danger-border); background: var(--color-danger-bg); }
+.reserva-emendas { display: flex; flex-direction: column; gap: 0.4rem; }
+.reserva-emenda { display: flex; align-items: flex-start; gap: 0.6rem; border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.5rem 0.75rem; font-size: 0.85rem; cursor: pointer; background: var(--surface, #fff); }
+.reserva-emenda input { margin-top: 0.2rem; }
+.reserva-emenda small { display: block; }
+.reserva-emenda--sel { border-color: var(--primary); background: var(--primary-light); }
 .reserva-teto__barra { height: 8px; border-radius: 999px; background: var(--surface, #fff); overflow: hidden; }
 .reserva-teto__barra i { display: block; height: 100%; background: var(--color-warning-text, #b45309); }
 .reserva-teto--passa .reserva-teto__barra i { background: var(--color-danger-text); }

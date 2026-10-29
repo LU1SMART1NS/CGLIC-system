@@ -645,6 +645,18 @@ export interface PedidoEmenda {
   emendaId: string | null;
   /** Outras emendas do pedido, além da conferida (migration 211): a sobra de uma emenda antiga que completou o pedido. */
   outrasEmendas: OutraEmendaDoPedido[];
+  /** Trocas da emenda na conferência com o SIOP, com o motivo (migration 243), da mais antiga à mais nova. */
+  trocasDeEmenda?: TrocaDeEmenda[];
+}
+
+export interface TrocaDeEmenda {
+  deNumero: string;
+  deAno: number;
+  paraNumero: string;
+  paraAno: number;
+  motivo: string;
+  criadoPorNome: string | null;
+  criadoEm: string;
 }
 
 export interface OutraEmendaDoPedido {
@@ -659,7 +671,7 @@ export interface OutraEmendaDoPedido {
 }
 
 export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
-  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes, anulacoes, outras] = await Promise.all([
+  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes, anulacoes, outras, trocas] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedidos').select('*').order('numero').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_devolucoes').select('*').order('id').range(de, ate)),
@@ -678,8 +690,23 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       db().from('emenda_pedido_anulacoes').select('*').order('id').range(de, ate)
     ).catch(() => []),
     // Outras emendas dos pedidos (migration 211). Antes da migration a tabela não existe: segue sem ela.
-    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_emendas').select('*').order('id').range(de, ate)).catch(() => [])
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_emendas').select('*').order('id').range(de, ate)).catch(() => []),
+    // Trocas da emenda na conferência (migration 243). Antes da migration a tabela não existe: segue sem ela.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_trocas_emenda').select('*').order('id').range(de, ate)).catch(() => [])
   ]);
+  const trocasPorPedido = new Map<string, TrocaDeEmenda[]>();
+  for (const t of trocas) {
+    const troca: TrocaDeEmenda = {
+      deNumero: t.de_numero,
+      deAno: num(t.de_ano),
+      paraNumero: t.para_numero,
+      paraAno: num(t.para_ano),
+      motivo: t.motivo,
+      criadoPorNome: t.criado_por_nome ?? null,
+      criadoEm: t.criado_em
+    };
+    trocasPorPedido.set(t.pedido_id, [...(trocasPorPedido.get(t.pedido_id) ?? []), troca]);
+  }
   // O pedido de origem e o pedido novo da anulação aparecem pelo nome (o sequencial do banco não vai para a tela).
   const identidade = (p: Record<string, any>) => ({
     numeroNoAno: p.numero_no_ano ?? null,
@@ -864,7 +891,8 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       pedidoOrigemNome: p.pedido_origem_id ? emTextoPorId.get(p.pedido_origem_id) ?? null : null,
       anulacoes: (anulacoesPorPedido.get(p.id) ?? []).sort((a, b) => a.anuladoEm.localeCompare(b.anuladoEm)),
       emendaId: p.emenda_id ?? null,
-      outrasEmendas: (outrasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))
+      outrasEmendas: (outrasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)),
+      trocasDeEmenda: (trocasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))
     }))
     .sort((a, b) => b.numero - a.numero);
 }
@@ -890,8 +918,10 @@ export async function salvarPedidoEmenda(p: {
   contatoTelefone: string | null;
   contatoEmail: string | null;
   motivo?: string | null;
-  /** Só no pedido novo: a emenda registrada de onde ele nasce (migration 205). */
+  /** A emenda registrada do pedido: obrigatória no pedido novo e no antigo que ainda não tem (migration 243). */
   emendaId?: string | null;
+  /** Emenda ainda não registrada, pelo nº e ano (o valor e o GND podem ficar para a conferência): registrada junto. */
+  emendaNova?: { numero: string; ano: number; valor: number | null; gnd: Gnd | null } | null;
   linhas: LinhaParaSalvar[];
   /** Pedido novo com a sobra de uma emenda do mesmo parlamentar (migration 204): nasce com o número e o ano dela. */
   emendaDaSobra?: { numero: string; ano: number } | null;
@@ -908,6 +938,7 @@ export async function salvarPedidoEmenda(p: {
       contato_email: p.contatoEmail,
       motivo: p.motivo ?? null,
       emenda_id: p.emendaId ?? null,
+      emenda_nova: p.emendaNova ?? null,
       emenda_da_sobra: p.emendaDaSobra ?? null,
       linhas: p.linhas.map((l) => ({ id: l.id ?? null, tipo: l.tipo, item_key: l.itemKey ?? null, kit_id: l.kitId ?? null, quantidade: l.quantidade, beneficiario_id: l.beneficiarioId }))
     }
@@ -1356,8 +1387,9 @@ export interface EmendaSiop {
   /** 8 dígitos: os 4 do autor e os 4 da emenda. */
   numero: string;
   autorId: string;
-  valor: number;
-  gnd: Gnd;
+  /** Nulo: registrada na reserva pelo nº e ano, valor a ler no SIOP (migration 243). */
+  valor: number | null;
+  gnd: Gnd | null;
   beneficiarioId: string | null;
   objeto: string | null;
   /** Dia em que a CAEP viu a emenda no SIOP: o aviso conta daqui. */
@@ -1416,8 +1448,8 @@ export async function fetchEmendasSiop(): Promise<EmendaSiop[]> {
     ano: num(e.ano),
     numero: e.numero,
     autorId: e.autor_id,
-    valor: num(e.valor),
-    gnd: e.gnd,
+    valor: e.valor == null ? null : num(e.valor),
+    gnd: e.gnd ?? null,
     beneficiarioId: e.beneficiario_id ?? null,
     objeto: e.objeto ?? null,
     vistaEm: e.vista_em,
@@ -1471,8 +1503,9 @@ export interface EmendaParaSalvar {
   numero: string;
   ano: number | null;
   autorId: string;
-  valor: number;
-  gnd: Gnd;
+  /** Opcional (migration 243): a CAEP confirma na conferência com o SIOP. */
+  valor: number | null;
+  gnd: Gnd | null;
   beneficiarioId: string | null;
   objeto: string | null;
   vistaEm: string;

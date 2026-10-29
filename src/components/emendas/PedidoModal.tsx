@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { mascaraTelefone } from '../../utils/mascaras';
 import { ChevronDown, Plus, Search } from 'lucide-react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
@@ -8,19 +7,21 @@ import { InfoHint } from '../../design-system/components/InfoHint';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { usePodeGerirEmendas, useSalvarPedido } from '../../hooks/useEmendas';
+import { useEmendasSiop, usePedidosEmendas, usePodeGerirEmendas, useSalvarPedido } from '../../hooks/useEmendas';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, calcularKit, curto, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta } from '../../utils/emendasKits';
 import { casaBusca, daUfDoParlamentar, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import { identificacaoDoPedido, itensDaLinha, numeroDaEmendaEmTexto, orgaoDoPedido, precoParaEmenda, valorDaLinha, VOLTA_AO_OFICIO } from '../../utils/emendasPedidos';
-import { nomeDoItem, notaDoPreco } from '../../utils/emendasQuadro';
+import { emendaDoPedidoNoQuadro, nomeDoItem, notaDoPreco } from '../../utils/emendasQuadro';
 import type { SobraDaEmenda } from '../../utils/emendasSobra';
 import { agruparPorBeneficiario, beneficiarioDaLinha, chaveDoConteudo, definirNoGrupo, gradePorItem, moverLinha, repartirLinha, type GrupoReserva } from '../../utils/emendasReserva';
 import { formatarTelefone, localDoBeneficiario, nomeESigla, rotuloBeneficiario, soDigitos } from '../../services/emendasService';
 import type { AutorEmenda, BeneficiarioEmenda, EmendaSiop, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
-import { numeroDaEmenda } from '../../utils/emendasSemPedido';
+import { lerNumeroDaEmenda, numeroDaEmenda } from '../../utils/emendasSemPedido';
+import { emendaSugerida, emendasParaAReserva } from '../../utils/emendasDaReserva';
+import { lerValorBR, mascaraTelefone, mascaraValorBR } from '../../utils/mascaras';
 import { QuadroGabinete } from './QuadroGabinete';
 import { BeneficiarioModal } from './BeneficiarioModal';
 
@@ -173,8 +174,17 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const contatoDaEmenda = emenda ? ultimoContato.get(emenda.autorId) : autorInicial ? ultimoContato.get(autorInicial) : undefined;
 
   const [autorId, setAutorId] = useState(pedido?.autorId ?? emenda?.autorId ?? sobra?.autorId ?? autorInicial ?? '');
-  // Reserva para um órgão (migration 163): nova reserva sem parlamentar.
-  const [paraOrgao, setParaOrgao] = useState(false);
+  // D1 (migration 243): a reserva para um órgão sem parlamentar acabou; a que ficou de antes indica o parlamentar.
+  const paraOrgao = false;
+  // Migration 243: todo pedido nasce com a emenda. O pedido antigo sem emenda informa a emenda ao gravar.
+  const emendasQ = useEmendasSiop();
+  const pedidosQ = usePedidosEmendas();
+  const precisaEmenda = !sobra && !emenda && (!pedido || (!pedido.emendaId && !pedido.siopEmenda));
+  /** id da emenda registrada, 'nova' (nº e ano digitados) ou nulo (ainda não tocou: vale a sugerida). */
+  const [emendaEscolhida, setEmendaEscolhida] = useState<string | null>(null);
+  const [novaNumero, setNovaNumero] = useState('');
+  const [novaAno, setNovaAno] = useState(Number(hoje.slice(0, 4)));
+  const [novaValor, setNovaValor] = useState('');
   const [buscaAutor, setBuscaAutor] = useState('');
   const [observacao, setObservacao] = useState(pedido?.observacao ?? '');
   const [obsAberta, setObsAberta] = useState(Boolean(pedido?.observacao));
@@ -292,9 +302,36 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const beneficiariosEncontrados = (filtraUf ? beneficiariosNaBusca.filter((b) => daUfDoParlamentar(b, ufDoAutor)) : beneficiariosNaBusca).slice(0, MAX_BENEFICIARIOS);
   const deOutraUf = (b: BeneficiarioEmenda) => !daUfDoParlamentar(b, ufDoAutor);
 
+  // Emendas do parlamentar com o valor a indicar de cada uma (a mesma conta da conferência do ofício).
+  const emendasDoAutor = useMemo(
+    () => (precisaEmenda ? emendasParaAReserva({ autorId: autorId || null, pedidoId: pedido?.id ?? null, emendas: emendasQ.data ?? [], pedidos: pedidosQ.data ?? [], itens: porChave, precos }) : []),
+    [precisaEmenda, autorId, pedido?.id, emendasQ.data, pedidosQ.data, porChave, precos]
+  );
+  const escolha = emendaEscolhida === 'nova' || emendasDoAutor.some((x) => x.emenda.id === emendaEscolhida) ? emendaEscolhida! : emendaEscolhida === null ? emendaSugerida(emendasDoAutor) ?? '' : '';
+  const daLista = emendasDoAutor.find((x) => x.emenda.id === escolha);
+  const novaLida = escolha === 'nova' ? lerNumeroDaEmenda(novaNumero, novaAno) : null;
+  const novaJaRegistrada = novaLida ? (emendasQ.data ?? []).find((e) => e.numero === novaLida.numero && e.ano === novaLida.ano) : undefined;
+  const novaValorLido = lerValorBR(novaValor);
+  // D3: o pedido não passa do valor a indicar da emenda, quando o valor no SIOP é conhecido.
+  const teto = sobra ? sobra.sobra : precisaEmenda ? daLista?.aIndicar ?? (escolha === 'nova' && novaValorLido && novaValorLido > 0 ? novaValorLido : null) : null;
+  const passaDoTeto = teto != null && total > teto + 0.004;
+  // Emenda que sai no quadro da minuta: a do pedido, a escolhida aqui ou a digitada.
+  const emendaDoQuadro = sobra
+    ? { numero: sobra.emenda, ano: sobra.ano }
+    : emenda
+      ? { numero: emenda.numero, ano: emenda.ano }
+      : (emendaDoPedidoNoQuadro(pedido) ?? (daLista ? { numero: daLista.emenda.numero, ano: daLista.emenda.ano } : novaLida));
+
   const tel = soDigitos(contatoTelefone);
   const pendencias: Pendencia[] = [];
-  if (!autorId && !pedido && !paraOrgao) pendencias.push({ texto: 'o parlamentar', alvo: 'emendas-pedido-busca-autor', lado: 'pedido' });
+  if (!autorId && (!pedido || semAutorGravado)) pendencias.push({ texto: 'o parlamentar', alvo: 'emendas-pedido-busca-autor', lado: 'pedido' });
+  if (precisaEmenda && autorId) {
+    if (!escolha) pendencias.push({ texto: 'a emenda', alvo: 'emendas-pedido-emenda', lado: 'pedido' });
+    else if (escolha === 'nova' && !novaLida) pendencias.push({ texto: 'nº da emenda com 8 dígitos', alvo: 'emendas-pedido-emenda-numero', lado: 'pedido' });
+    else if (novaJaRegistrada) pendencias.push({ texto: novaJaRegistrada.autorId === autorId ? 'escolher na lista a emenda já registrada' : 'emenda deste parlamentar (o nº está registrado para outro)', alvo: 'emendas-pedido-emenda-numero', lado: 'pedido' });
+    if (escolha === 'nova' && novaValor.trim() && !(novaValorLido && novaValorLido > 0)) pendencias.push({ texto: 'valor da emenda maior que zero (ou em branco)', alvo: 'emendas-pedido-emenda-valor', lado: 'pedido' });
+  }
+  if (passaDoTeto) pendencias.push({ texto: 'o pedido caber no valor a indicar da emenda', alvo: 'emendas-pedido-teto', lado: 'pedido' });
   const grupoSemOrgao = orgaoNaFrente ? grupos.find((g) => !g.beneficiarioId && linhas.some((l) => l.grupo === g.chave)) : undefined;
   if (grupoSemOrgao) pendencias.push({ texto: 'o órgão que pediu', alvo: `emendas-pedido-beneficiario-${grupoSemOrgao.chave}`, lado: 'pedido' });
   if (linhas.length === 0) pendencias.push({ texto: 'pelo menos um item', alvo: 'emendas-pedido-busca', lado: 'itens' });
@@ -321,7 +358,6 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const recuperarRascunho = () => {
     const r = rascunhoAntigo!;
     setAutorId(r.autorId);
-    setParaOrgao(r.paraOrgao);
     setContatoNome(r.contato.nome);
     setContatoTelefone(r.contato.telefone);
     setContatoEmail(r.contato.email);
@@ -372,6 +408,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   /** Escolher o autor sugere o último contato da assessoria usado com ele (só se os campos estiverem vazios). */
   const escolherAutor = (id: string) => {
     setAutorId(id);
+    setEmendaEscolhida(null);
     setBuscaAutor('');
     const c = ultimoContato.get(id);
     if (c && !contatoNome && !contatoTelefone && !contatoEmail) {
@@ -517,7 +554,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         contatoTelefone: tel || null,
         contatoEmail: contatoEmail.trim() || null,
         motivo: motivo.trim() || null,
-        emendaId: !pedido && emenda ? emenda.id : null,
+        emendaId: precisaEmenda ? daLista?.emenda.id ?? null : !pedido && emenda ? emenda.id : null,
+        emendaNova: precisaEmenda && escolha === 'nova' && novaLida ? { numero: novaLida.numero, ano: novaLida.ano, valor: novaValorLido && novaValorLido > 0 ? novaValorLido : null, gnd: null } : null,
         emendaDaSobra: sobra ? { numero: sobra.emenda, ano: sobra.ano } : null,
         linhas: linhas.map((l) => ({ id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, quantidade: l.quantidade, beneficiarioId: beneficiarioDaLinha(l, grupos) }))
       });
@@ -1107,31 +1145,9 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
             <span className="reserva-rotulo">{semAutorGravado ? 'Parlamentar que assumiu a reserva (quando houver)' : 'Para quem é a reserva'}</span>
             {emenda && (
               <p className="reserva-ok" data-testid="emendas-pedido-da-emenda">
-                Pedido da emenda {numeroDaEmenda(emenda.numero)} / {emenda.ano} · {formatCurrency(emenda.valor)} · {emenda.gnd}, vista no SIOP.
+                Pedido da emenda {numeroDaEmenda(emenda.numero)} / {emenda.ano}
+                {emenda.valor != null ? ` · ${formatCurrency(emenda.valor)}${emenda.gnd ? ` · ${emenda.gnd}` : ''}, vista no SIOP.` : ' · valor a ler no SIOP.'}
               </p>
-            )}
-            {!pedido && !emenda && !sobra && !autorInicial && (
-              <div className="reserva-segmentos" role="group" aria-label="Tipo de reserva">
-                <button
-                  type="button"
-                  aria-pressed={!paraOrgao}
-                  onClick={() => setParaOrgao(false)}
-                  data-testid="emendas-pedido-para-parlamentar"
-                >
-                  Parlamentar
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={paraOrgao}
-                  onClick={() => {
-                    setParaOrgao(true);
-                    setAutorId('');
-                  }}
-                  data-testid="emendas-pedido-para-orgao"
-                >
-                  Órgão (parlamentar a definir)
-                </button>
-              </div>
             )}
             {paraOrgao ? (
               <p className="reserva-mudo reserva-texto">O órgão pediu e a CAEP separa os itens enquanto procura o parlamentar. Ele é indicado depois, antes da minuta.</p>
@@ -1180,6 +1196,64 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               </>
             )}
           </div>
+
+          {precisaEmenda && autor && (
+            <div className="reserva-secao" data-testid="emendas-pedido-emenda">
+              <span className="reserva-rotulo">Emenda</span>
+              <div className="reserva-emendas" role="radiogroup" aria-label="Emenda do pedido">
+                {emendasDoAutor.map((x) => (
+                  <label key={x.emenda.id} className={`reserva-emenda${escolha === x.emenda.id ? ' reserva-emenda--sel' : ''}`}>
+                    <input type="radio" name="emendas-pedido-emenda" checked={escolha === x.emenda.id} onChange={() => setEmendaEscolhida(x.emenda.id)} data-testid={`emendas-pedido-emenda-${x.emenda.id}`} />
+                    <span>
+                      <b>
+                        {numeroDaEmenda(x.emenda.numero)} / {x.emenda.ano}
+                      </b>{' '}
+                      <span className="reserva-mudo">· {x.emenda.valor != null ? `${formatCurrency(x.emenda.valor)} no SIOP` : 'valor a ler no SIOP'}</span>
+                      <small className="reserva-mudo">
+                        {x.aIndicar != null ? `A indicar: ${formatCurrency(Math.max(0, x.aIndicar))}` : 'Sem o valor, o limite fica para a conferência com o SIOP'}
+                        {x.outros.length > 0 && ` · ${x.outros.length === 1 ? '1 outro pedido' : `${x.outros.length} outros pedidos`} da emenda`}
+                      </small>
+                    </span>
+                  </label>
+                ))}
+                <label className={`reserva-emenda${escolha === 'nova' ? ' reserva-emenda--sel' : ''}`}>
+                  <input type="radio" name="emendas-pedido-emenda" checked={escolha === 'nova'} onChange={() => setEmendaEscolhida('nova')} data-testid="emendas-pedido-emenda-nova" />
+                  <span>
+                    <b>{emendasDoAutor.length ? 'Outra emenda' : 'Informar a emenda'}</b>
+                    <small className="reserva-mudo">Ainda não registrada: o nº e o ano saem na minuta; o valor pode ficar para a conferência.</small>
+                  </span>
+                </label>
+              </div>
+              {escolha === 'nova' && (
+                <div className="reserva-grade3">
+                  <AppInput
+                    label="Nº da emenda"
+                    placeholder="0000 0000"
+                    inputMode="numeric"
+                    value={novaNumero}
+                    onChange={(e) => {
+                      setNovaNumero(e.target.value);
+                      const l = lerNumeroDaEmenda(e.target.value, null);
+                      if (l) setNovaAno(l.ano);
+                    }}
+                    error={falta('emendas-pedido-emenda-numero') ? (novaJaRegistrada ? (novaJaRegistrada.autorId === autorId ? 'Já registrada: escolha na lista.' : 'Registrada para outro parlamentar.') : '8 dígitos, ou 12 com o ano.') : undefined}
+                    data-testid="emendas-pedido-emenda-numero"
+                  />
+                  <AppInput label="Ano" type="number" min={2015} max={2100} value={String(novaAno)} onChange={(e) => setNovaAno(Number(e.target.value))} data-testid="emendas-pedido-emenda-ano" />
+                  <AppInput
+                    label="Valor no SIOP (opcional)"
+                    placeholder="a ler no SIOP"
+                    inputMode="decimal"
+                    value={novaValor}
+                    onChange={(e) => setNovaValor(mascaraValorBR(e.target.value, novaValor))}
+                    error={falta('emendas-pedido-emenda-valor') ? 'Maior que zero, ou em branco.' : undefined}
+                    data-testid="emendas-pedido-emenda-valor"
+                  />
+                </div>
+              )}
+              {falta('emendas-pedido-emenda') && <span className="reserva-alerta">Escolha a emenda do pedido: o nº sai na minuta do ofício.</span>}
+            </div>
+          )}
 
           <div className="reserva-secao">
             <span className="reserva-rotulo">
@@ -1230,7 +1304,28 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               </div>
               <span className="reserva-mudo">
                 Valor da emenda {formatCurrency(sobra.valor ?? 0)} − empenhado {formatCurrency(sobra.empenhado)} − em andamento {formatCurrency(sobra.emAndamento)}. Preço previsto, como no quadro do parlamentar.
-                {total > sobra.sobra + 0.004 ? ' O pedido passa do valor a indicar: reduza as quantidades ou confirme com o parlamentar outra fonte para a diferença.' : ''}
+                {passaDoTeto ? ' O pedido passa do valor a indicar: diminua as quantidades.' : ''}
+              </span>
+            </div>
+          )}
+          {!sobra && teto != null && (
+            <div className={`reserva-teto${passaDoTeto ? ' reserva-teto--passa' : ''}`} data-testid="emendas-pedido-teto">
+              <div className="reserva-barra">
+                <b>A indicar da emenda: {formatCurrency(teto)}</b>
+                <span className="reserva-espaco" />
+                <span className="reserva-mudo">
+                  Pedido: {formatCurrency(total)} · {passaDoTeto ? <b className="reserva-alerta">passa {formatCurrency(total - teto)}</b> : `restam ${formatCurrency(teto - total)}`}
+                </span>
+              </div>
+              <div className="reserva-teto__barra">
+                <i style={{ width: `${Math.min(100, teto > 0 ? (total / teto) * 100 : 100)}%` }} />
+              </div>
+              <span className="reserva-mudo">
+                {daLista
+                  ? `Valor da emenda ${formatCurrency(daLista.emenda.valor ?? 0)} − outros pedidos dela ${formatCurrency(daLista.usado)} (pelo ofício, ou pelo previsto sem ofício).`
+                  : 'Valor da emenda informado acima.'}{' '}
+                Preço previsto, como no quadro do parlamentar.
+                {passaDoTeto ? ' O pedido passa do valor a indicar: diminua as quantidades ou escolha outra emenda.' : ''}
               </span>
             </div>
           )}
@@ -1367,6 +1462,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 linhas={linhas.map((l) => ({ ...l, beneficiarioId: beneficiarioDaLinha(l, grupos) }))}
                 data={pedido?.reservadoEm ?? hoje}
                 devolvidoEm={pedido?.devolvidoEm}
+                emenda={emendaDoQuadro}
               />
             </details>
           )}
