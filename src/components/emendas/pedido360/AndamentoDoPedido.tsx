@@ -140,7 +140,7 @@ const MovimentosDoPedido: React.FC<{ p: PedidoEmenda }> = ({ p }) => {
   return (
     <details style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '0.55rem 0.75rem' }} data-testid="pedido360-movimentos">
       <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
-        <RotateCcw size={13} aria-hidden="true" /> Envios, devoluções e etapas voltadas ({movimentos.length})
+        <RotateCcw size={13} aria-hidden="true" /> Envios, devoluções, etapas voltadas e retificadores ({movimentos.length})
       </summary>
       <ul style={{ listStyle: 'none', margin: '0.5rem 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
         {[...movimentos].reverse().map((m) => {

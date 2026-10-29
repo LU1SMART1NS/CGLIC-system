@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { InfoHint } from '../../design-system/components/InfoHint';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { useToast } from '../../design-system/components/Toast';
-import { useRemoverEmendaDoPedido, useSalvarValorOficio } from '../../hooks/useEmendas';
+import { useItensCaep, useRemoverEmendaDoPedido, useSalvarValorOficio } from '../../hooks/useEmendas';
+import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { AppInput } from '../../design-system/components/FormFields';
 import { formatCurrency } from '../../utils/format';
-import { lerValorBR, mascaraValorBR } from '../../utils/mascaras';
-import { numeroDaEmendaEmTexto } from '../../utils/emendasPedidos';
+import { numeroDaEmendaEmTexto, valorDoPedido } from '../../utils/emendasPedidos';
 import { dataBR } from '../../utils/emendasKits';
 import { carteiraDetalhe, carteiraSubtitle } from '../carteira/carteiraStyles';
 import type { PedidoEmenda } from '../../services/emendasService';
@@ -69,9 +69,10 @@ export const EmendasDoPedido: React.FC<{ p: PedidoEmenda; podeGerir: boolean }> 
             )}
           </span>
         </span>
-        {podeGerir && p.etapa !== 'CANCELADO' && !editandoOficio && (
+        {/* Migration 249 (D7): o valor do ofício não se digita. A falta se confere pela soma dos itens; o retificador, no cartão do pedido. */}
+        {podeGerir && p.oficioValor == null && !['RESERVADO', 'MINUTA', 'OFICIO', 'CANCELADO'].includes(p.etapa) && !editandoOficio && (
           <AppButton size="xs" variant="link" onClick={() => setEditandoOficio(true)} data-testid={`emendas-pedido-oficio-editar-${p.id}`}>
-            {p.oficioValor != null ? 'Alterar' : 'Informar'}
+            Conferir pela soma
           </AppButton>
         )}
       </div>
@@ -112,22 +113,26 @@ export const EmendasDoPedido: React.FC<{ p: PedidoEmenda; podeGerir: boolean }> 
   );
 };
 
-/** Valor do ofício do pedido já conferido (migration 232): o que ficou a informar, ou o retificador que mudou o valor. */
+/**
+ * Valor do ofício a informar (migration 249, D7): o ofício pede a soma dos itens, centavo a centavo. A tela mostra a soma
+ * pelo preço de hoje e a CAEP confirma com o documento SEI; não há valor para digitar.
+ */
 const ValorDoOficio: React.FC<{ p: PedidoEmenda; onClose: () => void }> = ({ p, onClose }) => {
   const salvar = useSalvarValorOficio();
   const toast = useToast();
-  const [valor, setValor] = useState(p.oficioValor != null ? p.oficioValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
+  const { data: itensLista = [] } = useItensCaep();
+  const { precos } = usePrecosParaEmenda();
+  const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
+  const soma = itensLista.length ? valorDoPedido(p, itens, precos) : null;
   const [sei, setSei] = useState(p.oficioValorDocumentoSei ?? p.oficioDocumentoSei ?? '');
-  const [retificador, setRetificador] = useState(p.oficioValorRetificador ?? false);
-  const lido = lerValorBR(valor);
   const seiLimpo = sei.replace(/\D/g, '');
-  const ok = lido != null && lido > 0 && /^[0-9]{7,10}$/.test(seiLimpo);
+  const ok = soma != null && soma > 0 && /^[0-9]{7,10}$/.test(seiLimpo);
   const gravar = async (ev: React.FormEvent) => {
     ev.preventDefault();
     if (!ok) return;
     try {
-      await salvar.mutateAsync({ id: p.id, versao: p.versao, valor: lido!, documentoSei: seiLimpo, retificador });
-      toast.success(`Valor do ofício do ${pedidoEmTexto(p)} gravado.`);
+      await salvar.mutateAsync({ id: p.id, versao: p.versao, valor: soma!, documentoSei: seiLimpo });
+      toast.success(`Valor do ofício do ${pedidoEmTexto(p)} conferido: ${formatCurrency(soma!)}.`);
       onClose();
     } catch (err) {
       toast.error((err as Error).message);
@@ -136,17 +141,20 @@ const ValorDoOficio: React.FC<{ p: PedidoEmenda; onClose: () => void }> = ({ p, 
   return (
     <form onSubmit={gravar} style={{ ...linha, flexWrap: 'wrap', alignItems: 'flex-end' }} data-testid={`emendas-pedido-oficio-form-${p.id}`}>
       <div style={{ flex: '1 1 10rem' }}>
-        <AppInput label="Valor do ofício (R$)" inputMode="decimal" value={valor} onChange={(e) => setValor(mascaraValorBR(e.target.value, valor))} data-testid="emendas-pedido-oficio-valor" />
+        <span style={{ ...carteiraDetalhe, display: 'block' }}>Os itens somam</span>
+        <b style={{ fontSize: '1.1rem', fontVariantNumeric: 'tabular-nums' }} data-testid="emendas-pedido-oficio-soma">
+          {soma == null ? '…' : formatCurrency(soma)}
+        </b>
+        <span style={{ ...carteiraSubtitle, display: 'block' }}>pelo preço de hoje · confira com o ofício</span>
       </div>
       <div style={{ flex: '1 1 8rem' }}>
         <AppInput label="Documento SEI do ofício" inputMode="numeric" hint="Só números, 7 a 10 dígitos." value={sei} onChange={(e) => setSei(e.target.value)} data-testid="emendas-pedido-oficio-sei" />
       </div>
-      <label style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', fontSize: '0.82rem' }}>
-        <input type="checkbox" checked={retificador} onChange={(e) => setRetificador(e.target.checked)} /> Retificador
-      </label>
       <span style={{ display: 'inline-flex', gap: '0.3rem' }}>
         <ActionButton action="cancelar" size="xs" type="button" onClick={onClose} disabled={salvar.isPending} />
-        <ActionButton action="salvar" size="xs" type="submit" disabled={!ok} isLoading={salvar.isPending} data-testid="emendas-pedido-oficio-salvar" />
+        <AppButton size="xs" type="submit" disabled={!ok} isLoading={salvar.isPending} data-testid="emendas-pedido-oficio-salvar">
+          Confere com o ofício
+        </AppButton>
       </span>
     </form>
   );

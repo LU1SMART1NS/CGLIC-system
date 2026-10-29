@@ -45,6 +45,8 @@ interface Props {
   onAlterar: () => void;
   onCancelar: () => void;
   onAnular: () => void;
+  /** Ofício retificador (migration 249): só antes do empenho, para quem gere emendas. */
+  onRetificador?: () => void;
   /** Envio à CCGA por ata, desfazer o envio e voltar etapa (migration 248): cada um só quando cabe. */
   ccga?: AcoesCcga;
   onAba: (aba: Pedido360Aba) => void;
@@ -80,7 +82,7 @@ const LIMITE_DO_NOME = 40;
  * mais grave em selo, o contato da assessoria e as datas ao lado, quatro indicadores e, no pé, o processo SEI, a
  * emenda (abre a Emenda 360) e o GND. A próxima tarefa é o botão principal.
  */
-export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onProxima, onAlterar, onCancelar, onAnular, ccga, onAba, onAbrirParlamentar, onAbrirEmenda, verMais }) => {
+export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onProxima, onAlterar, onCancelar, onAnular, onRetificador, ccga, onAba, onAbrirParlamentar, onAbrirEmenda, verMais }) => {
   const cancelado = p.etapa === 'CANCELADO';
   const ativas = linhasAtivas(p);
   const atas = atasDoPedido(p, itens);
@@ -183,6 +185,11 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
               <ActionButton action="cancelarCiclo" size="sm" label="Cancelar pedido" onClick={onCancelar} data-testid={`emendas-pedido-cancelar-${p.id}`} />
               <ActionButton action="editar" size="sm" label={!p.autorId ? 'Indicar o parlamentar' : !p.siopEmenda && !p.emendaId ? 'Informar a emenda' : 'Alterar itens'} onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
             </>
+          )}
+          {onRetificador && (
+            <AppButton size="sm" variant="link" onClick={onRetificador} data-testid={`emendas-pedido-retificador-${p.id}`}>
+              Registrar ofício retificador
+            </AppButton>
           )}
           {ccga?.voltar && (
             <AppButton size="sm" variant="link" onClick={ccga.voltar} data-testid={`emendas-pedido-voltar-etapa-${p.id}`}>

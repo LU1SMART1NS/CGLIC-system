@@ -86,6 +86,9 @@ export function textoDoMovimento(m: MovimentoDoPedido, quantos: number): { titul
       return { titulo: `Devolvido à CAEP · ${ata} · ${itens}`, detalhe: [m.motivo, m.explicacao].filter(Boolean).join(': ') || null };
     case 'DESFEITO_CCGA':
       return { titulo: `Envio desfeito pela CAEP · ${ata} · ${itens}`, detalhe: m.motivo };
+    case 'RETIFICADOR':
+      // Migration 249: o motivo diz o ofício substituído; a explicação, os ajustes nos itens.
+      return { titulo: 'Ofício retificador registrado', detalhe: [m.motivo, m.explicacao].filter(Boolean).join(' · ') || null };
     default:
       return {
         titulo: `Voltou de "${m.etapaDe ? ROTULO_ETAPA[m.etapaDe] : '?'}" para "${m.etapaPara ? ROTULO_ETAPA[m.etapaPara] : '?'}"`,

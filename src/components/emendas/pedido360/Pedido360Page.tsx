@@ -49,6 +49,8 @@ import { ConferenciaDoOficio } from './ConferenciaDoOficio';
 import { PEDIDO360_ABAS, type Pedido360Aba } from './pedido360Abas';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
+// Entrega 1 do ofício retificador (migration 249): da conferência no SIOP ao envio à CGOFI, antes do empenho.
+const ETAPAS_DO_RETIFICADOR = new Set(['CONFERIDO', 'SOLICITADO', 'AUTORIZADO', 'CGOFI']);
 const SEM_CREDOR: CredorNoPedido[] = [];
 const IDS_DAS_ABAS = PEDIDO360_ABAS.map((a) => a.id);
 
@@ -92,6 +94,8 @@ export const Pedido360Page: React.FC = () => {
   const [ccga, setCcga] = useState<'ENVIAR' | 'DESFAZER' | 'VOLTAR' | null>(null);
   // Conferência do ofício (protótipo aprovado em 28/10/2026): abre no lugar das abas, numa área larga, e não em janela.
   const [conferindo, setConferindo] = useState<{ devolvendo: boolean } | null>(null);
+  // Ofício retificador (migration 249): o pedido inteiro abre no mesmo lugar da conferência.
+  const [retificando, setRetificando] = useState(false);
   // Captação principal (migration 218): botão no cartão e gaveta entre o cartão e as abas, como na Ata 360.
   const gruposDosBeneficiarios = useMapaGruposBeneficiarios();
   const [captacaoAberta, setCaptacaoAberta] = useState(false);
@@ -158,7 +162,8 @@ export const Pedido360Page: React.FC = () => {
         }
       : undefined;
   // Só com o ofício recebido: depois de registrar, o pedido muda de etapa e a tela volta às abas.
-  const naConferencia = Boolean(conferindo && podeGerir && p.etapa === 'OFICIO');
+  const podeRetificar = podeGerir && ETAPAS_DO_RETIFICADOR.has(p.etapa);
+  const naConferencia = Boolean(conferindo && podeGerir && p.etapa === 'OFICIO') || (retificando && podeRetificar);
   const tabs = PEDIDO360_ABAS.map((a) => (a.id === 'itens' ? { ...a, label: `Itens (${linhasAtivas(p).length})` } : a));
 
   return (
@@ -178,6 +183,7 @@ export const Pedido360Page: React.FC = () => {
           onAlterar={() => setEditando(true)}
           onCancelar={() => onAcao('CANCELAR')}
           onAnular={() => setAnulando(true)}
+          onRetificador={podeRetificar && !naConferencia ? () => setRetificando(true) : undefined}
           ccga={acoesCcga}
           onAba={irPara}
           onAbrirParlamentar={p.autorId ? () => navegar(`/emendas/parlamentares/${encodeURIComponent(p.autorId!)}`) : undefined}
@@ -204,7 +210,11 @@ export const Pedido360Page: React.FC = () => {
           reservadoFora={reservadoPorItem(pedidos, p.id)}
           hoje={hoje}
           iniciarDevolvendo={conferindo?.devolvendo}
-          onSair={() => setConferindo(null)}
+          retificador={retificando && podeRetificar}
+          onSair={() => {
+            setConferindo(null);
+            setRetificando(false);
+          }}
           onNovaMinuta={() => {
             setConferindo(null);
             irPara('quadro');

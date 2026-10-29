@@ -7,7 +7,8 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useAutoresEmendas: () => ({ data: [{ id: 'B2', nome: 'Dep. B' }] }),
   useConferirOficio: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useEmendasSiop: () => ({ data: [] }),
-  usePedidoEmDiaNaTela: () => () => true
+  usePedidoEmDiaNaTela: () => () => true,
+  useRegistrarOficioRetificador: () => ({ isPending: false, mutateAsync: vi.fn() })
 }));
 vi.mock('../../../design-system/components/Toast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn(), show: vi.fn() }) }));
 
@@ -108,15 +109,54 @@ describe('conferência do ofício no Pedido 360 (protótipo aprovado em 28/10/20
     expect(html).toContain('Não bate: gerar nova minuta');
   });
 
-  it('o previsto (950) cabe no que sobra da emenda: igual cabe, menor não cabe; o ofício diferente só avisa', () => {
+  it('o previsto (950) cabe no que sobra da emenda: igual cabe, menor não cabe', () => {
     const cabe = render(pedido({ siopValor: 950, oficioValor: 900 }));
     expect(cabe).toContain('data-testid="conferencia-cabe">Cabe<');
-    expect(cabe).toContain('conferencia-oficio-diferente');
     expect(cabe).not.toContain('conferencia-nao-cabe');
     const naoCabe = render(pedido({ siopValor: 949.99, oficioValor: 950 }));
     expect(naoCabe).toContain('Não cabe');
     expect(naoCabe).toContain('conferencia-nao-cabe');
-    expect(naoCabe).not.toContain('conferencia-oficio-diferente');
+  });
+
+  it('o valor do ofício não se digita: é a soma dos itens, e a CAEP só confere (migration 249)', () => {
+    const html = render(pedido({ siopValor: 950 }));
+    expect(html).not.toContain('conferencia-valor-oficio');
+    expect(html).not.toContain('Ofício retificador');
+    expect(html).toContain('Os itens somam');
+    expect(html).toContain('conferencia-soma-dica');
+    expect(html).toContain('Tudo confere com o ofício SEI 37091178 (R$');
+  });
+
+  it('retificador: pede o SEI, mostra o ofício anterior e esconde o SIOP e as marcas', () => {
+    const html = renderToStaticMarkup(
+      <ConferenciaDoOficio
+        pedido={pedido({ etapa: 'CONFERIDO', oficioValor: 1200, oficioValorDocumentoSei: '37091178' })}
+        pedidos={[]}
+        itens={itens}
+        itensLista={itensLista}
+        beneficiarios={new Map()}
+        beneficiariosLista={[]}
+        autor={undefined}
+        nomeDoAutor="Deputado"
+        precos={undefined}
+        reservadoFora={new Map()}
+        hoje="2026-10-28"
+        retificador
+        onSair={() => {}}
+        onNovaMinuta={() => {}}
+      />
+    );
+    expect(html).toContain('Ofício retificador');
+    expect(html).toContain('substitui o ofício SEI 37091178');
+    expect(html).toContain('retificador-sei');
+    expect(html).toContain('Ofício anterior');
+    expect(html).toContain('menos R$');
+    expect(html).toContain('retificador-confere');
+    expect(html).toContain('retificador-nao-confere-botao');
+    expect(html).toContain('conferencia-qtd-l1');
+    expect(html).not.toContain('conferencia-confere-l1');
+    expect(html).not.toContain('conferencia-ponto-');
+    expect(html).not.toContain('Não bate: gerar nova minuta');
   });
 
   it('os outros pedidos da mesma emenda descontam da sobra', () => {
