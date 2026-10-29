@@ -26,10 +26,11 @@ const estado = (p: PedidoEmenda, chave: string, notas = new Map<string, NotaDaLi
   andamentoDoPedido(p, itens, notas, HOJE, true).fases.flatMap((f) => f.tarefas).find((t) => t.chave === chave)!;
 
 describe('Andamento do pedido: as etapas como tarefas', () => {
-  it('quatro fases na ordem do caminho, com doze tarefas', () => {
+  it('quatro fases na ordem do caminho, com treze tarefas', () => {
     const a = andamentoDoPedido(pedido({}), itens, new Map(), HOJE, true);
     expect(a.fases.map((f) => f.nome)).toEqual(['Interlocução', 'Empenho', 'Contratação', 'Execução']);
-    expect(a.fases.flatMap((f) => f.tarefas)).toHaveLength(12);
+    expect(a.fases.flatMap((f) => f.tarefas)).toHaveLength(13);
+    expect(a.fases[3].tarefas.map((t) => t.chave)).toEqual(['ordem', 'entrega', 'liquidacao', 'pagamento']);
   });
 
   it('reservado: a minuta é com a CAEP, com o botão da próxima etapa; o resto vem depois', () => {
@@ -92,11 +93,25 @@ describe('Andamento do pedido: as etapas como tarefas', () => {
     expect(estado(p, 'pagamento', notas).feito).toMatch(/200,00 em 06\/10\/2026$/);
     const a = andamentoDoPedido(p, itens, notas, HOJE, true);
     expect(a.contagem).toEqual({ COMIGO: 0, COBRAR: 0, AGUARDANDO: 0, FONTE: 0 });
-    expect(a.feitas).toBe(12);
-    expect(a.total).toBe(12);
+    expect(a.feitas).toBe(13);
+    expect(a.total).toBe(13);
     // Sem fatura ainda: a entrega fecha sozinha quando a fatura chegar.
     const semFatura = new Map([['l1', nota('l1', { contractKey: '200331-00163-2026' })]]);
     expect(estado(p, 'entrega', semFatura)).toMatchObject({ estado: 'FONTE', progresso: '0 de 1 nota com fatura' });
+  });
+
+  it('Ordem de Fornecimento (migration 244): abre com a CAEP no contrato assinado e fecha pelo registro ou pela entrega', () => {
+    const p = pedido({ etapa: 'CONTRATACAO', contratacaoEm: '2026-10-15', empenhadoEm: '2026-04-17' });
+    // Sem contrato: depois.
+    expect(estado(p, 'ordem', new Map([['l1', nota('l1', {})]])).estado).toBe('DEPOIS');
+    const contratado = new Map([['l1', nota('l1', { contractKey: '200331-00163-2026' })]]);
+    expect(estado(p, 'ordem', contratado)).toMatchObject({ estado: 'COMIGO', acao: 'FAZER', comQuem: 'CAEP', fase: 'EXECUCAO' });
+    expect(andamentoDoPedido(p, itens, contratado, HOJE, true).contagem.COMIGO).toBe(1);
+    // Registrada pela CAEP: a data.
+    expect(estado({ ...p, ordemFornecimentoEm: '2026-10-28', ordemFornecimentoDocumentoSei: '41234567' }, 'ordem', contratado)).toMatchObject({ estado: 'FEITA', feito: '28/10/2026' });
+    // Já com fatura e sem registro: comprovada pela entrega.
+    const faturado = new Map([['l1', nota('l1', { contractKey: '200331-00163-2026', faturas: 1, faturadoEm: '2026-07-20' })]]);
+    expect(estado(p, 'ordem', faturado)).toMatchObject({ estado: 'FEITA', feito: 'comprovado pela entrega' });
   });
 
   it('cancelado: feito o que aconteceu, o resto não houve e nada entra nos contadores', () => {

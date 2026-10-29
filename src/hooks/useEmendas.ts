@@ -35,6 +35,7 @@ import {
   fetchDadosDaAtaParaAutorizacao,
   informarSolicitacaoDaAta,
   registrarEnvioCgofi,
+  registrarOrdemFornecimento,
   fetchEmendasSiop,
   fetchContatosDasEmendas,
   fetchAsparDosOrgaos,
@@ -280,6 +281,11 @@ export function useInformarSolicitacaoDaAta() {
 export function useRegistrarEnvioCgofi() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: registrarEnvioCgofi, retry: 0, onSettled: invalidar });
+}
+
+export function useRegistrarOrdemFornecimento() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: registrarOrdemFornecimento, retry: 0, onSettled: invalidar });
 }
 
 /** Execução de cada emenda pelo Portal da Transparência (migration 204), lida uma vez por dia pelo servidor. */

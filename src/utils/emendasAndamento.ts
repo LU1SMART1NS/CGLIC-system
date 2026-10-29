@@ -4,8 +4,8 @@
  * Aguardando resposta · Fecha sozinha). Não é um plano editável: as tarefas saem das etapas, que alimentam avisos,
  * Início e somas. Concluir uma tarefa abre a mesma janela da etapa de hoje.
  *
- * Quatro fases: Interlocução, Empenho, Contratação e Execução (liquidação e pagamento pelas notas; a entrega ainda
- * não tem fonte).
+ * Quatro fases: Interlocução, Empenho, Contratação e Execução (informações para a Ordem de Fornecimento, registradas
+ * pela CAEP; entrega, liquidação e pagamento pelas notas).
  */
 import type { AcaoGestor } from '../types';
 import type { GrupoTarefa } from './modeloGestao';
@@ -46,6 +46,7 @@ export type ChaveDaTarefa =
   | 'empenho'
   | 'despacho'
   | 'contrato'
+  | 'ordem'
   | 'entrega'
   | 'liquidacao'
   | 'pagamento';
@@ -307,6 +308,18 @@ export function andamentoDoPedido(
   const execucao = jaEmpenhado(p.etapa) ? execucaoDoPedido(p, notas) : null;
   const temNotas = Boolean(execucao && execucao.notas > 0);
   const contratado = Boolean(contratos?.contratado);
+  // Migration 244 (29/10/2026): a CAEP reúne as informações para a Ordem de Fornecimento depois do contrato e registra
+  // a data e o SEI. Pedido que já tem fatura sem esse registro fica comprovado pela entrega.
+  const ordem = base('ordem', 'EXECUCAO', null, 'Reunir as informações para a Ordem de Fornecimento', 'FAZER', 'CAEP');
+  ordem.regra = 'abre com o contrato assinado; fecha quando a CAEP registra a data e o documento SEI';
+  if (p.ordemFornecimentoEm) {
+    ordem.estado = 'FEITA';
+    ordem.feito = dataBR(p.ordemFornecimentoEm);
+  } else if (contratado && execucao) {
+    const entregue = execucao.notasFaturadas > 0;
+    ordem.estado = entregue ? 'FEITA' : 'COMIGO';
+    if (entregue) ordem.feito = 'comprovado pela entrega';
+  }
   // Migration 231: a fatura no Contratos.gov.br mostra que o fornecedor entregou e o fiscal atestou.
   const entrega = base('entrega', 'EXECUCAO', null, 'Entrega e fatura', 'ACOMPANHAR', 'fornecedor e fiscal do contrato');
   entrega.regra = 'fecha quando cada nota tem fatura no Contratos.gov.br (o fornecedor entregou e o fiscal atestou)';
@@ -353,6 +366,7 @@ export function andamentoDoPedido(
     fechada(empenho, houve('EMPENHADO'), p.empenhadoEm ? dataBR(p.empenhadoEm) : null),
     fechada(despacho, houve('CONTRATACAO'), p.contratacaoEm ? dataBR(p.contratacaoEm) : null),
     fechada(contrato, false, null),
+    fechada(ordem, Boolean(p.ordemFornecimentoEm), p.ordemFornecimentoEm ? dataBR(p.ordemFornecimentoEm) : null),
     fechada(entrega, false, null),
     fechada(liquidacao, false, null),
     fechada(pagamento, false, null)

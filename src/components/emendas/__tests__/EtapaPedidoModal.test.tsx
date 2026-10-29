@@ -10,6 +10,7 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useCancelarPedido: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useInformarSolicitacaoDaAta: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useRegistrarEnvioCgofi: () => ({ isPending: false, mutateAsync: vi.fn() }),
+  useRegistrarOrdemFornecimento: () => ({ isPending: false, mutateAsync: vi.fn() }),
   usePedidoEmDiaNaTela: () => () => true
 }));
 vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined }) }));
@@ -129,5 +130,20 @@ describe('janela das etapas: completar o SEI de um passo registrado pela fonte (
     expect(datado).not.toContain('Empenhado em');
     const semData = renderToStaticMarkup(<EtapaPedidoModal pedido={{ ...pedido('CONTRATACAO'), contratacaoPelaFonte: true }} acao="MAIS_CONTRATACAO" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
     expect(semData).toContain('Enviado em');
+  });
+});
+
+describe('janela das etapas: informações para a Ordem de Fornecimento (migration 244)', () => {
+  it('pede o documento SEI e a data; registrada, abre com o que foi gravado para corrigir', () => {
+    const nova = renderToStaticMarkup(<EtapaPedidoModal pedido={pedido('CONTRATACAO')} acao="ORDEM_FORNECIMENTO" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
+    expect(nova).toContain('Informações para a Ordem de Fornecimento');
+    expect(nova).toContain('Documento SEI com as informações *');
+    expect(nova).toContain('Concluídas em');
+    expect(nova).toContain('Registrar');
+    const gravada = renderToStaticMarkup(
+      <EtapaPedidoModal pedido={{ ...pedido('CONTRATACAO'), ordemFornecimentoEm: '2026-10-28', ordemFornecimentoDocumentoSei: '41234567' }} acao="ORDEM_FORNECIMENTO" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />
+    );
+    expect(gravada).toContain('value="41234567"');
+    expect(gravada).toContain('Salvar');
   });
 });

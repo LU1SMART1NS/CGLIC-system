@@ -625,6 +625,9 @@ export interface PedidoEmenda {
   empenhadoPelaFonte?: boolean;
   /** Chegou à contratação pelo contrato no Contratos.gov.br, sem o envio à CCGA registrado (migration 230). */
   contratacaoPelaFonte?: boolean;
+  /** Informações para a Ordem de Fornecimento, reunidas pela CAEP depois do contrato (migration 244). */
+  ordemFornecimentoEm?: string | null;
+  ordemFornecimentoDocumentoSei?: string | null;
   canceladoEm: string | null;
   canceladoMotivo: string | null;
   versao: number;
@@ -852,6 +855,8 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       contratacaoDocumentosSei: Array.isArray(p.contratacao_documentos_sei) ? p.contratacao_documentos_sei : [],
       empenhadoPelaFonte: Boolean(p.empenhado_pela_fonte),
       contratacaoPelaFonte: Boolean(p.contratacao_pela_fonte),
+      ordemFornecimentoEm: p.ordem_fornecimento_em ?? null,
+      ordemFornecimentoDocumentoSei: p.ordem_fornecimento_documento_sei ?? null,
       canceladoEm: p.cancelado_em ?? null,
       canceladoMotivo: p.cancelado_motivo ?? null,
       versao: p.versao,
@@ -985,6 +990,16 @@ export async function registrarEnvioCgofi(v: { pedidoId: string; documentoSei: s
     p_documento_sei: v.documentoSei,
     p_enviado_em: v.enviadoEm,
     p_solicitacoes: v.solicitacoes
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
+
+/** Informações para a Ordem de Fornecimento (migration 244): data e documento SEI; a etapa não muda. */
+export async function registrarOrdemFornecimento(v: { pedidoId: string; documentoSei: string; data: string }): Promise<void> {
+  const { error } = await db().rpc('registrar_ordem_fornecimento', {
+    p_id: v.pedidoId,
+    p_documento_sei: v.documentoSei,
+    p_data: v.data
   });
   if (error) throw new Error(mensagemDoBanco(error));
 }
