@@ -7,8 +7,6 @@ import { HeaderRefreshAction } from '../../design-system/components/HeaderRefres
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { StatusBadge, type StatusBadgeVariant } from '../../design-system/components/StatusBadge';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { AppButton } from '../../design-system/components/AppButton';
-import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
@@ -28,16 +26,12 @@ import {
   useNotasDasLinhas,
   useDiferencasDeEmpenho,
   useCredorDiferente,
-  useEmendasSiop,
-  useContatosDasEmendas,
   useMapaGruposBeneficiarios
 } from '../../hooks/useEmendas';
 import { contarPorGti, passaFiltroGti, pctDoGti } from '../../config/gruposGti';
 import { GRUPOS_CAPTACAO, fatiasDaCaptacao, lerFiltroCaptacao, lerModoCaptacao } from '../../config/captacaoEmendas';
 import { CelulaCaptacao, FiltroCaptacao } from './CaptacaoDoPedido';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { contaEmendasSemPedido, diasSemContatoParaUrgente, emendasNaLista } from '../../utils/emendasSemPedido';
-import { formatCurrency } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias } from '../../utils/emendasKits';
 import { casaBusca, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import {
@@ -149,11 +143,6 @@ export const EmendasPedidosPage: React.FC = () => {
       return prox;
     });
   const [editando, setEditando] = useState<PedidoEmenda | 'novo' | null>(null);
-  // Emendas vistas no SIOP (migration 205): registrar ou alterar, e o pedido novo criado a partir de uma delas.
-  const { data: emendasSiop = [] } = useEmendasSiop();
-  // Faixa acima do trilho: as emendas sem pedido não são pedidos (não entram nas fases), mas precisam ser vistas daqui.
-  const { data: contatosDasEmendas = [] } = useContatosDasEmendas();
-  const semPedido = useMemo(() => contaEmendasSemPedido(emendasNaLista(emendasSiop, pedidos, contatosDasEmendas, hoje)), [emendasSiop, pedidos, contatosDasEmendas, hoje]);
 
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
   const autorPorId = useMemo(() => new Map<string, AutorEmenda>(autores.map((a) => [a.id, a])), [autores]);
@@ -401,25 +390,6 @@ export const EmendasPedidosPage: React.FC = () => {
           </>
         }
       />
-
-      {semPedido.total > 0 && (
-        <NoticeBar
-          tone={podeGerir && semPedido.urgentes > 0 ? 'danger' : 'warning'}
-          testId="emendas-pedidos-faixa-sem-pedido"
-          action={
-            <AppButton variant="outline" size="sm" onClick={() => navegar('/emendas/emendas?situacao=sem&ano=todos')} data-testid="emendas-pedidos-faixa-sem-pedido-ver">
-              Ver emendas
-            </AppButton>
-          }
-        >
-          <b>
-            {semPedido.total === 1 ? '1 emenda indicada no SIOP ainda sem pedido' : `${semPedido.total} emendas indicadas no SIOP ainda sem pedido`}
-          </b>
-          {/* Os contatos só a CAEP e o coordenador leem: para os outros não dá para saber se está urgente. */}
-          {podeGerir && semPedido.urgentes > 0 && ` · ${semPedido.urgentes} sem contato há ${diasSemContatoParaUrgente()} dias ou mais`}
-          {semPedido.valor > 0 && ` · ${formatCurrency(semPedido.valor)}`}
-        </NoticeBar>
-      )}
 
         <CarteiraSegmentTabs<Segmento>
           testIdPrefix="emendas-pedidos-etapa"

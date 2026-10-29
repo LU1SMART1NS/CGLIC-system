@@ -117,24 +117,12 @@ describe('Pedidos: ver por pedido ou por emenda', () => {
   });
 });
 
-describe('Pedidos: a faixa das emendas sem pedido', () => {
-  it('por pedido: faixa acima do trilho com as emendas sem pedido, fora da contagem das fases (decisão de 26/10/2026)', () => {
+describe('Pedidos: sem a faixa das emendas sem pedido', () => {
+  it('a faixa amarela saiu da tela (decisão de 29/10/2026); as emendas sem pedido seguem na tela Emendas', () => {
     perfil.gerir = true;
     const html = render('/');
-    expect(html).toContain('emendas-pedidos-faixa-sem-pedido');
-    expect(html).toContain('2 emendas indicadas no SIOP ainda sem pedido');
-    expect(html).toContain('1 sem contato há 7 dias ou mais');
-    expect(html).toContain('role="alert"');
-    expect(html).toContain('Ver emendas');
-    expect(render('/?ver=emenda')).not.toContain('emendas-pedidos-faixa-sem-pedido');
-  });
-
-  it('faixa para a consulta: sem a urgência, que depende dos contatos que ela não lê', () => {
-    perfil.gerir = false;
-    const html = render('/');
-    expect(html).toContain('2 emendas indicadas no SIOP ainda sem pedido');
-    expect(html).not.toContain('sem contato há');
-    perfil.gerir = true;
+    expect(html).not.toContain('emendas-pedidos-faixa-sem-pedido');
+    expect(html).not.toContain('indicadas no SIOP ainda sem pedido');
   });
 });
 
