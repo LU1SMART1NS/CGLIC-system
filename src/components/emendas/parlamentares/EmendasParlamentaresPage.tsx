@@ -119,7 +119,7 @@ export const EmendasParlamentaresPage: React.FC = () => {
   const anoDaUrl = searchParams.get('ano');
   const ativos = useMemo(() => pedidos.filter((p) => p.etapa !== 'CANCELADO' && pedidoNoAno(p, lerAnoDaUrl(anoDaUrl, anoCorrente, false))), [pedidos, anoDaUrl, anoCorrente]);
   const anosDoSeletor = contagemPorAno(pedidos, anoCorrente);
-  const { emendas, porAutor, minimo, precos } = useSobraDasEmendas(pedidos, itens, notas, ano);
+  const { emendas, porAutor, precos } = useSobraDasEmendas(pedidos, itens, notas, ano, true);
   const pago = useMemo(() => pagoPorParlamentar(ativos, notas), [ativos, notas]);
 
   const linhas: Linha[] = useMemo(() => {
@@ -132,6 +132,10 @@ export const EmendasParlamentaresPage: React.FC = () => {
       l.pedidos++;
       l.lista.push(p);
       m.set(chave, l);
+    }
+    // Emenda do ano registrada do SIOP e ainda sem pedido: o parlamentar entra na lista com 0 pedido (29/10/2026).
+    if (!semAnoEscolhido) {
+      for (const [id, e] of porAutor) if (id && !m.has(id)) m.set(id, { autorId: id, autor: autorPorId.get(id), pedidos: 0, emendas: e, execucao: undefined, lista: [] });
     }
     if (mostrar === 'todos') {
       for (const a of autores) if (!m.has(a.id)) m.set(a.id, { autorId: a.id, autor: a, pedidos: 0, emendas: semAnoEscolhido ? undefined : porAutor.get(a.id), execucao: undefined, lista: [] });
@@ -150,9 +154,10 @@ export const EmendasParlamentaresPage: React.FC = () => {
     return [...m.values()].sort((a, b) => valorDa(b) - valorDa(a) || b.pedidos - a.pedidos || (a.autor?.nome ?? '').localeCompare(b.autor?.nome ?? '', 'pt-BR'));
   }, [ativos, autorPorId, autores, mostrar, porAutor, pago, gruposDosBeneficiarios, itens, precos, semAnoEscolhido]);
   const semPedido = useMemo(() => {
+    // Quem já aparece pela emenda do ano sem pedido não conta: está na lista.
     const com = new Set(ativos.map((p) => p.autorId));
-    return autores.filter((a) => !com.has(a.id)).length;
-  }, [ativos, autores]);
+    return autores.filter((a) => !com.has(a.id) && (semAnoEscolhido || !porAutor.has(a.id))).length;
+  }, [ativos, autores, porAutor, semAnoEscolhido]);
   const ORDEM = ordem(encerrado);
 
   const doTipo = linhas.filter((l) => tipo === 'todos' || l.autor?.tipo === tipo);
@@ -161,10 +166,20 @@ export const EmendasParlamentaresPage: React.FC = () => {
   const filtradas = doTipo.filter((l) => naSituacao(l) && (!uf || l.autor?.uf === uf) && passaFiltroGti(l.captacao, filtroCaptacao, modoCaptacao) && (!termo || semAcento(`${l.autorId ? l.autor?.nome ?? '' : AUTOR_A_DEFINIR} ${l.autor?.partido ?? ''} ${l.autor?.uf ?? ''}`).includes(termo)));
   const ufs = [...new Set(doTipo.map((l) => l.autor?.uf).filter((x): x is string => Boolean(x)))].sort().map((v) => ({ value: v, label: v, count: doTipo.filter((l) => l.autor?.uf === v).length }));
   const filtrosAtivos = Boolean(termo || uf || mostrar || situacao || filtroCaptacao !== 'TODOS');
+  // "61 parlamentares e 13 bancadas": a bancada não é um parlamentar (29/10/2026).
+  const quemTemEmenda = useMemo(() => {
+    const ids = [...porAutor.keys()].filter(Boolean);
+    const bancadas = ids.filter((id) => autorPorId.get(id)?.tipo === 'BANCADA').length;
+    const parlamentares = ids.length - bancadas;
+    const partes = [
+      parlamentares ? `${formatNumber(parlamentares)} ${parlamentares === 1 ? 'parlamentar' : 'parlamentares'}` : '',
+      bancadas ? `${formatNumber(bancadas)} ${bancadas === 1 ? 'bancada' : 'bancadas'}` : ''
+    ].filter(Boolean);
+    return partes.join(' e ') || 'nenhum parlamentar';
+  }, [porAutor, autorPorId]);
   const naoEmpenhadas = emendas.filter((e) => e.situacao === 'naoEmpenhado');
   const contagemCaptacao = contarPorGti(doTipo.map((l) => l.captacao), modoCaptacao, GRUPOS_CAPTACAO);
   const comSobra = emendas.filter((e) => e.situacao === 'sobra');
-  const aConferir = emendas.filter((e) => e.situacao === 'conferir' || e.situacao === 'informar' || e.situacao === 'acima');
   const valorOu = (v: number | undefined) => (v == null ? vazio : <span style={carteiraNumero}>{formatCurrency(v)}</span>);
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ORDEM);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chaveDaLinha, POR_PAGINA);
@@ -269,7 +284,7 @@ export const EmendasParlamentaresPage: React.FC = () => {
           title={`Emendas de ${ano}${encerrado ? ' (ano encerrado)' : ''}`}
           testId="emendas-sobra-faixa"
           items={[
-            { label: 'Emendas', value: formatNumber(emendas.length), hint: `${formatNumber(porAutor.size)} ${porAutor.size === 1 ? 'parlamentar' : 'parlamentares'}` },
+            { label: 'Emendas', value: formatNumber(emendas.length), hint: quemTemEmenda },
             { label: 'Valor no SIOP', value: formatCurrency(emendas.reduce((t, e) => t + (e.valor ?? 0), 0)), hint: 'soma das emendas' },
             encerrado
               ? {
@@ -280,10 +295,9 @@ export const EmendasParlamentaresPage: React.FC = () => {
               : {
                   label: 'Valor a indicar',
                   value: formatCurrency(comSobra.reduce((t, e) => t + e.sobra, 0)),
-                  hint: `${formatNumber(comSobra.length)} ${comSobra.length === 1 ? 'emenda' : 'emendas'}${minimo != null ? `, a partir de ${formatCurrency(minimo)}` : ''}`,
+                  hint: `${formatNumber(comSobra.length)} ${comSobra.length === 1 ? 'emenda' : 'emendas'}`,
                   tone: comSobra.length ? 'warning' : 'default'
-                },
-            { label: 'A conferir', value: formatNumber(aConferir.length), hint: 'itens sem nota ou empenhado acima do valor' }
+                }
           ]}
         />
       )}

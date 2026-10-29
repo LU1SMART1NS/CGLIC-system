@@ -94,6 +94,15 @@ describe('sobra das emendas (migration 204)', () => {
     expect(e).toMatchObject({ oficiado: 12000, situacao: 'acima' });
   });
 
+  it('emenda registrada sem pedido: só entra quando pedida, com o valor inteiro a indicar (29/10/2026)', () => {
+    const semPedido = { ...registrada(360000), id: 'em2', numero: '29730025', autorId: 'A2' };
+    const p = pedido(1, 'CGOFI', [linha('l1', 'a', 1)], { oficioValor: 8000 });
+    const base = { pedidos: [p], ano: 2026, itens, notas: new Map(), portal: new Map(), minimo: 19, emendas: [registrada(10000), semPedido] };
+    expect(sobraDasEmendas(base).map((e) => e.emenda)).toEqual(['43600002']);
+    const e = sobraDasEmendas({ ...base, incluirSemPedido: true }).find((x) => x.emenda === '29730025');
+    expect(e).toMatchObject({ autorId: 'A2', pedidos: [], valor: 360000, oficiado: 0, empenhado: 0, emAndamento: 0, sobra: 360000, situacao: 'sobra' });
+  });
+
   it('menor preço só de ata vigente com saldo livre', () => {
     expect(menorPrecoDisponivel(itens, new Map())).toBe(19);
     expect(menorPrecoDisponivel(itens, new Map([['b', 100]]))).toBe(1000);

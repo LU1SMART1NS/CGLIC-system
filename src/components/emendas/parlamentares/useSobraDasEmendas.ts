@@ -13,7 +13,13 @@ const SEM_EMENDAS: EmendaSiop[] = [];
  * que a CAEP ainda oferece. A mesma conta em Parlamentares e no Parlamentar 360. Ano antes do corrente = encerrado:
  * o resto vira "Não empenhado" (28/10/2026).
  */
-export function useSobraDasEmendas(pedidos: PedidoEmenda[], itens: Map<string, ItemCaep>, notas: Map<string, NotaDaLinha>, ano: number | readonly number[]) {
+export function useSobraDasEmendas(
+  pedidos: PedidoEmenda[],
+  itens: Map<string, ItemCaep>,
+  notas: Map<string, NotaDaLinha>,
+  ano: number | readonly number[],
+  incluirSemPedido = false
+) {
   const { precos } = usePrecosParaEmenda();
   const { data: portal = SEM_PORTAL } = useExecucaoEmendas();
   // Valor da emenda no SIOP: o da emenda registrada (migration 232).
@@ -24,8 +30,8 @@ export function useSobraDasEmendas(pedidos: PedidoEmenda[], itens: Map<string, I
   const portalPorCodigo = useMemo(() => new Map(portal.map((x) => [x.codigo, x])), [portal]);
   const anoCorrente = Number(hojeEmBrasilia().slice(0, 4));
   const emendas = useMemo(
-    () => anos.flatMap((a) => sobraDasEmendas({ pedidos, ano: a, itens, notas, portal: portalPorCodigo, precos, minimo, encerrado: a < anoCorrente, emendas: registradas })),
-    [pedidos, anos, itens, notas, portalPorCodigo, precos, minimo, anoCorrente, registradas]
+    () => anos.flatMap((a) => sobraDasEmendas({ pedidos, ano: a, itens, notas, portal: portalPorCodigo, precos, minimo, encerrado: a < anoCorrente, emendas: registradas, incluirSemPedido })),
+    [pedidos, anos, itens, notas, portalPorCodigo, precos, minimo, anoCorrente, registradas, incluirSemPedido]
   );
   const porAutor = useMemo(() => sobraPorAutor(emendas), [emendas]);
   return { emendas, porAutor, minimo, precos, portalPorCodigo };
