@@ -604,6 +604,8 @@ export interface PedidoEmenda {
   oficioValorRetificador?: boolean;
   /** Preço unitário de cada item (item_key → R$) no quadro da minuta registrada (migration 234); nulo antes disso. */
   minutaPrecos?: Record<string, number> | null;
+  /** Último dia para o ofício chegar, gravado com a minuta (migration 246); nulo sem minuta registrada. */
+  minutaValidaAte?: string | null;
   conferidoEm: string | null;
   /** Solicitação de empenho (CAEP → DGFNSP). */
   solicitadoEm: string | null;
@@ -869,6 +871,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       oficioValorDocumentoSei: p.oficio_valor_documento_sei ?? null,
       oficioValorRetificador: p.oficio_valor_retificador === true,
       minutaPrecos: p.minuta_precos && typeof p.minuta_precos === 'object' ? (p.minuta_precos as Record<string, number>) : null,
+      minutaValidaAte: p.minuta_valida_ate ?? null,
       conferidoEm: p.conferido_em ?? null,
       solicitadoEm: p.solicitado_em ?? null,
       solicitadoDocumentoSei: p.solicitado_documento_sei ?? null,

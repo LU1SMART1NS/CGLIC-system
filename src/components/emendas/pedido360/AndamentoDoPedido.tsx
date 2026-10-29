@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { usePrecosParaEmenda } from '../../../hooks/useEmendasQuadro';
 import { Link } from 'react-router-dom';
 import { Check, ChevronDown, ChevronRight, Circle, CircleDashed, CircleDot, Minus, RotateCcw } from 'lucide-react';
 import { InfoHint } from '../../../design-system/components/InfoHint';
@@ -92,7 +93,8 @@ const Documentos: React.FC<{ p: PedidoEmenda; etapa: Parameters<typeof documento
  * e a linha do tempo de antes; os botões abrem as mesmas janelas.
  */
 export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, hoje, podeGerir, podeVerContratos, onAcao, onAlterar, onAnular }) => {
-  const andamento = useMemo(() => andamentoDoPedido(p, itens, notas, hoje, podeGerir), [p, itens, notas, hoje, podeGerir]);
+  const { precos } = usePrecosParaEmenda();
+  const andamento = useMemo(() => andamentoDoPedido(p, itens, notas, hoje, podeGerir, precos), [p, itens, notas, hoje, podeGerir, precos]);
   const [filtro, setFiltro] = useState<GrupoTarefa | null>(null);
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
   const cancelado = p.etapa === 'CANCELADO';

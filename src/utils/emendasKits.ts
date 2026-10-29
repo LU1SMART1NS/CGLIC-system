@@ -5,13 +5,14 @@
  * Entrega 1: saldo do item = alocado à CAEP. Na entrega 2 os pedidos dos parlamentares saem desse saldo.
  */
 import type { ItemCaep, KitEmenda, LinhaPedido } from '../services/emendasService';
-import type { PrecoPrevisto } from '../services/emendasQuadroService';
+import type { PrecoDoItem } from '../services/emendasQuadroService';
 import { descricaoItemEmFrase } from './textCase';
 import { EMENDAS_RULES } from '../config/alertRules';
+import { podeReservar, reajusteDoItem } from './emendasReajuste';
 
-/** Dias antes do fim da ata em que o kit e o pedido avisam (Ajustes; padrão 60). Lido na hora, nunca copiado. */
+/** Dias antes do fim da ata em que o kit e o pedido avisam (Ajustes; padrão 90). Lido na hora, nunca copiado. */
 export const avisoIndicacaoDias = (): number => EMENDAS_RULES.avisoIndicacaoAntesDias;
-/** A menos destes dias do fim da ata não se recebe indicação (Ajustes; padrão 35; o banco confere, migration 162). */
+/** A menos destes dias do fim da ata não se recebe indicação (Ajustes; padrão 60; o banco confere, migrations 162 e 246). */
 export const corteIndicacaoDias = (): number => EMENDAS_RULES.corteIndicacaoAntesDias;
 
 /** Último dia para receber indicação com itens da ata: fim da vigência menos o corte. */
@@ -38,10 +39,8 @@ export interface CalculoDoKit {
   situacao: SituacaoKit;
   motivo: string;
   kitsPossiveis: number;
-  /** Valor de um kit pelo preço previsto para a emenda (sem os preços previstos, o de hoje). */
+  /** Valor de um kit pelo preço de hoje das atas (o da emenda). */
   valorPorKit: number;
-  /** Valor de um kit pelo preço de hoje das atas. */
-  valorPorKitHoje: number;
   componentes: ComponenteDoKit[];
   /** Item que trava ou vai travar o kit (ata encerrada, sem saldo ou ata vencendo). */
   itemLimitante: ComponenteDoKit | null;
@@ -88,7 +87,7 @@ export function calcularKit(
   itens: Map<string, ItemCaep>,
   hoje: string,
   saldoDoItem: (item: ItemCaep) => number = (i) => i.alocado,
-  precos?: Map<string, PrecoPrevisto>
+  precos?: Map<string, PrecoDoItem>
 ): CalculoDoKit {
   const componentes: ComponenteDoKit[] = kit.itens.map((c) => {
     const item = itens.get(c.itemKey) ?? null;
@@ -104,10 +103,9 @@ export function calcularKit(
   });
   const soma = (preco: (k: string) => number) => Math.round(componentes.reduce((s, c) => s + (c.item ? preco(c.itemKey) * c.quantidade : 0), 0) * 100) / 100;
   // A mesma regra de precoParaEmenda (emendasPedidos, que importa daqui).
-  const valorPorKitHoje = soma((k) => precos?.get(k)?.precoAtual ?? itens.get(k)?.valorUnitario ?? 0);
-  const valorPorKit = soma((k) => precos?.get(k)?.precoPrevisto ?? precos?.get(k)?.precoAtual ?? itens.get(k)?.valorUnitario ?? 0);
+  const valorPorKit = soma((k) => precos?.get(k)?.precoAtual ?? itens.get(k)?.valorUnitario ?? 0);
   const kitsPossiveis = componentes.length ? Math.min(...componentes.map((c) => c.kits)) : 0;
-  const base = { kitsPossiveis, valorPorKit, valorPorKitHoje, componentes };
+  const base = { kitsPossiveis, valorPorKit, componentes };
 
   if (!kit.ativo) return { ...base, situacao: 'desativado', motivo: 'Desativado pela CAEP.', itemLimitante: null };
 
@@ -133,6 +131,19 @@ export function calcularKit(
       situacao: 'indisponivel',
       motivo: `A ata ${noCorte.item!.numeroAta} (${curto(noCorte.item!.descricao)}) termina em ${dataBR(noCorte.item!.vigenciaFinal)}: passou do prazo de indicação (${corteIndicacaoDias()} dias antes do fim). Troque o item ou espere a prorrogação.`,
       itemLimitante: noCorte
+    };
+  }
+  // Item perto do reajuste da ata (ou com o reajuste devido) não entra em reserva nova (migration 246).
+  const noReajuste = componentes
+    .map((c) => ({ c, r: reajusteDoItem(precos?.get(c.itemKey), hoje) }))
+    .find((x) => !podeReservar(x.r));
+  if (noReajuste) {
+    return {
+      ...base,
+      kitsPossiveis: 0,
+      situacao: 'indisponivel',
+      motivo: `A ata ${noReajuste.c.item!.numeroAta} (${curto(noReajuste.c.item!.descricao)}): ${noReajuste.r.rotulo!.charAt(0).toLowerCase()}${noReajuste.r.rotulo!.slice(1)}. ${noReajuste.r.detalhe}`,
+      itemLimitante: noReajuste.c
     };
   }
   const limitante = componentes.reduce<ComponenteDoKit | null>((m, c) => (m == null || c.kits < m.kits ? c : m), null);

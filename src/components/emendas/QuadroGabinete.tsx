@@ -5,10 +5,13 @@ import { copiar } from '../../utils/copiarQuadro';
 import { Tabs } from '../../design-system/components/Tabs';
 import { InfoHint } from '../../design-system/components/InfoHint';
 import { useToast } from '../../design-system/components/Toast';
-import { useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
+import { hojeEmBrasilia, useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { ataEItem, brl, COLUNAS, emendaNoQuadro, htmlDaTabela, montarQuadro, reais, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
 import type { AutorEmenda } from '../../services/emendasService';
+import { dataBR } from '../../utils/emendasKits';
+import { itensDaLinha } from '../../utils/emendasPedidos';
+import { podeIrNaMinuta, reajusteDoItem, tramiteAteContratoDias, validadeMinutaDiasUteis } from '../../utils/emendasReajuste';
 
 const borda = '1px solid #000';
 const celula: React.CSSProperties = { border: borda, padding: '0.35rem 0.4rem', textAlign: 'center', verticalAlign: 'middle' };
@@ -28,17 +31,17 @@ const aviso: React.CSSProperties = {
 /** Explicação do ⓘ ao lado do título. */
 const AJUDA_DO_QUADRO =
   'A Tabela 1 é para colar no Word ou no SEI: cada item aparece uma vez, com uma linha para cada beneficiário, e os kits ' +
-  'já vêm abertos nos seus itens. O texto é a versão curta para mandar ao parlamentar pelo WhatsApp. Os valores já incluem o ' +
-  'reajuste que a ata pode ter até o empenho, mais uma folga de Ajustes para o caso de o IPCA vir maior, para não faltar recurso. O prazo do ofício é de 30 dias, ou menos quando alguma ' +
-  'ata está perto de vencer.';
+  'já vêm abertos nos seus itens. O texto é a versão curta para mandar ao parlamentar pelo WhatsApp. Os valores são o preço ' +
+  'de hoje das atas: o ofício precisa pedir exatamente esses valores, que são os empenhados. O prazo do ofício é curto (dias ' +
+  'úteis de Ajustes), e menor quando alguma ata reajusta ou termina logo, para o contrato sair antes pelo mesmo preço.';
 
 interface Props {
   autor: AutorEmenda | null | undefined;
   linhas: LinhaDoPedidoNoQuadro[];
   /** Data da reserva (AAAA-MM-DD). */
   data: string;
-  /** Ofício devolvido: o prazo do novo ofício conta daqui. */
-  devolvidoEm?: string | null;
+  /** Prazo do ofício gravado quando a minuta foi registrada (migration 246). */
+  minutaValidaAte?: string | null;
   /** Emenda do pedido (migration 243): sai na coluna EMENDA e no texto do WhatsApp. */
   emenda?: { numero: string; ano: number } | null;
   testId?: string;
@@ -46,13 +49,14 @@ interface Props {
 
 /**
  * Quadro da reserva para o parlamentar (migration 165): o Anexo que a CAEP manda ao parlamentar, pronto para colar no
- * Word ou no SEI (tabela) ou no WhatsApp (texto). O valor unitário já vem com o reajuste previsto da ata.
+ * Word ou no SEI (tabela) ou no WhatsApp (texto). O valor unitário é o preço de hoje da ata (migration 246).
  */
-export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvidoEm, emenda, testId = 'emendas-quadro' }) => {
+export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, minutaValidaAte, emenda, testId = 'emendas-quadro' }) => {
   const toast = useToast();
   const { data: itensLista = [] } = useItensCaep();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
-  const { precos, ipca, semPrevisao: semPrecos } = usePrecosParaEmenda();
+  const { precos, semPrevisao: semPrecos } = usePrecosParaEmenda();
+  const hoje = hojeEmBrasilia();
   const [aba, setAba] = useState<'sei' | 'whatsapp'>('sei');
 
   const quadro = useMemo(
@@ -61,15 +65,25 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
         autor,
         linhas,
         data,
-        devolvidoEm,
+        hoje,
+        prazoGravado: minutaValidaAte,
         itens: new Map(itensLista.map((i) => [i.itemKey, i])),
         beneficiarios: new Map(beneficiariosLista.map((b) => [b.id, b])),
         precos: precos ?? new Map(),
-        ipca,
         emenda
       }),
-    [autor, linhas, data, devolvidoEm, itensLista, beneficiariosLista, precos, ipca, emenda]
+    [autor, linhas, data, hoje, minutaValidaAte, itensLista, beneficiariosLista, precos, emenda]
   );
+  // Itens que não podem sair na minuta (migration 246): a menos do tempo até o contrato do reajuste, ou com o devido.
+  const foraDaMinuta = useMemo(() => {
+    const vistos = new Map<string, string>();
+    for (const l of linhas)
+      for (const x of itensDaLinha(l)) {
+        const r = reajusteDoItem(precos?.get(x.itemKey), hoje);
+        if (!podeIrNaMinuta(r)) vistos.set(x.itemKey.split('-')[0], `ata ${x.itemKey.split('-')[0]} (${r.rotulo?.toLowerCase()})`);
+      }
+    return [...vistos.values()];
+  }, [linhas, precos, hoje]);
   const texto = useMemo(() => textoParaWhatsapp(quadro), [quadro]);
   const html = useMemo(() => htmlDaTabela(quadro), [quadro]);
 
@@ -84,7 +98,6 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
     }
   };
 
-  const diferenca = quadro.total - quadro.totalHoje;
   const semGndMisturado = quadro.semGnd > 0 && quadro.semGnd < quadro.linhas.length;
 
   return (
@@ -110,7 +123,25 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
         />
       </div>
 
-      {semPrecos && <div style={aviso} role="status">Não foi possível ler o reajuste previsto: o quadro usa o preço de hoje das atas.</div>}
+      {quadro.prazoDoOficio && (
+        <div style={aviso} role="status" data-testid={`${testId}-prazo`}>
+          Enviar o ofício até {dataBR(quadro.prazoDoOficio.data)}
+          {quadro.prazoDoOficio.pela === 'REAJUSTE'
+            ? ` (reajuste da ata ${quadro.prazoDoOficio.ata} menos ${tramiteAteContratoDias()} dias até o contrato)`
+            : quadro.prazoDoOficio.pela === 'ATA'
+              ? ` (prazo de indicação da ata ${quadro.prazoDoOficio.ata})`
+              : minutaValidaAte
+                ? ' (prazo gravado com a minuta)'
+                : ` (${validadeMinutaDiasUteis()} dias úteis)`}
+          . Depois disso, nova minuta com o preço do dia.
+        </div>
+      )}
+      {foraDaMinuta.length > 0 && !minutaValidaAte && (
+        <div style={{ ...aviso, background: 'var(--color-danger-bg, #fde8e6)', color: 'var(--color-danger-text, #b3261e)' }} role="alert" data-testid={`${testId}-fora-da-minuta`}>
+          A minuta não pode sair com {foraDaMinuta.join(', ')}: não dá tempo de assinar o contrato pelo preço de hoje. Troque ou retire o item.
+        </div>
+      )}
+      {semPrecos && <div style={aviso} role="status">Não foi possível ler o reajuste das atas: confira se algum item está perto do reajuste antes de enviar.</div>}
       {quadro.semBeneficiario > 0 && (
         <div style={aviso} role="status">
           {quadro.semBeneficiario === 1 ? '1 item sai' : `${quadro.semBeneficiario} itens saem`} com o beneficiário “a definir”.
@@ -202,7 +233,6 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
         <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary, #334155)' }}>
           Total a empenhar <b style={{ color: 'var(--primary)' }}>{brl(quadro.total)}</b>
           {quadro.porGnd.map((g) => ` · ${g.gnd ?? 'sem GND'} ${brl(g.total)}`).join('')}
-          {diferenca > 0.004 ? ` · +${brl(diferenca)} sobre o preço de hoje` : ''}
         </span>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <AppButton type="button" icon={<Copy size={16} aria-hidden="true" />} onClick={() => void copiarPara('sei')} data-testid={`${testId}-copiar-sei`}>

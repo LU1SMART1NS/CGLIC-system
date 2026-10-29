@@ -5,9 +5,9 @@ import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { useSalvarKit } from '../../hooks/useEmendas';
-import { formatNumber } from '../../utils/format';
+import { formatCurrency, formatNumber } from '../../utils/format';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
-import { precoParaEmenda, textoDoPreco } from '../../utils/emendasPedidos';
+import { precoParaEmenda } from '../../utils/emendasPedidos';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { avisoIndicacaoDias, buscarItensCaep, calcularKit, dataBR, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta, sugestoesDeTroca } from '../../utils/emendasKits';
 import type { ItemCaep, ItemDoKit, KitEmenda } from '../../services/emendasService';
@@ -57,7 +57,7 @@ export const KitModal: React.FC<Props> = ({ kit, itens, nomesExistentes, hoje, s
   const encontrados = buscarItensCaep(disponiveis, busca).filter((i) => !noKit.has(i.itemKey));
   const originais = new Set(kit?.itens.map((i) => i.itemKey) ?? []);
   const { precos } = usePrecosParaEmenda();
-  const preco = (i: ItemCaep) => { const p = precoParaEmenda(i.itemKey, porChave, precos); return textoDoPreco(p.previsto, p.hoje, ' un.'); };
+  const preco = (i: ItemCaep) => { const p = precoParaEmenda(i.itemKey, porChave, precos); return `${formatCurrency(p.valor)} un.`; };
   const calculo = calcularKit({ ativo: true, itens: linhas }, porChave, hoje, saldoDoItem, precos);
 
   const pendencias: string[] = [];
@@ -202,7 +202,7 @@ export const KitModal: React.FC<Props> = ({ kit, itens, nomesExistentes, hoje, s
 
         {linhas.length > 0 && (
           <div style={aviso(calculo.situacao === 'indisponivel' ? 'erro' : calculo.situacao === 'vence' ? 'atencao' : 'info')} data-testid="emendas-kit-resumo">
-            Com o saldo de hoje dá para oferecer <b>{formatNumber(calculo.kitsPossiveis)}</b> kits. Valor por kit: {textoDoPreco(calculo.valorPorKit, calculo.valorPorKitHoje)}.
+            Com o saldo de hoje dá para oferecer <b>{formatNumber(calculo.kitsPossiveis)}</b> kits. Valor por kit: {formatCurrency(calculo.valorPorKit)}.
             {calculo.motivo ? ` ${calculo.motivo}` : ''}
           </div>
         )}

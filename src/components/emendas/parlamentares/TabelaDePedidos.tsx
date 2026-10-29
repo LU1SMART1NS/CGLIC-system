@@ -10,14 +10,14 @@ import { avisoGrave, avisosDoPedido, execucaoDoPedido, rotuloDaEtapaDoPedido, va
 import { numeroDaEmenda } from '../../../utils/emendasSemPedido';
 import { faltaAnoDaEmenda, numeroDoPedido, rotaDoPedido } from '../../../utils/emendasNomeDoPedido';
 import type { ConferenciaEmpenho, ItemCaep, NotaDaLinha, PedidoEmenda } from '../../../services/emendasService';
-import type { PrecoPrevisto } from '../../../services/emendasQuadroService';
+import type { PrecoDoItem } from '../../../services/emendasQuadroService';
 import type { CredorNoPedido } from '../../../utils/emendasConferenciaNota';
 
 interface Props {
   pedidos: PedidoEmenda[];
   itens: Map<string, ItemCaep>;
   notas: Map<string, NotaDaLinha>;
-  precos: Map<string, PrecoPrevisto> | undefined;
+  precos: Map<string, PrecoDoItem> | undefined;
   hoje: string;
   diferencas: Map<string, ConferenciaEmpenho[]>;
   credor: Map<string, CredorNoPedido[]>;
@@ -80,7 +80,7 @@ export const TabelaDePedidos: React.FC<Props> = ({ pedidos, itens, notas, precos
       header: 'Aviso',
       nowrap: true,
       render: (p) => {
-        const [a, ...outros] = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credor.get(p.id));
+        const [a, ...outros] = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credor.get(p.id), precos);
         if (!a) return <span style={carteiraDetalhe}>—</span>;
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>

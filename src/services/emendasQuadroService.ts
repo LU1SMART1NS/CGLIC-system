@@ -2,7 +2,7 @@
  * Quadro da reserva para o parlamentar (migration 165): o que a CAEP copia para o SEI ou para o WhatsApp no formato do
  * Anexo (DESCRIÇÃO ITEM · BENEFICIÁRIO FINAL · MUNICÍPIO · QTD · VR UNITÁRIO · VR TOTAL · TOTAL A EMPENHAR).
  *
- * Lê o preço previsto de cada item pela projeção do reajuste da ata (emendas_precos_previstos) e grava o nome na ata assinada e
+ * Lê o preço de hoje e a data do reajuste de cada item (emendas_reajuste_dos_itens) e grava o nome na ata assinada e
  * o GND do item (salvar_dados_item_emenda, emendas.manage, com conferência de versão).
  */
 import { supabase } from './supabaseClient';
@@ -10,31 +10,23 @@ import { mensagemDoBanco } from './emendasService';
 
 export type GndItem = 'GND-3' | 'GND-4';
 
-/**
- * Por que o preço previsto é o que é:
- * - PREVISTO: próximo reajuste dentro da vigência; SE_PRORROGAR: reajuste na prorrogação da ata;
- * - DEVIDO: reajuste já devido e ainda não aplicado na ata;
- * - SEM_PREVISAO: falta base para calcular (termo de conformidade, percentual ou índice);
- * - EM_DIA / SEM_REAJUSTE: vale o preço de hoje.
- * No quadro (aplicarPrazoDoEmpenho) ainda entram: FORA_DO_PRAZO, reajuste depois do empenho provável (preço de hoje);
- * FOLGA_IPCA, sem base, com a folga do IPCA dos últimos 12 meses.
- */
-export type MotivoPrecoPrevisto = 'PREVISTO' | 'SE_PRORROGAR' | 'DEVIDO' | 'SEM_PREVISAO' | 'SEM_REAJUSTE' | 'EM_DIA' | 'FORA_DO_PRAZO' | 'FOLGA_IPCA';
+/** De onde vem a data do reajuste: o próximo reajuste da ata, a prorrogação, ou o fim da vigência (ata sem data-base). */
+export type OrigemDoReajuste = 'REAJUSTE' | 'PRORROGACAO' | 'FIM_DA_VIGENCIA' | 'DEVIDO';
 
-export interface PrecoPrevisto {
+/**
+ * Preço de hoje de um item da CAEP e a data do próximo reajuste da ata (migration 246). Desde 29/10/2026 o ofício e o
+ * empenho são pelo preço de hoje, sem projeção; a data do reajuste decide até quando o item entra em reserva e minuta.
+ */
+export interface PrecoDoItem {
   itemKey: string;
   precoAtual: number;
-  precoPrevisto: number;
-  motivo: MotivoPrecoPrevisto;
-  /** Já havia reajuste devido (o previsto inclui os dois). */
+  /** Data do próximo reajuste (ou do fim da vigência, na ata sem data-base); null sem reajuste na vigência ou com o devido. */
+  dataReajuste: string | null;
+  origem: OrigemDoReajuste | null;
+  /** Reajuste devido e ainda não aplicado: o preço do banco é o antigo e o item fica fora até o apostilamento. */
   devido: boolean;
-  /** Quando o próximo reajuste passa a valer (só PREVISTO e SE_PRORROGAR). */
-  efeito: string | null;
-  percentual: number | null;
-  /** Meses do percentual que vêm da projeção do Focus, não do IPCA publicado. */
-  mesesEstimados: number | null;
-  /** Folga (%) somada ao reajuste projetado na tela (aplicarPrazoDoEmpenho); ausente no preço que vem do banco. */
-  folga?: number;
+  /** Preço com o reajuste devido, só para o texto do aviso. */
+  precoDevido: number | null;
 }
 
 function db() {
@@ -44,44 +36,18 @@ function db() {
 
 const num = (v: unknown): number => (v == null ? 0 : Number(v));
 
-export interface IpcaDozeMeses {
-  /** IPCA acumulado (%) nos últimos 12 meses publicados. */
-  percentual: number;
-  /** Primeiro e último mês (AAAA-MM-01). */
-  de: string;
-  ate: string;
-}
-
-/** IPCA acumulado dos 12 últimos meses publicados (série do BCB lida pelo servidor); null sem os 12 meses. */
-export async function fetchIpcaDozeMeses(): Promise<IpcaDozeMeses | null> {
-  const { data, error } = await db()
-    .from('indices_precos_mensais')
-    .select('mes, variacao')
-    .eq('indice', 'IPCA')
-    .eq('tipo', 'OFICIAL')
-    .order('mes', { ascending: false })
-    .range(0, 11);
+export async function fetchPrecosDosItens(): Promise<Map<string, PrecoDoItem>> {
+  const { data, error } = await db().rpc('emendas_reajuste_dos_itens');
   if (error) throw new Error(mensagemDoBanco(error));
-  const meses = (data ?? []) as { mes: string; variacao: number | string }[];
-  if (meses.length < 12) return null;
-  const fator = meses.reduce((f, m) => f * (1 + Number(m.variacao) / 100), 1);
-  return { percentual: Math.round((fator - 1) * 10000) / 100, de: String(meses[11].mes).slice(0, 10), ate: String(meses[0].mes).slice(0, 10) };
-}
-
-export async function fetchPrecosPrevistos(): Promise<Map<string, PrecoPrevisto>> {
-  const { data, error } = await db().rpc('emendas_precos_previstos');
-  if (error) throw new Error(mensagemDoBanco(error));
-  const m = new Map<string, PrecoPrevisto>();
+  const m = new Map<string, PrecoDoItem>();
   for (const r of (data ?? []) as Record<string, any>[]) {
     m.set(r.item_key, {
       itemKey: r.item_key,
       precoAtual: num(r.preco_atual),
-      precoPrevisto: num(r.preco_previsto),
-      motivo: r.motivo,
+      dataReajuste: r.data_reajuste ?? null,
+      origem: r.origem ?? null,
       devido: Boolean(r.devido),
-      efeito: r.efeito ?? null,
-      percentual: r.percentual == null ? null : Number(r.percentual),
-      mesesEstimados: r.meses_estimados ?? null
+      precoDevido: r.preco_devido == null ? null : Number(r.preco_devido)
     });
   }
   return m;

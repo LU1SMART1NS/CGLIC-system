@@ -19,7 +19,7 @@ import { avisoIndicacaoDias, corteIndicacaoDias, ROTULO_SITUACAO_KIT, type Compo
 import type { KitEmenda } from '../../services/emendasService';
 import { KitModal } from './KitModal';
 import { montarLinhasKitsCaep, saldoDoItemParaKits, type LinhaKitCaep } from '../../utils/emendasItensSaldo';
-import { ItemDaAta, ValorPrevisto, VigenciaDaAta } from './emendasPartes';
+import { ItemDaAta, PrecoDaEmenda, VigenciaDaAta } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 
 type Segmento = 'todos' | SituacaoKit;
@@ -182,7 +182,7 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem, 
           }
         ]
       : []),
-    { key: 'valor', header: 'Valor por kit', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <ValorPrevisto previsto={l.calculo.valorPorKit} hoje={l.calculo.valorPorKitHoje} nota="Previsto para a emenda, com o reajuste das atas (o mesmo do quadro do parlamentar)" /> },
+    { key: 'valor', header: 'Valor por kit', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <PrecoDaEmenda valor={l.calculo.valorPorKit} /> },
     {
       key: 'possiveis',
       header: 'Kits possíveis',
@@ -211,7 +211,7 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem, 
       <PageHeader
         title="Itens"
         subtitle="Conjuntos de itens que a CAEP oferece aos parlamentares, e quantos ainda cabem no saldo."
-        hint={`O kit não guarda quantidade: pedir N kits tira de cada item N vezes a quantidade por kit. Vence em breve = alguma ata do kit acaba em até ${avisoIndicacaoDias()} dias; Indisponível = ata encerrada, a menos de ${corteIndicacaoDias()} dias do fim ou sem saldo (prazos em Ajustes › Regras de Alertas).`}
+        hint={`O kit não guarda quantidade: pedir N kits tira de cada item N vezes a quantidade por kit. Vence em breve = alguma ata do kit acaba em até ${avisoIndicacaoDias()} dias; Indisponível = ata encerrada, a menos de ${corteIndicacaoDias()} dias do fim, item perto do reajuste da ata ou sem saldo (prazos em Ajustes › Regras de Alertas).`}
         icon={<PackageOpen size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={seletor}
         actions={

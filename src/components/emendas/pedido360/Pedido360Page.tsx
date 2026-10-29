@@ -134,7 +134,7 @@ export const Pedido360Page: React.FC = () => {
   const p = pedido;
   const autor = p.autorId ? autorPorId.get(p.autorId) : undefined;
   const nomeDoAutor = autor?.nome ?? (p.autorId ?? AUTOR_A_DEFINIR);
-  const avisos = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id));
+  const avisos = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id), precos);
   const valor = valorDoPedidoNaEtapa(p, itens, precos);
   const captacao = fatiasDaCaptacao([p], gruposDosBeneficiarios, itens, precos);
   const onAcao = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) =>
@@ -251,7 +251,7 @@ export const Pedido360Page: React.FC = () => {
           )}
           {activeTab === 'quadro' && (
             <InstrumentSection id="pedido-quadro" title="Quadro do ofício" subtitle="O quadro da minuta do ofício, para copiar" icon={FileText}>
-              <QuadroGabinete autor={autor} linhas={linhasAtivas(p)} data={p.reservadoEm} devolvidoEm={p.devolvidoEm} emenda={emendaDoPedidoNoQuadro(p)} testId="pedido360-quadro" />
+              <QuadroGabinete autor={autor} linhas={linhasAtivas(p)} data={p.reservadoEm} minutaValidaAte={p.minutaValidaAte} emenda={emendaDoPedidoNoQuadro(p)} testId="pedido360-quadro" />
             </InstrumentSection>
           )}
         </Instrument360TabPanel>

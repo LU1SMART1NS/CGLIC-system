@@ -18,7 +18,7 @@ import {
   type ModoFiltroGti
 } from './gruposGti';
 import type { BeneficiarioEmenda, ItemCaep, PedidoEmenda } from '../services/emendasService';
-import type { PrecoPrevisto } from '../services/emendasQuadroService';
+import type { PrecoDoItem } from '../services/emendasQuadroService';
 import { linhasAtivas, valorDaLinha } from '../utils/emendasPedidos';
 
 /** Grupos que podem ser a captação principal (filtro e contagem). */
@@ -114,7 +114,7 @@ export function fatiasDaCaptacao(
   pedidos: PedidoEmenda[],
   grupos: Map<string, GrupoBeneficiario>,
   itens: Map<string, ItemCaep>,
-  precos?: Map<string, PrecoPrevisto>
+  precos?: Map<string, PrecoDoItem>
 ): FatiasDaAta & { porBeneficiario: BeneficiariosDaFatia[] } {
   const porGrupo = new Map<GrupoDaFatia, Map<string, number>>();
   for (const p of pedidos) {

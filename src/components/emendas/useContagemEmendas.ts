@@ -11,6 +11,7 @@ import {
   usePodeGerirEmendas
 } from '../../hooks/useEmendas';
 import { useAvisosResolvidos } from '../../hooks/useAvisosResolvidos';
+import { usePrecosDosItens } from '../../hooks/useEmendasQuadro';
 import { avisosDosPedidosParaOMenu } from '../../utils/emendasInicio';
 import { contaEmendasSemPedido, emendasNaLista } from '../../utils/emendasSemPedido';
 import { naoCarregou } from '../fonte/useLeiturasComFalha';
@@ -36,6 +37,8 @@ export function useContagemEmendas(): { total: number; urgentes: number; semPedi
   const { consulta: resolvidos } = useAvisosResolvidos();
   const emendas = useEmendasSiop({ enabled });
   const contatos = useContatosDasEmendas({ enabled });
+  // Sem os preços o menu ainda conta: só os avisos do reajuste da ata (migration 246) ficam de fora.
+  const { data: precos } = usePrecosDosItens({ enabled });
   const consultas = [pedidos, itens, notas, conferencia, credor, resolvidos, emendas, contatos];
   const carregando = consultas.some((q) => q.isLoading);
   // Uma leitura que falhou sem leitura anterior deixaria o número errado: o menu fica sem número.
@@ -43,8 +46,8 @@ export function useContagemEmendas(): { total: number; urgentes: number; semPedi
   const hoje = hojeEmBrasilia();
   return useMemo(() => {
     if (!enabled || carregando || algumaNaoCarregou || !pedidos.data || !itens.data || !notas.data) return null;
-    const { comAviso, urgentes } = avisosDosPedidosParaOMenu(pedidos.data, itens.data, hoje, notas.data, diferencas, credorPendente);
+    const { comAviso, urgentes } = avisosDosPedidosParaOMenu(pedidos.data, itens.data, hoje, notas.data, diferencas, credorPendente, precos);
     const sem = contaEmendasSemPedido(emendasNaLista(emendas.data ?? [], pedidos.data, contatos.data ?? [], hoje));
     return { total: comAviso + sem.total, urgentes: urgentes + sem.urgentes, semPedido: sem.total };
-  }, [enabled, carregando, algumaNaoCarregou, pedidos.data, itens.data, notas.data, hoje, diferencas, credorPendente, emendas.data, contatos.data]);
+  }, [enabled, carregando, algumaNaoCarregou, pedidos.data, itens.data, notas.data, hoje, diferencas, credorPendente, emendas.data, contatos.data, precos]);
 }

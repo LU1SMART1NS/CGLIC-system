@@ -27,7 +27,7 @@ export const ExportarItensEKits: React.FC = () => {
   const { data: pedidos = [], isLoading: carregandoPedidos } = usePedidosEmendas();
   const { data: kits = [], isLoading: carregandoKits } = useKitsEmendas();
   const { data: reservado, isLoading: carregandoReservado } = useReservadoPorItem();
-  const { precos, ipca } = usePrecosParaEmenda();
+  const { precos } = usePrecosParaEmenda();
   const fatias = useFatiasItensGti();
   const toast = useToast();
   const [aberta, setAberta] = useState(false);
@@ -37,8 +37,8 @@ export const ExportarItensEKits: React.FC = () => {
   const hoje = hojeEmBrasilia();
 
   const linhas = useMemo(
-    () => (aberta ? { itens: montarLinhasItensCaep(itens, pedidos, precos, ipca, fatias), kits: montarLinhasKitsCaep(kits, itens, hoje, reservado, precos) } : null),
-    [aberta, itens, pedidos, precos, ipca, fatias, kits, hoje, reservado]
+    () => (aberta ? { itens: montarLinhasItensCaep(itens, pedidos, precos, hoje, fatias), kits: montarLinhasKitsCaep(kits, itens, hoje, reservado, precos) } : null),
+    [aberta, itens, pedidos, precos, fatias, kits, hoje, reservado]
   );
   const quantas = useMemo(() => (linhas ? comSaldo(linhas.itens, linhas.kits) : { itens: [], kits: [] }), [linhas]);
   const nenhuma = !COLUNAS_ITENS.some((c) => escolha.itens.includes(c.id)) && !COLUNAS_KITS.some((c) => escolha.kits.includes(c.id));

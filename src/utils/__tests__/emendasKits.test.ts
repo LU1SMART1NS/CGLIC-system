@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { calcularKit, sugestoesDeTroca, diasEntre, buscarItensCaep, nomeDaLinhaDoPedido } from '../emendasKits';
 import type { ItemCaep } from '../../services/emendasService';
+import type { PrecoDoItem } from '../../services/emendasQuadroService';
 
 const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
   itemKey: k,
@@ -26,10 +27,10 @@ describe('calcularKit', () => {
     expect(r.itemLimitante?.itemKey).toBe('b');
   });
 
-  it('ata vencendo em até 60 dias: vence em breve, com a data', () => {
-    const r = calcularKit({ ativo: true, itens: [{ itemKey: 'a', quantidade: 1 }, { itemKey: 'l', quantidade: 1 }] }, mapa(item('a'), item('l', { numeroAta: '00061/2024', vigenciaFinal: '2026-12-19' })), HOJE);
+  it('ata vencendo em até 90 dias: vence em breve, com a data', () => {
+    const r = calcularKit({ ativo: true, itens: [{ itemKey: 'a', quantidade: 1 }, { itemKey: 'l', quantidade: 1 }] }, mapa(item('a'), item('l', { numeroAta: '00061/2024', vigenciaFinal: '2027-01-08' })), HOJE);
     expect(r.situacao).toBe('vence');
-    expect(r.motivo).toContain('19/12/2026, daqui a 57 dias');
+    expect(r.motivo).toContain('08/01/2027, daqui a 77 dias');
   });
 
   it('ata encerrada: indisponível inteiro, zero kits', () => {
@@ -92,19 +93,31 @@ describe('buscarItensCaep', () => {
 });
 
 describe('prazo de indicação (migration 162)', () => {
-  it('a menos de 35 dias do fim da ata o kit fica indisponível; entre 35 e 60, vence em breve com a data limite', async () => {
+  it('a menos de 60 dias do fim da ata o kit fica indisponível; entre 60 e 90, vence em breve com a data limite', async () => {
     const { EMENDAS_RULES } = await import('../../config/alertRules');
     const kit = { ativo: true, itens: [{ itemKey: 'a', quantidade: 1 }] };
-    const r30 = calcularKit(kit, mapa(item('a', { numeroAta: '00061/2024', vigenciaFinal: '2026-11-22' })), HOJE);
-    expect(r30).toMatchObject({ situacao: 'indisponivel', kitsPossiveis: 0 });
-    expect(r30.motivo).toContain('passou do prazo de indicação (35 dias');
-    const r40 = calcularKit(kit, mapa(item('a', { numeroAta: '00061/2024', vigenciaFinal: '2026-12-02' })), HOJE);
-    expect(r40.situacao).toBe('vence');
-    expect(r40.motivo).toContain('Indicação só até 28/10/2026');
+    const r50 = calcularKit(kit, mapa(item('a', { numeroAta: '00061/2024', vigenciaFinal: '2026-12-12' })), HOJE);
+    expect(r50).toMatchObject({ situacao: 'indisponivel', kitsPossiveis: 0 });
+    expect(r50.motivo).toContain('passou do prazo de indicação (60 dias');
+    const r70 = calcularKit(kit, mapa(item('a', { numeroAta: '00061/2024', vigenciaFinal: '2027-01-01' })), HOJE);
+    expect(r70.situacao).toBe('vence');
+    expect(r70.motivo).toContain('Indicação só até 02/11/2026');
     // Ajustes muda o corte na hora
-    EMENDAS_RULES.corteIndicacaoAntesDias = 45;
-    expect(calcularKit(kit, mapa(item('a', { vigenciaFinal: '2026-12-02' })), HOJE).situacao).toBe('indisponivel');
-    EMENDAS_RULES.corteIndicacaoAntesDias = 35;
+    EMENDAS_RULES.corteIndicacaoAntesDias = 75;
+    expect(calcularKit(kit, mapa(item('a', { vigenciaFinal: '2027-01-01' })), HOJE).situacao).toBe('indisponivel');
+    EMENDAS_RULES.corteIndicacaoAntesDias = 60;
+  });
+
+  it('item a menos de 60 dias do reajuste da ata, ou com o reajuste devido, deixa o kit indisponível (migration 246)', () => {
+    const kit = { ativo: true, itens: [{ itemKey: 'a', quantidade: 1 }] };
+    const preco = (extra: Partial<PrecoDoItem>) => new Map<string, PrecoDoItem>([['a', { itemKey: 'a', precoAtual: 100, dataReajuste: null, origem: null, devido: false, precoDevido: null, ...extra }]]);
+    const perto = calcularKit(kit, mapa(item('a')), HOJE, undefined, preco({ dataReajuste: '2026-12-01', origem: 'REAJUSTE' }));
+    expect(perto).toMatchObject({ situacao: 'indisponivel', kitsPossiveis: 0 });
+    expect(perto.motivo).toContain('reajuste em 01/12/2026');
+    const devido = calcularKit(kit, mapa(item('a')), HOJE, undefined, preco({ devido: true, origem: 'DEVIDO', precoDevido: 105 }));
+    expect(devido.situacao).toBe('indisponivel');
+    expect(devido.motivo).toContain('aguarda o apostilamento');
+    expect(calcularKit(kit, mapa(item('a')), HOJE, undefined, preco({ dataReajuste: '2027-03-01', origem: 'REAJUSTE' })).situacao).toBe('disponivel');
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
-import type { PrecoPrevisto } from '../../services/emendasQuadroService';
+import type { PrecoDoItem } from '../../services/emendasQuadroService';
 import {
   ajustesFeitos,
   cabeNaEmenda,
@@ -10,8 +10,9 @@ import {
   passaDoSaldo,
   precosDaMinuta,
   precosQueMudaram,
+  oficioForaDoPrazo,
   sobraDaEmendaParaOPedido,
-  valorPrevisto,
+  valorDosItens,
   type LinhaConferida
 } from '../emendasConferenciaOficio';
 
@@ -49,9 +50,9 @@ const linha = (id: string, itemKey: string, quantidade: number): LinhaPedido => 
 });
 const pedido = (minutaPrecos: Record<string, number> | null): PedidoEmenda =>
   ({ id: 'p', versao: 1, linhas: [linha('l1', VIATURA, 3), linha('l2', MOTO, 4)], minutaPrecos }) as unknown as PedidoEmenda;
-const previsto = (itemKey: string, precoPrevisto: number): [string, PrecoPrevisto] => [
+const previsto = (itemKey: string, precoPrevisto: number): [string, PrecoDoItem] => [
   itemKey,
-  { itemKey, precoAtual: precoPrevisto, precoPrevisto, motivo: 'SEM_PREVISAO', devido: false, efeito: null, percentual: null, mesesEstimados: null }
+  { itemKey, precoAtual: precoPrevisto, dataReajuste: null, origem: null, devido: false, precoDevido: null }
 ];
 
 describe('conferência do ofício: o previsto cabe no que sobra da emenda (28/10/2026)', () => {
@@ -60,8 +61,8 @@ describe('conferência do ofício: o previsto cabe no que sobra da emenda (28/10
     const p = pedido(null);
     expect(precosDaMinuta(p, itens, precos)).toEqual({ [VIATURA]: 300000, [MOTO]: 40000 });
     const [v, m] = linhasParaConferir(p);
-    expect(valorPrevisto([v, m], itens, precos)).toBe(1060000);
-    expect(valorPrevisto([{ ...v, quantidade: 2 }, { ...m, retirada: true }], itens, precos)).toBe(600000);
+    expect(valorDosItens([v, m], itens, precos)).toBe(1060000);
+    expect(valorDosItens([{ ...v, quantidade: 2 }, { ...m, retirada: true }], itens, precos)).toBe(600000);
   });
 
   it('a sobra desconta os outros pedidos da emenda (pelo ofício, ou pelo previsto sem ofício); igual cabe', () => {
@@ -111,5 +112,14 @@ describe('conferência do ofício: ajustes ao ofício', () => {
     expect(passaDoSaldo(subiu(5)[0], livrePorItem(subiu(5), itens, fora))).toBe(true);
     // A linha gravada que já passava (alocação diminuiu depois) não trava a conferência sem mudar a quantidade.
     expect(passaDoSaldo(linhas[0], livrePorItem(linhas, itens, new Map([[VIATURA, 9]])))).toBe(false);
+  });
+});
+
+describe('ofício no prazo da minuta (migration 246)', () => {
+  it('fora do prazo só quando a minuta gravou o prazo e o ofício chegou depois dele', () => {
+    expect(oficioForaDoPrazo({ minutaValidaAte: '2026-11-09', oficioEm: '2026-11-10' })).toBe(true);
+    expect(oficioForaDoPrazo({ minutaValidaAte: '2026-11-09', oficioEm: '2026-11-09' })).toBe(false);
+    expect(oficioForaDoPrazo({ minutaValidaAte: null, oficioEm: '2026-12-01' })).toBe(false);
+    expect(oficioForaDoPrazo({ minutaValidaAte: '2026-11-09', oficioEm: null })).toBe(false);
   });
 });
