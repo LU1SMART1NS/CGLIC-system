@@ -1510,6 +1510,13 @@ export async function salvarValorOficioPedido(id: string, versao: number, v: { v
   return data as { id: string; versao: number };
 }
 
+/** Reserva do parlamentar, ainda sem o nº da emenda, ligada à emenda registrada (migration 242): fica como o pedido criado a partir dela. */
+export async function ligarReservaAEmenda(pedidoId: string, versao: number, emendaId: string): Promise<{ versao: number }> {
+  const { data, error } = await db().rpc('ligar_reserva_a_emenda', { p_pedido_id: pedidoId, p_versao: versao, p_emenda_id: emendaId });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { versao: number };
+}
+
 export async function apagarEmendaSiop(id: string, versao: number): Promise<void> {
   const { error } = await db().rpc('apagar_emenda_siop', { p_id: id, p_versao: versao });
   if (error) throw new Error(mensagemDoBanco(error));

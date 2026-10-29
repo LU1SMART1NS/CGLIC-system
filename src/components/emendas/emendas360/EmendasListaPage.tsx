@@ -30,7 +30,7 @@ import {
 import { formatCurrency } from '../../../utils/format';
 import { dataBR } from '../../../utils/emendasKits';
 import { casaBusca } from '../../../utils/emendasBeneficiarios';
-import { diasSemContatoParaUrgente, emendasNaLista, numeroDaEmenda, ROTULO_SITUACAO_EMENDA, semPedido, type EmendaNaLista } from '../../../utils/emendasSemPedido';
+import { diasSemContatoParaUrgente, emendasNaLista, numeroDaEmenda, reservasParaLigar, ROTULO_SITUACAO_EMENDA, semPedido, type EmendaNaLista } from '../../../utils/emendasSemPedido';
 import { execucaoDosPedidos } from '../../../utils/emendasParlamentar';
 import { contarPorGti, passaFiltroGti, resumirFatias, type FatiasDaAta } from '../../../config/gruposGti';
 import { GRUPOS_CAPTACAO, fatiasDaCaptacao, lerFiltroCaptacao, lerModoCaptacao, type GrupoBeneficiario } from '../../../config/captacaoEmendas';
@@ -232,6 +232,11 @@ export const EmendasListaPage: React.FC = () => {
             dot={false}
           />
           {l.urgente && <div style={{ ...carteiraDetalhe, color: 'var(--color-danger-text)' }}>{l.diasSemContato} dias sem contato</div>}
+          {reservasParaLigar(l, pedidos).length > 0 && (
+            <div style={carteiraDetalhe} data-testid={`emendas-emenda-reserva-${l.chave}`}>
+              reserva do parlamentar a ligar
+            </div>
+          )}
         </span>
       )
     }
