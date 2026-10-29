@@ -586,7 +586,9 @@ export const ROTULO_MOTIVO_SEM_NOTA: Record<MotivoSemNota, string> = {
   CONTRATO_SEM_NOTA: 'o contrato ainda não tem nota no sistema',
   OUTRAS_EMENDAS: 'o contrato só tem notas de outras emendas',
   VARIAS: 'há mais de uma nota possível',
-  SEM_EMENDA: 'o pedido não tem o número da emenda'
+  SEM_EMENDA: 'o pedido não tem o número da emenda',
+  /** Migration 241: a nota do fornecedor não tem este item na lista do SIAFI. */
+  FORA_DA_NOTA: 'a nota do fornecedor não tem este item (SIAFI)'
 };
 
 /** Nota da linha: a achada pelo sistema (a nota não é mais digitada; migrations 174 e 177). */

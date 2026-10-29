@@ -1100,7 +1100,7 @@ export async function fetchReservadoPorItem(): Promise<Map<string, number>> {
  */
 export type RegraDaNota = 'SEI' | 'CONTRATO' | 'ITEM' | 'FORNECEDOR' | 'AUTOR';
 /** Por que a linha empenhada ainda não tem nota. */
-export type MotivoSemNota = 'SEM_CONTRATO' | 'CONTRATO_FORA' | 'CONTRATO_SEM_NOTA' | 'OUTRAS_EMENDAS' | 'VARIAS' | 'SEM_EMENDA';
+export type MotivoSemNota = 'SEM_CONTRATO' | 'CONTRATO_FORA' | 'CONTRATO_SEM_NOTA' | 'OUTRAS_EMENDAS' | 'VARIAS' | 'SEM_EMENDA' | 'FORA_DA_NOTA';
 
 export interface NotaDaLinha {
   linhaId: string;
