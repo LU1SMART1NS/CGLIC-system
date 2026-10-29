@@ -525,7 +525,7 @@ export const MOTIVOS_DEVOLUCAO_CCGA = [
 /** Vai e volta com a CCGA e etapas voltadas pela CAEP (migration 248), do mais antigo ao mais novo. */
 export interface MovimentoDoPedido {
   id: string;
-  acao: 'ENVIO_CCGA' | 'DEVOLUCAO_CCGA' | 'DESFEITO_CCGA' | 'VOLTOU_ETAPA';
+  acao: 'ENVIO_CCGA' | 'DEVOLUCAO_CCGA' | 'DESFEITO_CCGA' | 'VOLTOU_ETAPA' | 'RETIFICADOR';
   /** Ata como nas telas de Emendas ("NÚMERO-UASG"), no vai e volta com a CCGA. */
   ataKey: string | null;
   linhaIds: string[];
@@ -1702,6 +1702,31 @@ export async function salvarValorOficioPedido(id: string, versao: number, v: { v
     p_id: id,
     p_versao: versao,
     p: { valor: v.valor, documento_sei: v.documentoSei, retificador: v.retificador }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/**
+ * Ofício retificador antes do empenho (migration 249): ajusta as linhas (null = sem ajuste), grava a soma dos itens que a
+ * CAEP conferiu como valor do ofício e guarda o ofício anterior no histórico do pedido.
+ */
+export async function registrarOficioRetificador(v: {
+  id: string;
+  versao: number;
+  documentoSei: string;
+  data: string;
+  valorOficio: number;
+  ajustes: string[];
+  linhas: LinhaParaSalvar[] | null;
+}): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('registrar_oficio_retificador', {
+    p_id: v.id,
+    p_versao: v.versao,
+    p_dados: { documento_sei: v.documentoSei, data: v.data, valor_oficio: v.valorOficio, ajustes: v.ajustes },
+    p_linhas: v.linhas
+      ? v.linhas.map((l) => ({ id: l.id ?? null, tipo: l.tipo, item_key: l.itemKey ?? null, kit_id: l.kitId ?? null, quantidade: l.quantidade, beneficiario_id: l.beneficiarioId }))
+      : null
   });
   if (error) throw new Error(mensagemDoBanco(error));
   return data as { id: string; versao: number };

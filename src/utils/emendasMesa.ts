@@ -732,10 +732,21 @@ export function mesaDoPedido(
             semSei: false,
             volta: true
           });
+        // Ofício retificador (migration 249): substitui o ofício anterior, que fica aqui.
+        for (const m of (p.movimentos ?? []).filter((x) => x.acao === 'RETIFICADOR')) {
+          const t = textoDoMovimento(m, m.linhaIds.length);
+          registros.push({
+            chave: `mov-${m.id}`,
+            texto: [t.titulo, t.detalhe].filter(Boolean).join(' · '),
+            data: dataBR(m.data),
+            sei: m.documentoSei ? [m.documentoSei] : [],
+            semSei: false
+          });
+        }
       }
       if (f.id === 'CONTRATACAO')
         for (const m of p.movimentos ?? []) {
-          if (m.acao === 'VOLTOU_ETAPA') continue;
+          if (m.acao === 'VOLTOU_ETAPA' || m.acao === 'RETIFICADOR') continue;
           const t = textoDoMovimento(m, m.linhaIds.length);
           registros.push({
             chave: `mov-${m.id}`,

@@ -89,6 +89,10 @@ describe('envio à CCGA por ata (migration 248)', () => {
     const m = { id: 'm', ataKey: '00045/2025-200331', linhaIds: ['l1', 'l2'], etapaDe: null, etapaPara: null, documentoSei: null, explicacao: 'acabou', data: '2026-10-30', criadoPorNome: null, criadoEm: '' };
     expect(textoDoMovimento({ ...m, acao: 'DEVOLUCAO_CCGA', motivo: 'Outro' }, 2)).toEqual({ titulo: 'Devolvido à CAEP · ata 00045/2025 · 2 itens', detalhe: 'Outro: acabou' });
     expect(textoDoMovimento({ ...m, acao: 'VOLTOU_ETAPA', etapaDe: 'CGOFI', etapaPara: 'AUTORIZADO', motivo: 'engano' }, 0).detalhe).toBe('engano');
+    expect(textoDoMovimento({ ...m, acao: 'RETIFICADOR', motivo: 'Substitui o ofício SEI 37091178 (R$ 1200,00)', explicacao: 'Mira → PMX: 3 → 2' }, 0)).toEqual({
+      titulo: 'Ofício retificador registrado',
+      detalhe: 'Substitui o ofício SEI 37091178 (R$ 1200,00) · Mira → PMX: 3 → 2'
+    });
   });
 });
 

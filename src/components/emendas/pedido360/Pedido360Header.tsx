@@ -44,6 +44,8 @@ interface Props {
   onCancelar: () => void;
   /** Quantas linhas há em "Com você" na aba Andamento: o indicador Etapa leva até lá. */
   comVoce: number;
+  /** Ofício retificador (migration 249): só antes do empenho, para quem gere emendas. */
+  onRetificador?: () => void;
   /** Envio à CCGA por ata, desfazer o envio e voltar etapa (migration 248): cada um só quando cabe. */
   ccga?: AcoesCcga;
   onAba: (aba: Pedido360Aba) => void;
@@ -79,7 +81,7 @@ const LIMITE_DO_NOME = 40;
  * mais grave em selo, o contato da assessoria e as datas ao lado, quatro indicadores e, no pé, o processo SEI, a
  * emenda (abre a Emenda 360) e o GND. A próxima tarefa é o botão principal.
  */
-export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onAlterar, onCancelar, comVoce, ccga, onAba, onAbrirParlamentar, onAbrirEmenda, verMais }) => {
+export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onAlterar, onCancelar, onRetificador, comVoce, ccga, onAba, onAbrirParlamentar, onAbrirEmenda, verMais }) => {
   const cancelado = p.etapa === 'CANCELADO';
   const ativas = linhasAtivas(p);
   const atas = atasDoPedido(p, itens);
@@ -179,6 +181,7 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
             ...(podeGerir && !cancelado && !jaEmpenhado(p.etapa)
               ? [{ label: !p.autorId ? 'Indicar o parlamentar' : !p.siopEmenda && !p.emendaId ? 'Informar a emenda' : 'Alterar itens', onClick: onAlterar, testId: `emendas-pedido-alterar-${p.id}` }]
               : []),
+            ...(onRetificador ? [{ label: 'Registrar ofício retificador', onClick: onRetificador, testId: `emendas-pedido-retificador-${p.id}` }] : []),
             ...(ccga?.voltar ? [{ label: 'Voltar etapa', onClick: ccga.voltar, testId: `emendas-pedido-voltar-etapa-${p.id}` }] : []),
             ...(podeGerir && !cancelado && !jaEmpenhado(p.etapa) ? [{ label: 'Cancelar pedido', onClick: onCancelar, danger: true, testId: `emendas-pedido-cancelar-${p.id}` }] : [])
           ]}

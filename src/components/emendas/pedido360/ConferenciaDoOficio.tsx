@@ -3,7 +3,7 @@ import { AppButton } from '../../../design-system/components/AppButton';
 import { ActionButton } from '../../../design-system/components/ActionButton';
 import { AppDateInput, AppInput, AppSelect, AppTextarea } from '../../../design-system/components/FormFields';
 import { useToast } from '../../../design-system/components/Toast';
-import { hojeEmBrasilia, useAutoresEmendas, useConferirOficio, useEmendasSiop, usePedidoEmDiaNaTela } from '../../../hooks/useEmendas';
+import { hojeEmBrasilia, useAutoresEmendas, useConferirOficio, useEmendasSiop, usePedidoEmDiaNaTela, useRegistrarOficioRetificador } from '../../../hooks/useEmendas';
 import { formatCurrency, formatNumber } from '../../../utils/format';
 import {
   ataDoItem,
@@ -21,7 +21,6 @@ import {
   linhasParaConferir,
   linhasParaSalvar,
   livrePorItem,
-  mesmoValor,
   passaDoSaldo,
   PONTOS_SIOP,
   oficioForaDoPrazo,
@@ -56,6 +55,11 @@ interface Props {
   onSair: () => void;
   /** Nova minuta registrada: o pedido voltou para a reserva e a tela vai para o quadro do ofício. */
   onNovaMinuta: () => void;
+  /**
+   * Ofício retificador (migration 249): o pedido já conferido abre igual, sem a parte do SIOP e sem as marcas. A CAEP
+   * informa o SEI do retificador, ajusta os itens e confirma que a soma bate com ele.
+   */
+  retificador?: boolean;
 }
 
 const valorBR = (v: number) =>
@@ -87,19 +91,24 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   hoje,
   iniciarDevolvendo = false,
   onSair,
-  onNovaMinuta
+  onNovaMinuta,
+  retificador = false
 }) => {
   const toast = useToast();
   const conferir = useConferirOficio();
+  const registrarRetificador = useRegistrarOficioRetificador();
+  // Retificador: o SEI e o dia em que chegou; "Não confere" só explica, não grava.
+  const [seiRetificador, setSeiRetificador] = useState('');
+  const [dataRetificador, setDataRetificador] = useState(hojeEmBrasilia());
+  const [naoConfere, setNaoConfere] = useState(false);
+  const oficioQueVale = pedido.oficioValorDocumentoSei ?? pedido.oficioDocumentoSei;
   const emDiaNaTela = usePedidoEmDiaNaTela();
   const { data: emendasSiop } = useEmendasSiop();
   const { data: autores = [] } = useAutoresEmendas();
 
   // Parte 1: as linhas do pedido ajustadas ao ofício.
-  const [linhas, setLinhas] = useState<LinhaConferida[]>(() => linhasParaConferir(pedido));
-  const [valorOficio, setValorOficio] = useState(pedido.oficioValor != null ? valorBR(pedido.oficioValor) : '');
+  const [linhas, setLinhas] = useState<LinhaConferida[]>(() => linhasParaConferir(pedido).map((l) => (retificador ? { ...l, confere: true } : l)));
   const [seiOficio, setSeiOficio] = useState(pedido.oficioValorDocumentoSei ?? pedido.oficioDocumentoSei ?? '');
-  const [retificador, setRetificador] = useState(pedido.oficioValorRetificador ?? false);
   const [acrescentando, setAcrescentando] = useState(false);
   const [novoItem, setNovoItem] = useState('');
   const [novoBeneficiario, setNovoBeneficiario] = useState('');
@@ -158,7 +167,6 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   const valorDigitado = lerValorBR(valor);
   const valorDaEmenda = digitaValorDaEmenda ? valorDigitado : registrada.valor;
   const trocouEmenda = Boolean(numeroDaReserva && emendaLida && (emendaLida.numero !== numeroDaReserva || (anoDaReserva != null && (emendaLida.ano ?? anoEmenda) !== anoDaReserva)));
-  const valorDoOficio = lerValorBR(valorOficio);
 
   const nomeDoItem = (l: Pick<LinhaConferida, 'tipo' | 'itemKey' | 'kitNome'>): string => {
     if (l.tipo === 'KIT') return `${l.kitNome ?? 'kit'} (kit)`;
@@ -178,13 +186,13 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   // Pedido completado com outra emenda (migration 211): o sistema não tem o valor dela, então não trava; a CAEP confere.
   const comOutraEmenda = pedido.outrasEmendas.length > 0;
   const cabe = conta != null && (comOutraEmenda || cabeNaEmenda(total, conta.sobra));
-  const mudaram = precosQueMudaram(linhas, pedido, itens, precos);
+  // O preço e o prazo da minuta são do primeiro ofício: o retificador usa o preço de hoje.
+  const mudaram = retificador ? [] : precosQueMudaram(linhas, pedido, itens, precos);
   const ajustes = ajustesFeitos(linhas, nomeParaHistorico);
   const ficam = linhas.filter((l) => !l.retirada);
   const conferidas = linhas.filter((l) => l.retirada || l.confere).length;
   const pontosMarcados = PONTOS_SIOP.filter((x) => pontos[x.chave]).length;
-  const oficioIgual = valorDoOficio != null && valorDoOficio > 0 && mesmoValor(valorDoOficio, total);
-  const foraDoPrazo = oficioForaDoPrazo(pedido);
+  const foraDoPrazo = !retificador && oficioForaDoPrazo(pedido);
   const semBeneficiario = ficam.filter((l) => !l.beneficiarioId).length;
   const foraDoSaldo = linhas.filter((l) => passaDoSaldo(l, livre));
   const rodada = rodadaDoPedido(pedido);
@@ -268,8 +276,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   if (ficam.length === 0) pendencias.push('pelo menos um item no pedido (se o ofício não pede nenhum, cancele o pedido)');
   if (foraDoSaldo.length) pendencias.push('quantidade dentro do saldo livre da CAEP');
   if (semBeneficiario) pendencias.push(`beneficiário em ${semBeneficiario === 1 ? 'um item' : `${semBeneficiario} itens`} (use "Alterar itens")`);
-  if (!(valorDoOficio != null && valorDoOficio > 0)) pendencias.push('valor do ofício');
-  else if (!oficioIgual) pendencias.push('valor do ofício igual ao do pedido, centavo a centavo (ajuste os itens ou gere nova minuta)');
+  if (!(total > 0)) pendencias.push('itens com valor (a soma dos itens é o valor do ofício)');
   if (foraDoPrazo) pendencias.push(`ofício dentro do prazo da minuta (${dataBR(pedido.minutaValidaAte)}): gere nova minuta`);
   if (mudaram.length) pendencias.push('o preço da minuta (mudou depois dela): gere nova minuta');
   if (conta && !cabe) pendencias.push('o pedido caber no valor a indicar da emenda (ajuste os itens ou gere nova minuta)');
@@ -280,11 +287,42 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   if (trocouEmenda && !motivoTroca.trim()) pendencias.push('motivo da troca da emenda');
   if (pontosMarcados < PONTOS_SIOP.length) pendencias.push('marcar os 6 pontos do SIOP');
 
+  const seiDoRetificador = seiRetificador.replace(/\D/g, '');
+  const pendenciasDoRetificador: string[] = [];
+  if (!documentoSeiDaEtapaValido(seiDoRetificador)) pendenciasDoRetificador.push('documento SEI do retificador (só números, 7 a 10 dígitos)');
+  else if (seiDoRetificador === oficioQueVale) pendenciasDoRetificador.push('o SEI do retificador (este é o do ofício que vale hoje)');
+  if (!dataRetificador) pendenciasDoRetificador.push('dia em que o retificador chegou');
+  if (ficam.length === 0) pendenciasDoRetificador.push('pelo menos um item no pedido');
+  if (foraDoSaldo.length) pendenciasDoRetificador.push('quantidade dentro do saldo livre da CAEP');
+  if (semBeneficiario) pendenciasDoRetificador.push(`beneficiário em ${semBeneficiario === 1 ? 'um item' : `${semBeneficiario} itens`}`);
+
+  const confereRetificador = async () => {
+    setTentou(true);
+    if (pendenciasDoRetificador.length) return;
+    try {
+      const gravado = await registrarRetificador.mutateAsync({
+        id: pedido.id,
+        versao: pedido.versao,
+        documentoSei: seiDoRetificador,
+        data: dataRetificador,
+        valorOficio: total,
+        ajustes,
+        linhas: linhasParaSalvar(linhas)
+      });
+      toast.success(
+        `${nomeDoAutor}: ofício retificador SEI ${seiDoRetificador} registrado (${formatCurrency(total)})${ajustes.length ? `, com ${ajustes.length === 1 ? '1 ajuste' : `${ajustes.length} ajustes`} nos itens` : ''}.`
+      );
+      if (!emDiaNaTela(gravado.id, gravado.versao)) toast.show('Registrado, mas a tela ainda não mostra a mudança. Clique em "Atualizar" no alto da tela.', 'warning');
+      onSair();
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
   const motivoSugerido = (): string => {
     if (foraDoPrazo) return `O ofício chegou em ${dataBR(pedido.oficioEm)}, depois do prazo da minuta (${dataBR(pedido.minutaValidaAte)}). Nova minuta com o preço do dia.`;
     if (mudaram.length)
       return `O preço mudou depois da minuta (${[...new Set(mudaram.map((m) => `ata ${m.numeroAta ?? '?'}`))].join(', ')}). Nova minuta com o preço do dia.`;
-    if (valorDoOficio != null && valorDoOficio > 0 && !oficioIgual) return `O ofício pede ${formatCurrency(valorDoOficio)} e os itens somam ${formatCurrency(total)}.`;
     if (conta && !cabe)
       return `O valor dos itens (${formatCurrency(total)}) passa do valor a indicar da emenda (${formatCurrency(conta.sobra)})${mudaram.length ? `: o preço mudou depois da minuta (${[...new Set(mudaram.map((m) => `ata ${m.numeroAta ?? '?'}`))].join(', ')})` : ''}.`;
     return '';
@@ -294,7 +332,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
     setDevolvendo(true);
   };
 
-  const ocupado = conferir.isPending;
+  const ocupado = conferir.isPending || registrarRetificador.isPending;
   const motivoDoAjuste = `Ajustado ao ofício${seiOficio.replace(/\D/g, '') ? ` SEI ${seiOficio.replace(/\D/g, '')}` : ''}`;
 
   const tudoConfere = async () => {
@@ -313,9 +351,9 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
           ano: emendaLida?.ano ?? anoEmenda,
           ...(digitaValorDaEmenda ? { valor_emenda: valorDigitado } : {}),
           ...(trocouEmenda ? { motivo_troca: motivoTroca.trim() } : {}),
-          valor_oficio: valorDoOficio,
+          // Migration 249: o ofício pede a soma dos itens, centavo a centavo; a CAEP só confere.
+          valor_oficio: total,
           oficio_valor_documento_sei: seiOficio.replace(/\D/g, '') || null,
-          oficio_retificador: retificador,
           gnd,
           conferencia: {
             ...pontos,
@@ -368,23 +406,49 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
     <div className="conferencia-oficio" data-testid="conferencia-oficio">
       <div className="conferencia-oficio__topo">
         <div>
-          <h2 className="conferencia-oficio__titulo">Conferência do ofício</h2>
+          <h2 className="conferencia-oficio__titulo">{retificador ? 'Ofício retificador' : 'Conferência do ofício'}</h2>
           <div className="conferencia-oficio__sub">
             {nomeDoAutor} · {identificacaoDoPedido(pedido)}
-            {pedido.oficioDocumentoSei ? ` · ofício SEI ${pedido.oficioDocumentoSei}` : ''}
+            {retificador ? (oficioQueVale ? ` · substitui o ofício SEI ${oficioQueVale}` : '') : pedido.oficioDocumentoSei ? ` · ofício SEI ${pedido.oficioDocumentoSei}` : ''}
           </div>
         </div>
         <AppButton variant="outline" size="sm" onClick={onSair} disabled={ocupado} data-testid="conferencia-sair">
-          Sair da conferência
+          {retificador ? 'Sair sem gravar' : 'Sair da conferência'}
         </AppButton>
       </div>
 
+      {retificador && (
+        <section className="conferencia-oficio__parte" aria-labelledby="retificador-parte-0">
+          <div className="conferencia-oficio__parte-cab">
+            <h3 id="retificador-parte-0">Qual é o ofício retificador?</h3>
+            <span className="conferencia-oficio__dica">
+              Ele substitui o ofício anterior, que fica no histórico do pedido. Se os itens mudarem, o pedido volta para "Conferido no SIOP" e a solicitação de empenho é
+              refeita.
+            </span>
+          </div>
+          <div className="conferencia-oficio__grade">
+            <AppInput
+              label="Documento SEI do retificador *"
+              hint="Só números, 7 a 10 dígitos."
+              inputMode="numeric"
+              value={seiRetificador}
+              onChange={(e) => setSeiRetificador(e.target.value)}
+              error={tentou && !documentoSeiDaEtapaValido(seiDoRetificador) ? 'Informe o SEI do retificador.' : undefined}
+              data-testid="retificador-sei"
+            />
+            <AppDateInput label="Recebido em *" value={dataRetificador} onValueChange={setDataRetificador} />
+          </div>
+        </section>
+      )}
+
       <section className="conferencia-oficio__parte" aria-labelledby="conferencia-parte-1">
         <div className="conferencia-oficio__parte-cab">
-          <span className="conferencia-oficio__num">1</span>
-          <h3 id="conferencia-parte-1">O ofício pede o que está no pedido?</h3>
+          {!retificador && <span className="conferencia-oficio__num">1</span>}
+          <h3 id="conferencia-parte-1">{retificador ? 'Ajuste os itens ao retificador' : 'O ofício pede o que está no pedido?'}</h3>
           <span className="conferencia-oficio__dica">
-            Marque cada item que bate com o ofício. Se o ofício mudou a quantidade, ajuste; se tirou um item, retire; se pediu outro, acrescente.
+            {retificador
+              ? 'Mude as quantidades, retire ou acrescente itens como o retificador pede.'
+              : 'Marque cada item que bate com o ofício. Se o ofício mudou a quantidade, ajuste; se tirou um item, retire; se pediu outro, acrescente.'}
           </span>
         </div>
 
@@ -397,15 +461,17 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
                 <strong>{item ? `Ata ${item.numeroAta}` : 'Kits'}</strong>
                 {item?.fornecedor && <span className="emendas-bloco-ata__forn">{item.fornecedor}</span>}
                 <span style={{ flex: 1 }} />
-                <span className={`conferencia-oficio__contagem${ok === ls.length ? ' conferencia-oficio__contagem--ok' : ''}`}>
-                  {ok} de {ls.length} conferidos
-                </span>
+                {!retificador && (
+                  <span className={`conferencia-oficio__contagem${ok === ls.length ? ' conferencia-oficio__contagem--ok' : ''}`}>
+                    {ok} de {ls.length} conferidos
+                  </span>
+                )}
               </div>
               <div className="conferencia-oficio__tabela">
                 <table>
                   <thead>
                     <tr>
-                      <th className="conferencia-oficio__c">Confere</th>
+                      {!retificador && <th className="conferencia-oficio__c">Confere</th>}
                       <th>Item</th>
                       <th>Beneficiário</th>
                       <th className="conferencia-oficio__n">Quantidade</th>
@@ -421,6 +487,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
                       const classe = l.retirada ? 'retirada' : l.original === 0 ? 'nova' : l.confere ? 'ok' : '';
                       return (
                         <tr key={l.chave} className={classe ? `conferencia-oficio__linha--${classe}` : undefined} data-testid={`conferencia-linha-${l.chave}`}>
+                          {!retificador && (
                           <td className="conferencia-oficio__c">
                             {l.retirada ? (
                               <span className="conferencia-oficio__etiqueta">retirado</span>
@@ -440,12 +507,14 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
                               />
                             )}
                           </td>
+                          )}
                           <td className="conferencia-oficio__item">
                             <strong>{nomeDoItem(l)}</strong>
-                            {l.original === 0 && <span className="conferencia-oficio__nota conferencia-oficio__nota--nova">acrescentado pelo ofício</span>}
+                            {l.original === 0 && <span className="conferencia-oficio__nota conferencia-oficio__nota--nova">acrescentado pelo {retificador ? 'retificador' : 'ofício'}</span>}
                             {l.original > 0 && !l.retirada && l.quantidade !== l.original && (
-                              <span className="conferencia-oficio__nota">no pedido: {formatNumber(l.original)}</span>
+                              <span className="conferencia-oficio__nota">{retificador ? 'no ofício anterior' : 'no pedido'}: {formatNumber(l.original)}</span>
                             )}
+                            {retificador && l.retirada && <span className="conferencia-oficio__nota">retirado pelo retificador</span>}
                             {passa && <span className="conferencia-oficio__nota conferencia-oficio__nota--erro">passa do saldo livre da CAEP</span>}
                           </td>
                           <td>
@@ -563,36 +632,34 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
         )}
 
         <div className="conferencia-oficio__soma">
-          <div className="conferencia-oficio__kpi">
-            <span>Valor do pedido{ajustes.length ? ' ajustado' : ''}</span>
+          <div className="conferencia-oficio__kpi conferencia-oficio__kpi--destaque">
+            <span>Os itens somam{ajustes.length ? ' (ajustado)' : ''}</span>
             <b data-testid="conferencia-total">{formatCurrency(total)}</b>
             <small>pelo preço de hoje das atas</small>
           </div>
-          <AppInput
-            label="Valor deste ofício (R$) *"
-            hint="O que o parlamentar pediu neste ofício."
-            inputMode="decimal"
-            placeholder="1.200.000,00"
-            value={valorOficio}
-            onChange={(e) => setValorOficio(mascaraValorBR(e.target.value, valorOficio))}
-            data-testid="conferencia-valor-oficio"
-          />
-          <AppInput
-            label="Documento SEI do ofício"
-            hint="Com retificador, o do retificador."
-            inputMode="numeric"
-            value={seiOficio}
-            onChange={(e) => setSeiOficio(e.target.value)}
-          />
+          {retificador ? (
+            <div className="conferencia-oficio__kpi">
+              <span>Ofício anterior</span>
+              <b>{pedido.oficioValor != null ? formatCurrency(pedido.oficioValor) : '—'}</b>
+              <small>
+                {pedido.oficioValor != null && Math.abs(total - pedido.oficioValor) > 0.004
+                  ? `${total < pedido.oficioValor ? 'menos' : 'mais'} ${formatCurrency(Math.abs(total - pedido.oficioValor))} com o retificador`
+                  : 'mesmo valor'}
+              </small>
+            </div>
+          ) : (
+            <AppInput label="Documento SEI do ofício" hint="Só números, 7 a 10 dígitos." inputMode="numeric" value={seiOficio} onChange={(e) => setSeiOficio(e.target.value)} />
+          )}
         </div>
-        <label className="conferencia-oficio__check">
-          <input type="checkbox" checked={retificador} onChange={(e) => setRetificador(e.target.checked)} /> Ofício retificador (o valor substitui o do ofício anterior)
-        </label>
-        {valorDoOficio != null && valorDoOficio > 0 && !oficioIgual && (
-          <div className="conferencia-oficio__aviso conferencia-oficio__aviso--erro" role="status" data-testid="conferencia-oficio-diferente">
-            O ofício pede {formatCurrency(valorDoOficio)} e os itens somam {formatCurrency(total)} ({valorDoOficio > total ? 'ofício acima' : 'ofício abaixo'} em{' '}
-            {formatCurrency(Math.abs(valorDoOficio - total))}). O ofício precisa ser igual ao pedido, centavo a centavo: se o parlamentar mudou algum item, ajuste o pedido acima;
-            senão, gere nova minuta.
+        <span className="conferencia-oficio__dica" data-testid="conferencia-soma-dica">
+          {retificador
+            ? 'O retificador tem de pedir exatamente esta soma, centavo a centavo: ela vira o valor do ofício. Confira com o valor escrito nele.'
+            : 'O ofício tem de pedir exatamente esta soma, centavo a centavo: ela vira o valor do ofício. Se o parlamentar mudou algum item, ajuste acima; se o valor do ofício é outro, gere nova minuta.'}
+        </span>
+        {retificador && naoConfere && (
+          <div className="conferencia-oficio__aviso conferencia-oficio__aviso--atencao" role="status" data-testid="retificador-nao-confere">
+            Nada foi gravado. Se o retificador pede outras quantidades ou outros itens, ajuste acima até a soma bater. Se ele usa um preço diferente do preço de hoje da
+            ata, o gabinete precisa mandar novo ofício com o preço certo.
           </div>
         )}
         {foraDoPrazo && (
@@ -613,6 +680,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
         )}
       </section>
 
+      {!retificador && (
       <section className="conferencia-oficio__parte" aria-labelledby="conferencia-parte-2">
         <div className="conferencia-oficio__parte-cab">
           <span className="conferencia-oficio__num">2</span>
@@ -688,13 +756,13 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
         {registrada && registrada.valor != null && (
           <div className="conferencia-oficio__aviso conferencia-oficio__aviso--info" data-testid="conferencia-valor-registrado">
             Valor da emenda no SIOP: <b>{formatCurrency(registrada.valor)}</b> · {registrada.gnd} · lido em {registrada.vistaEm.split('-').reverse().join('/')}
-            {valorDoOficio != null && valorDoOficio > 0 && !corrigindoSiop && (
+            {total > 0 && !corrigindoSiop && (
               <>
                 {' '}
                 ·{' '}
-                {valorDoOficio - registrada.valor > 0.004
-                  ? `o ofício pede ${formatCurrency(valorDoOficio - registrada.valor)} a mais que a emenda`
-                  : `a indicar depois deste ofício: ${formatCurrency(registrada.valor - valorDoOficio)} (os outros pedidos da emenda também descontam)`}
+                {total - registrada.valor > 0.004
+                  ? `o ofício pede ${formatCurrency(total - registrada.valor)} a mais que a emenda`
+                  : `a indicar depois deste ofício: ${formatCurrency(registrada.valor - total)} (os outros pedidos da emenda também descontam)`}
               </>
             )}{' '}
             <AppButton type="button" variant="link" size="xs" onClick={() => setCorrigindoSiop((c) => !c)} data-testid="conferencia-corrigir-siop">
@@ -702,9 +770,9 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
             </AppButton>
           </div>
         )}
-        {!registrada && valorDaEmenda != null && valorDoOficio != null && valorDoOficio - valorDaEmenda > 0.004 && (
+        {!registrada && valorDaEmenda != null && total - valorDaEmenda > 0.004 && (
           <div className="conferencia-oficio__aviso conferencia-oficio__aviso--atencao" role="status">
-            O ofício pede {formatCurrency(valorDoOficio - valorDaEmenda)} a mais que o valor da emenda no SIOP.
+            O ofício pede {formatCurrency(total - valorDaEmenda)} a mais que o valor da emenda no SIOP.
           </div>
         )}
         {conferenciaDaEmenda && conferenciaDaEmenda.outroAutor.length > 0 && (
@@ -773,9 +841,30 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
           ))}
         </div>
       </section>
+      )}
 
       <div className="conferencia-oficio__rodape" data-testid="conferencia-rodape">
-        {devolvendo ? (
+        {retificador ? (
+          <>
+            <div className="conferencia-oficio__estado">
+              <b>
+                {ajustes.length ? (ajustes.length === 1 ? '1 ajuste nos itens' : `${ajustes.length} ajustes nos itens`) : 'Nenhum item mudou'} · soma {formatCurrency(total)}
+              </b>
+              <span className="conferencia-oficio__sub">Nada é gravado até clicar em "Confere".</span>
+              {tentou && pendenciasDoRetificador.length > 0 && (
+                <span className="conferencia-oficio__falta" role="alert" data-testid="retificador-pendencias">
+                  Falta: {pendenciasDoRetificador.join('; ')}.
+                </span>
+              )}
+            </div>
+            <AppButton variant="outline" onClick={() => setNaoConfere(true)} disabled={ocupado} data-testid="retificador-nao-confere-botao">
+              Não confere
+            </AppButton>
+            <AppButton onClick={confereRetificador} isLoading={ocupado} disabled={ocupado} data-testid="retificador-confere">
+              {`Confere com o ofício${seiDoRetificador ? ` SEI ${seiDoRetificador}` : ''} (${formatCurrency(total)})`}
+            </AppButton>
+          </>
+        ) : devolvendo ? (
           <>
             <div className="conferencia-oficio__devolver">
               <AppTextarea
@@ -821,7 +910,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
               Não bate: gerar nova minuta
             </AppButton>
             <AppButton onClick={tudoConfere} isLoading={ocupado} disabled={ocupado} data-testid="conferencia-tudo-confere">
-              {ajustes.length ? 'Tudo confere, salvar ajustes' : 'Tudo confere'}
+              {`Tudo confere com o ofício${seiOficio.replace(/\D/g, '') ? ` SEI ${seiOficio.replace(/\D/g, '')}` : ''} (${formatCurrency(total)})`}
             </AppButton>
           </>
         )}

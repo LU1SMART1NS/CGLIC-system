@@ -1963,6 +1963,8 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .conferencia-oficio__kpi span { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
 .conferencia-oficio__kpi b { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
 .conferencia-oficio__kpi small { font-size: 0.75rem; color: #64748b; }
+.conferencia-oficio__kpi--destaque { border: 2px solid var(--primary); background: var(--color-info-bg); }
+.conferencia-oficio__kpi--destaque b { font-size: 1.45rem; color: var(--primary); }
 .conferencia-oficio__bate { color: var(--color-success-text); }
 .conferencia-oficio__nao-bate { color: var(--color-danger-text); }
 .conferencia-oficio__aviso { font-size: 0.82rem; font-weight: 600; padding: 0.5rem 0.7rem; border-radius: 6px; background: var(--color-info-bg); color: var(--color-info-text); }
