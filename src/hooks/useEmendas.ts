@@ -17,6 +17,7 @@ import {
   fetchKitsEmendas,
   salvarBeneficiarioEmenda,
   salvarKitEmenda,
+  excluirKitEmenda,
   fetchPedidosEmendas,
   fetchReservadoPorItem,
   fetchReservadoDoItem,
@@ -59,6 +60,7 @@ import {
   type BeneficiarioParaSalvar,
   type ConferenciaEmpenho,
   type KitParaSalvar,
+  type KitEmenda,
   type PedidoEmenda
 } from '../services/emendasService';
 
@@ -168,6 +170,15 @@ export function useSalvarKit() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (k: KitParaSalvar) => salvarKitEmenda(k),
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'kits'] })
+  });
+}
+
+export function useExcluirKit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (k: Pick<KitEmenda, 'id' | 'versao'>) => excluirKitEmenda(k),
     retry: 0,
     onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'kits'] })
   });

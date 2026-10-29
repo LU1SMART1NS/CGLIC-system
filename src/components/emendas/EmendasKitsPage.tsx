@@ -13,7 +13,8 @@ import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitl
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useItensCaep, useKitsEmendas, usePodeGerirEmendas, useReservadoPorItem, useSalvarKit } from '../../hooks/useEmendas';
+import { useConfirmDialog } from '../../design-system';
+import { hojeEmBrasilia, useItensCaep, useKitsEmendas, usePodeGerirEmendas, useExcluirKit, useReservadoPorItem, useSalvarKit } from '../../hooks/useEmendas';
 import { formatNumber } from '../../utils/format';
 import { avisoIndicacaoDias, corteIndicacaoDias, ROTULO_SITUACAO_KIT, type ComponenteDoKit, type SituacaoKit } from '../../utils/emendasKits';
 import type { KitEmenda } from '../../services/emendasService';
@@ -102,6 +103,8 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem, 
   const { data: itens = [], isLoading: carregandoItens, refetch: recarregarItens } = useItensCaep();
   const podeGerir = usePodeGerirEmendas();
   const salvar = useSalvarKit();
+  const excluir = useExcluirKit();
+  const confirm = useConfirmDialog();
   const toast = useToast();
   const hoje = hojeEmBrasilia();
   const [segmento, setSegmento] = useState<Segmento>('todos');
@@ -151,6 +154,18 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem, 
     try {
       await salvar.mutateAsync({ id: k.id, versao: k.versao, nome: k.nome, descricao: k.descricao, ativo: !k.ativo, itens: k.itens });
       toast.success(k.ativo ? `${k.nome} desativado: sai da lista dos pedidos.` : `${k.nome} reativado.`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
+  // Só o kit que nenhum pedido usa; o de pedido só se desativa (migration 251).
+  const excluirKit = async (k: KitEmenda) => {
+    const ok = await confirm({ title: 'Excluir kit', message: `Excluir ${k.nome}? Nenhum pedido usa este kit. A exclusão não pode ser desfeita.`, confirmLabel: 'Excluir', tone: 'danger' });
+    if (!ok) return;
+    try {
+      await excluir.mutateAsync(k);
+      toast.success(`${k.nome} excluído.`);
     } catch (err) {
       toast.error((err as Error).message);
     }
@@ -286,9 +301,12 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem, 
                       iconOnly
                       label={`${l.ativo ? 'Desativar' : 'Reativar'} ${l.nome}`}
                       onClick={() => void alternarAtivo(l)}
-                      disabled={salvar.isPending}
+                      disabled={salvar.isPending || excluir.isPending}
                       data-testid={`emendas-kits-ativo-${l.id}`}
                     />
+                    {l.pedidos === 0 && (
+                      <ActionButton action="excluir" iconOnly label={`Excluir ${l.nome}`} onClick={() => void excluirKit(l)} disabled={salvar.isPending || excluir.isPending} data-testid={`emendas-kits-excluir-${l.id}`} />
+                    )}
                   </div>
                 )
               : undefined
