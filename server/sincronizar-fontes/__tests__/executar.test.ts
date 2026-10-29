@@ -28,6 +28,8 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarAutoresEmendas: vi.fn(async () => ({ legislatura: 57, deputados: 648, deputadosNoCargo: 513, senadores: 126, senadoresNoCargo: 81 })),
     sincronizarReajusteAtas: vi.fn(async () => sucesso(29)),
     contarReajusteAtasPendentes: vi.fn(async () => ({ pendentes: 149, semEdital: 64, mesesProjetados: 25 })),
+    sincronizarAtasAMontar: vi.fn(async () => sucesso(15)),
+    testarAtasAMontar: vi.fn(async () => ({ compras: 15, itensLidos: 2, minutasLidas: 1, pendentes: 0, falhas: [], pregoes: [], naFila: 0, leituras: [] })),
     sincronizarNotasDasEmendasDoTesouro: vi.fn(async () => sucesso(181)),
     contarNotasEmendasTesouroPendentes: vi.fn(async () => ({ pendentes: 198, amostra: '2026NE000043', amostraUgs: [] })),
     medirEmendasDoPortal: vi.fn(async () => ({ ano2026: { emendas: 12 } })),
@@ -286,6 +288,23 @@ describe('reajuste das atas', () => {
     const r = await executarPedido({ recurso: 'reajuste_atas', forcar: false, dry: true }, d);
     expect(d.sincronizarReajusteAtas).not.toHaveBeenCalled();
     expect(r).toMatchObject({ dry: true, consulta: { pendentes: 149 } });
+  });
+});
+
+describe('atas a montar', () => {
+  it('vale para as duas carteiras (sem UASG) e lê a minuta com o leitor de PDF do servidor', async () => {
+    expect(validarPedido({ recurso: 'atas_a_montar' })).toMatchObject({ ok: true, pedido: { recurso: 'atas_a_montar' } });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'atas_a_montar', forcar: false, dry: false }, d);
+    expect(d.sincronizarAtasAMontar).toHaveBeenCalledWith(expect.objectContaining({ forcar: false, orcamentoMs: expect.any(Number), leitor: expect.objectContaining({ textoDoPdf: expect.any(Function) }) }));
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 15 } });
+  });
+
+  it('no teste (dry) lê sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'atas_a_montar', forcar: false, dry: true }, d);
+    expect(d.sincronizarAtasAMontar).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ dry: true, consulta: { compras: 15, minutasLidas: 1 } });
   });
 });
 

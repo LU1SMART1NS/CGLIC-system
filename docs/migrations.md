@@ -155,17 +155,18 @@ Situação em 14/10/2026: 126 arquivos, de `20260917000001` a `20261014000124`.
 | 182 | `20261024000182_notas_das_emendas_no_portal.sql` | Leitura das notas no Portal da Transparência (SIAFI): `notas_para_ler_no_siafi` passa a incluir as notas das emendas parlamentares (ligadas às linhas dos pedidos ou citadas nos despachos de empenho do SEI), em qualquer contrato, para conferir os pedidos com o empenho de fato. Gravação e Edge Function iguais. |
 | 183 | `20261025000183_emendas_nota_sei_da_emenda.sql` | Emendas, a nota citada no SEI só liga à linha do pedido quando o plano interno é da emenda (número da emenda ou código do autor). Antes, faltando a nota da 200330, a regra pegava a de mesmo número da 200331 (outra despesa): 41 linhas em 16 pedidos em 25/10/2026. |
 | 187 | `20261025000187_emendas_empenho_x_pedido.sql` | Emendas, empenhado × pedido: view `v_emendas_empenho_x_pedido` compara, por emenda e item, as linhas dos pedidos já empenhados com as notas da emenda lidas no Portal (A_MAIS, A_MENOS, A_CONFERIR, IGUAL, SEM_NOTA). Avisos "Empenhado a mais/a menos" no Início e em Pedidos; `avisos_resolvidos` ganha o tipo EMPENHO, resolvido pelo gestor de emendas ou pelo coordenador (`resolver_aviso`/`reexibir_aviso`). |
+| 238 | `20261028000238_atas_a_montar.sql` | Atas a montar, entrega 1 (leitura pelo servidor, recurso `atas_a_montar`): `atas_a_montar_compras` (pregões de registro de preços homologados no PNCP: itens com resultado e leitura da minuta da ata do edital — descrição, CATMAT, gerenciador e participantes; só o servidor grava por `gravar_ata_a_montar_compra`), `atas_a_montar_rascunhos` (o que o gestor preenche, por `salvar_rascunho_ata_a_montar`, gestor e coordenador), view `v_atas_a_montar` (um fornecedor vencedor por linha, some quando a ata chega ao banco), fila `atas_a_montar_para_ler` (só servidor); agendamento de 2 em 2 horas no minuto 52. |
 
 ## Por tema
 
-- **Atas e itens:** 1, 56, 73, 84, 91–92, 96, 102, 105–107, 109, 111, 114, 116.
+- **Atas e itens:** 1, 56, 73, 84, 91–92, 96, 102, 105–107, 109, 111, 114, 116, 238.
 - **Contratos e gestão:** planos e modelos 5, 12–14, 19, 34, 21b, 23b, 37–44, 64; complexidade 66; gestor e distribuição 69–71, 86; contratos oficiais 72, itens 78, detalhes 93; avisos 46, 101.
 - **Notas de empenho:** 16–18, 51–54, 80–82, 85, 94, 99, 104, 113, 117, 118, 121.
 - **Faturas e OB:** 83, 119, 120, 122, 123.
 - **Ciclo de pagamento e previsão:** 22b, 45, 58, 60–63, 87–90; feriados 59, importação automática 228.
 - **Alocação e unidades internas:** 4, 6–9, 11, 21, 28, 29, 35; nota → unidade 55, 98; contratado por unidade 103, 110; unidade em uso 108.
 - **Vínculos automáticos:** item ↔ contrato 15, 48–50, 95, 100, 112, 115; nota ↔ item 94 (contrato de um item), 118 (pelo valor), 121 (SIAFI).
-- **Sincronização e cron:** 72, 76, 77, 78, 80, 82, 83, 87, 91, 95, 105, 109, 111, 121, 123.
+- **Sincronização e cron:** 72, 76, 77, 78, 80, 82, 83, 87, 91, 95, 105, 109, 111, 121, 123, 238.
 - **Segurança, perfis e RLS:** 2, 3, 6, 11, 20, 22–32, 33, 36, 47, 55, 65, 67, 68, 74, 75, 76, 84, 97, 98, 124.
 - **Limpezas e acertos de dados:** 41, 53, 60, 99, 101, 110.
 
@@ -190,6 +191,7 @@ Os jobs de sincronização chamam `disparar_sincronizacao(recurso, uasg)`, que a
 | sincronizar-reajuste-atas | :44, de 3 em 3 h | reajuste das atas: IPCA e Focus (Banco Central), editais, apostilamentos e preço homologado (PNCP) | 159 |
 | sincronizar-empenhos-200330 / -200331 | :45 / :50 | empenhos | 82 |
 | sincronizar-cadastro-uasgs | :48 | cadastro de UASGs | 111 |
+| sincronizar-atas-a-montar | :52, de 2 em 2 h | atas a montar: pregões homologados, resultado dos itens e minuta da ata do edital (PNCP) | 238 |
 | sincronizar-autores-emendas | segunda-feira 06:40 UTC | deputados e senadores (Câmara e Senado), na região de São Paulo | 155, 156 |
 | sincronizar-ordens-bancarias-200330 / -200331 | :53 / :57 | ordens bancárias | 83 (134 move a 200330) |
 | vincular-contratos-automaticamente | :55 | `executar_vinculos_automaticos(...,'CRON')` | 95 |
@@ -201,7 +203,7 @@ Nenhum job foi removido: as migrations 87 e 123 usam `cron.unschedule` só para 
 
 ## Tabelas no estado final
 
-- **Atas e itens:** `atas_registro_preco`, `itens_ata`, `itens_ata_unidades_copia`, `itens_ata_unidades_historico`, `atas_participacao`, `itens_ata_participacao`, `participacao_compras_lidas`, `atas_fornecedor_pncp`, `ata_item_quantidade_assinada`, `ata_item_assinada_registros`, `ata_item_remanejamentos`, `ata_item_continua_orgao`, `adesao_quantidade_informada`, `uasgs_cadastro`, `participantes_contratos_itens`, `participantes_contratos_leituras`.
+- **Atas e itens:** `atas_registro_preco`, `itens_ata`, `itens_ata_unidades_copia`, `itens_ata_unidades_historico`, `atas_participacao`, `itens_ata_participacao`, `participacao_compras_lidas`, `atas_fornecedor_pncp`, `ata_item_quantidade_assinada`, `ata_item_assinada_registros`, `ata_item_remanejamentos`, `ata_item_continua_orgao`, `adesao_quantidade_informada`, `atas_a_montar_compras`, `atas_a_montar_rascunhos`, `uasgs_cadastro`, `participantes_contratos_itens`, `participantes_contratos_leituras`.
 - **Contratos e gestão:** `contratos_oficiais`, `itens_contrato`, `itens_contrato_leituras`, `contratos_detalhes_copia`, `contract_managers`, `ata_managers`, `contract_task_*` (7), `ata_task_*` (7) (210: módulos `contract_task_modulos`/`ata_task_modulos`, ação do gestor e prazo projetado nas tarefas; 215: o coordenador edita a regra das tarefas e os detalhes dos modelos; 225: plano automático, com módulos que entram sozinhos todo dia, tarefas fechadas pela fonte, dispensa de módulo e tarefa do pregão, registrados em `plano_automatico_*`), `instrument_complexity_overrides`, `contract_sem_ata_confirmacoes`, `contract_ata_descartes`, `distribuicao_avisos`, `avisos_resolvidos`.
 - **Vínculos:** `arp_item_contract_links`, `arp_item_contract_dismissals`, `vinculo_automatico_execucoes`, `vinculo_automatico_a_conferir`, `vinculo_automatico_decisoes`.
 - **Empenhos:** `empenhos`, `contrato_empenhos`, `empenho_eventos_historico`, `contrato_empenhos_sincronizacao`, `contrato_empenho_descartes`, `contrato_empenho_distribuicoes`, `contrato_empenho_itens`, `contrato_empenho_vinculo_recusado`, `contrato_empenho_ausente_da_fonte`, `ausente_da_fonte_decisoes`, `correcoes_empenho_na_fonte`, `empenho_leituras_siafi`, `empenho_itens_siafi`, `correcoes_nota_no_contrato`.
