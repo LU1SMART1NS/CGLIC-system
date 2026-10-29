@@ -4,7 +4,16 @@ import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput, AppSelect, AppDateInput } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useAutoresEmendas, useAvancarPedido, useCancelarPedido, useInformarSolicitacaoDaAta, usePedidoEmDiaNaTela, useRegistrarEnvioCgofi } from '../../hooks/useEmendas';
+import {
+  hojeEmBrasilia,
+  useAutoresEmendas,
+  useAvancarPedido,
+  useCancelarPedido,
+  useInformarSolicitacaoDaAta,
+  usePedidoEmDiaNaTela,
+  useRegistrarEnvioCgofi,
+  useRegistrarOrdemFornecimento
+} from '../../hooks/useEmendas';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import {
   ataDoItem,
@@ -31,8 +40,9 @@ import { precosDaMinuta } from '../../utils/emendasConferenciaOficio';
 /**
  * MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa.
  * SOLICITACAO_ATA: a solicitação de empenho de uma ata (migration 178), sem mudar de etapa.
+ * ORDEM_FORNECIMENTO: as informações para a Ordem de Fornecimento, depois do contrato (migration 244), sem mudar de etapa.
  */
-export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_CGOFI' | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA' | 'CANCELAR' | 'QUADROS_AUTORIZACAO';
+export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_CGOFI' | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA' | 'ORDEM_FORNECIMENTO' | 'CANCELAR' | 'QUADROS_AUTORIZACAO';
 
 /** De onde a janela foi aberta: a ata e o número que já estão na linha do tempo. */
 export interface ContextoDaJanela {
@@ -67,6 +77,7 @@ const TITULO: Record<AcaoDaJanela, string> = {
   MAIS_EMPENHADO: 'Acrescentar número SEI do empenho',
   MAIS_CONTRATACAO: 'Acrescentar número SEI do despacho para contratação',
   SOLICITACAO_ATA: 'Solicitação de empenho de uma ata',
+  ORDEM_FORNECIMENTO: 'Informações para a Ordem de Fornecimento',
   CANCELAR: 'Cancelar o pedido',
   QUADROS_AUTORIZACAO: 'Quadros da autorização'
 };
@@ -80,7 +91,8 @@ const ROTULO_SEI: Partial<Record<AcaoDaJanela, string>> = {
   CONTRATACAO: 'Documento(s) SEI do despacho para contratação *',
   MAIS_CGOFI: 'Documento SEI do envio à CGOFI *',
   MAIS_EMPENHADO: 'Documento(s) SEI do empenho *',
-  MAIS_CONTRATACAO: 'Documento(s) SEI do despacho para contratação *'
+  MAIS_CONTRATACAO: 'Documento(s) SEI do despacho para contratação *',
+  ORDEM_FORNECIMENTO: 'Documento SEI com as informações *'
 };
 /** Etapas com vários números: um por nota (uma emenda tem uma nota por fornecedor). */
 const VARIOS: ReadonlySet<AcaoDaJanela> = new Set(['EMPENHADO', 'CONTRATACAO', 'MAIS_EMPENHADO', 'MAIS_CONTRATACAO']);
@@ -92,7 +104,8 @@ const ROTULO_DATA: Partial<Record<AcaoDaJanela, string>> = {
   AUTORIZADO: 'Assinado pela DGFNSP em',
   CGOFI: 'Enviado em',
   EMPENHADO: 'Empenhado em',
-  CONTRATACAO: 'Enviado em'
+  CONTRATACAO: 'Enviado em',
+  ORDEM_FORNECIMENTO: 'Concluídas em'
 };
 
 const grade: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.8rem' };
@@ -134,6 +147,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const cancelar = useCancelarPedido();
   const informar = useInformarSolicitacaoDaAta();
   const registrarEnvio = useRegistrarEnvioCgofi();
+  const registrarOrdem = useRegistrarOrdemFornecimento();
   const emDiaNaTela = usePedidoEmDiaNaTela();
   const atas = atasDoPedido(pedido, itens);
   // Envio à CGOFI (migration 193): as solicitações assinadas que ainda não foram, todas marcadas de início.
@@ -174,8 +188,8 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
   const toast = useToast();
   const { data: autores = [] } = useAutoresEmendas();
   const modo = acao;
-  const [data, setData] = useState(hojeEmBrasilia());
-  const [documentoSei, setDocumentoSei] = useState('');
+  const [data, setData] = useState(acao === 'ORDEM_FORNECIMENTO' ? pedido.ordemFornecimentoEm ?? hojeEmBrasilia() : hojeEmBrasilia());
+  const [documentoSei, setDocumentoSei] = useState(acao === 'ORDEM_FORNECIMENTO' ? pedido.ordemFornecimentoDocumentoSei ?? '' : '');
   const [processoSei, setProcessoSei] = useState(pedido.oficioProcessoSei ?? '');
   const { precos } = usePrecosParaEmenda();
   const [motivo, setMotivo] = useState(MOTIVOS_CANCELAMENTO[0]);
@@ -195,7 +209,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
         : modo === 'MAIS_CONTRATACAO' && !pedido.contratacaoEm
           ? 'Enviado em'
           : ROTULO_DATA[modo];
-  const ocupado = avancar.isPending || cancelar.isPending || informar.isPending || registrarEnvio.isPending;
+  const ocupado = avancar.isPending || cancelar.isPending || informar.isPending || registrarEnvio.isPending || registrarOrdem.isPending;
   const variasAtas = modo === 'SOLICITADO' && atas.length > 1;
   const numerosPorAta = atas
     .map((a) => ({ ata: a, numero: (porAta[a.ataKey] ?? '').replace(/\D/g, '') }))
@@ -237,6 +251,9 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
       if (modo === 'CGOFI') {
         await registrarEnvio.mutateAsync({ pedidoId: pedido.id, documentoSei: numeros[0], enviadoEm: data, solicitacoes: [...paraEnviar] });
         toast.success(`${nomeDoAutor}: envio à CGOFI registrado (${paraEnviar.size === 1 ? '1 solicitação' : `${paraEnviar.size} solicitações`}).`);
+      } else if (modo === 'ORDEM_FORNECIMENTO') {
+        await registrarOrdem.mutateAsync({ pedidoId: pedido.id, documentoSei: numeros[0], data });
+        toast.success(`${nomeDoAutor}: informações para a Ordem de Fornecimento registradas.`);
       } else if (modo === 'SOLICITACAO_ATA') {
         await informar.mutateAsync({
           pedidoId: pedido.id,
@@ -300,7 +317,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
         <>
           <ActionButton action="cancelar" label={modo === 'CANCELAR' ? 'Voltar' : 'Cancelar'} type="button" onClick={onClose} disabled={ocupado} />
           <AppButton type="submit" form="emendas-etapa-form" variant={modo === 'CANCELAR' ? 'danger' : 'primary'} disabled={ocupado} isLoading={ocupado} data-testid="emendas-etapa-salvar">
-            {modo === 'CANCELAR' ? 'Cancelar o pedido' : modo.startsWith('MAIS_') ? 'Acrescentar' : modo === 'SOLICITACAO_ATA' ? 'Salvar' : 'Registrar'}
+            {modo === 'CANCELAR' ? 'Cancelar o pedido' : modo.startsWith('MAIS_') ? 'Acrescentar' : modo === 'SOLICITACAO_ATA' || (modo === 'ORDEM_FORNECIMENTO' && pedido.ordemFornecimentoEm) ? 'Salvar' : 'Registrar'}
           </AppButton>
         </>
       }

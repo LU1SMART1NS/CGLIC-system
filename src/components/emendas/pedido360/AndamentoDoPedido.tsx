@@ -239,6 +239,32 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, ho
           </div>
         );
       }
+      case 'ordem':
+        // Migration 244: a CAEP registra a data e o SEI; abre com o contrato assinado.
+        if (p.ordemFornecimentoDocumentoSei)
+          return (
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.35rem', marginTop: '0.3rem' }}>
+              <NumeroSeiEtiqueta numero={p.ordemFornecimentoDocumentoSei} testId="pedido360-sei-ordem-fornecimento" />
+              {podeGerir && (
+                <AppButton size="xs" variant="link" onClick={() => onAcao('ORDEM_FORNECIMENTO')} data-testid="emendas-pedido-ordem-fornecimento-corrigir">
+                  Corrigir
+                </AppButton>
+              )}
+            </div>
+          );
+        if (!podeGerir || t.estado === 'DEPOIS' || t.estado === 'NAO_HOUVE') return null;
+        return (
+          <div style={{ marginTop: '0.35rem' }}>
+            <AppButton
+              size={t.estado === 'COMIGO' ? 'sm' : 'xs'}
+              variant={t.estado === 'COMIGO' ? 'primary' : 'link'}
+              onClick={() => onAcao('ORDEM_FORNECIMENTO')}
+              data-testid="emendas-pedido-ordem-fornecimento"
+            >
+              {t.estado === 'COMIGO' ? 'Registrar as informações' : 'Completar o número SEI'}
+            </AppButton>
+          </div>
+        );
       default:
         return null;
     }
