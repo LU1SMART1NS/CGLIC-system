@@ -14,12 +14,14 @@ import type { GrupoTarefa } from '../../../utils/modeloGestao';
 import { numeroDaChave } from '../../../utils/contractKeyUtils';
 import { formatCurrency } from '../../../utils/format';
 import { dataBR } from '../../../utils/emendasKits';
-import { contratosDoPedido, documentosDaEtapa, ETAPAS_COM_VARIOS_SEI, jaEmpenhado, rodadaDoPedido, seiDaEtapa, solicitacoesSemAta, avisoGrave, type AvisoPedido } from '../../../utils/emendasPedidos';
+import { ataDoItem, contratosDoPedido, documentosDaEtapa, linhasAtivas, ETAPAS_COM_VARIOS_SEI, jaEmpenhado, rodadaDoPedido, seiDaEtapa, solicitacoesSemAta, avisoGrave, type AvisoPedido } from '../../../utils/emendasPedidos';
 import { andamentoDoPedido, grupoDaTarefaDoPedido, type EstadoDaTarefa, type TarefaDoAndamento } from '../../../utils/emendasAndamento';
 import type { ItemCaep, NotaDaLinha, PedidoEmenda } from '../../../services/emendasService';
 import { BotaoDaPendencia, RodadasDoPedido, type AoAgir } from '../PedidoAberto';
 import { proximaAcaoDaJanela } from '../proximaAcaoDaJanela';
 import type { AcaoDaJanela } from '../EtapaPedidoModal';
+import type { AcoesCcga } from './Pedido360Header';
+import { linhaContratada, temSituacaoNaCcga, textoDoMovimento } from '../../../utils/emendasCcga';
 
 interface Props {
   p: PedidoEmenda;
@@ -32,6 +34,8 @@ interface Props {
   onAcao: AoAgir;
   onAlterar: () => void;
   onAnular: () => void;
+  /** Envio à CCGA por ata, desfazer o envio e voltar etapa (migration 248). */
+  ccga?: AcoesCcga;
 }
 
 const ICONE: Record<EstadoDaTarefa, React.ReactNode> = {
@@ -88,11 +92,83 @@ const Documentos: React.FC<{ p: PedidoEmenda; etapa: Parameters<typeof documento
   );
 };
 
+/** Situação de cada ata na CCGA (migration 248): na CCGA, devolvida, a enviar ou contratada. */
+const AtasNaCcga: React.FC<{ p: PedidoEmenda; notas: Map<string, NotaDaLinha> }> = ({ p, notas }) => {
+  const porAta = new Map<string, { enviadas: number; devolvidas: number; aEnviar: number; contratadas: number; sei: Set<string>; em: string | null; motivo: string | null }>();
+  for (const l of linhasAtivas(p)) {
+    if (!l.itemKey) continue;
+    const chave = ataDoItem(l.itemKey);
+    const a = porAta.get(chave) ?? { enviadas: 0, devolvidas: 0, aEnviar: 0, contratadas: 0, sei: new Set<string>(), em: null, motivo: null };
+    if (linhaContratada(l, notas)) a.contratadas++;
+    else if (l.ccgaSituacao === 'ENVIADA') {
+      a.enviadas++;
+      if (l.despachoDocumentoSei) a.sei.add(l.despachoDocumentoSei);
+      a.em = l.ccgaEm ?? a.em;
+    } else if (l.ccgaSituacao === 'DEVOLVIDA') {
+      a.devolvidas++;
+      a.motivo = l.ccgaMotivo ?? a.motivo;
+    } else a.aEnviar++;
+    porAta.set(chave, a);
+  }
+  if (porAta.size === 0) return null;
+  const partes = (a: NonNullable<ReturnType<typeof porAta.get>>) =>
+    [
+      a.enviadas ? `${a.enviadas} na CCGA${a.em ? ` desde ${dataBR(a.em)}` : ''}` : null,
+      a.devolvidas ? `${a.devolvidas} ${a.devolvidas === 1 ? 'devolvido' : 'devolvidos'}${a.motivo ? ` (${a.motivo})` : ''}` : null,
+      a.aEnviar ? `${a.aEnviar} a enviar` : null,
+      a.contratadas ? `${a.contratadas} ${a.contratadas === 1 ? 'contratado' : 'contratados'}` : null
+    ].filter(Boolean).join(' · ');
+  return (
+    <ul style={{ listStyle: 'none', margin: '0.35rem 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }} data-testid="pedido360-ccga-atas">
+      {[...porAta].sort((x, y) => x[0].localeCompare(y[0])).map(([chave, a]) => (
+        <li key={chave} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem 0.5rem', fontSize: '0.85rem', color: a.devolvidas ? 'var(--color-warning-text)' : undefined }}>
+          <b>Ata {chave.split('-')[0]}</b>
+          <span style={a.devolvidas ? undefined : carteiraDetalhe}>{partes(a)}</span>
+          {[...a.sei].map((n) => (
+            <NumeroSeiEtiqueta key={n} numero={n} testId="pedido360-sei-despacho-ata" />
+          ))}
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+/** Histórico do vai e volta com a CCGA e das etapas voltadas (migration 248), do mais novo ao mais antigo. */
+const MovimentosDoPedido: React.FC<{ p: PedidoEmenda }> = ({ p }) => {
+  const movimentos = p.movimentos ?? [];
+  if (movimentos.length === 0) return null;
+  return (
+    <details style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '0.55rem 0.75rem' }} data-testid="pedido360-movimentos">
+      <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+        <RotateCcw size={13} aria-hidden="true" /> Envios, devoluções e etapas voltadas ({movimentos.length})
+      </summary>
+      <ul style={{ listStyle: 'none', margin: '0.5rem 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+        {[...movimentos].reverse().map((m) => {
+          const t = textoDoMovimento(m, m.linhaIds.length);
+          return (
+            <li key={m.id} style={{ borderLeft: `3px solid ${m.acao === 'ENVIO_CCGA' ? 'var(--primary)' : 'var(--color-warning)'}`, paddingLeft: '0.6rem' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem 0.5rem' }}>
+                <b style={{ fontSize: '0.85rem' }}>{t.titulo}</b>
+                {m.documentoSei && <NumeroSeiEtiqueta numero={m.documentoSei} testId="pedido360-sei-movimento" />}
+              </div>
+              <div style={carteiraDetalhe}>
+                {dataBR(m.data)}
+                {m.criadoPorNome ? ` · ${m.criadoPorNome}` : ''}
+                {t.detalhe ? ` · ${t.detalhe}` : ''}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+};
+
 /**
  * Aba Andamento do Pedido 360: as etapas como tarefas, no desenho do Plano de gestão das atas. Junta o "O que falta"
  * e a linha do tempo de antes; os botões abrem as mesmas janelas.
  */
-export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, hoje, podeGerir, podeVerContratos, onAcao, onAlterar, onAnular }) => {
+export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, hoje, podeGerir, podeVerContratos, onAcao, onAlterar, onAnular, ccga }) => {
   const { precos } = usePrecosParaEmenda();
   const andamento = useMemo(() => andamentoDoPedido(p, itens, notas, hoje, podeGerir, precos), [p, itens, notas, hoje, podeGerir, precos]);
   const [filtro, setFiltro] = useState<GrupoTarefa | null>(null);
@@ -214,7 +290,22 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, ho
         return (
           <>
             <Documentos p={p} etapa="CONTRATACAO" />
-            {podeGerir && p.etapa === 'CONTRATACAO' && (
+            {jaEmpenhado(p.etapa) && temSituacaoNaCcga(p) && <AtasNaCcga p={p} notas={notas} />}
+            {(ccga?.enviar || ccga?.desfazer) && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.35rem' }}>
+                {ccga.enviar && (
+                  <AppButton size="xs" variant="link" onClick={ccga.enviar} data-testid="emendas-pedido-ccga-enviar-atas">
+                    Enviar à CCGA
+                  </AppButton>
+                )}
+                {ccga.desfazer && (
+                  <AppButton size="xs" variant="link" onClick={ccga.desfazer} data-testid="emendas-pedido-ccga-desfazer">
+                    Desfazer envio
+                  </AppButton>
+                )}
+              </div>
+            )}
+            {podeGerir && p.etapa === 'CONTRATACAO' && !temSituacaoNaCcga(p) && (
               <AppButton size="xs" variant="link" onClick={() => onAcao('MAIS_CONTRATACAO' as AcaoDaJanela)} data-testid="emendas-pedido-mais-sei-CONTRATACAO">
                 {seiDaEtapa(p, 'CONTRATACAO').length ? '+ número SEI' : 'Completar o número SEI'}
               </AppButton>
@@ -430,6 +521,7 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, ho
           </section>
         );
       })}
+      <MovimentosDoPedido p={p} />
       {p.observacao && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
           <span style={carteiraDetalhe}>Observação</span>

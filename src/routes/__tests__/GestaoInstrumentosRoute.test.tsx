@@ -38,6 +38,11 @@ vi.mock('../../hooks/usePainelCarteira', () => ({
   usePainelCarteira: () => ({ atas: [], contratos: [], gestores: [], isLoading: false })
 }));
 
+// Emendas a contratar (migration 248): nada enviado à CCGA, a gaveta não aparece.
+vi.mock('../../hooks/useEmendas', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../hooks/useEmendas')>()),
+  useEmendasAContratar: vi.fn(() => ({ data: [], isLoading: false, isError: false }))
+}));
 vi.mock('../../hooks/useRefreshItemSaldos', () => ({
   useRefreshItemSaldos: () => ({ refresh: vi.fn(), isRefreshing: false })
 }));

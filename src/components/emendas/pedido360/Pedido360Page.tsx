@@ -40,6 +40,8 @@ import { PedidoModal } from '../PedidoModal';
 import { EtapaPedidoModal, type AcaoDaJanela, type ContextoDaJanela } from '../EtapaPedidoModal';
 import { AnulacaoModal } from '../AnulacaoModal';
 import { AutorizacaoQuadrosModal } from '../AutorizacaoQuadrosModal';
+import { DesfazerEnvioCcgaModal, EnviarCcgaModal, VoltarEtapaModal } from '../CcgaModais';
+import { atasParaDesfazer, atasParaEnviar, temSituacaoNaCcga, voltaDaEtapa } from '../../../utils/emendasCcga';
 import { Pedido360Header } from './Pedido360Header';
 import { AndamentoDoPedido } from './AndamentoDoPedido';
 import { ExecucaoDoPedidoAba } from './ExecucaoDoPedidoAba';
@@ -86,6 +88,8 @@ export const Pedido360Page: React.FC = () => {
   const [editando, setEditando] = useState(false);
   const [anulando, setAnulando] = useState(false);
   const [janela, setJanela] = useState<{ acao: AcaoDaJanela; contexto?: ContextoDaJanela } | null>(null);
+  // Envio à CCGA por ata, desfazer o envio e voltar etapa (migration 248).
+  const [ccga, setCcga] = useState<'ENVIAR' | 'DESFAZER' | 'VOLTAR' | null>(null);
   // Conferência do ofício (protótipo aprovado em 28/10/2026): abre no lugar das abas, numa área larga, e não em janela.
   const [conferindo, setConferindo] = useState<{ devolvendo: boolean } | null>(null);
   // Captação principal (migration 218): botão no cartão e gaveta entre o cartão e as abas, como na Ata 360.
@@ -137,8 +141,22 @@ export const Pedido360Page: React.FC = () => {
   const avisos = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id), precos);
   const valor = valorDoPedidoNaEtapa(p, itens, precos);
   const captacao = fatiasDaCaptacao([p], gruposDosBeneficiarios, itens, precos);
+  // Com a migration 248, o envio para contratação é por ata (cada uma vai ao seu gestor); sem ela, o pedido inteiro.
+  const porAta = temSituacaoNaCcga(p);
   const onAcao = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) =>
-    acao === 'CONFERIDO' || acao === 'DIVERGENCIA' ? setConferindo({ devolvendo: acao === 'DIVERGENCIA' }) : setJanela({ acao, contexto });
+    acao === 'CONFERIDO' || acao === 'DIVERGENCIA'
+      ? setConferindo({ devolvendo: acao === 'DIVERGENCIA' })
+      : acao === 'CONTRATACAO' && porAta
+        ? setCcga('ENVIAR')
+        : setJanela({ acao, contexto });
+  const acoesCcga =
+    podeGerir && porAta
+      ? {
+          enviar: atasParaEnviar(p, notas).length > 0 && p.etapa === 'CONTRATACAO' ? () => setCcga('ENVIAR') : undefined,
+          desfazer: atasParaDesfazer(p, notas).length > 0 ? () => setCcga('DESFAZER') : undefined,
+          voltar: voltaDaEtapa(p) ? () => setCcga('VOLTAR') : undefined
+        }
+      : undefined;
   // Só com o ofício recebido: depois de registrar, o pedido muda de etapa e a tela volta às abas.
   const naConferencia = Boolean(conferindo && podeGerir && p.etapa === 'OFICIO');
   const tabs = PEDIDO360_ABAS.map((a) => (a.id === 'itens' ? { ...a, label: `Itens (${linhasAtivas(p).length})` } : a));
@@ -160,6 +178,7 @@ export const Pedido360Page: React.FC = () => {
           onAlterar={() => setEditando(true)}
           onCancelar={() => onAcao('CANCELAR')}
           onAnular={() => setAnulando(true)}
+          ccga={acoesCcga}
           onAba={irPara}
           onAbrirParlamentar={p.autorId ? () => navegar(`/emendas/parlamentares/${encodeURIComponent(p.autorId!)}`) : undefined}
           onAbrirEmenda={p.siopEmenda ? () => navegar(rotaDaEmenda({ ano: p.siopEmendaAno ?? null, numero: p.siopEmenda! })) : undefined}
@@ -206,6 +225,7 @@ export const Pedido360Page: React.FC = () => {
                 onAcao={onAcao}
                 onAlterar={() => setEditando(true)}
                 onAnular={() => setAnulando(true)}
+                ccga={acoesCcga}
               />
             </InstrumentSection>
           )}
@@ -274,6 +294,9 @@ export const Pedido360Page: React.FC = () => {
       {janela?.acao === 'QUADROS_AUTORIZACAO' && janela.contexto?.ataKey && (
         <AutorizacaoQuadrosModal pedido={p} ataKey={janela.contexto.ataKey} pedidos={pedidos} itens={itens} autores={autorPorId} beneficiarios={beneficiarios} podeGerir={podeGerir} onClose={() => setJanela(null)} />
       )}
+      {ccga === 'ENVIAR' && <EnviarCcgaModal pedido={p} itens={itens} notas={notas} nomeDoAutor={nomeDoAutor} onClose={() => setCcga(null)} />}
+      {ccga === 'DESFAZER' && <DesfazerEnvioCcgaModal pedido={p} itens={itens} notas={notas} nomeDoAutor={nomeDoAutor} onClose={() => setCcga(null)} />}
+      {ccga === 'VOLTAR' && <VoltarEtapaModal pedido={p} nomeDoAutor={nomeDoAutor} onClose={() => setCcga(null)} />}
       {janela && janela.acao !== 'QUADROS_AUTORIZACAO' && (
         <EtapaPedidoModal pedido={p} acao={janela.acao} contexto={janela.contexto} itens={itens} nomeDoAutor={nomeDoAutor} onClose={() => setJanela(null)} />
       )}

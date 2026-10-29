@@ -11,6 +11,7 @@ import { useContagemEmendas } from '../emendas/useContagemEmendas';
 import { useContagemGruposBeneficiarios } from '../emendas/useContagemGruposBeneficiarios';
 import { useContagemAtasAMontar } from '../atas/montar/useContagemAtasAMontar';
 import { pendenciasDoMenu, type PendenciaDaArea } from './pendenciasDoMenu';
+import { useContagemEmendasAContratar } from '../emendas/useContagemEmendasAContratar';
 
 interface SidebarProps {
   /** 'rail' = trilha de ícones à esquerda (desktop); 'bottom' = barra inferior (celular). */
@@ -108,9 +109,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
   const gruposBeneficiarios = useContagemGruposBeneficiarios();
   const emendas = useContagemEmendas();
   const atasAMontar = useContagemAtasAMontar();
+  const emendasAContratar = useContagemEmendasAContratar();
   const pendencias = useMemo(
-    () => pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar }),
-    [empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar]
+    () => pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar, emendasAContratar }),
+    [empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar, emendasAContratar]
   );
 
   // Registra antes de montar os links, para o da área atual já apontar para a página aberta (idempotente).

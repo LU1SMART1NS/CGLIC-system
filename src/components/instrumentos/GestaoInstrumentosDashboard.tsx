@@ -40,6 +40,9 @@ import { PainelBotoesGavetas, PainelGaveta, type PainelBotaoGaveta, type PainelG
 import { GavetaSituacao } from './GavetaSituacao';
 import { GavetaDistribuicaoConectada } from './GavetaDistribuicaoConectada';
 import { GavetaAlocacao } from './GavetaAlocacao';
+import { GavetaEmendasAContratar } from './GavetaEmendasAContratar';
+import { useEmendasAContratar } from '../../hooks/useEmendas';
+import { enviosParaContratar } from '../../utils/emendasCcga';
 import { contarFaixas, criticasPorInstrumento, resumoPorGestor, type InstrumentoNoPainel } from './painelResumo';
 import { formatNumber } from '../../utils/format';
 
@@ -435,11 +438,17 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   // ---- Gavetas: botões com resumo e uma área aberta por vez -------------------------------------------------------
   const extras = useContagensExtras();
   // A gaveta Distribuição (ocupação de cada gestor) é só do coordenador, como a Central (decisão de 25/10/2026).
-  const gavetasDisponiveis: PainelGavetaId[] = saldosOnly
-    ? ['situacao', 'alocacao']
-    : role === 'admin' && !gestorNome
-      ? ['situacao', 'distribuicao']
-      : ['situacao'];
+  // Emendas a contratar (migration 248, D1): o gestor vê as atas dele; o coordenador, as sem gestor ou as do gestor escolhido.
+  const aContratarConsulta = useEmendasAContratar();
+  const emendasAContratar = useMemo(
+    () => enviosParaContratar(aContratarConsulta.data ?? [], { coordenador: role === 'admin', gestorNome: gestorNome || null }),
+    [aContratarConsulta.data, role, gestorNome]
+  );
+  const temEmendasAContratar = emendasAContratar.aContratar.length + emendasAContratar.desfeitos.length > 0;
+  const gavetasDisponiveis: PainelGavetaId[] = [
+    ...(saldosOnly ? (['situacao', 'alocacao'] as const) : role === 'admin' && !gestorNome ? (['situacao', 'distribuicao'] as const) : (['situacao'] as const)),
+    ...(temEmendasAContratar && (role === 'admin' || ehGestor) ? (['emendasAContratar'] as const) : [])
+  ];
   const gavetaUrl = searchParams.get('gaveta') as PainelGavetaId | null;
   const gavetaAberta: PainelGavetaId | null = gavetaUrl && gavetasDisponiveis.includes(gavetaUrl) ? gavetaUrl : null;
   const rolarParaGaveta = useRef(false);
@@ -461,6 +470,10 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       return saldosOnly
         ? { id, resumo: `${formatNumber(summaryCounts.itensCriticosArp)} itens acima de 80%`, atencao: summaryCounts.itensCriticosArp > 0 }
         : { id, resumo: `${formatNumber(vencem90Contratos)} ${vencem90Contratos === 1 ? 'contrato vence' : 'contratos vencem'} em 90 dias`, atencao: vencem90Contratos > 0 };
+    }
+    if (id === 'emendasAContratar') {
+      const n = emendasAContratar.aContratar.length;
+      return { id, resumo: n ? `${formatNumber(n)} ${n === 1 ? 'pedido' : 'pedidos'} a contratar` : 'envio desfeito', atencao: n > 0 };
     }
     if (id === 'distribuicao') {
       const sem = extras.atasSemGestor;
@@ -503,7 +516,9 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           ? 'Clique numa faixa para abrir os registros.'
           : gavetaAberta === 'distribuicao'
             ? 'Vigentes de cada carteira; vencem = em até 90 dias; críticas = pendências críticas. Clique num gestor para ver o painel dele.'
-            : 'Itens com quantitativo SENASP das atas não encerradas, pelo quanto já foi alocado às unidades.'
+            : gavetaAberta === 'emendasAContratar'
+              ? 'Pedidos de emenda que a CAEP enviou à CCGA, só com os itens da ata. Saem sozinhos quando o contrato aparece no Contratos.gov.br.'
+              : 'Itens com quantitativo SENASP das atas não encerradas, pelo quanto já foi alocado às unidades.'
       }
     >
       {gavetaAberta === 'situacao' && (
@@ -528,6 +543,16 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
         />
       )}
       {gavetaAberta === 'alocacao' && <GavetaAlocacao onAbrir={navigate} />}
+      {gavetaAberta === 'emendasAContratar' && (
+        <GavetaEmendasAContratar
+          aContratar={emendasAContratar.aContratar}
+          desfeitos={emendasAContratar.desfeitos}
+          isLoading={aContratarConsulta.isLoading}
+          erro={aContratarConsulta.isError}
+          semGestor={role === 'admin' && !gestorNome}
+          onAbrir={navigate}
+        />
+      )}
     </PainelGaveta>
   );
 

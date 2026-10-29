@@ -37,6 +37,11 @@ import {
   informarSolicitacaoDaAta,
   registrarEnvioCgofi,
   registrarOrdemFornecimento,
+  enviarPedidoCcga,
+  devolverItensCcga,
+  desfazerEnvioCcga,
+  voltarEtapaPedido,
+  fetchEmendasAContratar,
   fetchEmendasSiop,
   fetchContatosDasEmendas,
   fetchAsparDosOrgaos,
@@ -287,6 +292,39 @@ export function useInformarSolicitacaoDaAta() {
 export function useRegistrarEnvioCgofi() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: registrarEnvioCgofi, retry: 0, onSettled: invalidar });
+}
+
+/** Envio à CCGA por ata, desfazer o envio e voltar etapa (migration 248): só coordenador e gestor de emendas. */
+export function useEnviarCcga() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: enviarPedidoCcga, retry: 0, onSettled: invalidar });
+}
+
+export function useDesfazerEnvioCcga() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: desfazerEnvioCcga, retry: 0, onSettled: invalidar });
+}
+
+export function useVoltarEtapa() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: voltarEtapaPedido, retry: 0, onSettled: invalidar });
+}
+
+/** O gestor da ata devolve à CAEP (migration 248): recarrega o Início dele e os pedidos. */
+export function useDevolverCcga() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: devolverItensCcga, retry: 0, onSettled: invalidar });
+}
+
+/** Itens a contratar pelas emendas e envios desfeitos, para o Início do gestor da ata e do coordenador (migration 248). */
+export function useEmendasAContratar({ enabled = true }: LeituraOpcional = {}) {
+  const { role } = useAuth();
+  return useQuery({
+    queryKey: [...CHAVE_EMENDAS, 'a-contratar'],
+    queryFn: fetchEmendasAContratar,
+    enabled: enabled && (role === 'admin' || role === 'gestor'),
+    staleTime: 5 * 60_000
+  });
 }
 
 export function useRegistrarOrdemFornecimento() {

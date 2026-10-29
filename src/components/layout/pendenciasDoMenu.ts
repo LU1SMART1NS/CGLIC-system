@@ -25,19 +25,26 @@ export interface FontesDoMenu {
   emendas?: { total: number; urgentes: number; semPedido?: number } | null;
   /** Fornecedores vencedores de pregão ainda sem ata (Atas › A montar); só gestor e coordenador recebem número. */
   atasAMontar?: number | null;
+  /** Pedidos de emenda a contratar (migration 248): o gestor nas atas dele, o coordenador nas atas sem gestor. */
+  emendasAContratar?: number | null;
 }
 
 /**
  * Regras dos números do menu (só pendências que o perfil resolve; quem calcula cada parte já filtra pelo perfil). Com
  * número, a área abre direto na página e no segmento da pendência; sem número, o menu volta à última página usada.
  */
-export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
+export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar, emendasAContratar }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
   const r: Record<string, PendenciaDaArea | undefined> = {};
 
-  // Início (coordenador): as filas da Central de Distribuição.
+  // Início: as filas da Central de Distribuição (coordenador) e os pedidos de emenda a contratar (gestor e coordenador).
   const atas = extras.atasSemGestor ?? 0;
   const diverg = extras.gestorDiferente ?? 0;
-  if (atas + diverg > 0) r['visao-geral'] = { contagem: atas + diverg, destino: atas > 0 ? '/atas/distribuicao' : '/atas/distribuicao?aba=DIVERGENCIAS' };
+  const aContratar = emendasAContratar ?? 0;
+  if (atas + diverg + aContratar > 0)
+    r['visao-geral'] = {
+      contagem: atas + diverg + aContratar,
+      destino: atas > 0 ? '/atas/distribuicao' : diverg > 0 ? '/atas/distribuicao?aba=DIVERGENCIAS' : '/instrumentos?gaveta=emendasAContratar'
+    };
 
   // Atas e Contratos: atas a montar, sempre em vermelho (a ata precisa ir ao SEI); abre a Carteira de Atas em "A montar".
   if (atasAMontar && atasAMontar > 0)
