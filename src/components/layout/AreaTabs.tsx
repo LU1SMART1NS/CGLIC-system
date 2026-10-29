@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { navigationConfig, filterNavigationByRole, findAreaForTabs } from '../../config/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { AREA_TABS_ACTIONS_ID } from '../../design-system/components/PageHeader';
+import { useAtasAMontar } from '../../hooks/useAtasAMontar';
+import type { NavItem } from '../../config/navigation';
 
 /** Filtros da Carteira que valem em mais de uma aba: seguem o usuário ao trocar de aba (mesmos nomes de parâmetro). */
 const CARTEIRA_SHARED_PARAMS = ['situacao', 'unidade', 'gestor', 'busca', 'alocacao', 'empenho'];
@@ -18,6 +20,13 @@ function sharedSearch(areaId: string, search: string): string {
   const text = next.toString();
   return text ? `?${text}` : '';
 }
+
+/** Número ao lado da aba (só busca quando a aba aparece para o perfil). */
+const ContagemAtasAMontar: React.FC = () => {
+  const { data } = useAtasAMontar();
+  return data ? <span className="area-tab-count">{data.length}</span> : null;
+};
+const CONTAGENS: Record<NonNullable<NavItem['contagem']>, React.FC> = { 'atas-a-montar': ContagemAtasAMontar };
 
 /**
  * Abas da área no topo das páginas de lista: alternam entre as páginas irmãs do
@@ -35,23 +44,25 @@ export const AreaTabs: React.FC = () => {
   const tabs = area?.children ?? [];
   if (!area || tabs.length < 2) return null;
 
-  // Com abas de mais de um grupo (Ajustes: Gestão · Emendas · Acesso), a primeira linha mostra os grupos
-  // e a segunda as páginas do grupo ativo. Com um grupo só, as páginas aparecem direto.
+  // Com abas de mais de um grupo (Ajustes: Gestão · Emendas · Acesso; Carteira: Atas · Contratos · Itens), a primeira
+  // linha mostra os grupos e a segunda as páginas do grupo ativo. Com um grupo só, as páginas aparecem direto.
   const groups = Array.from(new Set(tabs.map((t) => t.group).filter((g): g is string => Boolean(g))));
   const grouped = groups.length > 1;
   const activeGroup = grouped ? tabs.find((t) => t.route === pathname)?.group : undefined;
 
   const renderLink = (tab: (typeof tabs)[number], className: string) => {
     const active = tab.route === pathname;
+    const Contagem = tab.contagem ? CONTAGENS[tab.contagem] : null;
     return (
       <Link
         key={tab.id}
-        to={`${tab.route ?? '/'}${active ? '' : sharedSearch(area.id, search)}`}
+        to={`${tab.route ?? '/'}${active || tab.filtrosProprios ? '' : sharedSearch(area.id, search)}`}
         className={className}
         data-active={active ? 'true' : undefined}
         aria-current={active ? 'page' : undefined}
       >
         {tab.label}
+        {Contagem && <Contagem />}
       </Link>
     );
   };
@@ -79,7 +90,7 @@ export const AreaTabs: React.FC = () => {
           return (
             <Link
               key={group}
-              to={first.route ?? '/'}
+              to={`${first.route ?? '/'}${active ? '' : sharedSearch(area.id, search)}`}
               className="area-tab"
               data-active={active ? 'true' : undefined}
               aria-current={active ? 'true' : undefined}

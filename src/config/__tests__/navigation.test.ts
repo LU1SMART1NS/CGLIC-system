@@ -34,12 +34,13 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(area.children![0].matchPrefixes).toContain('/prazos');
     });
 
-    it('Carteira tem as abas Atas, Contratos e Itens (unidade interna e órgão partícipe são filtros)', () => {
+    it('Carteira tem as abas Atas (Registradas · A montar), Contratos e Itens (unidade interna e órgão partícipe são filtros)', () => {
       const area = navigationConfig.find((i) => i.id === 'carteira')!;
-      expect(area.children!.map((c) => [c.label, c.route])).toEqual([
-        ['Atas', '/atas'],
-        ['Contratos', '/contratos'],
-        ['Itens', '/itens']
+      expect(area.children!.map((c) => [c.group, c.label, c.route])).toEqual([
+        ['Atas', 'Registradas', '/atas'],
+        ['Atas', 'A montar', '/atas/montar'],
+        ['Contratos', 'Contratos', '/contratos'],
+        ['Itens', 'Itens', '/itens']
       ]);
     });
 
@@ -283,7 +284,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const labels = flatLabels(visible);
 
       expect(labels).toContain('Início');
-      expect(labels).toContain('Atas');
+      expect(labels).toContain('Registradas');
+      expect(labels).toContain('A montar');
       expect(labels).toContain('Contratos');
       expect(labels).toContain('Itens');
       expect(labels).toContain('Modelos de Gestão');
@@ -308,9 +310,9 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(labels).not.toContain('Distribuição');
 
       expect(labels).toContain('Início');
-      expect(labels).toContain('Atas');
+      expect(labels).toContain('Registradas');
       // Carteira dele é Atas · Itens: contratos são do gestor da ata (o empenhado por unidade fica na Alocação e no Item)
-      expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Atas', 'Itens']);
+      expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Registradas', 'Itens']);
       expect(labels).not.toContain('Contratos');
       expect(labels).not.toContain('Modelos de Gestão');
       // Ajustes aparece com a consulta dos grupos das UASGs e o cadastro de unidades internas, que ele mantém
@@ -329,7 +331,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const visible = filterNavigationByRole(navigationConfig, 'gestor_emendas');
       expect(visible.map((i) => i.id)).toEqual(['visao-geral', 'carteira', 'emendas', 'configuracoes']);
       expect(visible.find((i) => i.id === 'visao-geral')?.children?.map((c) => [c.label, c.route])).toEqual([['Painel', '/emendas/inicio']]);
-      expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Atas', 'Itens']);
+      expect(visible.find((i) => i.id === 'carteira')?.children?.map((c) => c.label)).toEqual(['Registradas', 'Itens']);
       expect(visible.find((i) => i.id === 'emendas')?.children?.map((c) => [c.label, c.route])).toEqual([
         ['Parlamentares', '/emendas/parlamentares'],
         ['Emendas', '/emendas/emendas'],
@@ -381,7 +383,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const labels = flatLabels(visible);
 
       expect(labels).toContain('Início');
-      expect(labels).toContain('Atas');
+      expect(labels).toContain('Registradas');
+      expect(labels).not.toContain('A montar');
       expect(labels).toContain('Contratos');
       expect(labels).toContain('Pagamentos');
       expect(labels).toContain('Empenhos');

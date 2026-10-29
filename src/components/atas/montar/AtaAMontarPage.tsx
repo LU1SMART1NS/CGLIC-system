@@ -127,7 +127,7 @@ export const AtaAMontarPage: React.FC = () => {
   const { ano = '', sequencial = '', fornecedor = '' } = useParams();
   const fornecedorNi = decodeURIComponent(fornecedor);
   const controle = controleDaCompra(ano, sequencial);
-  const voltar = useBackTarget({ path: '/atas?ver=montar', label: 'Voltar para Atas a montar' });
+  const voltar = useBackTarget({ path: '/atas/montar', label: 'Voltar para Atas a montar' });
   const toast = useToast();
 
   const compraQ = useCompraAMontar(controle);
