@@ -168,10 +168,10 @@ describe('Parlamentar 360', () => {
 });
 
 describe('Ano da emenda (28/10/2026)', () => {
-  it('Parlamentares abre no ano corrente; num ano encerrado a Sobra vira "Não empenhado"', () => {
+  it('Parlamentares abre no ano corrente; num ano encerrado o A indicar vira "Não empenhado"', () => {
     const corrente = render('/emendas/parlamentares');
     expect(corrente).toContain('emendas-parlamentares-ano-btn');
-    expect(corrente).toContain('>Sobra<');
+    expect(corrente).toContain('>A indicar<');
     const antigo = render('/emendas/parlamentares?ano=2024');
     expect(antigo).toContain('Emendas de 2024 (ano encerrado)');
     expect(antigo).toContain('>Não empenhado<');

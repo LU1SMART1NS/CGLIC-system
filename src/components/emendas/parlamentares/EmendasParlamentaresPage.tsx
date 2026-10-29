@@ -200,7 +200,7 @@ export const EmendasParlamentaresPage: React.FC = () => {
     { key: 'pago', header: 'Pago', align: 'right', nowrap: true, sortValue: ORDEM.pago.value, sortFirstDir: 'desc', render: (l) => valorOu(l.execucao && l.execucao.notas > 0 ? l.execucao.pago : undefined) },
     {
       key: 'sobra',
-      header: encerrado ? 'Não empenhado' : 'Sobra',
+      header: encerrado ? 'Não empenhado' : 'A indicar',
       align: 'right',
       nowrap: true,
       minWidth: '140px',
@@ -238,7 +238,7 @@ export const EmendasParlamentaresPage: React.FC = () => {
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Parlamentares"
-        subtitle="Quem tem emenda ou pedido com a CAEP: emendas do ano, o que já foi empenhado e pago e o que sobra."
+        subtitle="Quem tem emenda ou pedido com a CAEP: emendas do ano, o que já foi empenhado e pago e o que falta indicar."
         icon={<Users size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -261,7 +261,7 @@ export const EmendasParlamentaresPage: React.FC = () => {
           items={[
             { label: 'Emendas', value: formatNumber(linhas.reduce((t, l) => t + (l.semAno?.emendas ?? 0), 0)), hint: `${formatNumber(linhas.filter((l) => l.semAno?.emendas).length)} parlamentares`, tone: 'warning' },
             { label: 'Valor no SIOP', value: formatCurrency(linhas.reduce((t, l) => t + (l.semAno?.valor ?? 0), 0)), hint: 'soma das emendas' },
-            { label: 'Pedidos', value: formatNumber(ativos.length), hint: 'com o número da emenda, sem o ano: informe o ano no pedido para ler o empenhado e a sobra' }
+            { label: 'Pedidos', value: formatNumber(ativos.length), hint: 'com o número da emenda, sem o ano: informe o ano no pedido para ler o empenhado e o valor a indicar' }
           ]}
         />
       ) : (
@@ -278,7 +278,7 @@ export const EmendasParlamentaresPage: React.FC = () => {
                   hint: `${formatNumber(naoEmpenhadas.length)} ${naoEmpenhadas.length === 1 ? 'emenda' : 'emendas'}: crédito perdido em 31/12/${ano}`
                 }
               : {
-                  label: 'Sobra para novo pedido',
+                  label: 'Valor a indicar',
                   value: formatCurrency(comSobra.reduce((t, e) => t + e.sobra, 0)),
                   hint: `${formatNumber(comSobra.length)} ${comSobra.length === 1 ? 'emenda' : 'emendas'}${minimo != null ? `, a partir de ${formatCurrency(minimo)}` : ''}`,
                   tone: comSobra.length ? 'warning' : 'default'
@@ -313,7 +313,7 @@ export const EmendasParlamentaresPage: React.FC = () => {
           value={situacao}
           emptyValue=""
           options={[
-            { value: 'sobra', label: encerrado ? 'Com não empenhado' : 'Com sobra', count: doTipo.filter((l) => (restoDa(l.emendas, encerrado) ?? 0) > 0).length },
+            { value: 'sobra', label: encerrado ? 'Com não empenhado' : 'Com valor a indicar', count: doTipo.filter((l) => (restoDa(l.emendas, encerrado) ?? 0) > 0).length },
             { value: 'conferir', label: 'A conferir', count: doTipo.filter((l) => l.emendas?.emendas.some((e) => e.situacao === 'conferir' || e.situacao === 'informar' || e.situacao === 'acima')).length }
           ]}
           onChange={(v) => mudar('emendas', v)}

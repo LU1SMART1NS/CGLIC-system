@@ -253,7 +253,7 @@ export const LigarEmendaModal: React.FC<Props> = ({ emenda, pedido: pedidoFixo, 
           <AppInput
             label="Observação (opcional)"
             maxLength={500}
-            placeholder="Ex.: sobra da emenda de 2024 completou o pedido"
+            placeholder="Ex.: o valor a indicar da emenda de 2024 completou o pedido"
             value={observacao}
             onChange={(e) => setObservacao(e.target.value)}
             data-testid="emendas-ligar-emenda-obs"

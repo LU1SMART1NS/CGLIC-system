@@ -206,7 +206,7 @@ export function sobraPorAutor(emendas: SobraDaEmenda[]): Map<string, SobraDoAuto
 }
 
 export const ROTULO_SITUACAO_SOBRA: Record<SituacaoDaSobra, string> = {
-  sobra: 'Sobra para novo pedido',
+  sobra: 'Valor a indicar',
   conferir: 'Empenhado a confirmar',
   informar: 'Ofício a informar',
   acima: 'Ofícios ou empenho acima do SIOP',

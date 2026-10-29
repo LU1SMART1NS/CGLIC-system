@@ -875,7 +875,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         pedido
           ? `${semAutorGravado ? 'Reserva para' : 'Alterar o pedido de'} ${tituloDoPedido} · ${identificacaoDoPedido(pedido)}`
           : sobra
-            ? `Novo pedido com a sobra da emenda ${numeroDaEmendaEmTexto(sobra.emenda)} / ${sobra.ano}`
+            ? `Novo pedido com o valor a indicar da emenda ${numeroDaEmendaEmTexto(sobra.emenda)} / ${sobra.ano}`
             : emenda
               ? `Novo pedido da emenda ${numeroDaEmenda(emenda.numero)} / ${emenda.ano}`
               : 'Nova reserva'
@@ -1218,7 +1218,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
           {sobra && (
             <div className={`reserva-teto${total > sobra.sobra + 0.004 ? ' reserva-teto--passa' : ''}`} data-testid="emendas-pedido-teto">
               <div className="reserva-barra">
-                <b>Disponível da emenda: {formatCurrency(sobra.sobra)}</b>
+                <b>A indicar da emenda: {formatCurrency(sobra.sobra)}</b>
                 <span className="reserva-espaco" />
                 <span className="reserva-mudo">
                   Pedido: {formatCurrency(total)} ·{' '}
@@ -1230,7 +1230,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               </div>
               <span className="reserva-mudo">
                 Valor da emenda {formatCurrency(sobra.valor ?? 0)} − empenhado {formatCurrency(sobra.empenhado)} − em andamento {formatCurrency(sobra.emAndamento)}. Preço previsto, como no quadro do parlamentar.
-                {total > sobra.sobra + 0.004 ? ' O pedido passa do disponível: reduza as quantidades ou confirme com o parlamentar outra fonte para a diferença.' : ''}
+                {total > sobra.sobra + 0.004 ? ' O pedido passa do valor a indicar: reduza as quantidades ou confirme com o parlamentar outra fonte para a diferença.' : ''}
               </span>
             </div>
           )}

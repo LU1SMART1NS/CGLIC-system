@@ -167,6 +167,10 @@ export const EmendasInicioPage: React.FC = () => {
     return sobraDasEmendas({ pedidos, ano: Number(hoje.slice(0, 4)), itens, notas, portal: new Map(portal.map((x) => [x.codigo, x])), precos, minimo, emendas: emendasSiop ?? [] }).filter((e) => e.situacao === 'sobra');
   }, [pedidos, hoje, itens, notas, portal, precos, emendasSiop]);
   const valorDasSobras = sobras.reduce((t, e) => t + e.sobra, 0);
+  // Valor a indicar (protótipo aprovado em 29/10/2026): individuais e bancadas na mesma gaveta, com filtro por tipo.
+  const [tipoDoAIndicar, setTipoDoAIndicar] = useState<'todas' | 'individuais' | 'bancadas'>('todas');
+  const ehBancada = useCallback((e: SobraDaEmenda) => (e.autorId ? autorPorId.get(e.autorId)?.tipo === 'BANCADA' : false), [autorPorId]);
+  const sobrasDoTipo = tipoDoAIndicar === 'todas' ? sobras : sobras.filter((e) => ehBancada(e) === (tipoDoAIndicar === 'bancadas'));
   // Pedidos com o nº da emenda e sem o ano (28/10/2026): não entram em nenhum ano, nem na sobra nem no Portal.
   const semAno = useMemo(() => pedidos.filter((p) => p.etapa !== 'CANCELADO' && anoDoPedido(p) === ANO_SEM), [pedidos]);
   const colunasSemAno: Column<PedidoEmenda>[] = [
@@ -179,7 +183,7 @@ export const EmendasInicioPage: React.FC = () => {
     { key: 'autor', header: 'Parlamentar', priority: 'primary', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, render: (e) => <AutorDoPedido autor={e.autorId ? autorPorId.get(e.autorId) : undefined} autorId={e.autorId} destaque /> },
     { key: 'emenda', header: 'Emenda', nowrap: true, render: (e) => <span style={carteiraNumero}>{`${numeroDaEmendaEmTexto(e.emenda)} / ${e.ano}`}</span> },
     { key: 'pedidos', header: 'Pedidos', render: (e) => <span style={carteiraDetalhe}>{e.pedidos.map((p) => p.nome).join(', ')}</span> },
-    { key: 'sobra', header: 'Sobra', align: 'right', nowrap: true, render: (e) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(e.sobra)}</span> },
+    { key: 'sobra', header: 'A indicar', align: 'right', nowrap: true, render: (e) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(e.sobra)}</span> },
     { key: 'prazo', header: 'Prazo', nowrap: true, render: (e) => <span style={carteiraDetalhe}>empenhar até 31/12/{e.ano}</span> }
   ];
 
@@ -641,20 +645,33 @@ export const EmendasInicioPage: React.FC = () => {
         <PainelGaveta
           id="sobraEmenda"
           subtitulo="Clique na linha para abrir o parlamentar."
-          hint="Emendas do ano com sobra que compra pelo menos o item mais barato que a CAEP ainda oferece: valor no SIOP menos o empenhado pela SENASP (notas da emenda no Portal da Transparência, ou as ligadas no sistema) e o que está em andamento. O que não for empenhado até o fim do ano perde o crédito."
+          hint="Emendas do ano, individuais e de bancada, com valor a indicar que compra pelo menos o item mais barato que a CAEP ainda oferece: valor no SIOP menos o maior entre os ofícios e o empenhado pela SENASP (notas da emenda no Portal da Transparência, ou as ligadas no sistema). Na bancada, o valor no SIOP é só a compra direta (ação 21BM, modalidade 90). O que não for empenhado até o fim do ano perde o crédito."
           onFechar={fecharGaveta}
         >
           {sobras.length === 0 ? (
-            <EmptyState title={carregando ? 'Carregando…' : 'Nenhuma emenda do ano com sobra para novo pedido.'} testId="emendas-inicio-sobra-vazio" />
+            <EmptyState title={carregando ? 'Carregando…' : 'Nenhuma emenda do ano com valor a indicar.'} testId="emendas-inicio-sobra-vazio" />
           ) : (
+            <>
+            <CarteiraSegmentTabs<'todas' | 'individuais' | 'bancadas'>
+              testIdPrefix="emendas-inicio-a-indicar"
+              ariaLabel="Tipo de emenda"
+              active={tipoDoAIndicar}
+              onSelect={setTipoDoAIndicar}
+              segments={[
+                { id: 'todas', label: 'Todas', count: sobras.length },
+                { id: 'individuais', label: 'Individuais', count: sobras.filter((e) => !ehBancada(e)).length },
+                { id: 'bancadas', label: 'Bancadas', count: sobras.filter(ehBancada).length }
+              ]}
+            />
             <DataTable<SobraDaEmenda>
               testId="emendas-inicio-sobra"
               className="data-table-container--flush"
-              data={sobras}
+              data={sobrasDoTipo}
               keyExtractor={(e) => e.codigo}
               columns={colunasSobra}
               rowOpen={(e) => () => navigate(e.autorId ? `/emendas/parlamentares/${encodeURIComponent(e.autorId)}` : '/emendas/parlamentares')}
             />
+            </>
           )}
         </PainelGaveta>
       )}
@@ -709,7 +726,7 @@ export const EmendasInicioPage: React.FC = () => {
         <PainelGaveta
           id="notasSemPedido"
           subtitulo="Ligue a emenda ao pedido ou marque como resolvido."
-          hint="Notas de material (3.3.90.30 e 4.4.90.52) da UG 200330 do ano com o número de uma emenda no plano interno que nenhum pedido tem: a sobra de uma emenda antiga que completou um pedido, número trocado num pedido ou emenda executada fora do sistema. O pedido provável tem itens do mesmo fornecedor com o mesmo valor; o sistema só sugere. Se a emenda não é da CAEP, marque como resolvido."
+          hint="Notas de material (3.3.90.30 e 4.4.90.52) da UG 200330 do ano com o número de uma emenda no plano interno que nenhum pedido tem: o valor a indicar de uma emenda antiga que completou um pedido, número trocado num pedido ou emenda executada fora do sistema. O pedido provável tem itens do mesmo fornecedor com o mesmo valor; o sistema só sugere. Se a emenda não é da CAEP, marque como resolvido."
           onFechar={fecharGaveta}
         >
           {semPedido.length === 0 ? (

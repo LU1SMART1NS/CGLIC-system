@@ -1365,6 +1365,20 @@ export interface EmendaSiop {
   observacao: string | null;
   versao: number;
   criadoPorNome: string | null;
+  /** Migration 239 (bancadas, D6): bloqueios da linha de compra direta no SIOP, só informação. */
+  bloqueadoControle?: number | null;
+  bloqueadoProgramacao?: number | null;
+  /** Outras linhas da emenda no SIOP, fora da compra direta (21BM, modalidade 90): não entram no valor. */
+  foraCompraDireta?: LinhaForaDaCompraDireta[] | null;
+  /** Dia da leitura no SIOP que deu esses números. */
+  siopLidoEm?: string | null;
+}
+
+export interface LinhaForaDaCompraDireta {
+  acao: string;
+  modalidade: string;
+  autorizado: number;
+  empenhado: number;
 }
 
 export type MeioDoContato = 'TELEFONE' | 'WHATSAPP' | 'EMAIL' | 'REUNIAO';
@@ -1409,7 +1423,13 @@ export async function fetchEmendasSiop(): Promise<EmendaSiop[]> {
     vistaEm: e.vista_em,
     observacao: e.observacao ?? null,
     versao: e.versao,
-    criadoPorNome: e.criado_por_nome ?? null
+    criadoPorNome: e.criado_por_nome ?? null,
+    bloqueadoControle: e.bloqueado_controle != null ? num(e.bloqueado_controle) : null,
+    bloqueadoProgramacao: e.bloqueado_programacao != null ? num(e.bloqueado_programacao) : null,
+    foraCompraDireta: Array.isArray(e.fora_compra_direta)
+      ? e.fora_compra_direta.map((l: Record<string, any>) => ({ acao: String(l.acao ?? ''), modalidade: String(l.modalidade ?? ''), autorizado: num(l.autorizado), empenhado: num(l.empenhado) }))
+      : null,
+    siopLidoEm: e.siop_lido_em ?? null
   }));
 }
 
