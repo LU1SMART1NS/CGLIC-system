@@ -240,7 +240,7 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, avisos, ho
         );
       }
       case 'ordem':
-        // Migration 244: a CAEP registra a data e o SEI; abre com o contrato assinado.
+        // Migration 245: a CAEP registra a data e o SEI; abre com o contrato assinado.
         if (p.ordemFornecimentoDocumentoSei)
           return (
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.35rem', marginTop: '0.3rem' }}>

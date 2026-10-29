@@ -133,7 +133,7 @@ describe('janela das etapas: completar o SEI de um passo registrado pela fonte (
   });
 });
 
-describe('janela das etapas: informações para a Ordem de Fornecimento (migration 244)', () => {
+describe('janela das etapas: informações para a Ordem de Fornecimento (migration 245)', () => {
   it('pede o documento SEI e a data; registrada, abre com o que foi gravado para corrigir', () => {
     const nova = renderToStaticMarkup(<EtapaPedidoModal pedido={pedido('CONTRATACAO')} acao="ORDEM_FORNECIMENTO" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
     expect(nova).toContain('Informações para a Ordem de Fornecimento');

@@ -308,7 +308,7 @@ export function andamentoDoPedido(
   const execucao = jaEmpenhado(p.etapa) ? execucaoDoPedido(p, notas) : null;
   const temNotas = Boolean(execucao && execucao.notas > 0);
   const contratado = Boolean(contratos?.contratado);
-  // Migration 244 (29/10/2026): a CAEP reúne as informações para a Ordem de Fornecimento depois do contrato e registra
+  // Migration 245 (29/10/2026): a CAEP reúne as informações para a Ordem de Fornecimento depois do contrato e registra
   // a data e o SEI. Pedido que já tem fatura sem esse registro fica comprovado pela entrega.
   const ordem = base('ordem', 'EXECUCAO', null, 'Reunir as informações para a Ordem de Fornecimento', 'FAZER', 'CAEP');
   ordem.regra = 'abre com o contrato assinado; fecha quando a CAEP registra a data e o documento SEI';

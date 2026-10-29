@@ -100,7 +100,7 @@ describe('Andamento do pedido: as etapas como tarefas', () => {
     expect(estado(p, 'entrega', semFatura)).toMatchObject({ estado: 'FONTE', progresso: '0 de 1 nota com fatura' });
   });
 
-  it('Ordem de Fornecimento (migration 244): abre com a CAEP no contrato assinado e fecha pelo registro ou pela entrega', () => {
+  it('Ordem de Fornecimento (migration 245): abre com a CAEP no contrato assinado e fecha pelo registro ou pela entrega', () => {
     const p = pedido({ etapa: 'CONTRATACAO', contratacaoEm: '2026-10-15', empenhadoEm: '2026-04-17' });
     // Sem contrato: depois.
     expect(estado(p, 'ordem', new Map([['l1', nota('l1', {})]])).estado).toBe('DEPOIS');
