@@ -59,6 +59,7 @@ vi.mock('../../../hooks/useEmendas', () => ({
   usePodeGerirEmendas: () => perfil.gerir,
   usePodeVerContratos: () => false,
   useApagarEmendaSiop: () => ({ isPending: false, mutateAsync: vi.fn() }),
+  useLigarReservaAEmenda: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useMapaGruposBeneficiarios: () => new Map()
 }));
 vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined, ipca: null, semPrevisao: false }) }));

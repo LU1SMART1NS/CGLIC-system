@@ -144,6 +144,17 @@ function compararEmendas(a: EmendaNaLista, b: EmendaNaLista): number {
 
 export const semPedido = (l: EmendaNaLista): boolean => l.situacao !== 'COM_PEDIDO';
 
+/**
+ * Reservas do parlamentar que podem ser desta emenda sem pedido (29/10/2026): ativas, sem o nº da emenda e sem emenda
+ * de origem. A tela só sugere; a CAEP confirma a ligação (ligar_reserva_a_emenda, migration 242).
+ */
+export function reservasParaLigar(l: EmendaNaLista, pedidos: PedidoEmenda[]): PedidoEmenda[] {
+  if (!l.emenda || !semPedido(l) || !l.autorId) return [];
+  return pedidos
+    .filter((p) => p.etapa !== 'CANCELADO' && p.autorId === l.autorId && !p.emendaId && !p.siopEmenda)
+    .sort((a, b) => a.reservadoEm.localeCompare(b.reservadoEm) || a.numero - b.numero);
+}
+
 /** Para o número do menu e o Início: emendas sem pedido e quantas estão urgentes. */
 export function contaEmendasSemPedido(lista: EmendaNaLista[]): { total: number; urgentes: number; valor: number } {
   const sem = lista.filter(semPedido);

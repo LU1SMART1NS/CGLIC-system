@@ -25,6 +25,7 @@ import {
   fetchCredorDiferente,
   fetchNotasSemPedido,
   ligarEmendaAoPedido,
+  ligarReservaAEmenda,
   removerEmendaDoPedido,
   salvarPedidoEmenda,
   avancarPedidoEmenda,
@@ -222,6 +223,11 @@ export function useLigarEmendaAoPedido() {
     retry: 0,
     onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS] })
   });
+}
+
+export function useLigarReservaAEmenda() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: (v: { pedidoId: string; versao: number; emendaId: string }) => ligarReservaAEmenda(v.pedidoId, v.versao, v.emendaId), retry: 0, onSettled: invalidar });
 }
 
 export function useRemoverEmendaDoPedido() {

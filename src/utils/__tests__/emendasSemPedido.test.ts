@@ -6,7 +6,8 @@ import {
   lerNumeroDaEmenda,
   numeroDaEmenda,
   orgaoDoBeneficiario,
-  orgaosNaOrdem
+  orgaosNaOrdem,
+  reservasParaLigar
 } from '../emendasSemPedido';
 import type { ContatoDaEmenda, EmendaSiop, PedidoEmenda } from '../../services/emendasService';
 
@@ -115,5 +116,23 @@ describe('Emendas sem pedido', () => {
     expect(orgaoDoBeneficiario({ nome: 'Polícia Militar do Distrito Federal', sigla: 'PMDF', razaoSocial: null })).toBe('PM');
     expect(orgaoDoBeneficiario({ nome: 'Guarda Municipal de Recife', sigla: null, razaoSocial: 'Município do Recife' })).toBeNull();
     expect(orgaosNaOrdem('PC')).toEqual(['PC', 'PM', 'BM', 'PCI', 'SSP']);
+  });
+
+  it('sugere a reserva do mesmo parlamentar sem nº da emenda; some depois de ligada', () => {
+    const e = emenda({ id: 'e1' });
+    const reserva = pedido({ id: 'r1' });
+    const outros = [
+      pedido({ id: 'outro-autor', autorId: 'S:2' }),
+      pedido({ id: 'com-numero', siopEmenda: '42680099', siopEmendaAno: 2026 }),
+      pedido({ id: 'de-outra-emenda', emendaId: 'e9' }),
+      pedido({ id: 'cancelada', etapa: 'CANCELADO' })
+    ];
+    const [l] = emendasNaLista([e], [reserva, ...outros], [], HOJE).filter((x) => x.chave === 'e1');
+    expect(reservasParaLigar(l, [reserva, ...outros]).map((p) => p.id)).toEqual(['r1']);
+
+    const ligada = { ...reserva, emendaId: 'e1' };
+    const [depois] = emendasNaLista([e], [ligada], [], HOJE);
+    expect(depois.situacao).toBe('COM_PEDIDO');
+    expect(reservasParaLigar(depois, [ligada])).toEqual([]);
   });
 });

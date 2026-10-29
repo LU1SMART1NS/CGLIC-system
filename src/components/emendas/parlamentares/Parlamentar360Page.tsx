@@ -33,13 +33,14 @@ import {
 } from '../../../hooks/useEmendas';
 import { formatCurrency } from '../../../utils/format';
 import { dataBR } from '../../../utils/emendasKits';
-import { linhasAtivas, reservadoPorItem, ultimoContatoPorAutor } from '../../../utils/emendasPedidos';
-import { emendasNaLista, NOME_ORGAO_ASPAR, numeroDaEmenda, orgaosNaOrdem, ROTULO_MEIO, ROTULO_SITUACAO_EMENDA, type EmendaNaLista } from '../../../utils/emendasSemPedido';
+import { linhasAtivas, reservadoPorItem, ultimoContatoPorAutor, valorDoPedido } from '../../../utils/emendasPedidos';
+import { emendasNaLista, NOME_ORGAO_ASPAR, numeroDaEmenda, orgaosNaOrdem, reservasParaLigar, ROTULO_MEIO, ROTULO_SITUACAO_EMENDA, type EmendaNaLista } from '../../../utils/emendasSemPedido';
 import { ROTULO_SITUACAO_SOBRA, type SobraDaEmenda } from '../../../utils/emendasSobra';
 import { execucaoDosPedidos, pedidosDoParlamentar } from '../../../utils/emendasParlamentar';
 import { rotuloBeneficiario, type EmendaSiop, type NotaDaLinha, type OrgaoAspar } from '../../../services/emendasService';
 import { linhaDoAutor } from '../emendasPartes';
 import { CartaoDeContato, DetalheDaEmenda } from '../emendas360/DetalheDaEmenda';
+import { ReservasParaLigar } from '../emendas360/ReservasParaLigar';
 import { PedidoModal } from '../PedidoModal';
 import { EmendaSiopModal } from '../EmendaSiopModal';
 import { AsparModal } from '../AsparModal';
@@ -336,6 +337,16 @@ export const Parlamentar360Page: React.FC = () => {
                     <section key={e.chave} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '0.75rem 0.9rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }} data-testid={`parlamentar-360-emenda-${e.chave}`}>
                       {cabecalhoDaEmenda(e)}
                       {s && <SobraDaEmendaCartao e={s} minimo={minimo} podeGerir={podeGerir} onNovoComSobra={setComSobra} />}
+                      {e.emenda && (
+                        <ReservasParaLigar
+                          emenda={e.emenda}
+                          reservas={reservasParaLigar(e, pedidos)}
+                          podeGerir={podeGerir}
+                          valorDe={(p) => valorDoPedido(p, itens, precos)}
+                          onAbrirPedido={(id) => navegar(`/emendas/pedidos/id/${encodeURIComponent(id)}`)}
+                          testId={`parlamentar-360-reservas-${e.chave}`}
+                        />
+                      )}
                       <DetalheDaEmenda
                         l={e}
                         autor={autor}

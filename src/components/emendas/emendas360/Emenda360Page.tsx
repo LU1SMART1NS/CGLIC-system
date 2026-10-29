@@ -35,8 +35,8 @@ import {
 } from '../../../hooks/useEmendas';
 import { formatCurrency } from '../../../utils/format';
 import { curto, dataBR, nomeDaLinhaDoPedido } from '../../../utils/emendasKits';
-import { linhasAtivas, reservadoPorItem, ultimoContatoPorAutor } from '../../../utils/emendasPedidos';
-import { emendasNaLista, NOME_ORGAO_ASPAR, numeroDaEmenda, orgaoDoBeneficiario, orgaosNaOrdem, ROTULO_MEIO, ROTULO_SITUACAO_EMENDA, semPedido } from '../../../utils/emendasSemPedido';
+import { linhasAtivas, reservadoPorItem, ultimoContatoPorAutor, valorDoPedido } from '../../../utils/emendasPedidos';
+import { emendasNaLista, NOME_ORGAO_ASPAR, numeroDaEmenda, orgaoDoBeneficiario, orgaosNaOrdem, pedidoDaEmenda, reservasParaLigar, ROTULO_MEIO, ROTULO_SITUACAO_EMENDA, semPedido } from '../../../utils/emendasSemPedido';
 import { ROTULO_SITUACAO_SOBRA, type SobraDaEmenda } from '../../../utils/emendasSobra';
 import { execucaoDosPedidos } from '../../../utils/emendasParlamentar';
 import { nomeDoPedido } from '../../../utils/emendasNomeDoPedido';
@@ -52,6 +52,7 @@ import { SobraDaEmendaCartao } from '../parlamentares/SobraDaEmendaCartao';
 import { TabelaDePedidos } from '../parlamentares/TabelaDePedidos';
 import { useSobraDasEmendas } from '../parlamentares/useSobraDasEmendas';
 import { SiopDaBancada } from './SiopDaBancada';
+import { ReservasParaLigar } from './ReservasParaLigar';
 
 type Aba = 'pedidos' | 'execucao' | 'contatos';
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
@@ -102,11 +103,18 @@ export const Emenda360Page: React.FC = () => {
   const codigo = e?.ano ? `${e.ano}${e.numero}` : null;
   const sobra = codigo ? sobras.find((s) => s.codigo === codigo) : undefined;
   const portal = codigo ? portalPorCodigo.get(codigo) : undefined;
-  // Todos os pedidos da emenda, inclusive os cancelados (a lista da emenda só traz os ativos).
+  // Todos os pedidos da emenda, inclusive os cancelados (a lista da emenda só traz os ativos). Na emenda registrada
+  // conta também o pedido que nasceu dela ou foi ligado a ela antes da conferência com o SIOP.
   const daEmenda = useMemo(
-    () => (e ? pedidos.filter((p) => p.siopEmenda === e.numero && (e.ano == null ? p.siopEmendaAno == null : p.siopEmendaAno === e.ano)) : []),
+    () =>
+      e
+        ? pedidos.filter((p) =>
+            e.emenda ? pedidoDaEmenda(p, e.emenda) : p.siopEmenda === e.numero && (e.ano == null ? p.siopEmendaAno == null : p.siopEmendaAno === e.ano)
+          )
+        : [],
     [pedidos, e]
   );
+  const reservas = useMemo(() => (e ? reservasParaLigar(e, pedidos) : []), [e, pedidos]);
   const execucao = useMemo(() => execucaoDosPedidos(daEmenda, notas), [daEmenda, notas]);
 
   const abas: Array<{ id: Aba; label: string }> = [
@@ -360,6 +368,16 @@ export const Emenda360Page: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               {sobra && <SobraDaEmendaCartao e={sobra} minimo={minimo} podeGerir={podeGerir} onNovoComSobra={setNovoPedido} />}
               {registrada && autor?.tipo === 'BANCADA' && <SiopDaBancada e={registrada} />}
+              {registrada && (
+                <ReservasParaLigar
+                  emenda={registrada}
+                  reservas={reservas}
+                  podeGerir={podeGerir}
+                  valorDe={(p) => valorDoPedido(p, itens, precos)}
+                  onAbrirPedido={(id) => navegar(`/emendas/pedidos/id/${encodeURIComponent(id)}`)}
+                  testId="emenda-360-reservas"
+                />
+              )}
               {daEmenda.length === 0 ? (
                 <NoticeBar tone={e.urgente ? 'danger' : 'warning'} testId="emenda-360-sem-pedido">
                   Esta emenda ainda não tem pedido.{podeGerir ? ' Fale com a assessoria ou com a ASPAR (aba Contatos) e use "Criar pedido com esta emenda".' : ''}

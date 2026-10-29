@@ -58,6 +58,7 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useDiferencasDeEmpenho: () => ({ conferencia: [], diferencas: new Map(), porItem: new Map(), resolvidos: new Set<string>() }),
   useCredorDiferente: () => ({ porPedido: new Map(), todosPorPedido: new Map(), resolvidos: new Set<string>() }),
   usePodeGerirEmendas: () => perfil.gerir,
+  useLigarReservaAEmenda: () => ({ isPending: false, mutateAsync: vi.fn() }),
   usePodeVerContratos: () => false,
   useMapaGruposBeneficiarios: () => new Map()
 }));
@@ -135,6 +136,25 @@ describe('Emenda 360', () => {
     expect(html).toContain('emenda-360-criar-pedido');
     expect(html).toContain('emenda-360-sem-pedido');
     expect(html).toContain('>Contatos<');
+  });
+
+  it('reserva do mesmo parlamentar sem o nº da emenda: a lista avisa e a Emenda 360 oferece ligar (só para quem gere)', () => {
+    const reserva = pedido('r2', 'A2', 'RESERVADO');
+    PEDIDOS.push(reserva);
+    try {
+      expect(render('/emendas/emendas?situacao=sem')).toContain('emendas-emenda-reserva-e1');
+      const html = render('/emendas/emendas/2026/42680021');
+      expect(html).toContain('emenda-360-reservas');
+      expect(html).toContain('Reserva de 20/10/2026');
+      expect(html).toContain('emenda-360-reservas-ligar-r2');
+      perfil.gerir = false;
+      const consulta = render('/emendas/emendas/2026/42680021');
+      expect(consulta).toContain('emenda-360-reservas');
+      expect(consulta).not.toContain('emenda-360-reservas-ligar-r2');
+    } finally {
+      perfil.gerir = true;
+      PEDIDOS.pop();
+    }
   });
 
   it('emenda do pedido: pedidos da emenda e execução pelo Portal ao lado das notas, com a nota fora dos pedidos', () => {
