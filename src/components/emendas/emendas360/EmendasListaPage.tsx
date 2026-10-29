@@ -194,7 +194,7 @@ export const EmendasListaPage: React.FC = () => {
         return valorOu(e && e.notas > 0 ? e.pago : null);
       }
     },
-    { key: 'sobra', header: 'Sobra', align: 'right', nowrap: true, sortValue: ordem.sobra.value, sortFirstDir: 'desc', render: (l) => valorOu(sobraDe(l)?.sobra) },
+    { key: 'sobra', header: 'A indicar', align: 'right', nowrap: true, sortValue: ordem.sobra.value, sortFirstDir: 'desc', render: (l) => valorOu(sobraDe(l)?.sobra) },
     // Sem pedido, o que interessa é o último contato; com pedido, o andamento está no Pedido 360.
     ...(podeGerir && segmento !== 'com'
       ? [
