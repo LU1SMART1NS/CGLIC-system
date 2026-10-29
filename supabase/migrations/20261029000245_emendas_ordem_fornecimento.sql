@@ -1,6 +1,6 @@
 -- ==============================================================================
--- MIGRATION 244: EMENDAS PARLAMENTARES — INFORMAÇÕES PARA A ORDEM DE FORNECIMENTO
--- Versão: 20261029000244_emendas_ordem_fornecimento.sql
+-- MIGRATION 245: EMENDAS PARLAMENTARES — INFORMAÇÕES PARA A ORDEM DE FORNECIMENTO
+-- Versão: 20261029000245_emendas_ordem_fornecimento.sql
 --
 -- Pedido do usuário em 29/10/2026: a fase Execução do andamento do pedido começa com "Reunir as informações para a
 -- Ordem de Fornecimento". Decisões: quem faz é a CAEP; a tarefa abre com o contrato assinado; fecha quando a CAEP
@@ -22,9 +22,9 @@ BEGIN
   END IF;
 END $$;
 COMMENT ON COLUMN public.emenda_pedidos.ordem_fornecimento_em IS
-  'Data em que a CAEP concluiu as informações para a emissão da Ordem de Fornecimento (migration 244).';
+  'Data em que a CAEP concluiu as informações para a emissão da Ordem de Fornecimento (migration 245).';
 COMMENT ON COLUMN public.emenda_pedidos.ordem_fornecimento_documento_sei IS
-  'Documento SEI com as informações para a emissão da Ordem de Fornecimento (migration 244).';
+  'Documento SEI com as informações para a emissão da Ordem de Fornecimento (migration 245).';
 
 -- 2) Registrar ------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.registrar_ordem_fornecimento(p_id UUID, p_documento_sei TEXT, p_data DATE)

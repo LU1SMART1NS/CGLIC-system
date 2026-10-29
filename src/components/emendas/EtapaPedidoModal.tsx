@@ -40,7 +40,7 @@ import { precosDaMinuta } from '../../utils/emendasConferenciaOficio';
 /**
  * MAIS_*: acrescentar o número SEI de uma nota nova ao empenho ou ao envio para contratação, sem mudar de etapa.
  * SOLICITACAO_ATA: a solicitação de empenho de uma ata (migration 178), sem mudar de etapa.
- * ORDEM_FORNECIMENTO: as informações para a Ordem de Fornecimento, depois do contrato (migration 244), sem mudar de etapa.
+ * ORDEM_FORNECIMENTO: as informações para a Ordem de Fornecimento, depois do contrato (migration 245), sem mudar de etapa.
  */
 export type AcaoDaJanela = Exclude<AcaoPedido, 'ACRESCENTAR_SEI'> | 'MAIS_CGOFI' | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA' | 'ORDEM_FORNECIMENTO' | 'CANCELAR' | 'QUADROS_AUTORIZACAO';
 
