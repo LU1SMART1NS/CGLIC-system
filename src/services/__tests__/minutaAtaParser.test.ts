@@ -46,6 +46,13 @@ describe('lerParticipantesDaMinuta', () => {
     expect(r.gerenciador[9]).toBe(116);
   });
 
+  it('pregão 107/2026 (sem participantes): item todo da SENASP fecha; minuta diferente do PNCP não fecha', () => {
+    const r = lerParticipantesDaMinuta(texto('2026/797'), totais('2026/797'));
+    expect(r.gerenciador).toEqual({ 1: 10800, 2: 3240 });
+    // Item 2: 3.240 na minuta e no PNCP. Item 1: 10.800 na minuta, 10.805 homologado no PNCP.
+    expect(r.itensQueFecham).toEqual([2]);
+  });
+
   it('sem a seção 3 devolve erro, sem inventar participantes', () => {
     const r = lerParticipantesDaMinuta('Edital sem minuta da ata', { 1: 10 });
     expect(r.erro).toMatch(/Seção 3/);
@@ -81,6 +88,12 @@ describe('lerItensDaMinuta', () => {
   it('minuta sem CATMAT: descrição sim, código em branco (pregão 90039/2025)', () => {
     const r = lerItensDaMinuta(texto('2025/1667'), totais('2025/1667'));
     expect(r[3]).toEqual({ descricao: 'Roupa de Combate a Incêndio Florestal', catmat: null });
+  });
+
+  it('coluna "Grupo" antes do item: o número repetido não entra na descrição (pregão 107/2026)', () => {
+    const r = lerItensDaMinuta(texto('2026/797'), totais('2026/797'));
+    expect(r[1]).toEqual({ descricao: 'Locação de Aeronave - Helicóptero do tipo B2 ou Superior', catmat: '14680' });
+    expect(r[2]).toEqual({ descricao: 'Prestação de Serviços de Piloto Comandante de Aeronave / por demanda', catmat: '25275' });
   });
 
   it('a quantidade do item não vira código', () => {

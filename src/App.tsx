@@ -21,6 +21,7 @@ import { FalhaTelaBoundary } from './components/layout/FalhaTelaBoundary';
 // Se o pacote sumiu numa publicação nova, lazyComRecarga recarrega a página uma vez.
 const GestaoInstrumentosRoute = lazyComRecarga(() => import('./routes/GestaoInstrumentosRoute').then((m) => ({ default: m.GestaoInstrumentosRoute })));
 const ArpSearchRoute = lazyComRecarga(() => import('./routes/ArpSearchRoute').then((m) => ({ default: m.ArpSearchRoute })));
+const AtaAMontarPage = lazyComRecarga(() => import('./components/atas/montar/AtaAMontarPage').then((m) => ({ default: m.AtaAMontarPage })));
 const ItemBalancesRoute = lazyComRecarga(() => import('./routes/ItemBalancesRoute').then((m) => ({ default: m.ItemBalancesRoute })));
 const ItensRoute = lazyComRecarga(() => import('./routes/ItensRoute').then((m) => ({ default: m.ItensRoute })));
 const DistribuicaoEquipeRoute = lazyComRecarga(() => import('./routes/DistribuicaoEquipeRoute').then((m) => ({ default: m.DistribuicaoEquipeRoute })));
@@ -292,6 +293,15 @@ const AppContent: React.FC = () => {
             />
             <Route path="/atas/modelos" element={<LegacyRouteRedirect to="/configuracoes/modelos?tipo=atas" />} />
             <Route path="/contratos/modelos" element={<LegacyRouteRedirect to="/configuracoes/modelos?tipo=contratos" />} />
+            {/* Ata a montar (migration 238): quem monta a ata é o gestor da ata ou o coordenador (D8). */}
+            <Route
+              path="/atas/montar/:ano/:sequencial/:fornecedor"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor']}>
+                  <AtaAMontarPage />
+                </RequireRole>
+              }
+            />
             <Route
               path="/atas/detalhe/:ataKey"
               element={

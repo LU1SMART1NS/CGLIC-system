@@ -32,12 +32,15 @@ interface ArpSearchProps {
   onSelectArp: (arp: ArpRecord) => void;
   onSelectItem?: (arp: ArpRecord, item: ArpItemRecord) => void;
   onArpsLoaded?: (arps: ArpRecord[], itemsByAta?: Record<string, ArpItemRecord[]>) => void;
+  /** Seletor "Ver: Registradas · A montar", com a contagem das registradas (gestor e coordenador). */
+  seletor?: (registradas: number | undefined) => React.ReactNode;
 }
 
 export const ArpSearch: React.FC<ArpSearchProps> = ({
   onSelectArp,
   onSelectItem,
-  onArpsLoaded
+  onArpsLoaded,
+  seletor
 }) => {
   // Dados da carteira (atas no escopo do usuário, itens, gestor, saldo, sincronização).
   const {
@@ -256,6 +259,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         syncProgress={syncProgress}
         // A sincronização das atas consulta as APIs do governo: só o coordenador dispara.
         onTriggerSync={role === 'admin' ? triggerSync : undefined}
+        seletor={seletor?.(isBusy ? undefined : scopedArps.length)}
       />
 
       {isBusy ? (
