@@ -40,8 +40,9 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
   const [ano, setAno] = useState(emenda?.ano ?? anoDeHoje);
   const [autorEscolhido, setAutorEscolhido] = useState(emenda?.autorId ?? '');
   const [buscaAutor, setBuscaAutor] = useState('');
-  const [valor, setValor] = useState(emenda ? emReais(emenda.valor) : '');
-  const [gnd, setGnd] = useState<Gnd>(emenda?.gnd ?? 'GND-4');
+  const [valor, setValor] = useState(emenda?.valor != null ? emReais(emenda.valor) : '');
+  // Valor e GND podem ficar para a conferência com o SIOP (migration 243): a CAEP registra pelo nº e ano.
+  const [gnd, setGnd] = useState<Gnd | ''>(emenda ? emenda.gnd ?? '' : 'GND-4');
   const [vistaEm, setVistaEm] = useState(emenda?.vistaEm ?? hoje);
   const [beneficiarioId, setBeneficiarioId] = useState(emenda?.beneficiarioId ?? '');
   const [objeto, setObjeto] = useState(emenda?.objeto ?? '');
@@ -70,7 +71,8 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
   const faltas: string[] = [];
   if (!lido) faltas.push('o nº da emenda');
   if (!autorId) faltas.push('o parlamentar');
-  if (!valorLido || valorLido <= 0) faltas.push('o valor');
+  const valorInvalido = valor.trim() !== '' && (!valorLido || valorLido <= 0);
+  if (valorInvalido) faltas.push('um valor maior que zero');
   if (!vistaEm) faltas.push('a data');
 
   const enviar = async (ev: React.FormEvent) => {
@@ -84,8 +86,8 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
         numero: lido.numero,
         ano: lido.ano,
         autorId,
-        valor: valorLido!,
-        gnd,
+        valor: valor.trim() ? valorLido : null,
+        gnd: gnd || null,
         beneficiarioId: beneficiarioId || null,
         objeto: objeto.trim() || null,
         vistaEm,
@@ -106,7 +108,7 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
       size="lg"
       testId="emendas-emenda-siop-modal"
       title={emenda ? `Emenda ${numeroDaEmenda(emenda.numero)} / ${emenda.ano}` : 'Registrar emenda do SIOP'}
-      subtitle="Copie do SIOP o nº, o valor e o GND. O parlamentar vem pelo código do autor."
+      subtitle="Copie do SIOP o nº, o valor e o GND; o valor e o GND podem ficar para a conferência. O parlamentar vem pelo código do autor."
       footer={
         <>
           <ActionButton action="cancelar" type="button" onClick={onClose} disabled={salvar.isPending} />
@@ -143,14 +145,16 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
           )}
           <AppInput
             label="Valor no SIOP"
+            hint="Opcional: confirmado na conferência"
             placeholder="1.200.000,00"
             inputMode="decimal"
             value={valor}
             onChange={(e) => setValor(mascaraValorBR(e.target.value, valor))}
-            error={tentou && (!valorLido || valorLido <= 0) ? 'Informe o valor.' : undefined}
+            error={tentou && valorInvalido ? 'Valor maior que zero, ou deixe em branco.' : undefined}
             data-testid="emendas-emenda-siop-valor"
           />
-          <AppSelect label="GND" value={gnd} onChange={(e) => setGnd(e.target.value as Gnd)} data-testid="emendas-emenda-siop-gnd">
+          <AppSelect label="GND" value={gnd} onChange={(e) => setGnd(e.target.value as Gnd | '')} data-testid="emendas-emenda-siop-gnd">
+            <option value="">A ler no SIOP</option>
             <option value="GND-4">GND-4 · Investimento</option>
             <option value="GND-3">GND-3 · Custeio</option>
           </AppSelect>

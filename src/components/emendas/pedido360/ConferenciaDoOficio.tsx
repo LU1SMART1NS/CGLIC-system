@@ -116,9 +116,15 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
     setPreenchido(true);
     setEmenda(numeroDaEmendaEmTexto(daEmenda.numero));
     setAnoEmenda(daEmenda.ano);
-    setValor(valorBR(daEmenda.valor));
-    setGnd(daEmenda.gnd);
+    setValor(daEmenda.valor != null ? valorBR(daEmenda.valor) : '');
+    setGnd(daEmenda.gnd ?? 'GND-4');
   }
+  // Migration 243 (D5): o nº vem da reserva e só se confirma; trocar a emenda pede o motivo.
+  const numeroDaReserva = pedido.siopEmenda ?? daEmenda?.numero ?? null;
+  const anoDaReserva = pedido.siopEmendaAno ?? daEmenda?.ano ?? null;
+  const [trocandoEmenda, setTrocandoEmenda] = useState(false);
+  const [motivoTroca, setMotivoTroca] = useState('');
+  const emendaTravada = Boolean(numeroDaReserva) && !trocandoEmenda;
   const [corrigindoSiop, setCorrigindoSiop] = useState(false);
   const [data, setData] = useState(hojeEmBrasilia());
   const [pontos, setPontos] = useState<Record<string, boolean>>({});
@@ -143,9 +149,11 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   const idsDosOutros = [...new Set((conferenciaDaEmenda?.mesmaEmenda ?? []).map((x) => identificacaoDoPedido(x)))];
   const identificacoesDosOutros = idsDosOutros.length === 1 && (conferenciaDaEmenda?.mesmaEmenda.length ?? 0) > 1 ? `todos do ${idsDosOutros[0]}` : idsDosOutros.join(', ');
   const registrada = emendaLida ? emendasSiop?.find((e) => e.numero === emendaLida.numero && e.ano === (emendaLida.ano ?? anoEmenda)) : undefined;
-  const digitaValorDaEmenda = !registrada || corrigindoSiop;
+  // Emenda registrada na reserva sem o valor: o valor do SIOP entra aqui.
+  const digitaValorDaEmenda = !registrada || registrada.valor == null || corrigindoSiop;
   const valorDigitado = lerValorBR(valor);
   const valorDaEmenda = digitaValorDaEmenda ? valorDigitado : registrada.valor;
+  const trocouEmenda = Boolean(numeroDaReserva && emendaLida && (emendaLida.numero !== numeroDaReserva || (anoDaReserva != null && (emendaLida.ano ?? anoEmenda) !== anoDaReserva)));
   const valorDoOficio = lerValorBR(valorOficio);
 
   const nomeDoItem = (l: Pick<LinhaConferida, 'tipo' | 'itemKey' | 'kitNome'>): string => {
@@ -255,6 +263,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
   if (!emenda.trim()) pendencias.push('número da emenda');
   else if (!emendaLida) pendencias.push('nº da emenda com 8 dígitos (ex.: 4095 0004), ou 12 com o ano na frente');
   if (digitaValorDaEmenda && !(valorDigitado != null && valorDigitado > 0)) pendencias.push('valor da emenda no SIOP');
+  if (trocouEmenda && !motivoTroca.trim()) pendencias.push('motivo da troca da emenda');
   if (pontosMarcados < PONTOS_SIOP.length) pendencias.push('marcar os 6 pontos do SIOP');
 
   const motivoSugerido = (): string => {
@@ -285,6 +294,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
           emenda: emendaLida?.numero,
           ano: emendaLida?.ano ?? anoEmenda,
           ...(digitaValorDaEmenda ? { valor_emenda: valorDigitado } : {}),
+          ...(trocouEmenda ? { motivo_troca: motivoTroca.trim() } : {}),
           valor_oficio: valorDoOficio,
           oficio_valor_documento_sei: seiOficio.replace(/\D/g, '') || null,
           oficio_retificador: retificador,
@@ -585,7 +595,7 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
           <h3 id="conferencia-parte-2">A emenda no SIOP bate com o ofício?</h3>
         </div>
         <div className="conferencia-oficio__grade">
-          <AppSelect label="Ano da emenda *" value={String(anoEmenda)} onChange={(e) => setAnoEmenda(Number(e.target.value))} data-testid="conferencia-emenda-ano">
+          <AppSelect label="Ano da emenda *" value={String(anoEmenda)} disabled={emendaTravada} onChange={(e) => setAnoEmenda(Number(e.target.value))} data-testid="conferencia-emenda-ano">
             {anosDaEmenda.map((a) => (
               <option key={a} value={a}>
                 {a}
@@ -595,8 +605,9 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
           <AppInput
             label="Nº da emenda *"
             placeholder="Ex.: 4095 0004"
-            hint="8 dígitos. Pode colar o código do SIOP com o ano."
+            hint={emendaTravada ? 'Informado na reserva: confira no SIOP.' : '8 dígitos. Pode colar o código do SIOP com o ano.'}
             inputMode="numeric"
+            readOnly={emendaTravada}
             value={emenda}
             onChange={(e) => digitarEmenda(e.target.value)}
             data-testid="conferencia-emenda"
@@ -618,7 +629,39 @@ export const ConferenciaDoOficio: React.FC<Props> = ({
           </AppSelect>
           <AppDateInput label="Conferido em" value={data} onValueChange={setData} />
         </div>
-        {registrada && (
+        {numeroDaReserva && (
+          <div className="conferencia-oficio__aviso conferencia-oficio__aviso--info" data-testid="conferencia-emenda-da-reserva">
+            {trocandoEmenda ? 'Trocando a emenda informada na reserva: digite o nº e o ano que o ofício cita.' : 'A emenda foi informada na reserva e saiu na minuta.'}{' '}
+            <AppButton
+              type="button"
+              variant="link"
+              size="xs"
+              onClick={() => {
+                if (trocandoEmenda) {
+                  setEmenda(numeroDaEmendaEmTexto(numeroDaReserva));
+                  if (anoDaReserva != null) setAnoEmenda(anoDaReserva);
+                  setMotivoTroca('');
+                }
+                setTrocandoEmenda((t) => !t);
+              }}
+              data-testid="conferencia-trocar-emenda"
+            >
+              {trocandoEmenda ? 'Manter a emenda da reserva' : 'Trocar a emenda'}
+            </AppButton>
+          </div>
+        )}
+        {trocouEmenda && (
+          <AppInput
+            label="Motivo da troca da emenda *"
+            hint="Fica registrado no pedido."
+            placeholder="Ex.: o ofício cita outra emenda do parlamentar"
+            value={motivoTroca}
+            onChange={(e) => setMotivoTroca(e.target.value)}
+            error={tentou && !motivoTroca.trim() ? 'Informe o motivo.' : undefined}
+            data-testid="conferencia-motivo-troca"
+          />
+        )}
+        {registrada && registrada.valor != null && (
           <div className="conferencia-oficio__aviso conferencia-oficio__aviso--info" data-testid="conferencia-valor-registrado">
             Valor da emenda no SIOP: <b>{formatCurrency(registrada.valor)}</b> · {registrada.gnd} · lido em {registrada.vistaEm.split('-').reverse().join('/')}
             {valorDoOficio != null && valorDoOficio > 0 && !corrigindoSiop && (

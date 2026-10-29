@@ -22,6 +22,7 @@ import {
 } from '../../utils/emendasPedidos';
 import { corteIndicacaoDias, dataBR, diasEntre, passouDoCorte } from '../../utils/emendasKits';
 import { QuadroGabinete } from './QuadroGabinete';
+import { emendaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
 import type { AcaoPedido, ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
 import { curto } from '../../utils/emendasKits';
 import { mascaraProcessoSei, processoSeiValido } from '../../utils/mascaras';
@@ -456,7 +457,7 @@ export const EtapaPedidoModal: React.FC<Props> = ({ pedido, acao, contexto, iten
         )}
 
         {modo === 'MINUTA' && (
-          <QuadroGabinete autor={autores.find((a) => a.id === pedido.autorId)} linhas={linhasAtivas(pedido)} data={pedido.reservadoEm} devolvidoEm={pedido.devolvidoEm} testId="emendas-etapa-quadro" />
+          <QuadroGabinete autor={autores.find((a) => a.id === pedido.autorId)} linhas={linhasAtivas(pedido)} data={pedido.reservadoEm} devolvidoEm={pedido.devolvidoEm} emenda={emendaDoPedidoNoQuadro(pedido)} testId="emendas-etapa-quadro" />
         )}
 
         {modo === 'AUTORIZADO' && (

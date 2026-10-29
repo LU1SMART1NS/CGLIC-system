@@ -7,7 +7,7 @@ import { InfoHint } from '../../design-system/components/InfoHint';
 import { useToast } from '../../design-system/components/Toast';
 import { useBeneficiariosEmendas, useItensCaep } from '../../hooks/useEmendas';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
-import { ataEItem, brl, COLUNAS, htmlDaTabela, montarQuadro, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
+import { ataEItem, brl, COLUNAS, emendaNoQuadro, htmlDaTabela, montarQuadro, reais, textoParaWhatsapp, type LinhaDoPedidoNoQuadro } from '../../utils/emendasQuadro';
 import type { AutorEmenda } from '../../services/emendasService';
 
 const borda = '1px solid #000';
@@ -39,6 +39,8 @@ interface Props {
   data: string;
   /** Ofício devolvido: o prazo do novo ofício conta daqui. */
   devolvidoEm?: string | null;
+  /** Emenda do pedido (migration 243): sai na coluna EMENDA e no texto do WhatsApp. */
+  emenda?: { numero: string; ano: number } | null;
   testId?: string;
 }
 
@@ -46,7 +48,7 @@ interface Props {
  * Quadro da reserva para o parlamentar (migration 165): o Anexo que a CAEP manda ao parlamentar, pronto para colar no
  * Word ou no SEI (tabela) ou no WhatsApp (texto). O valor unitário já vem com o reajuste previsto da ata.
  */
-export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvidoEm, testId = 'emendas-quadro' }) => {
+export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvidoEm, emenda, testId = 'emendas-quadro' }) => {
   const toast = useToast();
   const { data: itensLista = [] } = useItensCaep();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
@@ -63,9 +65,10 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
         itens: new Map(itensLista.map((i) => [i.itemKey, i])),
         beneficiarios: new Map(beneficiariosLista.map((b) => [b.id, b])),
         precos: precos ?? new Map(),
-        ipca
+        ipca,
+        emenda
       }),
-    [autor, linhas, data, devolvidoEm, itensLista, beneficiariosLista, precos, ipca]
+    [autor, linhas, data, devolvidoEm, itensLista, beneficiariosLista, precos, ipca, emenda]
   );
   const texto = useMemo(() => textoParaWhatsapp(quadro), [quadro]);
   const html = useMemo(() => htmlDaTabela(quadro), [quadro]);
@@ -113,11 +116,6 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
           {quadro.semBeneficiario === 1 ? '1 item sai' : `${quadro.semBeneficiario} itens saem`} com o beneficiário “a definir”.
         </div>
       )}
-      {quadro.semEndereco > 0 && (
-        <div style={aviso} role="status" data-testid={`${testId}-sem-endereco`}>
-          {quadro.semEndereco === 1 ? '1 beneficiário está' : `${quadro.semEndereco} beneficiários estão`} sem endereço de entrega e sai só com a cidade: complete em Ajustes &gt; Beneficiários.
-        </div>
-      )}
       {quadro.semNomeCurto > 0 && (
         <div style={aviso} role="status" data-testid={`${testId}-sem-nome`}>
           {quadro.semNomeCurto === 1 ? '1 item está' : `${quadro.semNomeCurto} itens estão`} sem o nome da ata assinada e sai com o começo da descrição do catálogo: informe em Emendas › Itens.
@@ -144,10 +142,9 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
             <tbody>
               {quadro.linhas.map((l, i) => (
                 <tr key={i}>
-                  {l.linhasDoItem > 0 && (
-                    <td style={celula} rowSpan={l.linhasDoItem}>
-                      <b>{l.descricao}</b>
-                      {ataEItem(l) && <div style={abaixo}>{ataEItem(l)}</div>}
+                  {i === 0 && (
+                    <td style={celula} rowSpan={quadro.linhas.length} data-testid={`${testId}-emenda`}>
+                      {quadro.emenda ? <b>{emendaNoQuadro(quadro)}</b> : <span style={aDefinir}>a informar</span>}
                     </td>
                   )}
                   <td style={celula}>
@@ -161,17 +158,19 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
                       <span style={aDefinir}>a definir</span>
                     )}
                   </td>
-                  <td style={celula}>
-                    {l.entrega ? <b>{l.entrega}</b> : <span style={aDefinir}>a definir</span>}
-                    {l.endereco && <div style={abaixo}>{l.endereco}</div>}
-                  </td>
                   <td style={celula}>{l.quantidade}</td>
                   {l.linhasDoItem > 0 && (
-                    <td style={celulaValor} rowSpan={l.linhasDoItem}>
-                      {brl(l.unitario)}
+                    <td style={celula} rowSpan={l.linhasDoItem}>
+                      <b>{l.descricao}</b>
+                      {ataEItem(l) && <div style={abaixo}>{ataEItem(l)}</div>}
                     </td>
                   )}
-                  <td style={celulaValor}>{brl(l.total)}</td>
+                  {l.linhasDoItem > 0 && (
+                    <td style={celulaValor} rowSpan={l.linhasDoItem}>
+                      {reais(l.unitario)}
+                    </td>
+                  )}
+                  <td style={celulaValor}>{reais(l.total)}</td>
                 </tr>
               ))}
               {quadro.porGnd.map((g) => (
@@ -179,14 +178,14 @@ export const QuadroGabinete: React.FC<Props> = ({ autor, linhas, data, devolvido
                   <td colSpan={COLUNAS.length - 1} style={{ ...celula, textAlign: 'right', fontWeight: 700 }}>
                     {g.rotulo}
                   </td>
-                  <td style={{ ...celulaValor, fontWeight: 700 }}>{brl(g.total)}</td>
+                  <td style={{ ...celulaValor, fontWeight: 700 }}>{reais(g.total)}</td>
                 </tr>
               ))}
               <tr style={{ background: '#d9d9d9' }}>
-                <td colSpan={COLUNAS.length - 1} style={{ ...celula, fontWeight: 700, padding: '0.7rem 0.4rem' }}>
-                  TOTAL A EMPENHAR
+                <td colSpan={COLUNAS.length - 1} style={{ ...celula, fontWeight: 700, padding: '0.7rem 0.4rem', textAlign: 'right' }}>
+                  TOTAL A EMPENHAR (R$)
                 </td>
-                <td style={{ ...celulaValor, fontWeight: 700 }}>{brl(quadro.total)}</td>
+                <td style={{ ...celulaValor, fontWeight: 700 }}>{reais(quadro.total)}</td>
               </tr>
             </tbody>
           </table>

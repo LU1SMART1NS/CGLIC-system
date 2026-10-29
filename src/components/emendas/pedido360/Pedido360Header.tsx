@@ -144,8 +144,10 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
   );
 
   const emenda = p.siopEmenda ? `Emenda ${emendaEmTexto(p.siopEmenda)}${p.siopEmendaAno ? ` / ${p.siopEmendaAno}` : ' · ano a informar'}` : 'Emenda a informar';
+  // Troca da emenda na conferência (migration 243): a de antes e o motivo, para não parecer erro de digitação.
+  const troca = p.trocasDeEmenda?.at(-1);
   // O título já diz "Pedido": a linha de cima só com a emenda que paga o pedido.
-  const eyebrow = emenda;
+  const eyebrow = troca ? `${emenda} · trocada na conferência (era ${emendaEmTexto(troca.deNumero)} / ${troca.deAno}: ${troca.motivo})` : emenda;
 
   const datas = [
     // Da planilha não há data de reserva: o título já diz "Reserva da planilha".
@@ -171,7 +173,7 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
           {podeGerir && !cancelado && !jaEmpenhado(p.etapa) && (
             <>
               <ActionButton action="cancelarCiclo" size="sm" label="Cancelar pedido" onClick={onCancelar} data-testid={`emendas-pedido-cancelar-${p.id}`} />
-              <ActionButton action="editar" size="sm" label={p.autorId ? 'Alterar itens' : 'Indicar o parlamentar'} onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
+              <ActionButton action="editar" size="sm" label={!p.autorId ? 'Indicar o parlamentar' : !p.siopEmenda && !p.emendaId ? 'Informar a emenda' : 'Alterar itens'} onClick={onAlterar} data-testid={`emendas-pedido-alterar-${p.id}`} />
             </>
           )}
           {prox && p.etapa !== 'CONTRATACAO' && (
