@@ -1992,6 +1992,16 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .emendas-falta__item--atencao { border-color: var(--color-warning-text); }
 .emendas-falta__item--espera { border-color: #94a3b8; }
 .emendas-falta__titulo { font-size: 0.84rem; font-weight: 700; color: #0f172a; }
+/* Régua de passos do item no Andamento do Pedido 360: no celular, só o passo atual e o próximo. */
+.regua-item-lado { text-align: right; }
+.regua-item { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 0.35rem; }
+.regua-item__passo { white-space: nowrap; }
+@media (max-width: 640px) {
+  .regua-item-lado { text-align: left; }
+  .regua-item { justify-content: flex-start; }
+  .regua-item__passo--longe { display: none; }
+  .regua-item__passo--atual > .regua-item__sep { display: none; }
+}
 
 /* Aba Reajuste da Ata 360: linha do tempo do Termo de Conformidade ao limite de 2 anos da ata. Rola no celular. */
 .reaj-tempo-caixa { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); overflow-x: auto; }

@@ -186,7 +186,7 @@ export function passoDoItem(p: PedidoEmenda, l: LinhaPedido, notas: Map<string, 
       // Com a Ordem de Fornecimento emitida (migration 250), o item espera a entrega a partir dela.
       onde: [
         `Contrato ${numeroDaChave(n.contractKey!)}`,
-        n.contratoAssinadoEm ? dataBR(n.contratoAssinadoEm) : null,
+        n.contratoAssinadoEm ? `assinado em ${dataBR(n.contratoAssinadoEm)}` : null,
         (() => {
           const o = p.ordens?.find((x) => x.contractKey === n.contractKey);
           return o?.ordemEm ? `Ordem de Fornecimento em ${dataBR(o.ordemEm)}` : null;
@@ -268,7 +268,8 @@ export function itensDaMesa(p: PedidoEmenda, itens: Map<string, ItemCaep>, notas
   const uma =
     passos.size === 1 && !todos[0].devolvido && todos[0].passo >= 0
       ? {
-          texto: `${linhas.length === 1 ? 'O item está' : `Os ${linhas.length} itens estão`} ${PASSO_NO_TEXTO[todos[0].passo][linhas.length === 1 ? 0 : 1]}${todos[0].passo === 0 && jaEmpenhado(p.etapa) && p.etapa === 'EMPENHADO' ? ', a enviar à CCGA' : ''}.`,
+          // Do contrato em diante, o mesmo detalhe da linha do item (contrato, assinatura, Ordem, data) quando é um só.
+          texto: `${linhas.length === 1 ? 'O item está' : `Os ${linhas.length} itens estão`} ${PASSO_NO_TEXTO[todos[0].passo][linhas.length === 1 ? 0 : 1]}${todos[0].passo === 0 && jaEmpenhado(p.etapa) && p.etapa === 'EMPENHADO' ? ', a enviar à CCGA' : ''}${todos[0].passo >= 2 && new Set(todos.map((x) => x.onde)).size === 1 && todos[0].onde ? ` · ${todos[0].onde}` : ''}.`,
           passo: todos[0].passo
         }
       : null;
@@ -600,7 +601,9 @@ export function mesaDoPedido(
         faz: { tipo: 'janela', acao: 'MAIS_CONTRATACAO' },
         testId: 'emendas-pedido-mais-sei-CONTRATACAO'
       });
-    if (faltaSei.length && podeGerir) {
+    // Pedido do controle anterior da CAEP: o SEI que faltou lá não vira tarefa (35 de 81 pedidos empenhados em
+    // 30/10/2026); o histórico continua mostrando "sem SEI".
+    if (faltaSei.length && podeGerir && p.origem !== 'PLANILHA') {
       comVoce.push({
         chave: 'falta-sei',
         tom: 'eu',
@@ -740,15 +743,10 @@ export function mesaDoPedido(
   // Os passos da fase do pedido (na contratação concluída, os da execução).
   const idAtual = fases.find((f) => f.id === daEtapa && f.estado === 'atual')?.id ?? fases.find((f) => f.estado === 'atual')?.id;
   const atual = andamento.fases.find((f) => f.id === idAtual);
-  const passos = atual
-    ? atual.tarefas
-        .filter((t) => t.estado !== 'NAO_HOUVE')
-        .map((t) => ({
-          nome: t.nome,
-          feito: t.estado === 'FEITA',
-          atual: t.estado !== 'FEITA' && t.estado !== 'DEPOIS'
-        }))
-    : [];
+  // Só o primeiro passo ainda aberto é o atual; os seguintes ficam como "ainda não".
+  const daFase = atual ? atual.tarefas.filter((t) => t.estado !== 'NAO_HOUVE') : [];
+  const primeiroAberto = daFase.findIndex((t) => t.estado !== 'FEITA');
+  const passos = daFase.map((t, i) => ({ nome: t.nome, feito: t.estado === 'FEITA', atual: i === primeiroAberto }));
 
   // Histórico (D12): o que foi feito, por fase, com data e SEI; envios e devoluções da CCGA na Contratação.
   const docs = (e: EtapaPedido) => documentosDaEtapa(p, e);

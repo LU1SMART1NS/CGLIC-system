@@ -380,3 +380,23 @@ describe('Mesa do pedido: Informação e Ordem de Fornecimento por contrato (mig
     expect(m.comVoce.some((x) => x.chave === 'ordem-informacao')).toBe(false);
   });
 });
+
+describe('Mesa do pedido: ajustes de 30/10/2026', () => {
+  it('pedido do controle anterior da CAEP não pede o SEI que faltou lá', () => {
+    const p = pedido({ etapa: 'EMPENHADO', contratacaoEm: null, cgofiDocumentoSei: null, origem: 'PLANILHA' });
+    const m = mesaDoPedido(p, itens, new Map([['l1', nota('l1')]]), [], HOJE, true, beneficiarios);
+    expect(m.comVoce.some((l) => l.chave === 'falta-sei')).toBe(false);
+  });
+
+  it('"Nesta fase": só o primeiro passo aberto é o atual', () => {
+    const p = pedido({ linhas: [linha('l1', { ccgaSituacao: 'ENVIADA' })], ordens: [{ id: 'o', contractKey: '200331-00041-2026', informacaoEm: null, informacaoDocumentoSei: null, ordemEm: '2026-10-22', ordemDocumentoSei: '37510000' }] });
+    const m = mesaDoPedido(p, itens, new Map([['l1', nota('l1', { contractKey: '200331-00041-2026' })]]), [], HOJE, true, beneficiarios);
+    expect(m.passos.filter((x) => x.atual)).toHaveLength(1);
+  });
+
+  it('item único com contrato: a frase leva o contrato, a assinatura e a Ordem', () => {
+    const p = pedido({ linhas: [linha('l1', { ccgaSituacao: 'ENVIADA' })], ordens: [{ id: 'o', contractKey: '200331-00041-2026', informacaoEm: null, informacaoDocumentoSei: null, ordemEm: '2026-10-22', ordemDocumentoSei: '37510000' }] });
+    const it = itensDaMesa(p, itens, new Map([['l1', nota('l1', { contractKey: '200331-00041-2026', contratoAssinadoEm: '2026-10-02' })]]), beneficiarios)!;
+    expect(it.uma?.texto).toBe('O item está com contrato · Contrato 00041/2026 · assinado em 02/10/2026 · Ordem de Fornecimento em 22/10/2026.');
+  });
+});
