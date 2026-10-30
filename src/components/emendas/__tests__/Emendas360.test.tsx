@@ -71,6 +71,7 @@ vi.mock('../ContatoEmendaModal', () => ({ ContatoEmendaModal: () => null }));
 import { EmendasListaPage } from '../emendas360/EmendasListaPage';
 import { Emenda360Page } from '../emendas360/Emenda360Page';
 import { emendaDoEndereco, rotaDaEmenda } from '../emendas360/rotaDaEmenda';
+import { confereLarguraDaTabela } from './larguraDasTabelas';
 
 const render = (url: string) =>
   renderToStaticMarkup(
@@ -198,5 +199,13 @@ describe('Emenda 360', () => {
 
   it('nº que não existe: emenda não encontrada', () => {
     expect(render('/emendas/emendas/2026/99999999')).toContain('Emenda não encontrada');
+  });
+});
+
+describe('Emendas: tabela sem rolagem para o lado (D1, 30/10/2026)', () => {
+  it('Valor no SIOP, ofícios, empenhado, pago e a indicar numa coluna com barra, dentro da regra de largura', () => {
+    const html = render('/emendas/emendas');
+    expect(confereLarguraDaTabela(html, 'emendas-por-emenda-tabela').colunas).toBeLessThanOrEqual(5);
+    expect(html).toContain('data-testid="sort-menu-execucao"');
   });
 });

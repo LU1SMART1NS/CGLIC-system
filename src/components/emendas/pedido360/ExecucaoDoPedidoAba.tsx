@@ -7,11 +7,11 @@ import { carteiraDetalhe, carteiraNumero, carteiraSubtitle, carteiraValor } from
 import { CarteiraDetailLabel } from '../../carteira/CarteiraDetailLabel';
 import { numeroDaChave } from '../../../utils/contractKeyUtils';
 import { formatCurrency } from '../../../utils/format';
-import { curto, dataBR } from '../../../utils/emendasKits';
+import { curto, dataBR, nomeDaLinhaDoPedido } from '../../../utils/emendasKits';
 import { execucaoDoPedido, jaEmpenhado, linhasAtivas, listaEmTexto } from '../../../utils/emendasPedidos';
 import type { ConferenciaEmpenho, ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../../services/emendasService';
 import type { CredorNoPedido } from '../../../utils/emendasConferenciaNota';
-import { ExecucaoDoPedidoResumo } from '../emendasPartes';
+import { ExecucaoDoPedidoResumo, ValoresEmBarra } from '../emendasPartes';
 import { EmpenhoDoPedido } from '../EmpenhoDoPedido';
 import { CredorDoPedido } from '../CredorDoPedido';
 import { EmendasDoPedido } from '../EmendasDoPedido';
@@ -32,11 +32,8 @@ interface NotaDoPedido {
   linhas: LinhaPedido[];
 }
 
-const nomeDaLinha = (l: LinhaPedido, itens: Map<string, ItemCaep>) => {
-  if (l.tipo === 'KIT') return `${l.quantidade} ${l.kitNome ?? 'kit'}`;
-  const item = l.itemKey ? itens.get(l.itemKey) : undefined;
-  return `${l.quantidade} ${item?.nomeCurto?.trim() || curto(item?.descricao ?? l.itemKey ?? '', 40)}`;
-};
+// O nome do item em até 40 letras, como nas outras listas (D11 da revisão das tabelas, 30/10/2026).
+const nomeDaLinha = (l: LinhaPedido, itens: Map<string, ItemCaep>) => nomeDaLinhaDoPedido(l, itens, 40);
 
 /** Situação da nota pelo que já foi liquidado e pago (valores da nota inteira). */
 const situacaoDaNota = (n: NotaDaLinha): { texto: string; variante: 'success' | 'warning' | 'neutral' } => {
@@ -82,23 +79,37 @@ export const ExecucaoDoPedidoAba: React.FC<Props> = ({ p, itens, notas, conferen
     );
   }
 
+  // D2 da revisão das tabelas (30/10/2026): nota e contrato juntos; empenhado, liquidado e pago numa barra.
+  const contratoDa = (x: NotaDoPedido) =>
+    x.nota.contractKey ? (
+      podeVerContratos ? (
+        <Link to={`/contratos/${encodeURIComponent(x.nota.contractKey)}`} style={{ color: 'var(--primary)', fontWeight: 700 }}>
+          {numeroDaChave(x.nota.contractKey)}
+        </Link>
+      ) : (
+        <span style={{ ...carteiraValor, color: '#0f172a' }}>{numeroDaChave(x.nota.contractKey)}</span>
+      )
+    ) : (
+      'aguarda a CCGA'
+    );
   const colunas: Column<NotaDoPedido>[] = [
     {
       key: 'nota',
-      header: 'Nota',
+      header: 'Nota e contrato',
       priority: 'primary',
       nowrap: true,
       render: (x) => (
         <>
           <div style={{ ...carteiraValor, fontWeight: 700 }}>{x.nota.nota}</div>
           {x.nota.emitidaEm && <div style={carteiraDetalhe}>emitida em {dataBR(x.nota.emitidaEm)}</div>}
+          <div style={carteiraDetalhe}>Contrato {contratoDa(x)}</div>
         </>
       )
     },
     {
       key: 'itens',
-      header: 'Itens',
-      minWidth: '220px',
+      header: 'Fornecedor e itens',
+      minWidth: '240px',
       render: (x) => {
         const fornecedor = [...new Set(x.linhas.map((l) => (l.itemKey ? itens.get(l.itemKey)?.fornecedor : null)).filter((f): f is string => Boolean(f)))][0];
         return (
@@ -110,25 +121,29 @@ export const ExecucaoDoPedidoAba: React.FC<Props> = ({ p, itens, notas, conferen
       }
     },
     {
-      key: 'contrato',
-      header: 'Contrato',
-      nowrap: true,
-      render: (x) =>
-        x.nota.contractKey ? (
-          podeVerContratos ? (
-            <Link to={`/contratos/${encodeURIComponent(x.nota.contractKey)}`} style={{ color: 'var(--primary)', fontWeight: 700 }}>
-              {numeroDaChave(x.nota.contractKey)}
-            </Link>
-          ) : (
-            <span style={carteiraValor}>{numeroDaChave(x.nota.contractKey)}</span>
-          )
-        ) : (
-          <span style={carteiraDetalhe}>aguarda a CCGA</span>
-        )
+      key: 'execucao',
+      header: 'Execução',
+      minWidth: '220px',
+      render: (x) => {
+        const { valorEmpenhado: emp, valorLiquidado: liq, valorPago: pago } = x.nota;
+        return (
+          <ValoresEmBarra
+            total={emp != null ? formatCurrency(emp) : '—'}
+            rotulo="empenhado"
+            max={emp ?? 0}
+            partes={[
+              { valor: pago ?? 0, tom: 'forte' },
+              { valor: Math.max((liq ?? 0) - (pago ?? 0), 0), tom: 'fraca' }
+            ]}
+            legenda={[
+              { rotulo: 'Liquidado', valor: liq != null ? formatCurrency(liq) : '—', tom: 'fraca' },
+              { rotulo: 'Pago', valor: pago != null ? formatCurrency(pago) : '—', tom: 'forte' }
+            ]}
+            testId={`pedido360-execucao-barra-${x.nota.nota}`}
+          />
+        );
+      }
     },
-    { key: 'empenhado', header: 'Empenhado', align: 'right', nowrap: true, render: (x) => <span style={carteiraNumero}>{x.nota.valorEmpenhado != null ? formatCurrency(x.nota.valorEmpenhado) : '—'}</span> },
-    { key: 'liquidado', header: 'Liquidado', align: 'right', nowrap: true, render: (x) => <span style={carteiraNumero}>{x.nota.valorLiquidado != null ? formatCurrency(x.nota.valorLiquidado) : '—'}</span> },
-    { key: 'pago', header: 'Pago', align: 'right', nowrap: true, render: (x) => <span style={carteiraNumero}>{x.nota.valorPago != null ? formatCurrency(x.nota.valorPago) : '—'}</span> },
     {
       key: 'situacao',
       header: 'Situação',

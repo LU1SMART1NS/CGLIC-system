@@ -27,6 +27,7 @@ vi.mock('../../../hooks/useGruposGti', () => ({
 }));
 
 import { EmendasPorItemPage } from '../EmendasPorItemPage';
+import { confereLarguraDaTabela } from './larguraDasTabelas';
 
 const render = () => renderToStaticMarkup(<MemoryRouter>{<EmendasPorItemPage />}</MemoryRouter>);
 
@@ -41,5 +42,14 @@ describe('Emendas › Itens: coluna Interesse principal', () => {
   it('item sem órgãos participantes fica sem dados', () => {
     const html = render();
     expect(html).toMatch(/data-testid="emendas-itens-gti-b"[^>]*>Sem dados dos órgãos/);
+  });
+});
+
+describe('Itens: tabela sem rolagem para o lado (D1, 30/10/2026)', () => {
+  it('Item · Interesse principal · Ata · Saldo da CAEP, dentro da regra de largura', () => {
+    const html = render();
+    expect(confereLarguraDaTabela(html, 'emendas-itens-tabela').colunas).toBe(4);
+    expect(html).toContain('data-testid="sort-menu-saldo"');
+    expect(html).toContain('data-testid="emendas-itens-barra-a"');
   });
 });

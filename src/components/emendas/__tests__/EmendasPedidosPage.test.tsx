@@ -69,6 +69,7 @@ vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => (
 vi.mock('../EtapaPedidoModal', () => ({ EtapaPedidoModal: () => null }));
 
 import { EmendasPedidosPage } from '../EmendasPedidosPage';
+import { confereLarguraDaTabela } from './larguraDasTabelas';
 
 const render = (url: string) => renderToStaticMarkup(<MemoryRouter initialEntries={[url]}>{<EmendasPedidosPage />}</MemoryRouter>);
 
@@ -129,7 +130,7 @@ describe('Pedidos: sem a faixa das emendas sem pedido', () => {
 describe('Pedidos: lista plana que abre o Pedido 360 (protótipo aprovado em 27/10/2026)', () => {
   it('a coluna Pedido mostra o número no parlamentar; sem emenda é reserva; com a emenda sem o ano, "ano a informar"', () => {
     const html = render('/?ano=todos');
-    expect(html).toContain('>1/2026<');
+    expect(html).toContain('>Pedido 1/2026<');
     expect(html).toContain('>Reserva<');
     // Sem a data nem "da planilha" na coluna (decisão de 27/10/2026): a data fica no Pedido 360.
     expect(html).not.toContain('de 20/10/2026');
@@ -160,5 +161,14 @@ describe('Pedidos: ano da emenda (28/10/2026)', () => {
 
   it('quem chega por um aviso, etapa ou parlamentar abre em todos os anos', () => {
     expect(render('/?autor=A1')).toContain('Emenda 4014 0004');
+  });
+});
+
+describe('Pedidos: tabela sem rolagem para o lado (D1, 30/10/2026)', () => {
+  it('Pedido (parlamentar e número) · Itens e beneficiários · Valor · Captação · Andamento, dentro da regra de largura', () => {
+    const html = render('/emendas/pedidos');
+    expect(confereLarguraDaTabela(html, 'emendas-pedidos-tabela').colunas).toBe(5);
+    expect(html).toContain('data-testid="sort-menu-autor"');
+    expect(html).toContain('data-testid="sort-menu-etapa"');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcularKit, sugestoesDeTroca, diasEntre, buscarItensCaep, nomeDaLinhaDoPedido } from '../emendasKits';
+import { calcularKit, sugestoesDeTroca, diasEntre, buscarItensCaep, nomeDaLinhaDoPedido, nomeNaLista, NOME_NA_LISTA } from '../emendasKits';
 import type { ItemCaep } from '../../services/emendasService';
 import type { PrecoDoItem } from '../../services/emendasQuadroService';
 
@@ -134,5 +134,22 @@ describe('nomeDaLinhaDoPedido: o item pelo nome da ata assinada nas listas de pe
   });
   it('o kit pelo nome do kit', () => {
     expect(nomeDaLinhaDoPedido({ tipo: 'KIT', quantidade: 1, itemKey: null, kitNome: 'Kit perícia' }, itens)).toBe('1 Kit perícia');
+  });
+});
+
+describe('nomeNaLista: nome da ata em até 40 letras nas listas (D11, 30/10/2026)', () => {
+  it('nome curto fica inteiro; o longo corta no fim de uma palavra, sem pontuação solta, com "…"', () => {
+    expect(nomeNaLista('Nobreaks 1500 VA')).toBe('Nobreaks 1500 VA');
+    const lanterna = 'Lanterna dedicada para armas longas com acionador remoto e botão traseiro, com conexão para trilhos Picatinny';
+    expect(nomeNaLista(lanterna)).toBe('Lanterna dedicada para armas longas com…');
+    expect(nomeNaLista('Aeronaves Teleguiadas Tipo: Aeronave Remotamente Pilotada (Drone), Quantidade Motores: 4')).toBe('Aeronaves Teleguiadas Tipo: Aeronave…');
+    expect(nomeNaLista(lanterna).length).toBeLessThanOrEqual(NOME_NA_LISTA + 1);
+  });
+
+  it('nomeDaLinhaDoPedido corta o nome da ata', () => {
+    const longo = 'Bota de Combate a Incêndio Estrutural-Coturno Combate Incêndio Material: Couro , Material Sola: Borracha';
+    const itens = new Map([['x', { itemKey: 'x', descricao: 'COTURNO', nomeCurto: longo } as never]]);
+    const linha = { tipo: 'ITEM' as const, quantidade: 2, itemKey: 'x', kitNome: null };
+    expect(nomeDaLinhaDoPedido(linha, itens)).toBe('2 Bota de Combate a Incêndio…');
   });
 });

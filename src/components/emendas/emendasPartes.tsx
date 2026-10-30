@@ -26,7 +26,7 @@ export const linhaDoAutor = (autor: AutorEmenda): string => [TIPO[autor.tipo], a
  * definir" e, embaixo, para qual órgão a CAEP separou.
  */
 /** Mesma largura da coluna do parlamentar em todas as tabelas de Emendas (o navegador não estica conforme as outras colunas). */
-export const LARGURA_AUTOR = '240px';
+export const LARGURA_AUTOR = '200px';
 
 export const AutorDoPedido: React.FC<{ autor: AutorEmenda | undefined; autorId: string | null; orgao?: string | null; destaque?: boolean }> = ({ autor, autorId, orgao, destaque }) => {
   // Como coluna de identificação (destaque): nome forte e azul e a 2ª linha da Ata; nas outras colunas, valor e detalhe.
@@ -227,6 +227,48 @@ export const SituacaoDaLinhaEtiqueta: React.FC<{ s: SituacaoDaLinha; testId?: st
   <div data-testid={testId} data-situacao={s.situacao}>
     <StatusBadge label={s.rotulo} variant={varianteDaSituacao(s)} size="sm" dot={false} />
     {s.detalhe && <div style={{ ...carteiraDetalhe, marginTop: '0.2rem' }}>{s.detalhe}</div>}
+  </div>
+);
+
+/** Parte da barra: `forte` (pago) em azul cheio, `fraca` (empenhado ainda não pago, reservado) em azul claro. */
+export interface ParteDaBarra {
+  valor: number;
+  tom: 'forte' | 'fraca';
+}
+
+const COR_DA_PARTE: Record<ParteDaBarra['tom'] | 'vazia', string> = { forte: 'var(--primary)', fraca: 'rgba(var(--primary-rgb), 0.38)', vazia: '#e2e8f0' };
+
+/**
+ * Valores que se leem juntos numa célula só (D2 da revisão das tabelas, 30/10/2026): o total em cima, a barra das partes
+ * e embaixo cada valor com o quadradinho da cor dele. Junta colunas como Empenhado · Pago · Sobra sem esconder nenhuma.
+ */
+export const ValoresEmBarra: React.FC<{
+  total: React.ReactNode;
+  rotulo?: string;
+  max: number;
+  partes: ParteDaBarra[];
+  legenda: { rotulo: string; valor: React.ReactNode; tom?: ParteDaBarra['tom'] | 'vazia' }[];
+  testId?: string;
+}> = ({ total, rotulo, max, partes, legenda, testId }) => (
+  <div data-testid={testId} style={{ minWidth: '13rem', maxWidth: '18rem' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
+      <span style={{ ...carteiraValor, ...carteiraNumero, whiteSpace: 'nowrap' }}>{total}</span>
+      {rotulo && <span style={{ ...carteiraDetalhe, marginTop: 0, whiteSpace: 'nowrap' }}>{rotulo}</span>}
+    </div>
+    <div aria-hidden="true" style={{ display: 'flex', height: 6, borderRadius: 999, overflow: 'hidden', background: COR_DA_PARTE.vazia, margin: '0.35rem 0 0.3rem' }}>
+      {max > 0 &&
+        partes.map((p, i) => (
+          <span key={i} style={{ display: 'block', height: '100%', width: `${Math.max(0, Math.min(100, (p.valor / max) * 100))}%`, background: COR_DA_PARTE[p.tom] }} />
+        ))}
+    </div>
+    <div style={{ ...carteiraDetalhe, marginTop: 0, display: 'flex', flexWrap: 'wrap', gap: '0 0.7rem' }}>
+      {legenda.map((l) => (
+        <span key={l.rotulo} style={{ whiteSpace: 'nowrap' }}>
+          {l.tom && <span aria-hidden="true" style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, marginRight: 3, background: COR_DA_PARTE[l.tom] }} />}
+          {l.rotulo} <b style={{ ...carteiraNumero, color: '#0f172a' }}>{l.valor}</b>
+        </span>
+      ))}
+    </div>
   </div>
 );
 

@@ -54,14 +54,30 @@ export function curto(texto: string, n = 40): string {
   return t.length <= n ? t : t.slice(0, n).replace(/[\s,;.:-]+$/, '') + '…';
 }
 
+/** Até onde vai o nome do item nas listas de Emendas; o nome inteiro fica no quadro do ofício e nas telas 360. */
+export const NOME_NA_LISTA = 40;
+
+/**
+ * Nome do item da ata assinada nas listas: alguns vieram com a descrição técnica inteira (até 372 letras, 30/10/2026),
+ * então passa de 40 letras é cortado no fim de uma palavra, com "…". O nome inteiro vai no `title` da célula.
+ */
+export function nomeNaLista(nome: string, n = NOME_NA_LISTA): string {
+  const t = nome.trim().replace(/\s+/g, ' ');
+  if (t.length <= n) return t;
+  const ate = t.slice(0, n + 1);
+  const noFimDaPalavra = ate.includes(' ') ? ate.replace(/\s+\S*$/, '') : t.slice(0, n);
+  return noFimDaPalavra.replace(/[\s,;.:(\-/]+$/, '') + '…';
+}
+
 /**
  * A linha do pedido nas listas ("2 Pistola 9 mm"): o item pelo nome da ata assinada (nome curto da CAEP, o mesmo do
- * quadro do gabinete); sem ele, o começo da descrição do catálogo. O kit, pelo nome do kit.
+ * quadro do gabinete), cortado em 40 letras; sem ele, o começo da descrição do catálogo. O kit, pelo nome do kit.
  */
 export function nomeDaLinhaDoPedido(l: Pick<LinhaPedido, 'tipo' | 'quantidade' | 'itemKey' | 'kitNome'>, itens: Map<string, ItemCaep>, limite = 34): string {
   if (l.tipo === 'KIT') return `${l.quantidade} ${l.kitNome ?? 'kit'}`;
   const item = itens.get(l.itemKey ?? '');
-  return `${l.quantidade} ${item?.nomeCurto?.trim() || curto(item?.descricao ?? l.itemKey ?? '', limite)}`;
+  const nome = item?.nomeCurto?.trim();
+  return `${l.quantidade} ${nome ? nomeNaLista(nome) : curto(item?.descricao ?? l.itemKey ?? '', limite)}`;
 }
 
 export function diasEntre(hoje: string, fim: string): number {

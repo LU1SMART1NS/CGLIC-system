@@ -20,7 +20,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/carteira/CarteiraPagination.tsx': 1, // paginação
   'src/components/carteira/CarteiraRowLink.tsx': 1, // link de ID na tabela
   'src/components/carteira/CarteiraSegmentTabs.tsx': 1, // abas
-  'src/components/carteira/CarteiraSortHeader.tsx': 1, // cabeçalho de ordenação
+  'src/components/carteira/CarteiraSortHeader.tsx': 2, // cabeçalho de ordenação (coluna simples e coluna juntada com lista)
   'src/components/contracts/planTaskEditing.tsx': 1, // cabeçalho recolhível
   'src/components/emendas/AnoDaEmenda.tsx': 3, // aviso "sem ano", botão do ano e opções da lista (como o filtro de coluna)
   'src/components/emendas/pedido360/AndamentoDoPedido.tsx': 1, // cabeçalho recolhível das fases do pedido

@@ -12,7 +12,7 @@ import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
-import { carteiraDetalhe, carteiraIdentificacao, carteiraValor } from '../carteira/carteiraStyles';
+import { carteiraDetalhe } from '../carteira/carteiraStyles';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import {
@@ -264,34 +264,37 @@ export const EmendasPedidosPage: React.FC = () => {
 
   const colunas: Column<Linha>[] = [
     {
-      // O número do pedido no parlamentar e no ano (migration 217); antes da emenda, a reserva. O sequencial do banco não aparece.
-      key: 'pedido',
-      header: 'Pedido',
-      nowrap: true,
-      sortValue: ordem.pedido.value,
-      sortFirstDir: 'desc',
-      render: (l) => {
-        const numero = numeroDoPedido(l);
-        if (numero) return <span style={{ ...carteiraIdentificacao, whiteSpace: 'nowrap' }}>{numero}</span>;
-        if (faltaAnoDaEmenda(l))
-          return (
-            <>
-              <div style={carteiraValor}>Emenda {l.siopEmenda!.slice(0, 4)} {l.siopEmenda!.slice(4)}</div>
-              <div style={{ ...carteiraDetalhe, color: 'var(--color-warning-text)' }}>ano a informar</div>
-            </>
-          );
-        // Só "Reserva": o parlamentar ao lado já diferencia, e a data da reserva fica no Pedido 360 (decisão de 27/10/2026).
-        return <div style={carteiraValor}>Reserva</div>;
-      }
-    },
-    {
+      // Parlamentar e pedido numa coluna (D4 da revisão das tabelas, 30/10/2026). O número do pedido no parlamentar e no ano
+      // (migration 217); antes da emenda, a reserva. O sequencial do banco não aparece.
       key: 'autor',
-      header: 'Parlamentar',
+      header: 'Pedido',
       priority: 'primary',
       width: LARGURA_AUTOR,
       minWidth: LARGURA_AUTOR,
-      sortValue: ordem.autor.value,
-      render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} orgao={orgaoDoPedido(l, nomeDoBeneficiario)} destaque />
+      sortOptions: [
+        { key: 'autor', label: 'Parlamentar', sortValue: ordem.autor.value },
+        { key: 'pedido', label: 'Número do pedido', sortValue: ordem.pedido.value, sortFirstDir: 'desc' }
+      ],
+      render: (l) => {
+        const numero = numeroDoPedido(l);
+        return (
+          <>
+            <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} orgao={orgaoDoPedido(l, nomeDoBeneficiario)} destaque />
+            {numero ? (
+              <div style={{ ...carteiraDetalhe, fontWeight: 700, whiteSpace: 'nowrap' }} data-testid={`emendas-pedido-numero-${l.id}`}>
+                Pedido {numero}
+              </div>
+            ) : faltaAnoDaEmenda(l) ? (
+              <div style={{ ...carteiraDetalhe, color: 'var(--color-warning-text)' }}>
+                Emenda {l.siopEmenda!.slice(0, 4)} {l.siopEmenda!.slice(4)} · ano a informar
+              </div>
+            ) : (
+              // Só "Reserva": a data da reserva fica no Pedido 360 (decisão de 27/10/2026).
+              <div style={carteiraDetalhe}>Reserva</div>
+            )}
+          </>
+        );
+      }
     },
     {
       // O que foi pedido e para quem: uma linha por item ("10× Carabina 5,56 mm → PMMG"); a ata fica no Pedido 360 e no aviso (decisão de 28/10/2026).
@@ -309,14 +312,20 @@ export const EmendasPedidosPage: React.FC = () => {
       render: (l) => <CelulaCaptacao fatias={l.captacao} testId={`emendas-pedido-captacao-${l.id}`} />
     },
     {
+      // Etapa e aviso numa coluna (D5): a etiqueta da etapa, o documento que a marca e, embaixo, o aviso mais grave e "+N";
+      // a frase completa do aviso aparece ao parar o mouse e no detalhe da linha.
       key: 'etapa',
-      header: 'Etapa',
-      nowrap: true,
-      sortValue: ordem.etapa.value,
-      // Sem coluna própria para a reserva (repetia a etapa): o documento que marca a etapa fica embaixo dela.
+      header: 'Andamento',
+      minWidth: '170px',
+      sortOptions: [
+        { key: 'etapa', label: 'Etapa', sortValue: ordem.etapa.value },
+        { key: 'aviso', label: 'Aviso', sortValue: ordem.aviso.value, sortFirstDir: 'desc' }
+      ],
       render: (l) => {
         // Uma linha só, em texto: a emenda quando já há; antes dela, o processo. O SEI para copiar fica no detalhe.
         const documento = l.siopEmenda ? `Emenda ${l.siopEmenda}` : l.oficioProcessoSei ? `Processo ${l.oficioProcessoSei}` : null;
+        const [primeiro, ...outros] = l.avisos;
+        const r = resumoDasLinhas(l, notas);
         return (
           <>
             {l.etapa === 'CONTRATACAO' && etapaDoFiltro(l) !== 'AGUARDANDO_CONTRATO' ? (
@@ -324,30 +333,19 @@ export const EmendasPedidosPage: React.FC = () => {
             ) : (
               <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
             )}
-            {documento && <div style={carteiraDetalhe}>{documento}</div>}
-            {(() => {
-              const r = resumoDasLinhas(l, notas);
-              return r.divergem ? <div style={{ ...carteiraDetalhe, whiteSpace: 'normal' }}>{r.texto}</div> : null;
-            })()}
+            {documento && <div style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{documento}</div>}
+            {r.divergem && <div style={carteiraDetalhe}>{r.texto}</div>}
+            {primeiro && (
+              <div
+                title={l.avisos.map((a) => a.texto).join('\n')}
+                style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.35rem', marginTop: '0.3rem' }}
+                data-testid={`emendas-pedido-aviso-${l.id}`}
+              >
+                <StatusBadge label={primeiro.curto} variant={avisoGrave(primeiro) ? 'danger' : 'warning'} size="sm" dot={false} />
+                {outros.length > 0 && <span style={{ ...carteiraDetalhe, marginTop: 0, fontWeight: 700 }}>+{outros.length}</span>}
+              </div>
+            )}
           </>
-        );
-      }
-    },
-    {
-      // Etiqueta curta: o aviso mais grave e "+N"; a frase completa aparece ao parar o mouse e no detalhe da linha.
-      key: 'aviso',
-      header: 'Aviso',
-      nowrap: true,
-      sortValue: ordem.aviso.value,
-      sortFirstDir: 'desc',
-      render: (l) => {
-        const [primeiro, ...outros] = l.avisos;
-        if (!primeiro) return <span style={carteiraDetalhe}>—</span>;
-        return (
-          <span title={l.avisos.map((a) => a.texto).join('\n')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} data-testid={`emendas-pedido-aviso-${l.id}`}>
-            <StatusBadge label={primeiro.curto} variant={avisoGrave(primeiro) ? 'danger' : 'warning'} size="sm" dot={false} />
-            {outros.length > 0 && <span style={{ ...carteiraDetalhe, fontWeight: 700 }}>+{outros.length}</span>}
-          </span>
         );
       }
     }

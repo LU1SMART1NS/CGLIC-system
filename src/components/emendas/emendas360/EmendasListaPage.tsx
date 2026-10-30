@@ -11,7 +11,7 @@ import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilte
 import { CarteiraSegmentTabs } from '../../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
-import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraIdentificacao, carteiraSubtitle } from '../../carteira/carteiraStyles';
 import { AdminListShell } from '../../admin/shared/AdminListShell';
 import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
 import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
@@ -35,7 +35,7 @@ import { execucaoDosPedidos } from '../../../utils/emendasParlamentar';
 import { contarPorGti, passaFiltroGti, resumirFatias, type FatiasDaAta } from '../../../config/gruposGti';
 import { GRUPOS_CAPTACAO, fatiasDaCaptacao, lerFiltroCaptacao, lerModoCaptacao, type GrupoBeneficiario } from '../../../config/captacaoEmendas';
 import type { EmendaSiop, NotaDaLinha } from '../../../services/emendasService';
-import { AutorDoPedido, LARGURA_AUTOR } from '../emendasPartes';
+import { AutorDoPedido, LARGURA_AUTOR, ValoresEmBarra } from '../emendasPartes';
 import { CelulaCaptacao, FiltroCaptacao } from '../CaptacaoDoPedido';
 import { EmendaSiopModal } from '../EmendaSiopModal';
 import { AnoDaEmenda } from '../AnoDaEmenda';
@@ -136,7 +136,7 @@ export const EmendasListaPage: React.FC = () => {
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ordem);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chave, POR_PAGINA);
   const limite = diasSemContatoParaUrgente();
-  const valorOu = (v: number | null | undefined) => (v == null ? <span style={carteiraDetalhe}>—</span> : <span style={carteiraNumero}>{formatCurrency(v)}</span>);
+  const mostraContato = podeGerir && segmento !== 'com';
 
   const colunas: Column<EmendaNaLista>[] = [
     {
@@ -154,7 +154,6 @@ export const EmendasListaPage: React.FC = () => {
       )
     },
     { key: 'autor', header: 'Parlamentar', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, sortValue: ordem.autor.value, render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} /> },
-    { key: 'valor', header: 'Valor no SIOP', align: 'right', nowrap: true, sortValue: ordem.valor.value, sortFirstDir: 'desc', render: (l) => (l.valor != null ? <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(l.valor)}</span> : <span style={carteiraDetalhe}>—</span>) },
     {
       key: 'captacao',
       header: 'Captação principal',
@@ -164,65 +163,58 @@ export const EmendasListaPage: React.FC = () => {
       }
     },
     {
-      key: 'oficios',
-      header: 'Ofícios',
-      align: 'right',
-      nowrap: true,
-      sortValue: ordem.oficios.value,
-      sortFirstDir: 'desc',
+      // Valor no SIOP, ofícios, empenhado, pago e a indicar numa coluna só (D2 da revisão das tabelas, 30/10/2026).
+      key: 'execucao',
+      header: 'Valor e execução',
+      minWidth: '220px',
+      sortOptions: [
+        { key: 'valor', label: 'Valor no SIOP', sortValue: ordem.valor.value, sortFirstDir: 'desc' },
+        { key: 'oficios', label: 'Ofícios', sortValue: ordem.oficios.value, sortFirstDir: 'desc' },
+        { key: 'empenhado', label: 'Empenhado', sortValue: ordem.empenhado.value, sortFirstDir: 'desc' },
+        { key: 'pago', label: 'Pago', sortValue: ordem.pago.value, sortFirstDir: 'desc' },
+        { key: 'sobra', label: 'A indicar', sortValue: ordem.sobra.value, sortFirstDir: 'desc' }
+      ],
       render: (l) => {
         const x = sobraDe(l);
-        if (!x) return <span style={carteiraDetalhe}>—</span>;
+        const e = pagoPorChave.get(l.chave);
+        const pago = e && e.notas > 0 ? e.pago : null;
+        const empenhado = x?.empenhado ?? null;
+        const legenda = [
+          ...(x
+            ? [{ rotulo: 'Ofícios', valor: x.oficiosAInformar > 0 ? `${formatCurrency(x.oficiado)} (${x.oficiosAInformar} a informar)` : formatCurrency(x.oficiado) }]
+            : []),
+          { rotulo: 'Empenhado', valor: empenhado != null ? formatCurrency(empenhado) : '—', tom: 'fraca' as const },
+          { rotulo: 'Pago', valor: pago != null ? formatCurrency(pago) : '—', tom: 'forte' as const },
+          { rotulo: 'A indicar', valor: x ? formatCurrency(x.sobra) : '—', tom: 'vazia' as const }
+        ];
         return (
-          <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-            <span style={carteiraNumero}>{formatCurrency(x.oficiado)}</span>
-            {x.oficiosAInformar > 0 && <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{x.oficiosAInformar === 1 ? '1 a informar' : `${x.oficiosAInformar} a informar`}</span>}
-          </span>
+          <ValoresEmBarra
+            total={l.valor != null ? formatCurrency(l.valor) : '—'}
+            rotulo="no SIOP"
+            max={l.valor ?? 0}
+            partes={[
+              { valor: pago ?? 0, tom: 'forte' },
+              { valor: Math.max((empenhado ?? 0) - (pago ?? 0), 0), tom: 'fraca' }
+            ]}
+            legenda={legenda}
+            testId={`emendas-emenda-execucao-${l.chave}`}
+          />
         );
       }
     },
-    { key: 'empenhado', header: 'Empenhado', align: 'right', nowrap: true, sortValue: ordem.empenhado.value, sortFirstDir: 'desc', render: (l) => valorOu(sobraDe(l)?.empenhado) },
     {
-      key: 'pago',
-      header: 'Pago',
-      align: 'right',
-      nowrap: true,
-      sortValue: ordem.pago.value,
-      sortFirstDir: 'desc',
-      render: (l) => {
-        const e = pagoPorChave.get(l.chave);
-        return valorOu(e && e.notas > 0 ? e.pago : null);
-      }
-    },
-    { key: 'sobra', header: 'A indicar', align: 'right', nowrap: true, sortValue: ordem.sobra.value, sortFirstDir: 'desc', render: (l) => valorOu(sobraDe(l)?.sobra) },
-    // Sem pedido, o que interessa é o último contato; com pedido, o andamento está no Pedido 360.
-    ...(podeGerir && segmento !== 'com'
-      ? [
-          {
-            key: 'contato',
-            header: 'Último contato',
-            sortValue: ordem.contato.value,
-            render: (l: EmendaNaLista) => {
-              const u = l.contatos.at(-1);
-              if (!semPedido(l)) return <span style={carteiraDetalhe}>—</span>;
-              return u ? (
-                <>
-                  <div style={carteiraValor}>{dataBR(u.contatoEm)}</div>
-                  <div style={carteiraDetalhe}>{u.comQuem}</div>
-                </>
-              ) : (
-                <span style={carteiraDetalhe}>nenhum</span>
-              );
-            }
-          } satisfies Column<EmendaNaLista>
-        ]
-      : []),
-    {
+      // Último contato embaixo da situação (D5): só para quem gere e fora da aba "com pedido", como a antiga coluna.
       key: 'situacao',
       header: 'Situação',
-      nowrap: true,
-      sortValue: ordem.situacao.value,
-      sortFirstDir: 'desc',
+      minWidth: '150px',
+      ...(mostraContato
+        ? {
+            sortOptions: [
+              { key: 'situacao', label: 'Situação', sortValue: ordem.situacao.value, sortFirstDir: 'desc' as const },
+              { key: 'contato', label: 'Último contato', sortValue: ordem.contato.value }
+            ]
+          }
+        : { sortValue: ordem.situacao.value, sortFirstDir: 'desc' as const }),
       render: (l) => (
         <span title={l.urgente ? `${l.diasSemContato} dias sem contato registrado (urgente a partir de ${limite})` : undefined} data-testid={`emendas-emenda-situacao-${l.chave}`}>
           <StatusBadge
@@ -232,6 +224,11 @@ export const EmendasListaPage: React.FC = () => {
             dot={false}
           />
           {l.urgente && <div style={{ ...carteiraDetalhe, color: 'var(--color-danger-text)' }}>{l.diasSemContato} dias sem contato</div>}
+          {mostraContato && semPedido(l) && (
+            <div style={carteiraDetalhe} data-testid={`emendas-emenda-contato-${l.chave}`}>
+              {l.contatos.at(-1) ? `último contato ${dataBR(l.contatos.at(-1)!.contatoEm)} · ${l.contatos.at(-1)!.comQuem}` : 'nenhum contato'}
+            </div>
+          )}
           {reservasParaLigar(l, pedidos).length > 0 && (
             <div style={carteiraDetalhe} data-testid={`emendas-emenda-reserva-${l.chave}`}>
               reserva do parlamentar a ligar

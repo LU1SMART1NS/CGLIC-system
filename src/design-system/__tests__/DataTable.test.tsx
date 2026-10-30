@@ -167,3 +167,33 @@ describe('DataTable — linha com detalhes (renderExpanded)', () => {
     expect(html).not.toContain('aria-label="Detalhes"');
   });
 });
+
+describe('DataTable — coluna juntada com lista de ordenação (revisão das tabelas de Emendas, 30/10/2026)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('o cabeçalho mostra o valor que ordena agora e marca aria-sort na coluna juntada', () => {
+    mockMobile(false);
+    const html = renderToStaticMarkup(
+      <DataTable<Row>
+        columns={[
+          { key: 'sigla', header: 'Sigla' },
+          {
+            key: 'junta',
+            header: 'Nome e sigla',
+            sortOptions: [
+              { key: 'nome', label: 'Nome', sortValue: (r) => r.nome },
+              { key: 'interno', label: 'Interno', sortValue: (r) => r.interno }
+            ]
+          }
+        ]}
+        data={data}
+        keyExtractor={(r) => r.id}
+        sort={{ key: 'interno', dir: 'desc' }}
+        onSort={() => {}}
+      />
+    );
+    expect(html).toContain('data-testid="sort-menu-junta"');
+    expect(html).toContain('· Interno');
+    expect(html).toMatch(/<th aria-sort="descending"[^>]*><button[^>]*data-testid="sort-menu-junta"/);
+  });
+});
