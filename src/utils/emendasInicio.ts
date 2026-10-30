@@ -22,6 +22,9 @@ import {
 import type { CredorNoPedido } from './emendasConferenciaNota';
 import type { PrecoDoItem } from '../services/emendasQuadroService';
 
+/** Nome da ata acima disto entra no aviso para a CAEP revisar (nas listas o nome já aparece cortado em 40 letras). */
+export const NOME_LONGO = 80;
+
 export interface PedidoComAviso {
   pedido: PedidoEmenda;
   avisos: AvisoPedido[];
@@ -57,6 +60,8 @@ export interface ResumoInicioEmendas {
   livrePertoDoFim: ItemLivrePertoDoFim[];
   /** Itens com alocação para a CAEP em ata vigente e sem o nome da ata assinada: a CAEP cadastra antes de oferecer ao parlamentar. */
   semNomeCurto: ItemCaep[];
+  /** Itens com o nome da ata acima de NOME_LONGO letras (aparecem cortados nas listas). */
+  nomeLongo: ItemCaep[];
 }
 
 /** Item da linha a que o aviso de ata se refere: o que tem a ata mais perto do fim. */
@@ -169,9 +174,11 @@ export function resumoInicioEmendas(
     livrePertoDoFim.push({ item: i, livre: sobra, diasParaVencer: dias, indicarAte: limiteDaIndicacao(i.vigenciaFinal), passouDoCorte: passouDoCorte(dias) });
   }
   livrePertoDoFim.sort((a, b) => a.diasParaVencer - b.diasParaVencer || b.livre - a.livre);
-  const semNomeCurto = vigentes
-    .filter((i) => i.alocado > 0 && !i.nomeCurto?.trim())
-    .sort((a, b) => (a.vigenciaFinal ?? '9999-12-31').localeCompare(b.vigenciaFinal ?? '9999-12-31') || a.descricao.localeCompare(b.descricao, 'pt-BR'));
+  const peloFim = (a: ItemCaep, b: ItemCaep) => (a.vigenciaFinal ?? '9999-12-31').localeCompare(b.vigenciaFinal ?? '9999-12-31') || a.descricao.localeCompare(b.descricao, 'pt-BR');
+  const semNomeCurto = vigentes.filter((i) => i.alocado > 0 && !i.nomeCurto?.trim()).sort(peloFim);
+  // D12 da revisão das tabelas (30/10/2026): nome da ata com a descrição técnica inteira; a CAEP decide se encurta,
+  // porque o mesmo nome sai no quadro do ofício.
+  const nomeLongo = vigentes.filter((i) => i.alocado > 0 && (i.nomeCurto?.trim().length ?? 0) > NOME_LONGO).sort(peloFim);
 
   return {
     pedidosComAviso,
@@ -187,7 +194,8 @@ export function resumoInicioEmendas(
     reservado,
     livre,
     livrePertoDoFim,
-    semNomeCurto
+    semNomeCurto,
+    nomeLongo
   };
 }
 

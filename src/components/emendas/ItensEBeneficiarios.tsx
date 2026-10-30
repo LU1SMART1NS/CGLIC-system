@@ -2,11 +2,13 @@ import React from 'react';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { carteiraDetalhe, carteiraNumero } from '../carteira/carteiraStyles';
 import { linhasDaLista } from '../../utils/emendasPedidos';
+import { nomeNaLista } from '../../utils/emendasKits';
 import type { ItemCaep, PedidoEmenda } from '../../services/emendasService';
 
 /**
  * Coluna "Itens e beneficiários" das listas de pedidos (Pedidos, Parlamentar 360 e Emenda 360): uma linha por item,
- * "10× Carabina 5,56 mm → PMMG". Mostra 2 linhas; o resto vira "+N linhas", com a lista inteira na dica.
+ * "10× Carabina 5,56 mm → PMMG". Mostra 2 itens; o resto vira "+N itens", com a lista inteira na dica. O nome do item vai
+ * até 40 letras (D11 da revisão das tabelas, 30/10/2026: alguns nomes da ata têm a descrição técnica inteira).
  */
 export const ItensEBeneficiarios: React.FC<{ pedido: PedidoEmenda; itens: Map<string, ItemCaep>; beneficiarios: Map<string, { nome: string; sigla?: string | null }> }> = ({
   pedido,
@@ -20,10 +22,10 @@ export const ItensEBeneficiarios: React.FC<{ pedido: PedidoEmenda; itens: Map<st
   return (
     <>
       {mostradas.map((x) => (
-        <div key={x.id} style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', minWidth: 0, maxWidth: '32rem' }}>
+        <div key={x.id} style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', minWidth: 0, maxWidth: '24rem' }}>
           <span style={{ ...carteiraNumero, fontWeight: 700, color: '#64748b', minWidth: '2.2em', textAlign: 'right', flex: '0 0 auto' }}>{x.quantidade}×</span>
           <span title={x.nome} style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: '0 1 auto' }}>
-            {x.nome}
+            {nomeNaLista(x.nome)}
           </span>
           {x.kit && <StatusBadge label="Kit" variant="neutral" size="sm" dot={false} />}
           <span style={{ color: '#64748b', flex: '0 0 auto' }}>→</span>
@@ -45,7 +47,7 @@ export const ItensEBeneficiarios: React.FC<{ pedido: PedidoEmenda; itens: Map<st
       ))}
       {resto > 0 && (
         <div style={carteiraDetalhe} title={todas.map((x) => `${x.quantidade}× ${x.nome} → ${x.beneficiarioNome ?? 'a definir'}`).join('\n')}>
-          +{resto} {resto === 1 ? 'linha' : 'linhas'}
+          +{resto} {resto === 1 ? 'item' : 'itens'}
         </div>
       )}
     </>

@@ -197,6 +197,27 @@ export const EmendasGruposBeneficiariosPage: React.FC = () => {
     { id: 'TODOS', label: 'Todos', count: contagem.TODOS }
   ];
 
+  const escolhaDoGrupo = (l: Linha) =>
+    podeEditar ? (
+      <AppSelect
+        aria-label={`Grupo de ${l.b.nome}`}
+        value={l.grupo ?? ''}
+        disabled={salvando === l.b.id}
+        onChange={(e) => void escolher(l, e.target.value)}
+        data-testid={`grupo-beneficiario-${l.b.id}`}
+      >
+        {/* A sugestão fica embaixo da escolha (D7): o texto longo na opção alargava a coluna. */}
+        <option value="">A confirmar</option>
+        {GRUPOS_BENEFICIARIO.map((g) => (
+          <option key={g} value={g}>
+            {rotuloDoGrupo(g)}
+          </option>
+        ))}
+      </AppSelect>
+    ) : (
+      <GtiTag grupo={l.grupo ?? 'A_CONFIRMAR'} />
+    );
+
   const columns: Column<Linha>[] = [
     ...(podeEditar
       ? [
@@ -228,57 +249,34 @@ export const EmendasGruposBeneficiariosPage: React.FC = () => {
         <>
           <NomeComSigla b={l.b} />
           <div style={pequeno}>{l.b.razaoSocial ?? 'Sem CNPJ'}</div>
+          {/* Entrega embaixo do nome (D7 da revisão das tabelas, 30/10/2026). */}
+          {localDoBeneficiario(l.b) && <div style={pequeno}>Entrega em {localDoBeneficiario(l.b)}</div>}
         </>
       )
     },
-    { key: 'entrega', header: 'Entrega', nowrap: true, render: (l) => <span>{localDoBeneficiario(l.b) ?? '—'}</span> },
     {
       key: 'linhas',
-      header: 'Linhas',
+      header: 'Itens',
       align: 'right',
-      render: (l) => <span style={{ fontVariantNumeric: 'tabular-nums' }} title="Linhas dos pedidos em andamento com este beneficiário">{l.linhas}</span>
+      render: (l) => <span style={{ fontVariantNumeric: 'tabular-nums' }} title="Itens dos pedidos em andamento com este beneficiário">{l.linhas}</span>
     },
     {
-      key: 'sugestao',
-      header: 'Sugestão',
-      render: (l) => (l.sugestao ? <GtiTag grupo={l.sugestao} /> : <span style={pequeno}>sem sugestão</span>)
-    },
-    {
+      // Sugestão e quem confirmou embaixo da escolha do grupo (D7).
       key: 'grupo',
       header: 'Grupo',
-      minWidth: '200px',
-      render: (l) =>
-        podeEditar ? (
-          <AppSelect
-            aria-label={`Grupo de ${l.b.nome}`}
-            value={l.grupo ?? ''}
-            disabled={salvando === l.b.id}
-            onChange={(e) => void escolher(l, e.target.value)}
-            data-testid={`grupo-beneficiario-${l.b.id}`}
-          >
-            <option value="">{l.sugestao ? `A confirmar (sugestão: ${GRUPO_GTI_INFO[l.sugestao].rotulo})` : 'A confirmar'}</option>
-            {GRUPOS_BENEFICIARIO.map((g) => (
-              <option key={g} value={g}>
-                {rotuloDoGrupo(g)}
-              </option>
-            ))}
-          </AppSelect>
-        ) : (
-          <GtiTag grupo={l.grupo ?? 'A_CONFIRMAR'} />
-        )
-    },
-    {
-      key: 'confirmado',
-      header: 'Confirmado por',
-      render: (l) =>
-        l.grupo ? (
-          <>
-            <div style={{ fontWeight: 700 }}>{l.confirmadoPorNome ?? '—'}</div>
-            <div style={pequeno}>{l.confirmadoEm ? formatDataHoraBR(l.confirmadoEm) : ''}</div>
-          </>
-        ) : (
-          <span style={pequeno}>—</span>
-        )
+      minWidth: '220px',
+      render: (l) => (
+        <>
+          {escolhaDoGrupo(l)}
+          <div style={{ ...pequeno, marginTop: '0.25rem' }} data-testid={`grupo-beneficiario-origem-${l.b.id}`}>
+            {l.grupo
+              ? `confirmado por ${l.confirmadoPorNome ?? '—'}${l.confirmadoEm ? ` em ${formatDataHoraBR(l.confirmadoEm)}` : ''}`
+              : l.sugestao
+                ? <>sugestão: <GtiTag grupo={l.sugestao} /></>
+                : 'sem sugestão'}
+          </div>
+        </>
+      )
     }
   ];
 

@@ -41,7 +41,7 @@ import { LigarEmendaModal } from './LigarEmendaModal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { emendasAConferir, type EmendaAConferir } from '../../utils/emendasEmpenho';
 import { formatCurrency, formatCurrencyCompact, formatNumber } from '../../utils/format';
-import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR } from '../../utils/emendasKits';
+import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR, NOME_NA_LISTA, nomeNaLista } from '../../utils/emendasKits';
 import {
   avisoGrave,
   FASES_PEDIDO,
@@ -60,7 +60,7 @@ import {
 import { nomeDoItem } from '../../utils/emendasQuadro';
 import { menorPrecoDisponivel, sobraDasEmendas, type ExecucaoNoPortal, type SobraDaEmenda } from '../../utils/emendasSobra';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
-import { prazoDoAviso, resumoInicioEmendas, type ItemLivrePertoDoFim, type PedidoComAviso } from '../../utils/emendasInicio';
+import { NOME_LONGO, prazoDoAviso, resumoInicioEmendas, type ItemLivrePertoDoFim, type PedidoComAviso } from '../../utils/emendasInicio';
 import type { AutorEmenda, EtapaPedido, ItemCaep, NotaDaLinha, NotaSemPedido, PedidoEmenda } from '../../services/emendasService';
 import { AutorDoPedido, LARGURA_AUTOR, ItemDaAta } from './emendasPartes';
 import { DadosItemModal } from './DadosItemModal';
@@ -384,10 +384,30 @@ export const EmendasInicioPage: React.FC = () => {
 
   const colunasSemNome: Column<ItemCaep>[] = [
     { key: 'item', header: 'Item', priority: 'primary', minWidth: '260px', sortValue: (i) => i.descricao, render: (i) => <ItemDaAta item={i} comLinks /> },
-    { key: 'quadro', header: 'Nome na Ata', minWidth: '200px', render: (i) => <span style={carteiraValor}>{nomeDoItem(i, i.itemKey)}</span> },
+    {
+      key: 'quadro',
+      header: 'Nome na Ata',
+      minWidth: '220px',
+      render: (i) =>
+        i.nomeCurto?.trim() ? (
+          <>
+            <div style={{ ...carteiraValor, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={i.nomeCurto}>
+              {i.nomeCurto}
+            </div>
+            <div style={{ ...carteiraDetalhe, color: 'var(--color-warning-text)' }}>{i.nomeCurto.trim().length} letras: nas listas aparece "{nomeNaLista(i.nomeCurto)}"</div>
+          </>
+        ) : (
+          <>
+            <div style={carteiraValor}>{nomeDoItem(i, i.itemKey)}</div>
+            <div style={{ ...carteiraDetalhe, color: 'var(--color-warning-text)' }}>sem nome: vai o começo da descrição do catálogo</div>
+          </>
+        )
+    },
     { key: 'alocado', header: 'Alocado', align: 'right', nowrap: true, sortValue: (i) => i.alocado, sortFirstDir: 'desc', render: (i) => <span style={carteiraNumero}>{formatNumber(i.alocado)}</span> },
     { key: 'fim', header: 'Fim da ata', nowrap: true, sortValue: (i) => i.vigenciaFinal, render: (i) => <span style={carteiraValor}>{dataBR(i.vigenciaFinal)}</span> }
   ];
+  // Gaveta "Nome do item": primeiro os sem nome (o quadro sai com a descrição do catálogo), depois os de nome longo (D12).
+  const nomesARevisar = [...r.semNomeCurto, ...r.nomeLongo];
 
   const colunasAConferir: Column<EmendaAConferir>[] = [
     {
@@ -599,8 +619,12 @@ export const EmendasInicioPage: React.FC = () => {
           },
           {
             id: 'semNomeCurto',
-            resumo: carregando ? undefined : r.semNomeCurto.length === 0 ? 'todos com nome' : `${plural(r.semNomeCurto.length, 'item', 'itens')} sem nome`,
-            atencao: r.semNomeCurto.length > 0
+            resumo: carregando
+              ? undefined
+              : nomesARevisar.length === 0
+                ? 'todos com nome'
+                : [r.semNomeCurto.length > 0 && `${plural(r.semNomeCurto.length, 'item', 'itens')} sem nome`, r.nomeLongo.length > 0 && `${r.nomeLongo.length} com nome longo`].filter(Boolean).join(' · '),
+            atencao: nomesARevisar.length > 0
           }
         ]}
         aberta={gavetaAberta}
@@ -720,16 +744,16 @@ export const EmendasInicioPage: React.FC = () => {
         <PainelGaveta
           id="semNomeCurto"
           subtitulo={podeGerir ? 'Clique no lápis para dar o nome.' : 'Clique na linha para abrir o item.'}
-          hint="Item alocado à CAEP em ata vigente ainda sem o nome na ata assinada. Sem ele, o quadro do parlamentar mostra o começo da descrição do catálogo."
+          hint={`Item alocado à CAEP em ata vigente sem o nome na ata assinada (o quadro do parlamentar mostra o começo da descrição do catálogo) ou com nome acima de ${NOME_LONGO} letras (nas listas aparece cortado em ${NOME_NA_LISTA}). Encurtar o nome muda também o quadro do ofício: a decisão é da CAEP.`}
           onFechar={fecharGaveta}
         >
-          {r.semNomeCurto.length === 0 ? (
-            <EmptyState title={carregando ? 'Carregando…' : 'Todos os itens das atas vigentes já têm o nome da ata assinada.'} testId="emendas-inicio-sem-nome-vazio" />
+          {nomesARevisar.length === 0 ? (
+            <EmptyState title={carregando ? 'Carregando…' : 'Todos os itens das atas vigentes têm o nome da ata assinada, sem nomes longos.'} testId="emendas-inicio-sem-nome-vazio" />
           ) : (
             <DataTable<ItemCaep>
               testId="emendas-inicio-sem-nome"
               className="data-table-container--flush"
-              data={r.semNomeCurto}
+              data={nomesARevisar}
               keyExtractor={(i) => i.itemKey}
               columns={colunasSemNome}
               rowOpen={(i) => () => navigate(`/emendas/itens?busca=${encodeURIComponent(`${i.numeroAta} item ${Number(i.numeroItem)}`)}`)}

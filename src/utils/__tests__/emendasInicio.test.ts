@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { avisosDosPedidosParaOMenu, prazoDoAviso, resumoInicioEmendas } from '../emendasInicio';
+import { avisosDosPedidosParaOMenu, prazoDoAviso, resumoInicioEmendas, NOME_LONGO } from '../emendasInicio';
 import type { ConferenciaEmpenho, ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
 
 const HOJE = '2026-10-23';
@@ -100,6 +100,13 @@ describe('Início do gestor de emendas', () => {
       item('encerrado', { ataEncerrada: true })
     ];
     expect(resumoInicioEmendas([], lista, new Map(), HOJE).semNomeCurto.map((i) => i.itemKey)).toEqual(['branco', 'novo']);
+  });
+
+  it('itens com nome da ata acima de 80 letras (D12, 30/10/2026): a CAEP decide se encurta', () => {
+    const longo = 'Lanterna dedicada para armas longas com acionador remoto e botão traseiro, com conexão para trilhos Picatinny, 550lm';
+    const lista = [item('curto', { nomeCurto: 'Pistola' }), item('longo', { nomeCurto: longo }), item('longoZerado', { nomeCurto: longo, alocado: 0 })];
+    expect(longo.length).toBeGreaterThan(NOME_LONGO);
+    expect(resumoInicioEmendas([], lista, new Map(), HOJE).nomeLongo.map((i) => i.itemKey)).toEqual(['longo']);
   });
 });
 

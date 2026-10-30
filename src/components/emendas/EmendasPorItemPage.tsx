@@ -9,17 +9,16 @@ import { HeaderRefreshAction } from '../../design-system/components/HeaderRefres
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
-import { ProgressBar } from '../../design-system/components/ProgressBar';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
-import { carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraValor } from '../carteira/carteiraStyles';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { hojeEmBrasilia, useItensCaep, usePedidosEmendas, usePodeGerirEmendas } from '../../hooks/useEmendas';
 import { formatCurrencyCompact, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, rotuloItemDaAta } from '../../utils/emendasKits';
-import { ItemDaAta, PrecoDaEmenda, VigenciaDaAta } from './emendasPartes';
+import { PrecoDaEmenda, ValoresEmBarra, VigenciaDaAta } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { DadosItemModal } from './DadosItemModal';
 import { itemComSaldo, montarLinhasItensCaep, type LinhaItemCaep } from '../../utils/emendasItensSaldo';
@@ -32,6 +31,10 @@ import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
 
 type Segmento = 'com' | 'sem' | 'encerrada' | 'todos';
 type Linha = LinhaItemCaep;
+
+// Nome na ata em até 2 linhas e descrição em 1: o texto inteiro aparece ao passar o mouse e no Item 360.
+const DUAS_LINHAS: React.CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
+const UMA_LINHA: React.CSSProperties = { ...DUAS_LINHAS, WebkitLineClamp: 1 };
 
 // Ordenação pelo cabeçalho, como nas carteiras (?ordem=); sem escolha, pela descrição do item.
 const ORDEM: Record<string, CarteiraSortColumn<Linha>> = {
@@ -101,28 +104,39 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, exportar }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alvo?.itemKey]);
 
+  // D6 da revisão das tabelas (30/10/2026): item, nome na ata e descrição numa coluna; vigência e preço em Ata; alocado,
+  // reservado e saldo como uma barra. Cada coluna juntada ordena pelo valor escolhido no cabeçalho.
   const colunas: Column<Linha>[] = [
     {
       key: 'item',
       header: 'Item',
       priority: 'primary',
       minWidth: '280px',
-      sortValue: ORDEM.item.value,
-      render: (l) => <ItemDaAta item={l} />
-    },
-    {
-      key: 'quadro',
-      header: 'Nome na Ata',
-      minWidth: '160px',
-      sortValue: ORDEM.quadro.value,
-      render: (l) => (
-        <>
-          {l.nomeCurto ? <div style={carteiraValor}>{l.nomeCurto}</div> : <div style={{ ...carteiraDetalhe, marginTop: 0 }}>sem nome da ata assinada</div>}
-          <div style={{ marginTop: '0.2rem' }}>
-            {l.gnd ? <StatusBadge label={l.gnd === 'GND-4' ? 'GND-4 · Investimento' : 'GND-3 · Custeio'} variant="neutral" size="sm" dot={false} /> : <StatusBadge label="GND a informar" variant="warning" size="sm" dot={false} />}
-          </div>
-        </>
-      )
+      sortOptions: [
+        { key: 'item', label: 'Descrição', sortValue: ORDEM.item.value },
+        { key: 'quadro', label: 'Nome na ata', sortValue: ORDEM.quadro.value }
+      ],
+      render: (l) => {
+        const descricao = descricaoItemEmFrase(l.descricao);
+        return (
+          <>
+            <div style={{ ...carteiraDetalhe, marginTop: 0, fontWeight: 700, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.35rem' }}>
+              <span>{rotuloItemDaAta(l)}</span>
+              {l.gnd ? <span>· {l.gnd === 'GND-4' ? 'GND-4 · Investimento' : 'GND-3 · Custeio'}</span> : <StatusBadge label="GND a informar" variant="warning" size="sm" dot={false} />}
+            </div>
+            {l.nomeCurto ? (
+              <div style={{ ...carteiraValor, ...DUAS_LINHAS }} title={l.nomeCurto}>
+                {l.nomeCurto}
+              </div>
+            ) : (
+              <div style={{ ...carteiraDetalhe, color: 'var(--color-warning-text)' }}>sem nome da ata assinada</div>
+            )}
+            <div style={{ ...carteiraDetalhe, ...UMA_LINHA }} title={descricao}>
+              {descricao}
+            </div>
+          </>
+        );
+      }
     },
     {
       key: 'gti',
@@ -132,40 +146,42 @@ export const EmendasPorItemPage: React.FC<Props> = ({ seletor, abrir, exportar }
       render: (l) => <GtiCelulaAta fatias={l.fatias} testId={`emendas-itens-gti-${l.itemKey}`} />
     },
     {
-      key: 'vigencia',
-      header: 'Vigência',
+      key: 'ata',
+      header: 'Ata',
       nowrap: true,
-      sortValue: ORDEM.vigencia.value,
-      render: (l) => <VigenciaDaAta item={l} hoje={hoje} />
-    },
-    { key: 'alocado', header: 'Alocado à CAEP', align: 'right', nowrap: true, sortValue: ORDEM.alocado.value, sortFirstDir: 'desc', render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(l.alocado)}</span> },
-    {
-      key: 'reservado',
-      header: 'Reservado',
-      align: 'right',
-      nowrap: true,
-      sortValue: ORDEM.reservado.value,
-      sortFirstDir: 'desc',
+      sortOptions: [
+        { key: 'vigencia', label: 'Vigência', sortValue: ORDEM.vigencia.value },
+        { key: 'valor', label: 'Valor', sortValue: ORDEM.valor.value, sortFirstDir: 'desc' }
+      ],
       render: (l) => (
         <>
-          <div style={carteiraNumero}>{formatNumber(l.reservado)}</div>
-          {l.pedidos > 0 && <div style={carteiraDetalhe}>{l.pedidos === 1 ? '1 pedido' : `${l.pedidos} pedidos`}</div>}
-          <div style={{ marginTop: 4, minWidth: 80 }} aria-hidden="true">
-            <ProgressBar value={Math.min(l.reservado, l.alocado)} max={l.alocado} showPercent={false} height="4px" colorScheme="primary" testId={`emendas-itens-barra-${l.itemKey}`} />
+          <VigenciaDaAta item={l} hoje={hoje} />
+          <div style={{ ...carteiraDetalhe, display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
+            <PrecoDaEmenda valor={l.preco} reajuste={l.reajuste} />
           </div>
         </>
       )
     },
     {
       key: 'saldo',
-      header: 'Saldo',
-      align: 'right',
-      nowrap: true,
-      sortValue: ORDEM.saldo.value,
-      sortFirstDir: 'desc',
-      render: (l) => <span style={{ ...carteiraValor, ...carteiraNumero, color: l.saldo <= 0 ? 'var(--text-muted)' : undefined }}>{formatNumber(l.saldo)}</span>
-    },
-    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <PrecoDaEmenda valor={l.preco} reajuste={l.reajuste} /> }
+      header: 'Saldo da CAEP',
+      minWidth: '220px',
+      sortOptions: [
+        { key: 'saldo', label: 'Saldo', sortValue: ORDEM.saldo.value, sortFirstDir: 'desc' },
+        { key: 'alocado', label: 'Alocado à CAEP', sortValue: ORDEM.alocado.value, sortFirstDir: 'desc' },
+        { key: 'reservado', label: 'Reservado', sortValue: ORDEM.reservado.value, sortFirstDir: 'desc' }
+      ],
+      render: (l) => (
+        <ValoresEmBarra
+          total={formatNumber(l.saldo)}
+          rotulo={`livres de ${formatNumber(l.alocado)}`}
+          max={l.alocado}
+          partes={[{ valor: Math.min(l.reservado, l.alocado), tom: 'forte' }]}
+          legenda={[{ rotulo: 'Reservado', valor: l.pedidos > 0 ? `${formatNumber(l.reservado)} · ${l.pedidos === 1 ? '1 pedido' : `${l.pedidos} pedidos`}` : formatNumber(l.reservado), tom: 'forte' }]}
+          testId={`emendas-itens-barra-${l.itemKey}`}
+        />
+      )
+    }
   ];
 
   return (
