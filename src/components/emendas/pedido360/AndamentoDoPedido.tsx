@@ -382,7 +382,8 @@ const Caminho: React.FC<{ m: MesaDoPedido; onAcao: AoAgir }> = ({ m, onAcao }) =
                   <span
                     style={{
                       color: r.volta ? 'var(--color-danger-text)' : undefined,
-                      minWidth: 0
+                      minWidth: 0,
+                      whiteSpace: 'pre-line'
                     }}
                   >
                     {r.texto}
@@ -620,14 +621,6 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, beneficiar
       {m.itens && <OndeEstaCadaItem it={m.itens} />}
 
       <Caminho m={m} onAcao={onAcao} />
-
-      {p.observacao && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-          <span style={carteiraDetalhe}>Observação</span>
-          <InfoHint label="Ver a observação do pedido" content={p.observacao} testId={`emendas-pedido-observacao-${p.id}`} />
-        </div>
-      )}
-      {p.origem === 'PLANILHA' && <div style={carteiraDetalhe}>Pedido trazido do controle anterior da CAEP: as etapas sem data não tinham data registrada lá.</div>}
     </div>
   );
 };

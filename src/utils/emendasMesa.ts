@@ -760,7 +760,8 @@ export function mesaDoPedido(
     return {
       chave: t.chave,
       texto: t.nome,
-      data: t.feito,
+      // Pedido do controle anterior da CAEP: a falta de data se explica na própria linha (antes, uma frase no rodapé).
+      data: t.feito ?? (p.origem === 'PLANILHA' ? 'sem data no controle anterior' : null),
       sei,
       semSei: temDocumento && sei.length === 0,
       maisSei: podeGerir && sei.length > 0 && (e === 'EMPENHADO' || (e === 'CONTRATACAO' && !porAta)) ? (e === 'EMPENHADO' ? 'MAIS_EMPENHADO' : 'MAIS_CONTRATACAO') : undefined
@@ -823,6 +824,9 @@ export function mesaDoPedido(
       return { fase: NOME_FASE[f.id], registros };
     })
     .filter((f) => f.registros.length > 0);
+  // A observação do pedido (quase sempre anotação das cargas: ofício, valor, pedidos juntados) é histórico: vai no
+  // alto do Histórico, com o texto inteiro, em vez de um ⓘ solto no rodapé da aba.
+  if (p.observacao?.trim()) historico.unshift({ fase: 'Observação do pedido', registros: [{ chave: 'observacao', texto: p.observacao.trim(), data: null, sei: [], semSei: false }] });
   const voltas = (p.movimentos ?? []).filter((m) => m.acao === 'VOLTOU_ETAPA');
   if (voltas.length)
     historico.push({
