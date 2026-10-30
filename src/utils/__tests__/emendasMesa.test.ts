@@ -400,3 +400,18 @@ describe('Mesa do pedido: ajustes de 30/10/2026', () => {
     expect(it.uma?.texto).toBe('O item está com contrato · Contrato 00041/2026 · assinado em 02/10/2026 · Ordem de Fornecimento em 22/10/2026.');
   });
 });
+
+describe('Mesa do pedido: observação e datas do controle anterior (30/10/2026)', () => {
+  it('a observação vai no alto do Histórico, com o texto inteiro', () => {
+    const p = pedido({ observacao: 'Ofício 219/2026 (35657060), Guarda Municipal de Londrina: R$ 399.954,94.' });
+    const m = mesaDoPedido(p, itens, new Map([['l1', nota('l1')]]), [], HOJE, true, beneficiarios);
+    expect(m.historico[0]).toEqual({ fase: 'Observação do pedido', registros: [expect.objectContaining({ chave: 'observacao', texto: 'Ofício 219/2026 (35657060), Guarda Municipal de Londrina: R$ 399.954,94.' })] });
+  });
+
+  it('pedido do controle anterior: etapa sem data diz isso na própria linha', () => {
+    const p = pedido({ origem: 'PLANILHA', minutaEm: null, oficioEm: null, conferidoEm: null });
+    const m = mesaDoPedido(p, itens, new Map([['l1', nota('l1')]]), [], HOJE, true, beneficiarios);
+    const interlocucao = m.historico.find((f) => f.fase === 'Interlocução')!;
+    expect(interlocucao.registros.map((r) => r.data)).toEqual(['sem data no controle anterior', 'sem data no controle anterior']);
+  });
+});
