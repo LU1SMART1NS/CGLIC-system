@@ -74,60 +74,59 @@ const marca = (tom: LinhaDaMesa['tom']): React.CSSProperties =>
         marginTop: '0.3rem'
       };
 
-/** O trilho de 6 passos do item (D5): feito em verde, onde está em azul, devolvido em vermelho. */
-const Trilho: React.FC<{ passo: number; devolvido: boolean }> = ({ passo, devolvido }) => (
-  <span role="img" aria-label={`Passo: ${devolvido ? 'devolvido pela CCGA' : passo < 0 ? 'sem nota' : PASSOS_DO_ITEM[passo]}`} style={{ display: 'inline-flex', gap: '3px', marginTop: '0.2rem' }}>
-    {PASSOS_DO_ITEM.map((nome, i) => {
-      const fim = passo === PASSOS_DO_ITEM.length - 1;
-      const cor = devolvido && i === 1 ? 'var(--color-danger)' : i < passo || (fim && i === passo) ? 'var(--color-success)' : i === passo ? 'var(--primary)' : 'var(--border)';
-      return <i key={nome} style={{ width: 16, height: 5, borderRadius: 3, background: cor }} />;
-    })}
-  </span>
-);
-
-const LinhaDoItem: React.FC<{ x: ItemDaMesa }> = ({ x }) => {
-  const passo = x.devolvido ? 'Devolvido' : x.passo < 0 ? 'Sem nota' : PASSOS_DO_ITEM[x.passo];
-  const cor = x.devolvido ? 'var(--color-danger-text)' : x.passo === PASSOS_DO_ITEM.length - 1 ? 'var(--color-success-text)' : undefined;
+/**
+ * Régua de 6 passos do item com o nome de cada um (D5, ajuste de 30/10/2026: os tracinhos sem nome não diziam nada):
+ * feito com ✓ em verde, o atual em negrito azul, o que falta em cinza; devolvido pela CCGA em vermelho no lugar de
+ * "Na CCGA". No celular (index.css) ficam só o passo atual e o próximo.
+ */
+const Regua: React.FC<{ passo: number; devolvido: boolean }> = ({ passo, devolvido }) => {
+  const atual = devolvido ? 1 : passo;
+  const fim = passo === PASSOS_DO_ITEM.length - 1 && !devolvido;
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '0.2rem 1rem',
-        padding: '0.5rem 0.75rem 0.5rem 1.5rem',
-        borderTop: '1px dashed var(--border)'
-      }}
-      data-testid="pedido360-item"
-    >
-      <div style={{ minWidth: 0, fontSize: '0.85rem' }}>
-        <b>
-          {x.quantidade}× {x.nome}
-        </b>
-        {x.ata && <span style={carteiraDetalhe}> · Ata {x.ata}</span>}
-        {x.comVoce && (
-          <span
-            style={{
-              marginLeft: '0.4rem',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              color: 'var(--primary)'
-            }}
-          >
-            com você
+    <span className="regua-item" data-testid="pedido360-regua">
+      {PASSOS_DO_ITEM.map((nome, i) => {
+        const feito = i < atual || (fim && i === atual);
+        const eAtual = i === atual && !fim;
+        const longe = i < atual || i > atual + 1;
+        const cor = devolvido && i === 1 ? 'var(--color-danger-text)' : feito ? 'var(--color-success-text)' : eAtual ? 'var(--primary)' : '#94a3b8';
+        return (
+          <span key={nome} className={`regua-item__passo${longe && !(fim && i === atual) ? ' regua-item__passo--longe' : ''}${eAtual || (fim && i === atual) ? ' regua-item__passo--atual' : ''}`} style={{ color: cor, fontWeight: eAtual ? 700 : 400 }}>
+            {i > 0 && <span className="regua-item__sep" aria-hidden="true">› </span>}
+            {feito ? '✓ ' : ''}
+            {devolvido && i === 1 ? 'Devolvido pela CCGA' : nome}
           </span>
-        )}
-      </div>
-      <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
-        <b style={{ color: cor }}>{passo}</b>
-        {x.onde && <span style={{ color: '#64748b' }}> · {x.onde}</span>}
-        <br />
-        <Trilho passo={x.passo} devolvido={x.devolvido} />
-      </div>
-    </div>
+        );
+      })}
+    </span>
   );
 };
+
+const LinhaDoItem: React.FC<{ x: ItemDaMesa }> = ({ x }) => (
+  <div
+    style={{
+      display: 'flex',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: '0.2rem 1rem',
+      padding: '0.5rem 0.75rem 0.5rem 1.5rem',
+      borderTop: '1px dashed var(--border)'
+    }}
+    data-testid="pedido360-item"
+  >
+    <div style={{ minWidth: 0, fontSize: '0.85rem' }}>
+      <b>
+        {x.quantidade}× {x.nome}
+      </b>
+      {x.ata && <span style={carteiraDetalhe}> · Ata {x.ata}</span>}
+      {x.comVoce && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)' }}>com você</span>}
+    </div>
+    <div className="regua-item-lado" style={{ fontSize: '0.78rem', minWidth: 0 }}>
+      {x.passo < 0 ? <b style={{ color: 'var(--color-warning-text)' }}>Sem nota</b> : <Regua passo={x.passo} devolvido={x.devolvido} />}
+      {x.onde && <div style={{ color: '#64748b' }}>{x.onde}</div>}
+    </div>
+  </div>
+);
 
 const Grupo: React.FC<{
   g: GrupoDaMesa;
@@ -188,7 +187,9 @@ const OndeEstaCadaItem: React.FC<{ it: ItensDaMesa }> = ({ it }) => {
           }}
         >
           <span>{it.uma.texto}</span>
-          <Trilho passo={it.uma.passo} devolvido={false} />
+          <span style={{ fontSize: '0.78rem' }}>
+            <Regua passo={it.uma.passo} devolvido={false} />
+          </span>
         </div>
       </section>
     );
