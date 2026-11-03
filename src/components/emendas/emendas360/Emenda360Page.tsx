@@ -525,7 +525,7 @@ export const Emenda360Page: React.FC = () => {
           onClose={() => setNovoPedido(null)}
         />
       )}
-      {alterando && registrada && <EmendaSiopModal emenda={registrada} emendas={emendasQ.data ?? []} pedidos={pedidos} autores={autores} beneficiarios={beneficiariosLista} onClose={() => setAlterando(false)} />}
+      {alterando && registrada && <EmendaSiopModal emenda={registrada} emendas={emendasQ.data ?? []} pedidos={pedidos} autores={autores} onClose={() => setAlterando(false)} />}
       {registrando && registrada && <ContatoEmendaModal emenda={registrada} nomeDoAutor={autor?.nome ?? ''} uf={uf} orgaos={orgaos} onClose={() => setRegistrando(false)} />}
       {editandoAspar && uf && <AsparModal uf={uf} orgao={editandoAspar} atual={aspar.get(`${uf}:${editandoAspar}`) ?? null} onClose={() => setEditandoAspar(null)} />}
     </Instrument360Page>

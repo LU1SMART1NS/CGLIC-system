@@ -8,16 +8,19 @@
  *      todas as chamadas seguintes.
  *   2. <poll name="N" clearcache="true"/> pede os objetos da aba. A tabela é o gráfico Document\CH102 (no
  *      navegador, name="79"); totalsize="colunas:linhas", com a linha 0 = Total.
- *   3. Como o painel abre limitado (filtros do Passo 1 em Ano 2026, Órgão 30000 e RP 6; seis dos doze agrupadores
- *      do Passo 2 desligados), a leitura completa:
- *        - aciona "Limpar": <set name="Document.StandardActions.CLEARSTATE" action=""/> (Qva.PageBinding.Clear);
- *        - liga cada agrupador desligado clicando no botão à esquerda do rótulo ("Por GND"…):
- *          <set name="Document.N.Content" action=""/>; o clique certo aumenta as colunas da tabela, e o que
- *          diminuir é desfeito (o agrupador já estava ligado);
+ *   3. A aba abre nos gráficos e a tabela vem com mode="hidden" até o clique em "Passo 2 - Visualize os Resultados"
+ *      (TX1537). Sem filtro, a tabela tem todos os órgãos (93 mil linhas em 03/11/2026). Por isso a leitura, conferida
+ *      no painel em 03/11/2026:
+ *        - clica em "Passo 1 - Selecione os Filtros" (TX1538) e marca o órgão 30000 na lista de órgãos (LB160):
+ *          <set name="N" select="V" toggle="false"/>, com V = o value do <element text="30000 - …">;
+ *        - clica em "Passo 2" (TX1537), e a tabela aparece (MJSP, todos os anos e RP: ~5 mil linhas);
+ *        - liga os agrupadores que faltam (UF do autor, GND, Modalidade…) clicando no botão à esquerda do rótulo:
+ *          <set name="Document.N.Content" action=""/>, só quando a coluna ainda não está na tabela;
  *        - pede páginas grandes: <set name="79" pageSize="colunas:linhas"/> (SetPagesize do QvAjax.js); se o
  *          servidor não aceitar, segue com o tamanho que ele devolver.
  *   4. <get name="79" offset="0:K"/> devolve as linhas a partir de K. Cada coluna vem num <value name="Cn"> com um
  *      <element text="…"> por célula; o 1º é o cabeçalho e as células mescladas já vêm repetidas em cada linha.
+ *   5. A leitura só vale inteira, só do MJSP e conferida com a linha Total do painel.
  *
  * Só o servidor lê (não há CORS nem proxy da Vercel para o painel): o endereço /api-siop/ é traduzido pelo
  * proxyDeFontes da Edge Function. Os valores do painel são em R$ 1,00, no formato "1.234.567".
@@ -32,15 +35,34 @@ export const ABA_DAS_EMENDAS = 'SH08';
 export const TABELA_DAS_EMENDAS = 'Document\\CH102';
 /** Botão "Emendas Parlamentares" do menu inicial (SH06): plano B, se a aba não abrir direto. */
 export const BOTAO_DAS_EMENDAS = 'Document\\TX1738';
-/** Rótulos dos agrupadores do Passo 2, como aparecem no painel. */
+/** "Passo 1 - Selecione os Filtros" e "Passo 2 - Visualize os Resultados" da aba das emendas. */
+export const BOTAO_DOS_FILTROS = 'Document\\TX1538';
+export const BOTAO_DA_TABELA = 'Document\\TX1537';
+/** Lista "Orgão Orçamentário" do Passo 1 e o órgão lido (Ministério da Justiça e Segurança Pública). */
+export const LISTA_DE_ORGAOS = 'Document\\LB160';
+export const ORGAO_DO_MJSP = '30000';
+/** Rótulos de todos os agrupadores do Passo 2, como aparecem no painel. */
 export const AGRUPADORES = [
   'Por Autor da Emenda', 'Por Tipo de Autor', 'Por Partido',
   'Por UF do Autor', 'Por Número de Emenda', 'Por Órgão Orçamentário',
   'Por Unidade Orçamentária', 'Por Ação', 'Por Localizador',
   'Por GND', 'Por Modalidade', 'Por Natureza de Despesa'
 ] as const;
+/** Agrupadores que a leitura precisa, com a coluna que cada um põe na tabela. Os outros ficam como o painel abrir. */
+export const AGRUPADORES_DA_LEITURA: ReadonlyArray<readonly [rotulo: (typeof AGRUPADORES)[number], campo: string]> = [
+  ['Por Autor da Emenda', 'autor'],
+  ['Por Tipo de Autor', 'tipo_autor'],
+  ['Por UF do Autor', 'uf'],
+  ['Por Número de Emenda', 'emenda'],
+  ['Por Órgão Orçamentário', 'orgao'],
+  ['Por Ação', 'acao'],
+  ['Por GND', 'gnd'],
+  ['Por Modalidade', 'modalidade']
+];
 /** Linhas por página pedidas ao painel (o padrão do navegador é 40). */
 export const LINHAS_POR_PAGINA = 2000;
+/** Tempo máximo de cada chamada ao painel (as outras fontes também têm 30 s). */
+export const TEMPO_POR_CHAMADA_MS = 30_000;
 /** Quantos objetos da aba pedir no poll (a aba das emendas tem ~115). */
 const OBJETOS_NO_POLL = 200;
 const TAMANHO_DA_JANELA = 'clientsizeWH="1600:1000"';
@@ -321,10 +343,13 @@ export function montarTabela(cabecalhos: string[], linhas: Map<number, string[]>
     }
   }
   const resultado = [...porChave.values()];
+  // O painel mostra cada célula arredondada para R$ 1,00 e calcula o Total pelo valor exato: a soma das células pode se
+  // afastar do Total em até R$ 0,50 por linha (medido em 03/11/2026: R$ 12 em 5 mil linhas).
+  const tolerancia = Math.max(1, resultado.length * 0.5);
   const divergencias = CAMPOS_DE_VALOR.filter((campo) => {
     if (totais[campo] == null) return false;
     const soma = resultado.reduce((s, l) => s + (l[campo] ?? 0), 0);
-    return Math.abs(soma - (totais[campo] as number)) > 1;
+    return Math.abs(soma - (totais[campo] as number)) > tolerancia;
   });
   return { linhas: resultado, cabecalhos, totais, divergencias };
 }
@@ -366,6 +391,7 @@ export function criarSessaoDoPainel(opts: OpcoesDoPainel = {}): SessaoDoPainel {
       const params = new URLSearchParams({ mark, host: HOST_DO_PAINEL, view: DOCUMENTO_DO_PAINEL, slot: '', platform: 'browser.chrome', dpi: '96', xrfkey });
       const resp = await fetcher(`${ENDERECO_DO_PAINEL}?${params.toString()}`, {
         method: 'POST',
+        signal: AbortSignal.timeout(TEMPO_POR_CHAMADA_MS),
         headers: {
           accept: '*/*',
           'content-type': 'text/plain;charset=UTF-8',
@@ -405,10 +431,6 @@ export interface OpcoesDaLeitura extends OpcoesDoPainel {
   agora?: () => number;
   /** Limita as páginas lidas (teste de acesso): a leitura não é conferida. */
   paginas?: number;
-  /** Tirar os filtros do Passo 1 ("Limpar"). Padrão: sim. */
-  limparFiltros?: boolean;
-  /** Agrupadores a ligar. Padrão: todos. */
-  agrupadores?: readonly string[];
   /** Linhas por página pedidas ao painel. */
   linhasPorPagina?: number;
 }
@@ -418,23 +440,45 @@ export interface LeituraDoPainel extends TabelaDasEmendas {
   baseSiafi: string | null;
   /** Linhas da tabela no painel, contando o Total. */
   linhasNoPainel: number;
-  /** Agrupadores que a leitura ligou e os que não achou na tela. */
+  /** Agrupadores que a leitura ligou (os outros já estavam ligados). */
   agrupadoresLigados: string[];
-  agrupadoresNaoEncontrados: string[];
   /** Chamadas feitas ao painel. */
   chamadas: number;
 }
 
+/** Value do item da lista que começa com o texto pedido (ex.: "30000 - Ministério da Justiça…"). */
+export function itemDaLista(raiz: NoXml, objectid: string, comeco: string): { lista: string; valor: string; texto: string } | null {
+  for (const n of percorrer(raiz)) {
+    if (n.tag !== 'group' || n.atributos.objectid !== objectid || !n.filhos.length) continue;
+    for (const e of percorrer(n)) {
+      if (e.tag === 'element' && (e.atributos.text ?? '').startsWith(comeco) && e.atributos.value != null) {
+        return { lista: n.atributos.name, valor: e.atributos.value, texto: e.atributos.text };
+      }
+    }
+  }
+  return null;
+}
+
+/** Campos que a tabela já mostra, pelos cabeçalhos da página que veio no poll. */
+function camposDaTabela(raiz: NoXml, tabela: InfoDaTabela): Set<string> {
+  const grupo = grupoComDados(raiz, tabela.nome);
+  const campos = new Set<string>();
+  for (const c of grupo ? lerPagina(grupo).cabecalhos : []) {
+    const campo = campoDoCabecalho(c);
+    if (campo) campos.add(campo);
+  }
+  return campos;
+}
+
 /**
- * Abre a sessão, vai à aba das emendas, tira os filtros, liga os agrupadores e lê a tabela inteira. Lança se não
- * conseguir ler tudo dentro do orçamento de tempo: uma leitura incompleta não serve, porque o banco troca a foto dos
- * anos lidos de uma vez.
+ * Abre a sessão, vai à aba das emendas, filtra o MJSP, mostra a tabela, liga os agrupadores que faltam e lê a tabela
+ * inteira. Lança se não conseguir ler tudo dentro do orçamento de tempo: uma leitura incompleta não serve, porque o
+ * banco troca a foto dos anos lidos de uma vez.
  */
 export async function lerEmendasDoPainel(opts: OpcoesDaLeitura = {}): Promise<LeituraDoPainel> {
   const agora = opts.agora ?? (() => Date.now());
   const inicio = agora();
   const sessao = criarSessaoDoPainel(opts);
-  const agrupadores = opts.agrupadores ?? AGRUPADORES;
   let chamadas = 0;
   let baseSiafi: string | null = null;
   const chamar = async (comandos: string, primeira = false) => {
@@ -446,6 +490,12 @@ export async function lerEmendasDoPainel(opts: OpcoesDaLeitura = {}): Promise<Le
     baseSiafi = baseSiafi ?? baseSiafiDaResposta(r.texto);
     return r.raiz;
   };
+  const clicar = async (raiz: NoXml, objectid: string, oQue: string) => {
+    const nome = nomeDoObjeto(raiz, objectid);
+    if (!nome) throw new Error(`O painel do SIOP mudou: não achei ${oQue} (${objectid}).`);
+    await chamar(`<set name="Document.${nome}.Content" action="" ${TAMANHO_DA_JANELA} />`);
+    return chamar(pedirObjetos());
+  };
 
   await chamar(
     '<add name="Document.ActiveSheet" /><set name="Document" add="mode;servercontrol;ie6false" />' +
@@ -453,48 +503,33 @@ export async function lerEmendasDoPainel(opts: OpcoesDaLeitura = {}): Promise<Le
     true
   );
   let raiz = await chamar(pedirObjetos());
-  let info = infoDaTabela(raiz);
-  if (!info) {
+  if (!nomeDoObjeto(raiz, BOTAO_DOS_FILTROS) && nomeDoObjeto(raiz, BOTAO_DAS_EMENDAS)) {
     // Plano B: a sessão abriu no menu inicial; clica no botão "Emendas Parlamentares", como o navegador faz.
-    const botao = nomeDoObjeto(raiz, BOTAO_DAS_EMENDAS);
-    if (botao) {
-      await chamar(`<set name="Document.${botao}.Content" action="" ${TAMANHO_DA_JANELA} />`);
-      raiz = await chamar(pedirObjetos());
-      info = infoDaTabela(raiz);
-    }
+    raiz = await clicar(raiz, BOTAO_DAS_EMENDAS, 'o botão "Emendas Parlamentares"');
   }
-  if (!info) throw new Error(`O painel do SIOP não mostrou a tabela das emendas (${TABELA_DAS_EMENDAS}); o painel pode ter mudado.`);
 
-  if (opts.limparFiltros !== false) {
-    await chamar(`<set name="Document.StandardActions.CLEARSTATE" action="" ${TAMANHO_DA_JANELA} />`);
-    raiz = await chamar(pedirObjetos());
-    info = infoDaTabela(raiz);
-    if (!info) throw new Error('Sem filtros, o painel do SIOP não mostrou a tabela das emendas (o painel pode exigir algum filtro).');
-  }
+  // Passo 1: só o órgão do MJSP.
+  raiz = await clicar(raiz, BOTAO_DOS_FILTROS, 'o botão "Passo 1 - Selecione os Filtros"');
+  const orgao = itemDaLista(raiz, LISTA_DE_ORGAOS, `${ORGAO_DO_MJSP} `);
+  if (!orgao) throw new Error(`O painel do SIOP mudou: a lista de órgãos não tem o ${ORGAO_DO_MJSP}.`);
+  await chamar(`<set name="${orgao.lista}" select="${orgao.valor}" toggle="false" />`);
+
+  // Passo 2: a tabela.
+  raiz = await clicar(raiz, BOTAO_DA_TABELA, 'o botão "Passo 2 - Visualize os Resultados"');
+  let tabela = infoDaTabela(raiz);
+  if (!tabela) throw new Error(`O painel do SIOP não mostrou a tabela das emendas (${TABELA_DAS_EMENDAS}); o painel pode ter mudado.`);
 
   const agrupadoresLigados: string[] = [];
-  const agrupadoresNaoEncontrados: string[] = [];
-  for (const rotulo of agrupadores) {
+  for (const [rotulo, campo] of AGRUPADORES_DA_LEITURA) {
+    if (camposDaTabela(raiz, tabela).has(campo)) continue;
     const botao = botoesDosAgrupadores(raiz).get(rotulo);
-    if (!botao) {
-      agrupadoresNaoEncontrados.push(rotulo);
-      continue;
-    }
-    const antes = info!.colunas;
+    if (!botao) throw new Error(`O painel do SIOP mudou: não achei o agrupador "${rotulo}".`);
     await chamar(`<set name="Document.${botao}.Content" action="" ${TAMANHO_DA_JANELA} />`);
     raiz = await chamar(pedirObjetos());
-    info = infoDaTabela(raiz) ?? info;
-    if (info!.colunas < antes) {
-      // Já estava ligado: o clique desligou. Clica de novo para voltar.
-      const deNovo = botoesDosAgrupadores(raiz).get(rotulo) ?? botao;
-      await chamar(`<set name="Document.${deNovo}.Content" action="" ${TAMANHO_DA_JANELA} />`);
-      raiz = await chamar(pedirObjetos());
-      info = infoDaTabela(raiz) ?? info;
-    } else if (info!.colunas > antes) {
-      agrupadoresLigados.push(rotulo);
-    }
+    tabela = infoDaTabela(raiz) ?? tabela;
+    if (!camposDaTabela(raiz, tabela).has(campo)) throw new Error(`O painel do SIOP não ligou o agrupador "${rotulo}".`);
+    agrupadoresLigados.push(rotulo);
   }
-  const tabela = info!;
 
   // Páginas grandes; se o servidor não aceitar, vale o tamanho que ele devolver em cada página.
   const pedido = opts.linhasPorPagina ?? LINHAS_POR_PAGINA;
@@ -517,11 +552,18 @@ export async function lerEmendasDoPainel(opts: OpcoesDaLeitura = {}): Promise<Le
     offset = ultima + 1;
   }
 
+  const montada = montarTabela(cabecalhos, linhas);
   if (opts.paginas == null) {
     const faltam: number[] = [];
     for (let i = 0; i < tabela.linhas; i++) if (!linhas.has(i)) faltam.push(i);
     if (faltam.length) throw new Error(`Faltaram ${faltam.length} linhas do painel (ex.: ${faltam.slice(0, 3).join(', ')}).`);
+    if (Object.values(montada.totais).every((v) => v == null)) {
+      throw new Error('O painel do SIOP não trouxe a linha Total; sem ela a leitura não é conferida e nada é gravado.');
+    }
+    const deOutroOrgao = montada.linhas.find((l) => !(l.orgao ?? '').startsWith(`${ORGAO_DO_MJSP} `));
+    if (deOutroOrgao) {
+      throw new Error(`O filtro do órgão não pegou: veio a emenda ${deOutroOrgao.emenda} do órgão "${deOutroOrgao.orgao ?? 'sem órgão'}".`);
+    }
   }
-  const montada = montarTabela(cabecalhos, linhas);
-  return { ...montada, baseSiafi, linhasNoPainel: tabela.linhas, agrupadoresLigados, agrupadoresNaoEncontrados, chamadas };
+  return { ...montada, baseSiafi, linhasNoPainel: tabela.linhas, agrupadoresLigados, chamadas };
 }

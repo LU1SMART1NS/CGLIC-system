@@ -1641,7 +1641,11 @@ export interface EmendaSiop {
   foraCompraDireta?: LinhaForaDaCompraDireta[] | null;
   /** Dia da leitura no SIOP que deu esses números. */
   siopLidoEm?: string | null;
+  /** CAEP: registrada à mão ou pela conferência; PAINEL: registrada pelo servidor a partir do painel do SIOP (migration 252). */
+  origem?: OrigemDaEmenda;
 }
+
+export type OrigemDaEmenda = 'CAEP' | 'PAINEL';
 
 export interface LinhaForaDaCompraDireta {
   acao: string;
@@ -1698,7 +1702,43 @@ export async function fetchEmendasSiop(): Promise<EmendaSiop[]> {
     foraCompraDireta: Array.isArray(e.fora_compra_direta)
       ? e.fora_compra_direta.map((l: Record<string, any>) => ({ acao: String(l.acao ?? ''), modalidade: String(l.modalidade ?? ''), autorizado: num(l.autorizado), empenhado: num(l.empenhado) }))
       : null,
-    siopLidoEm: e.siop_lido_em ?? null
+    siopLidoEm: e.siop_lido_em ?? null,
+    origem: e.origem === 'PAINEL' ? 'PAINEL' : 'CAEP'
+  }));
+}
+
+/** Emenda de compra direta do painel do SIOP que o servidor não registrou por não achar o parlamentar (migration 252). */
+export interface EmendaPainelSemParlamentar {
+  ano: number;
+  /** 8 dígitos: os 4 do autor e os 4 da emenda. */
+  numero: string;
+  /** Nome do autor como está no painel. */
+  autor: string | null;
+  tipoAutor: string | null;
+  uf: string | null;
+  /** Soma da compra direta (21BM, modalidade 90). */
+  valor: number | null;
+  gnd: Gnd | null;
+  foraCompraDireta: LinhaForaDaCompraDireta[];
+  baseSiafiEm: string | null;
+}
+
+export async function fetchEmendasPainelSemParlamentar(): Promise<EmendaPainelSemParlamentar[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+    db().from('v_emendas_painel_sem_parlamentar').select('*').order('ano', { ascending: false }).order('numero').range(de, ate)
+  );
+  return linhas.map((e) => ({
+    ano: num(e.ano),
+    numero: String(e.numero),
+    autor: e.autor ?? null,
+    tipoAutor: e.tipo_autor ?? null,
+    uf: e.uf ?? null,
+    valor: numOuNulo(e.valor),
+    gnd: e.gnd === 'GND-3' || e.gnd === 'GND-4' ? e.gnd : null,
+    foraCompraDireta: Array.isArray(e.fora_compra_direta)
+      ? e.fora_compra_direta.map((l: Record<string, any>) => ({ acao: String(l.acao ?? ''), modalidade: String(l.modalidade ?? ''), autorizado: num(l.autorizado), empenhado: num(l.empenhado) }))
+      : [],
+    baseSiafiEm: e.base_siafi_em ?? null
   }));
 }
 

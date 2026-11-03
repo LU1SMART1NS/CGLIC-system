@@ -21,7 +21,7 @@ import { agruparPorBeneficiario, beneficiarioDaLinha, chaveDoConteudo, definirNo
 import { formatarTelefone, localDoBeneficiario, nomeESigla, rotuloBeneficiario, soDigitos } from '../../services/emendasService';
 import type { AutorEmenda, BeneficiarioEmenda, EmendaSiop, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
 import { lerNumeroDaEmenda, numeroDaEmenda } from '../../utils/emendasSemPedido';
-import { emendaSugerida, emendasParaAReserva } from '../../utils/emendasDaReserva';
+import { emendaSugerida, emendasParaAReserva, emendasSemPedido } from '../../utils/emendasDaReserva';
 import { lerValorBR, mascaraTelefone, mascaraValorBR } from '../../utils/mascaras';
 import { QuadroGabinete } from './QuadroGabinete';
 import { BeneficiarioModal } from './BeneficiarioModal';
@@ -292,6 +292,12 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     () => (precisaEmenda ? emendasParaAReserva({ autorId: autorId || null, pedidoId: pedido?.id ?? null, emendas: emendasQ.data ?? [], pedidos: pedidosQ.data ?? [], itens: porChave, precos }) : []),
     [precisaEmenda, autorId, pedido?.id, emendasQ.data, pedidosQ.data, porChave, precos]
   );
+  // Reserva nova (03/11/2026): as emendas registradas sem pedido aparecem antes da busca; o clique escolhe o parlamentar e a emenda.
+  const semPedido = useMemo(
+    () => (precisaEmenda && !pedido ? emendasSemPedido(emendasQ.data ?? [], pedidosQ.data ?? []) : []),
+    [precisaEmenda, pedido, emendasQ.data, pedidosQ.data]
+  );
+  const autorPorId = useMemo(() => new Map(autores.map((a) => [a.id, a])), [autores]);
   const escolha = emendaEscolhida === 'nova' || emendasDoAutor.some((x) => x.emenda.id === emendaEscolhida) ? emendaEscolhida! : emendaEscolhida === null ? emendaSugerida(emendasDoAutor) ?? '' : '';
   const daLista = emendasDoAutor.find((x) => x.emenda.id === escolha);
   const novaLida = escolha === 'nova' ? lerNumeroDaEmenda(novaNumero, novaAno) : null;
@@ -1175,6 +1181,32 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 ) : (
                   <p className="reserva-mudo reserva-texto">{buscaAutor.trim() ? `Ninguém encontrado com "${buscaAutor.trim()}".` : 'Digite e tecle Enter para escolher o primeiro.'}</p>
                 )}
+                {!buscaAutor.trim() && semPedido.length > 0 && (
+                  <>
+                    <span className="reserva-rotulo">Emendas sem pedido · {semPedido.length}</span>
+                    <div className="reserva-lista reserva-lista--borda" style={{ maxHeight: 280, overflowY: 'auto' }} data-testid="emendas-pedido-sem-pedido">
+                      {semPedido.map((e) => {
+                        const a = autorPorId.get(e.autorId);
+                        return (
+                          <button
+                            type="button"
+                            key={e.id}
+                            onClick={() => {
+                              escolherAutor(e.autorId);
+                              setEmendaEscolhida(e.id);
+                            }}
+                            data-testid={`emendas-pedido-sem-pedido-${e.id}`}
+                          >
+                            <b>{a?.nome ?? e.autorId}</b>
+                            <small>
+                              {[a ? metaDoAutor(a) : null, `Emenda ${numeroDaEmenda(e.numero)} / ${e.ano}`, e.valor != null ? formatCurrency(e.valor) : 'valor a ler no SIOP'].filter(Boolean).join(' · ')}
+                            </small>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -1190,6 +1222,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                       <b>
                         {numeroDaEmenda(x.emenda.numero)} / {x.emenda.ano}
                       </b>{' '}
+                      {x.outros.length === 0 && <span className="reserva-etiqueta">Sem pedido</span>}{' '}
                       <span className="reserva-mudo">· {x.emenda.valor != null ? `${formatCurrency(x.emenda.valor)} no SIOP` : 'valor a ler no SIOP'}</span>
                       <small className="reserva-mudo">
                         {x.aIndicar != null ? `A indicar: ${formatCurrency(Math.max(0, x.aIndicar))}` : 'Sem o valor, o limite fica para a conferência com o SIOP'}

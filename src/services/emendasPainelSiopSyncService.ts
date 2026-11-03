@@ -1,14 +1,12 @@
 /**
- * Emendas do Painel do Orçamento Federal do SIOP (migration 252): todas as emendas do painel, sem os filtros do Passo 1
- * e com os doze agrupadores do Passo 2 ligados (autor, tipo, partido, UF, nº, órgão, unidade orçamentária, ação,
- * localizador, GND, modalidade e natureza de despesa), com dotação inicial e atual, empenhado, liquidado e pago.
- * Antes a CAEP copiava o valor do SIOP à mão (emendas_siop, migrations 205 e 243); agora o servidor lê o painel uma vez
- * por dia.
+ * Emendas registradas sozinhas pelo Painel do Orçamento Federal do SIOP (migration 252, protótipo aprovado em
+ * 03/11/2026). Antes a CAEP digitava cada emenda no "Registrar emenda do SIOP"; agora o servidor lê o painel uma vez por
+ * dia (só o órgão 30000 - MJSP) e o banco registra as emendas novas de compra direta, com nº, ano, parlamentar, valor e
+ * GND.
  *
- * A leitura (siopPainelQlik.ts) só é gravada se vier inteira e bater com a linha Total do próprio painel. A gravação vai
- * em lotes (o painel inteiro não cabe numa chamada) com o mesmo id de leitura; no fim, concluir_leitura_siop_painel
- * remove dos anos lidos o que não veio nesta leitura. Se a execução cair no meio, as linhas antigas ficam e a próxima
- * leitura refaz tudo.
+ * A leitura (siopPainelQlik.ts) só é gravada se vier inteira, só do MJSP e conferida com a linha Total do painel. Vão ao
+ * banco as linhas a partir de 2026, numa chamada só: gravar_emendas_siop_painel troca a foto desses anos, aprende os
+ * códigos dos autores e registra as emendas na mesma transação. Só o servidor lê o painel (sem CORS para o navegador).
  */
 import { supabase } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
@@ -19,45 +17,56 @@ export const RECURSO_EMENDAS_SIOP_PAINEL = 'emendas_siop_painel' as const;
 export const FONTE_EMENDAS_SIOP_PAINEL = 'Painel do Orçamento Federal (SIOP)';
 /** O cron chama uma vez por dia; a validade um pouco menor garante que cada chamada leia. */
 export const VALIDADE_EMENDAS_SIOP_PAINEL = '20 hours';
-/** Leitura do painel; o resto dos 150 s da Edge Function fica para gravar. */
+/** Leitura do painel (~5 s em 03/11/2026); o resto dos 150 s da Edge Function fica para gravar. */
 export const ORCAMENTO_EMENDAS_SIOP_PAINEL_MS = 90_000;
-/** Linhas por chamada de gravação. */
-export const LOTE_DE_GRAVACAO = 1500;
+/** Primeiro ano gravado e registrado (D1). */
+export const ANO_INICIAL_DO_PAINEL = 2026;
 
 type Leitor = typeof lerEmendasDoPainel;
 
-export interface Gravador {
-  gravar: (leitura: string, linhas: LinhaDoPainelSiop[], baseSiafi: string | null) => Promise<number>;
-  concluir: (leitura: string, anos: number[]) => Promise<number>;
+/** O que o banco devolve da gravação. */
+export interface ResultadoDaGravacao {
+  gravadas: number;
+  removidas: number;
+  codigos: number;
+  registradas: number;
+  atualizadas: number;
+  semParlamentar: Array<{ ano: number; numero: string; autor: string | null; uf: string | null }>;
 }
 
-const GRAVADOR_DO_BANCO: Gravador = {
-  async gravar(leitura, linhas, baseSiafi) {
-    const { data, error } = await supabase!.rpc('gravar_emendas_siop_painel', { p_leitura: leitura, p_linhas: linhas, p_base_siafi: baseSiafi });
-    if (error) throw mapPostgresErrorToAppError(error);
-    return Number(data ?? 0);
-  },
-  async concluir(leitura, anos) {
-    const { data, error } = await supabase!.rpc('concluir_leitura_siop_painel', { p_leitura: leitura, p_anos: anos });
-    if (error) throw mapPostgresErrorToAppError(error);
-    return Number(data ?? 0);
-  }
+export type Gravador = (linhas: Omit<LinhaDoPainelSiop, 'dimensoes'>[], baseSiafi: string | null, anos: number[]) => Promise<ResultadoDaGravacao>;
+
+const GRAVADOR_DO_BANCO: Gravador = async (linhas, baseSiafi, anos) => {
+  const { data, error } = await supabase!.rpc('gravar_emendas_siop_painel', { p_linhas: linhas, p_base_siafi: baseSiafi, p_anos: anos });
+  if (error) throw mapPostgresErrorToAppError(error);
+  const r = (data ?? {}) as Record<string, any>;
+  return {
+    gravadas: Number(r.gravadas ?? 0),
+    removidas: Number(r.removidas ?? 0),
+    codigos: Number(r.codigos ?? 0),
+    registradas: Number(r.registradas ?? 0),
+    atualizadas: Number(r.atualizadas ?? 0),
+    semParlamentar: Array.isArray(r.sem_parlamentar) ? r.sem_parlamentar : []
+  };
 };
+
+/** Linhas que vão ao banco: a partir de 2026, sem as colunas como vieram (o banco guarda os campos). */
+export function linhasParaGravar(leitura: LeituraDoPainel): Omit<LinhaDoPainelSiop, 'dimensoes'>[] {
+  return leitura.linhas.filter((l) => l.ano >= ANO_INICIAL_DO_PAINEL).map(({ dimensoes: _d, ...l }) => l);
+}
 
 /** Resumo da leitura para o teste de acesso (dry) e para a mensagem da sincronização. */
 export function resumoDaLeitura(l: LeituraDoPainel): Record<string, unknown> {
   const emendas = new Set(l.linhas.map((x) => `${x.ano}${x.emenda}`));
   const anos = [...new Set(l.linhas.map((x) => x.ano))].sort();
-  const orgaos = new Set(l.linhas.map((x) => x.orgao).filter(Boolean));
   return {
     linhasNoPainel: l.linhasNoPainel,
     linhasLidas: l.linhas.length,
+    linhasParaGravar: linhasParaGravar(l).length,
     emendas: emendas.size,
     anos,
-    orgaos: orgaos.size,
     cabecalhos: l.cabecalhos,
     agrupadoresLigados: l.agrupadoresLigados,
-    agrupadoresNaoEncontrados: l.agrupadoresNaoEncontrados,
     baseSiafi: l.baseSiafi,
     totais: l.totais,
     divergencias: l.divergencias,
@@ -66,47 +75,39 @@ export function resumoDaLeitura(l: LeituraDoPainel): Record<string, unknown> {
   };
 }
 
-/** Teste sem gravar: abre o painel, tira os filtros, liga os agrupadores e lê a primeira página. */
+/** Teste sem gravar: abre o painel, filtra o MJSP, liga os agrupadores e lê a primeira página. */
 export async function testarEmendasDoPainelSiop(opts: { fetcher?: typeof fetch; ler?: Leitor } = {}): Promise<Record<string, unknown>> {
   const ler = opts.ler ?? lerEmendasDoPainel;
   return resumoDaLeitura(await ler({ fetcher: opts.fetcher, paginas: 1 }));
-}
-
-/** Grava a leitura em lotes e conclui (remove dos anos lidos o que não veio). */
-export async function gravarLeitura(leitura: LeituraDoPainel, gravador: Gravador = GRAVADOR_DO_BANCO, id: string = globalThis.crypto.randomUUID()) {
-  let gravadas = 0;
-  for (let i = 0; i < leitura.linhas.length; i += LOTE_DE_GRAVACAO) {
-    gravadas += await gravador.gravar(id, leitura.linhas.slice(i, i + LOTE_DE_GRAVACAO), leitura.baseSiafi);
-  }
-  const anos = [...new Set(leitura.linhas.map((l) => l.ano))].sort();
-  const removidas = await gravador.concluir(id, anos);
-  return { gravadas, removidas };
 }
 
 export async function sincronizarEmendasDoPainelSiop(
   opts: { forcar?: boolean; orcamentoMs?: number; agora?: () => number; fetcher?: typeof fetch; ler?: Leitor; gravador?: Gravador } = {}
 ): Promise<ResultadoSincronizacao> {
   const ler = opts.ler ?? lerEmendasDoPainel;
+  const gravar = opts.gravador ?? GRAVADOR_DO_BANCO;
   return executarComReserva(RECURSO_EMENDAS_SIOP_PAINEL, UASG_TODAS, { forcar: opts.forcar, validade: VALIDADE_EMENDAS_SIOP_PAINEL }, async () => {
     const leitura = await ler({ fetcher: opts.fetcher, orcamentoMs: opts.orcamentoMs ?? ORCAMENTO_EMENDAS_SIOP_PAINEL_MS, agora: opts.agora });
-    if (!leitura.linhas.length) {
-      return { status: 'ERRO', erro: 'O painel do SIOP não trouxe nenhuma emenda; nada foi gravado.' };
-    }
     if (leitura.divergencias.length) {
       return {
         status: 'ERRO',
         erro: `A soma das ${leitura.linhas.length} linhas lidas não bate com o Total do painel (${leitura.divergencias.join(', ')}); nada foi gravado.`
       };
     }
-    const { gravadas, removidas } = await gravarLeitura(leitura, opts.gravador);
-    const emendas = new Set(leitura.linhas.map((x) => `${x.ano}${x.emenda}`)).size;
-    const partes = [`${emendas} emenda(s) em ${gravadas} linha(s) do painel do SIOP`];
+    const linhas = linhasParaGravar(leitura);
+    if (!linhas.length) {
+      return { status: 'ERRO', erro: `O painel do SIOP não trouxe nenhuma emenda do MJSP a partir de ${ANO_INICIAL_DO_PAINEL}; nada foi gravado.` };
+    }
+    const anos = [...new Set(linhas.map((l) => l.ano))].sort();
+    const r = await gravar(linhas, leitura.baseSiafi, anos);
+    const partes = [`${r.gravadas} linha(s) do painel do SIOP`];
     if (leitura.baseSiafi) partes.push(`base SIAFI de ${leitura.baseSiafi.split('-').reverse().join('/')}`);
-    if (removidas) partes.push(`${removidas} linha(s) que saíram do painel removida(s)`);
-    if (leitura.agrupadoresNaoEncontrados.length) partes.push(`agrupadores não encontrados: ${leitura.agrupadoresNaoEncontrados.join(', ')}`);
-    const mensagem = `${partes.join(', ')}.`;
-    return leitura.agrupadoresNaoEncontrados.length
-      ? { status: 'PARCIAL', total: gravadas, fontesComFalha: [FONTE_EMENDAS_SIOP_PAINEL], mensagem }
-      : { status: 'SUCESSO', total: gravadas, fontesComFalha: [], mensagem };
+    if (r.registradas) partes.push(`${r.registradas} emenda(s) nova(s) registrada(s)`);
+    if (r.atualizadas) partes.push(`${r.atualizadas} emenda(s) sem pedido com valor ou GND novo`);
+    if (r.removidas) partes.push(`${r.removidas} linha(s) que saíram do painel removida(s)`);
+    if (r.semParlamentar.length) {
+      partes.push(`${r.semParlamentar.length} emenda(s) sem parlamentar no cadastro: ${r.semParlamentar.map((s) => `${s.numero}/${s.ano}`).join(', ')}`);
+    }
+    return { status: 'SUCESSO', total: r.gravadas, fontesComFalha: [], mensagem: `${partes.join(', ')}.` };
   });
 }

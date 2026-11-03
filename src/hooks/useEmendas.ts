@@ -47,6 +47,7 @@ import {
   fetchEmendasAContratar,
   fetchEmendasSiop,
   fetchEmendaNoPainelSiop,
+  fetchEmendasPainelSemParlamentar,
   fetchContatosDasEmendas,
   fetchAsparDosOrgaos,
   salvarEmendaSiop,
@@ -391,6 +392,12 @@ export function useEmendaNoPainelSiop(codigo: string | null) {
     enabled: Boolean(codigo),
     staleTime: 30 * 60_000
   });
+}
+
+/** Emendas do painel do SIOP sem parlamentar no cadastro (migration 252): só quem registra emendas. */
+export function useEmendasPainelSemParlamentar() {
+  const podeGerir = usePodeGerirEmendas();
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-painel-sem-parlamentar'], queryFn: fetchEmendasPainelSemParlamentar, enabled: podeGerir });
 }
 
 /** Contatos das emendas e ASPAR dos órgãos: só quem trata com eles, coordenador e gestor de emendas (o banco também). */

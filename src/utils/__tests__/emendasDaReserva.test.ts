@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { EmendaSiop, ItemCaep, LinhaPedido, PedidoEmenda } from '../../services/emendasService';
-import { emendaSugerida, emendasParaAReserva, pedidoDaEmenda } from '../emendasDaReserva';
+import { emendaSugerida, emendasParaAReserva, emendasSemPedido, pedidoDaEmenda } from '../emendasDaReserva';
 
 const MOTO = '00102/2024-200330-00002';
 const itens = new Map<string, ItemCaep>([
@@ -45,5 +45,20 @@ describe('emenda na reserva (migration 243): o valor a indicar desconta os outro
     expect(pedidoDaEmenda({ emendaId: 'e1', siopEmenda: null, siopEmendaAno: null }, e1)).toBe(true);
     expect(pedidoDaEmenda({ emendaId: null, siopEmenda: '41160011', siopEmendaAno: 2026 }, e1)).toBe(true);
     expect(pedidoDaEmenda({ emendaId: null, siopEmenda: '41160011', siopEmendaAno: 2025 }, e1)).toBe(false);
+  });
+});
+
+describe('emendas sem pedido na reserva nova (03/11/2026)', () => {
+  it('só as sem pedido ativo (pela ligação ou pelo nº e ano), da mais nova para a mais antiga', () => {
+    const e = (id: string, numero: string, ano: number, vistaEm: string) => ({ ...emenda(id, numero, ano, 1000), vistaEm }) as EmendaSiop;
+    const lista = emendasSemPedido(
+      [e('velha', '41160001', 2025, '2026-10-30'), e('ligada', '41160002', 2026, '2026-10-01'), e('pelo-numero', '41160003', 2026, '2026-10-01'), e('cancelada', '41160004', 2026, '2026-10-02'), e('nova', '41160005', 2026, '2026-10-29')],
+      [
+        pedido({ id: 'p1', emendaId: 'ligada' }),
+        pedido({ id: 'p2', siopEmenda: '41160003', siopEmendaAno: 2026 }),
+        pedido({ id: 'p3', emendaId: 'cancelada', etapa: 'CANCELADO' })
+      ]
+    );
+    expect(lista.map((x) => x.id)).toEqual(['nova', 'cancelada', 'velha']);
   });
 });

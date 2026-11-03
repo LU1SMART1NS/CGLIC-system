@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AGRUPADORES,
   baseSiafiDaResposta,
@@ -12,7 +12,13 @@ import {
   montarTabela,
   valorDoPainel
 } from '../siopPainelQlik';
-import { gravarLeitura, LOTE_DE_GRAVACAO, resumoDaLeitura, testarEmendasDoPainelSiop } from '../emendasPainelSiopSyncService';
+import { resumoDaLeitura, sincronizarEmendasDoPainelSiop, testarEmendasDoPainelSiop } from '../emendasPainelSiopSyncService';
+
+// Sem banco no teste: a reserva da sincronização só executa a tarefa.
+vi.mock('../sincronizacaoFontesService', async (orig) => ({
+  ...(await orig<typeof import('../sincronizacaoFontesService')>()),
+  executarComReserva: async (_r: string, _u: string, _o: unknown, tarefa: () => Promise<unknown>) => tarefa()
+}));
 
 // Respostas reais do painel (HAR de 03/11/2026), sem os estilos e com só os atributos lidos.
 const ARQUIVOS = import.meta.glob('./fixtures/siop/*.xml', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
@@ -32,36 +38,59 @@ const BOTAO: Record<string, string> = {
   'Por GND': '100', 'Por Modalidade': '96', 'Por Natureza de Despesa': '95'
 };
 
+const TABELA = POLL_EMENDAS.slice(POLL_EMENDAS.indexOf('<group name="79"'), POLL_EMENDAS.indexOf('</group>', POLL_EMENDAS.indexOf('<group name="79"')) + 8);
+const BASE = '<group name="113" objectid="Document\\TX1846" type="TX" mode="enabled"><value name="Content" text="Dados referentes à Base SIAFI de 30/10/2026"/></group>';
+/** Os dois passos da aba, como no painel (TX1538 = Passo 1, TX1537 = Passo 2). */
+const PASSOS = '<group name="26" objectid="Document\\TX1538" type="TX" mode="enabled"/><group name="13" objectid="Document\\TX1537" type="TX" mode="enabled"/>';
+/** Lista de órgãos do Passo 1 (LB160), como veio do painel em 03/11/2026. */
+const ORGAOS = '<group name="32" objectid="Document\\LB160" type="LB" label="Orgão Orçamentário"><value name="C0">' +
+  '<element value="32" text="03000 - Tribunal de Contas da União"/><element value="9" text="30000 - Ministério da Justiça e Segurança Pública"/>' +
+  '<element value="34" text="36000 - Ministério da Saúde"/></value></group>';
+/** Colunas que o agrupador põe na tabela e que as fixtures (do HAR) ainda não têm. */
+const COLUNA_NOVA: Record<string, string> = { 'Por UF do Autor': 'UF Autor', 'Por GND': 'GND' };
+
 /**
- * Painel falso: guarda os comandos e responde com as fixtures. A tabela tem 120 linhas; cada agrupador ligado é uma
- * coluna a mais (o painel abre com os seis do HAR ligados = 13 colunas). Clicar num botão troca o agrupador.
+ * Painel falso: guarda os comandos e responde como o painel. A aba abre nos gráficos (tabela escondida); "Passo 1"
+ * mostra a lista de órgãos; "Passo 2" mostra a tabela (120 linhas). Cada agrupador ligado que as fixtures não têm
+ * (UF do autor, GND) vira uma coluna a mais.
  */
-function painelFalso(opts: { ligados?: string[]; menuPrimeiro?: boolean; status?: number; corpo?: string } = {}) {
-  const ligados = new Set((opts.ligados ?? ['Por Autor da Emenda', 'Por Tipo de Autor', 'Por Número de Emenda', 'Por Órgão Orçamentário', 'Por Ação', 'Por Modalidade']).map((r) => BOTAO[r]));
+function painelFalso(opts: { menuPrimeiro?: boolean; status?: number; corpo?: string; semMjsp?: boolean } = {}) {
   const chamadas: Array<{ url: string; corpo: string; cookie: string }> = [];
+  const ligados = new Set<string>();
   let menu = Boolean(opts.menuPrimeiro);
-  let limpo = false;
-  const tamanho = (xml: string) => xml.replace('totalsize="13:562"', `totalsize="${7 + ligados.size}:120"`);
-  const comAgrupadores = (xml: string) => xml.replace('<object name="Document">', `<object name="Document">${AGRUPADORES_XML}`);
+  let passo: 'graficos' | 'filtros' | 'tabela' = 'graficos';
+  let orgao: string | null = null;
+  const botaoDe = Object.fromEntries(Object.entries(BOTAO).map(([r, b]) => [b, r]));
+  const extras = () => [...ligados].filter((r) => COLUNA_NOVA[r]).map((r, i) => `<value name="C${20 + i}"><element text="${COLUNA_NOVA[r]}"/></value>`).join('');
+  const comExtras = (xml: string) => xml.replace(/(<group name="79"[^>]*>)/, `$1${extras()}`).replace('totalsize="13:562"', `totalsize="${13 + ligados.size}:120"`);
   const fetcher = (async (url: string, init?: RequestInit) => {
     const corpo = String(init?.body ?? '');
     chamadas.push({ url, corpo, cookie: String((init?.headers as Record<string, string>)?.cookie ?? '') });
     if (opts.status) return new Response(opts.corpo ?? '', { status: opts.status });
     let texto = ABRIR;
     const clique = corpo.match(/<set name="Document\.(\d+)\.Content"/);
-    if (corpo.includes('CLEARSTATE')) limpo = true;
-    else if (clique) {
+    const selecao = corpo.match(/<set name="32" select="(\d+)"/);
+    if (clique) {
       if (clique[1] === '20') menu = false;
-      else if (ligados.has(clique[1])) ligados.delete(clique[1]);
-      else ligados.add(clique[1]);
-    } else if (corpo.includes('<poll ')) texto = menu ? POLL_MENU : tamanho(comAgrupadores(POLL_EMENDAS));
-    else {
+      else if (clique[1] === '26') passo = 'filtros';
+      else if (clique[1] === '13') passo = 'tabela';
+      else if (botaoDe[clique[1]]) ligados.has(botaoDe[clique[1]]) ? ligados.delete(botaoDe[clique[1]]) : ligados.add(botaoDe[clique[1]]);
+    } else if (selecao) orgao = selecao[1];
+    else if (corpo.includes('<poll ')) {
+      texto = menu
+        ? POLL_MENU
+        : '<?xml version="1.0" encoding="UTF-8" ?><result mark="40E69F2CB69D036A" stamp="1"><object name="Document">' +
+          PASSOS + AGRUPADORES_XML + BASE + (passo === 'filtros' ? ORGAOS : '') +
+          (passo === 'tabela' ? comExtras(TABELA) : '<group name="79" objectid="Document\\CH102" type="CH" mode="hidden"/>') +
+          '</object></result>';
+    } else {
       const m = corpo.match(/<get name="79" offset="0:(\d+)"/);
-      if (m) texto = tamanho(({ 0: POLL_EMENDAS, 40: PAGINA_40, 80: PAGINA_80 } as Record<string, string>)[m[1]]);
+      if (m) texto = comExtras(({ 0: POLL_EMENDAS, 40: PAGINA_40, 80: PAGINA_80 } as Record<string, string>)[m[1]]);
+      if (m && opts.semMjsp) texto = texto.replaceAll('30000 - Ministério da Justiça e Segurança Pública', '36000 - Ministério da Saúde');
     }
     return new Response(texto, { status: 200 });
   }) as unknown as typeof fetch;
-  return { fetcher, chamadas, ligados, foiLimpo: () => limpo };
+  return { fetcher, chamadas, ligados, orgao: () => orgao };
 }
 
 describe('XML do painel do SIOP', () => {
@@ -148,7 +177,7 @@ describe('linhas das emendas', () => {
 });
 
 describe('leitura do painel pela sessão do QlikView', () => {
-  it('abre na aba, limpa os filtros, liga os seis agrupadores desligados, pede páginas grandes e lê tudo', async () => {
+  it('abre na aba, filtra o MJSP no Passo 1, mostra a tabela no Passo 2, liga UF e GND, pede páginas grandes e lê tudo', async () => {
     const painel = painelFalso();
     const l = await lerEmendasDoPainel({ fetcher: painel.fetcher, xrfkey: 'ChaveDeTeste1234' });
     const { chamadas } = painel;
@@ -158,18 +187,19 @@ describe('leitura do painel pela sessão do QlikView', () => {
     expect(chamadas[0].cookie).toBe('xrfkey=ChaveDeTeste1234');
     expect(chamadas[0].corpo).toContain('<set name="Document.TabRow.Document\\SH08" action="" />');
     expect(chamadas[1].url).toContain('mark=40E69F2CB69D036A');
-    expect(chamadas[2].corpo).toContain('<set name="Document.StandardActions.CLEARSTATE" action=""');
-    expect(painel.foiLimpo()).toBe(true);
+    const comandos = chamadas.map((c) => c.corpo.replace(/<poll [^>]*>/g, '').replace(/^<update[^>]*>|<\/update>$/g, '')).filter(Boolean);
+    expect(comandos.slice(1, 4)).toEqual([
+      '<set name="Document.26.Content" action="" clientsizeWH="1600:1000" />',
+      '<set name="32" select="9" toggle="false" />',
+      '<set name="Document.13.Content" action="" clientsizeWH="1600:1000" />'
+    ]);
+    expect(painel.orgao()).toBe('9');
 
-    // Todos os doze ligados no fim; os seis que já estavam ligados foram clicados duas vezes (desligou e voltou).
-    expect(painel.ligados.size).toBe(12);
-    expect(l.agrupadoresLigados).toEqual(['Por Partido', 'Por UF do Autor', 'Por Unidade Orçamentária', 'Por Localizador', 'Por GND', 'Por Natureza de Despesa']);
-    expect(l.agrupadoresNaoEncontrados).toEqual([]);
-    const cliques = chamadas.map((c) => c.corpo.match(/<set name="Document\.(\d+)\.Content"/)?.[1]).filter(Boolean);
-    expect(cliques.filter((n) => n === '87')).toHaveLength(2);
-    expect(cliques.filter((n) => n === '100')).toHaveLength(1);
+    // A tabela das fixtures já tem autor, tipo, nº, órgão, ação e modalidade: só UF e GND são ligados.
+    expect(l.agrupadoresLigados).toEqual(['Por UF do Autor', 'Por GND']);
+    expect([...painel.ligados]).toEqual(['Por UF do Autor', 'Por GND']);
 
-    expect(chamadas.some((c) => c.corpo.includes('<set name="79" pageSize="19:2000" />'))).toBe(true);
+    expect(chamadas.some((c) => c.corpo.includes('<set name="79" pageSize="15:2000" />'))).toBe(true);
     // O servidor falso ignora o pageSize e devolve 40 por vez: a leitura segue pelo que veio.
     expect(chamadas.filter((c) => c.corpo.includes('<get name="79"')).map((c) => c.corpo.match(/offset="0:(\d+)"/)![1])).toEqual(['0', '40', '80']);
     expect(l.linhasNoPainel).toBe(120);
@@ -184,26 +214,15 @@ describe('leitura do painel pela sessão do QlikView', () => {
     expect(l.divergencias).toEqual(['dotacao_inicial', 'dotacao_atual', 'empenhado', 'liquidado', 'pago']);
   });
 
-  it('liga também a Modalidade quando a sessão abre com ela desligada (como no print de 03/11)', async () => {
-    const painel = painelFalso({ ligados: ['Por Autor da Emenda', 'Por Tipo de Autor', 'Por Número de Emenda', 'Por Órgão Orçamentário', 'Por Ação'] });
-    const l = await lerEmendasDoPainel({ fetcher: painel.fetcher });
-    expect(painel.ligados.size).toBe(12);
-    expect(l.agrupadoresLigados).toContain('Por Modalidade');
-    expect(l.agrupadoresLigados).toHaveLength(7);
-  });
-
-  it('pode manter os filtros e os agrupadores do painel', async () => {
-    const painel = painelFalso();
-    await lerEmendasDoPainel({ fetcher: painel.fetcher, limparFiltros: false, agrupadores: [] });
-    expect(painel.foiLimpo()).toBe(false);
-    expect(painel.chamadas.some((c) => /Document\.\d+\.Content/.test(c.corpo))).toBe(false);
-  });
-
   it('se a sessão abrir no menu inicial, clica em "Emendas Parlamentares" (TX1738) e segue', async () => {
     const painel = painelFalso({ menuPrimeiro: true });
-    const l = await lerEmendasDoPainel({ fetcher: painel.fetcher, limparFiltros: false, agrupadores: [] });
+    const l = await lerEmendasDoPainel({ fetcher: painel.fetcher });
     expect(painel.chamadas[2].corpo).toContain('<set name="Document.20.Content" action=""');
     expect(l.linhas).toHaveLength(119);
+  });
+
+  it('recusa a leitura quando o filtro do órgão não pegou', async () => {
+    await expect(lerEmendasDoPainel({ fetcher: painelFalso({ semMjsp: true }).fetcher })).rejects.toThrow(/filtro do órgão não pegou/);
   });
 
   it('não devolve leitura pela metade quando o tempo acaba', async () => {
@@ -221,34 +240,47 @@ describe('leitura do painel pela sessão do QlikView', () => {
     const painel = painelFalso();
     const r = await testarEmendasDoPainelSiop({ fetcher: painel.fetcher });
     expect(painel.chamadas.filter((c) => c.corpo.includes('<get name="79"'))).toHaveLength(1);
-    expect(r).toMatchObject({ linhasNoPainel: 120, linhasLidas: 39, baseSiafi: '2026-10-30', anos: [2026], orgaos: 1 });
-    expect(r.agrupadoresLigados).toHaveLength(6);
+    expect(r).toMatchObject({ linhasNoPainel: 120, linhasLidas: 39, linhasParaGravar: 39, baseSiafi: '2026-10-30', anos: [2026] });
+    expect(r.agrupadoresLigados).toEqual(['Por UF do Autor', 'Por GND']);
   });
 });
 
 describe('gravação da leitura', () => {
-  it('grava em lotes com o mesmo id e conclui pelos anos lidos', async () => {
-    const lotes: Array<{ id: string; n: number }> = [];
-    let concluiu: { id: string; anos: number[] } | null = null;
-    const linhas = Array.from({ length: LOTE_DE_GRAVACAO * 2 + 10 }, (_, i) => ({ ano: i % 2 ? 2026 : 2025, emenda: '42650013', chave: `k${i}` }));
-    const leitura = { ...resumoBase(), linhas } as never;
-    const r = await gravarLeitura(leitura, {
-      gravar: async (id, l) => (lotes.push({ id, n: l.length }), l.length),
-      concluir: async (id, anos) => ((concluiu = { id, anos }), 7)
-    }, 'leitura-1');
-    expect(lotes).toEqual([{ id: 'leitura-1', n: LOTE_DE_GRAVACAO }, { id: 'leitura-1', n: LOTE_DE_GRAVACAO }, { id: 'leitura-1', n: 10 }]);
-    expect(concluiu).toEqual({ id: 'leitura-1', anos: [2025, 2026] });
-    expect(r).toEqual({ gravadas: linhas.length, removidas: 7 });
+  const gravacao = { gravadas: 2, removidas: 0, codigos: 1, registradas: 1, atualizadas: 0, semParlamentar: [] };
+  const linhaDe = (ano: number, emenda: string) => ({ ano, emenda, chave: emenda, dimensoes: { Ano: String(ano) } }) as never;
+
+  it('grava numa chamada só as linhas a partir de 2026, sem as colunas como vieram, e conta as emendas novas', async () => {
+    const chamadas: Array<{ n: number; base: string | null; anos: number[]; comDimensoes: boolean }> = [];
+    const leitura = { ...resumoBase(), baseSiafi: '2026-10-30', linhas: [linhaDe(2025, '30880005'), linhaDe(2026, '71020007'), linhaDe(2026, '38980002')] };
+    const r = await sincronizarEmendasDoPainelSiop({
+      forcar: true,
+      ler: async () => leitura,
+      gravador: async (linhas, base, anos) => (chamadas.push({ n: linhas.length, base, anos, comDimensoes: linhas.some((l) => 'dimensoes' in l) }), gravacao)
+    });
+    expect(chamadas).toEqual([{ n: 2, base: '2026-10-30', anos: [2026], comDimensoes: false }]);
+    expect(r).toMatchObject({ status: 'SUCESSO', total: 2 });
+    expect((r as { mensagem: string }).mensagem).toContain('1 emenda(s) nova(s) registrada(s)');
+  });
+
+  it('não grava quando a soma não bate com o Total', async () => {
+    let gravou = false;
+    const r = await sincronizarEmendasDoPainelSiop({
+      forcar: true,
+      ler: async () => ({ ...resumoBase(), divergencias: ['empenhado'], linhas: [linhaDe(2026, '71020007')] }),
+      gravador: async () => ((gravou = true), gravacao)
+    });
+    expect(gravou).toBe(false);
+    expect(r).toMatchObject({ status: 'ERRO' });
   });
 
   it('resumo sem linhas', () => {
-    expect(resumoDaLeitura({ ...resumoBase(), linhas: [] })).toMatchObject({ emendas: 0, anos: [], amostra: null });
+    expect(resumoDaLeitura({ ...resumoBase(), linhas: [] })).toMatchObject({ emendas: 0, anos: [], amostra: null, linhasParaGravar: 0 });
   });
 });
 
 function resumoBase() {
   return {
     linhas: [], cabecalhos: [], totais: { dotacao_inicial: null, dotacao_atual: null, empenhado: null, liquidado: null, pago: null },
-    divergencias: [], baseSiafi: null, linhasNoPainel: 0, agrupadoresLigados: [], agrupadoresNaoEncontrados: [], chamadas: 0
+    divergencias: [] as string[], baseSiafi: null as string | null, linhasNoPainel: 0, agrupadoresLigados: [], chamadas: 0
   };
 }

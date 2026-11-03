@@ -7,6 +7,7 @@ import { HeaderRefreshAction } from '../../../design-system/components/HeaderRef
 import { DataTable, type Column } from '../../../design-system/components/DataTable';
 import { StatusBadge, type StatusBadgeVariant } from '../../../design-system/components/StatusBadge';
 import { ActionButton } from '../../../design-system/components/ActionButton';
+import { NoticeBar } from '../../../design-system/components/NoticeBar';
 import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilterBar';
 import { CarteiraSegmentTabs } from '../../carteira/CarteiraSegmentTabs';
 import { CarteiraPagination } from '../../carteira/CarteiraPagination';
@@ -18,8 +19,8 @@ import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
 import {
   hojeEmBrasilia,
   useAutoresEmendas,
-  useBeneficiariosEmendas,
   useContatosDasEmendas,
+  useEmendasPainelSemParlamentar,
   useEmendasSiop,
   useItensCaep,
   useMapaGruposBeneficiarios,
@@ -34,7 +35,7 @@ import { diasSemContatoParaUrgente, emendasNaLista, numeroDaEmenda, reservasPara
 import { execucaoDosPedidos } from '../../../utils/emendasParlamentar';
 import { contarPorGti, passaFiltroGti, resumirFatias, type FatiasDaAta } from '../../../config/gruposGti';
 import { GRUPOS_CAPTACAO, fatiasDaCaptacao, lerFiltroCaptacao, lerModoCaptacao, type GrupoBeneficiario } from '../../../config/captacaoEmendas';
-import type { EmendaSiop, NotaDaLinha } from '../../../services/emendasService';
+import type { EmendaPainelSemParlamentar, NotaDaLinha } from '../../../services/emendasService';
 import { AutorDoPedido, LARGURA_AUTOR, ValoresEmBarra } from '../emendasPartes';
 import { CelulaCaptacao, FiltroCaptacao } from '../CaptacaoDoPedido';
 import { EmendaSiopModal } from '../EmendaSiopModal';
@@ -60,7 +61,8 @@ export const EmendasListaPage: React.FC = () => {
   const emendasQ = useEmendasSiop();
   const { data: contatos = [] } = useContatosDasEmendas();
   const { data: autores = [] } = useAutoresEmendas();
-  const { data: beneficiarios = [] } = useBeneficiariosEmendas();
+  // Emendas do painel do SIOP que o servidor não registrou por não achar o parlamentar (migration 252).
+  const { data: semParlamentar = [] } = useEmendasPainelSemParlamentar();
   const { data: notas = SEM_NOTAS } = useNotasDasLinhas();
   const { data: itensLista = [] } = useItensCaep();
   const grupos = useMapaGruposBeneficiarios();
@@ -82,7 +84,7 @@ export const EmendasListaPage: React.FC = () => {
       return prox;
     });
   const [busca, setBusca] = useState('');
-  const [editando, setEditando] = useState<EmendaSiop | 'nova' | null>(null);
+  const [escolhendo, setEscolhendo] = useState<EmendaPainelSemParlamentar | null>(null);
 
   const autorPorId = useMemo(() => new Map(autores.map((a) => [a.id, a])), [autores]);
   const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
@@ -149,7 +151,15 @@ export const EmendasListaPage: React.FC = () => {
       render: (l) => (
         <>
           <div style={carteiraIdentificacao}>{numeroDaEmenda(l.numero)}</div>
-          <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>{l.ano ?? 'ano não informado'}{l.gnd ? ` · ${l.gnd}` : ''}</div>
+          <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>
+            {l.ano ?? 'ano não informado'}
+            {l.gnd ? ` · ${l.gnd}` : ''}
+            {l.emenda?.origem === 'PAINEL' && (
+              <span title="Registrada sozinha pelo painel do SIOP" data-testid={`emendas-emenda-do-siop-${l.chave}`}>
+                {' · do SIOP'}
+              </span>
+            )}
+          </div>
         </>
       )
     },
@@ -257,11 +267,35 @@ export const EmendasListaPage: React.FC = () => {
               onChange={(v) => mudarUrl((p) => (v === String(anoCorrente) ? p.delete('ano') : p.set('ano', v)))}
               testId="emendas-por-emenda-ano"
             />
-            {podeGerir && <ActionButton action="novo" label="Registrar emenda do SIOP" onClick={() => setEditando('nova')} data-testid="emendas-emenda-siop-nova" />}
             <HeaderRefreshAction onRefresh={() => void refetch()} isRefreshing={false} lastUpdated={null} dataTestId="emendas-emendas-atualizar" tooltipTitle="Recarregar" />
           </>
         }
       />
+      {podeGerir && semParlamentar.length > 0 && (
+        <NoticeBar tone="warning" testId="emendas-painel-sem-parlamentar">
+          <span style={{ fontWeight: 700 }}>
+            {semParlamentar.length} {semParlamentar.length === 1 ? 'emenda do SIOP sem parlamentar' : 'emendas do SIOP sem parlamentar'} no cadastro
+          </span>
+          <span style={{ ...carteiraDetalhe, color: 'inherit', opacity: 0.85, display: 'block' }}>
+            O servidor não achou um parlamentar só pelo nome do painel. Escolha uma vez: as próximas emendas dele entram sozinhas.
+          </span>
+          {semParlamentar.map((e) => (
+            <span key={`${e.ano}-${e.numero}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.35rem' }} data-testid={`emendas-painel-sem-parlamentar-${e.ano}-${e.numero}`}>
+              <span>
+                <b>
+                  {numeroDaEmenda(e.numero)} / {e.ano}
+                </b>
+                {' · '}
+                {e.autor ?? 'autor não informado'}
+                {e.uf ? ` (${e.uf})` : ''}
+                {' · '}
+                {e.valor != null ? formatCurrency(e.valor) : '—'}
+              </span>
+              <ActionButton action="atribuir" size="sm" label="Escolher o parlamentar" onClick={() => setEscolhendo(e)} data-testid={`emendas-painel-escolher-${e.ano}-${e.numero}`} />
+            </span>
+          ))}
+        </NoticeBar>
+      )}
       <CarteiraSegmentTabs<Segmento>
         testIdPrefix="emendas-por-emenda-situacao"
         ariaLabel="Situação das emendas"
@@ -309,9 +343,7 @@ export const EmendasListaPage: React.FC = () => {
         emptyTitle={segmento === 'sem' && !termo ? 'Nenhuma emenda sem pedido.' : 'Nenhuma emenda encontrada.'}
         emptyDescription={
           segmento === 'sem' && !termo
-            ? podeGerir
-              ? 'Quando vir no SIOP uma emenda que ainda não chegou à CAEP, use "Registrar emenda do SIOP".'
-              : 'A CAEP registra as emendas que vê no SIOP antes do pedido.'
+            ? 'As emendas indicadas no SIOP entram aqui sozinhas, uma vez por dia, antes do pedido.'
             : 'Ajuste a busca ou escolha outra situação.'
         }
       >
@@ -327,8 +359,16 @@ export const EmendasListaPage: React.FC = () => {
         />
         <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={sorted.length} onChange={setPage} testIdPrefix="emendas-por-emenda" />
       </AdminListShell>
-      {editando && (
-        <EmendaSiopModal emenda={editando === 'nova' ? null : editando} emendas={emendasQ.data ?? []} pedidos={pedidos} autores={autores} beneficiarios={beneficiarios} onClose={() => setEditando(null)} />
+      {escolhendo && (
+        <EmendaSiopModal
+          key={`${escolhendo.ano}-${escolhendo.numero}`}
+          emenda={null}
+          doPainel={escolhendo}
+          emendas={emendasQ.data ?? []}
+          pedidos={pedidos}
+          autores={autores}
+          onClose={() => setEscolhendo(null)}
+        />
       )}
     </PageContainer>
   );

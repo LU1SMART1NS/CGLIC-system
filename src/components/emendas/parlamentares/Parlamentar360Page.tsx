@@ -462,7 +462,7 @@ export const Parlamentar360Page: React.FC = () => {
           }}
         />
       )}
-      {alterandoEmenda && <EmendaSiopModal emenda={alterandoEmenda} emendas={emendasSiop} pedidos={pedidos} autores={autores} beneficiarios={beneficiariosLista} onClose={() => setAlterandoEmenda(null)} />}
+      {alterandoEmenda && <EmendaSiopModal emenda={alterandoEmenda} emendas={emendasSiop} pedidos={pedidos} autores={autores} onClose={() => setAlterandoEmenda(null)} />}
       {editandoAspar && autor.uf && <AsparModal uf={autor.uf} orgao={editandoAspar} atual={aspar.get(`${autor.uf}:${editandoAspar}`) ?? null} onClose={() => setEditandoAspar(null)} />}
     </Instrument360Page>
   );
