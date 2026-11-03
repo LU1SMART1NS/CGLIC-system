@@ -34,8 +34,8 @@ const SEM_VALOR = pedido('p3', 'A1', 'AUTORIZADO', { numeroNoAno: 1, anoDoNumero
 const PEDIDOS = [COM_EMENDA, pedido('p2', 'A1', 'RESERVADO'), SEM_VALOR];
 // Painel do Orçamento Federal do SIOP (migration 252): a emenda em duas linhas (ação e modalidade).
 const PAINEL = [
-  { codigo: '202642680021', ano: 2026, emenda: '42680021', acao: '21BM - Desenvolvimento de Políticas de Segurança Pública', modalidade: '90 - Aplicações Diretas', autor: 'Senadora Dois', dotacaoInicial: 300000, dotacaoAtual: 300000, empenhado: 0, liquidado: 0, pago: 0, baseSiafiEm: '2026-10-30', lidoEm: '2026-11-03T13:22:00Z' },
-  { codigo: '202642680021', ano: 2026, emenda: '42680021', acao: '2723 - Policiamento, Fiscalização', modalidade: '30 - Transferências a Estados e ao Distrito Federal', autor: 'Senadora Dois', dotacaoInicial: 200000, dotacaoAtual: 200000, empenhado: 0, liquidado: 0, pago: 0, baseSiafiEm: '2026-10-30', lidoEm: '2026-11-03T13:22:00Z' }
+  { codigo: '202642680021', ano: 2026, emenda: '42680021', autor: 'Senadora Dois', orgao: '30000 - Ministério da Justiça e Segurança Pública', unidadeOrcamentaria: '30911 - Fundo Nacional de Segurança Pública', acao: '21BM - Desenvolvimento de Políticas de Segurança Pública', localizador: '0001 - Nacional', gnd: '4', modalidade: '90 - Aplicações Diretas', naturezaDespesa: null, dotacaoInicial: 300000, dotacaoAtual: 300000, empenhado: 0, liquidado: 0, pago: 0, baseSiafiEm: '2026-10-30', lidoEm: '2026-11-03T13:22:00Z' },
+  { codigo: '202642680021', ano: 2026, emenda: '42680021', autor: 'Senadora Dois', orgao: '30000 - Ministério da Justiça e Segurança Pública', unidadeOrcamentaria: '30911 - Fundo Nacional de Segurança Pública', acao: '2723 - Policiamento, Fiscalização', localizador: '0001 - Nacional', gnd: '3', modalidade: '30 - Transferências a Estados e ao Distrito Federal', naturezaDespesa: null, dotacaoInicial: 200000, dotacaoAtual: 200000, empenhado: 0, liquidado: 0, pago: 0, baseSiafiEm: '2026-10-30', lidoEm: '2026-11-03T13:22:00Z' }
 ];
 const NOTAS = new Map<string, NotaDaLinha>([
   ['l1', { linhaId: 'l1', nota: '2026NE000103', regra: 'SEI', motivo: null, contractKey: null, empenhoId: 'e1', valorEmpenhado: 300, valorLiquidado: 150, valorPago: 100, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: '2026-04-17', atualizadoEm: null }]
@@ -51,7 +51,7 @@ vi.mock('../../../hooks/useEmendas', () => ({
   hojeEmBrasilia: () => '2026-10-23',
   usePedidosEmendas: () => ({ data: PEDIDOS, isLoading: false, isFetching: false, isError: false, error: null, refetch: vi.fn(), dataUpdatedAt: 0 }),
   useEmendasSiop: () => ({ data: EMENDAS, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
-  useEmendasDoPainelSiop: () => ({ data: PAINEL }),
+  useEmendaNoPainelSiop: (codigo: string | null) => ({ data: PAINEL.filter((l) => l.codigo === codigo) }),
   useContatosDasEmendas: () => ({ data: CONTATOS }),
   useNotasDasLinhas: () => ({ data: NOTAS }),
   useNotasSemPedido: () => ({ data: SEM_PEDIDO }),
@@ -208,7 +208,7 @@ describe('Emenda 360', () => {
     expect(html).toContain('emenda-360-painel-siop');
     expect(html).toContain('base SIAFI de 30/10/2026');
     expect(html).toContain('21BM - Desenvolvimento de Políticas de Segurança Pública');
-    expect(html).toContain('30 - Transferências a Estados e ao Distrito Federal');
+    expect(html).toContain('30 - Transferências a Estados e ao Distrito Federal · GND 3 · 0001 - Nacional · 30911 - Fundo Nacional de Segurança Pública');
     expect(html).toContain('Total da emenda');
     expect(html).toContain('500.000,00');
     expect(render('/emendas/emendas/2026/31660008')).not.toContain('emenda-360-painel-siop');

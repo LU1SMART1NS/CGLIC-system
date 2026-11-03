@@ -8,13 +8,28 @@ const soma = (linhas: LinhaPainelSiop[], campo: 'dotacaoInicial' | 'dotacaoAtual
   linhas.some((l) => l[campo] != null) ? linhas.reduce((s, l) => s + (l[campo] ?? 0), 0) : null;
 const valor = (v: number | null) => (v == null ? '—' : formatCurrency(v));
 
+/** Modalidade, GND, natureza, localizador e unidade orçamentária (e o órgão, se a emenda tiver mais de um). */
+function detalheDaLinha(l: LinhaPainelSiop, variosOrgaos: boolean): string {
+  return [
+    l.modalidade,
+    l.gnd ? `GND ${l.gnd.replace(/^GND\s*/i, '')}` : null,
+    l.naturezaDespesa,
+    l.localizador,
+    l.unidadeOrcamentaria,
+    variosOrgaos ? l.orgao : null
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 /**
- * A emenda como está no Painel do Orçamento Federal do SIOP (migration 252), lida pelo servidor uma vez por dia: cada
- * linha é a emenda numa ação e numa modalidade. Só informação: o valor da emenda nas telas continua o registrado na
+ * A emenda como está no Painel do Orçamento Federal do SIOP (migration 252), lida pelo servidor uma vez por dia, com
+ * todos os agrupadores do painel: cada linha é a emenda numa ação, modalidade, GND, natureza de despesa e localizador. Só informação: o valor da emenda nas telas continua o registrado na
  * conferência; o painel ajuda a conferir sem abrir o SIOP.
  */
 export const NoPainelDoSiop: React.FC<{ linhas: LinhaPainelSiop[]; valorRegistrado?: number | null }> = ({ linhas, valorRegistrado }) => {
   if (!linhas.length) return null;
+  const variosOrgaos = new Set(linhas.map((l) => l.orgao)).size > 1;
   const base = linhas.map((l) => l.baseSiafiEm).filter(Boolean).sort().at(-1) ?? null;
   const celula: React.CSSProperties = { padding: '0.45rem 0.6rem', borderTop: '1px solid var(--color-border)', textAlign: 'right', whiteSpace: 'nowrap', ...carteiraNumero };
   const titulo: React.CSSProperties = { ...celula, textAlign: 'left', whiteSpace: 'normal' };
@@ -29,7 +44,7 @@ export const NoPainelDoSiop: React.FC<{ linhas: LinhaPainelSiop[]; valorRegistra
         <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 640, fontSize: '0.88rem' }}>
           <thead>
             <tr>
-              <th style={{ ...cab, textAlign: 'left' }}>Ação · modalidade</th>
+              <th style={{ ...cab, textAlign: 'left' }}>Linha da emenda no painel</th>
               <th style={cab}>Dotação inicial</th>
               <th style={cab}>Dotação atual</th>
               <th style={cab}>Empenhado</th>
@@ -38,11 +53,11 @@ export const NoPainelDoSiop: React.FC<{ linhas: LinhaPainelSiop[]; valorRegistra
             </tr>
           </thead>
           <tbody>
-            {linhas.map((l) => (
-              <tr key={`${l.acao}|${l.modalidade}`}>
+            {linhas.map((l, i) => (
+              <tr key={i}>
                 <td style={titulo}>
-                  {l.acao}
-                  <div style={carteiraDetalhe}>{l.modalidade}</div>
+                  {l.acao ?? 'Ação não informada'}
+                  <div style={carteiraDetalhe}>{detalheDaLinha(l, variosOrgaos)}</div>
                 </td>
                 <td style={celula}>{valor(l.dotacaoInicial)}</td>
                 <td style={celula}>{valor(l.dotacaoAtual)}</td>

@@ -46,7 +46,7 @@ import {
   voltarEtapaPedido,
   fetchEmendasAContratar,
   fetchEmendasSiop,
-  fetchEmendasDoPainelSiop,
+  fetchEmendaNoPainelSiop,
   fetchContatosDasEmendas,
   fetchAsparDosOrgaos,
   salvarEmendaSiop,
@@ -383,9 +383,14 @@ export function useEmendasSiop({ enabled = true }: LeituraOpcional = {}) {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-siop'], queryFn: fetchEmendasSiop, enabled });
 }
 
-/** Emendas como estão no Painel do Orçamento Federal do SIOP (migration 252), lidas pelo servidor uma vez por dia. */
-export function useEmendasDoPainelSiop({ enabled = true }: LeituraOpcional = {}) {
-  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-painel-siop'], queryFn: fetchEmendasDoPainelSiop, enabled, staleTime: 30 * 60_000 });
+/** A emenda como está no Painel do Orçamento Federal do SIOP (migration 252), lida pelo servidor uma vez por dia. */
+export function useEmendaNoPainelSiop(codigo: string | null) {
+  return useQuery({
+    queryKey: [...CHAVE_EMENDAS, 'emenda-painel-siop', codigo],
+    queryFn: () => fetchEmendaNoPainelSiop(codigo as string),
+    enabled: Boolean(codigo),
+    staleTime: 30 * 60_000
+  });
 }
 
 /** Contatos das emendas e ASPAR dos órgãos: só quem trata com eles, coordenador e gestor de emendas (o banco também). */

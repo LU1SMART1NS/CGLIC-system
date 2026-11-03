@@ -26,7 +26,7 @@ import {
   useCredorDiferente,
   useDiferencasDeEmpenho,
   useEmendasSiop,
-  useEmendasDoPainelSiop,
+  useEmendaNoPainelSiop,
   useItensCaep,
   useKitsEmendas,
   useNotasDasLinhas,
@@ -41,7 +41,7 @@ import { emendasNaLista, NOME_ORGAO_ASPAR, numeroDaEmenda, orgaoDoBeneficiario, 
 import { ROTULO_SITUACAO_SOBRA, type SobraDaEmenda } from '../../../utils/emendasSobra';
 import { execucaoDosPedidos } from '../../../utils/emendasParlamentar';
 import { nomeDoPedido } from '../../../utils/emendasNomeDoPedido';
-import { nomeESigla, type LinhaPedido, type NotaDaLinha, type OrgaoAspar, type PedidoEmenda } from '../../../services/emendasService';
+import { nomeESigla, type LinhaPainelSiop, type LinhaPedido, type NotaDaLinha, type OrgaoAspar, type PedidoEmenda } from '../../../services/emendasService';
 import { linhaDoAutor } from '../emendasPartes';
 import { PedidoModal } from '../PedidoModal';
 import { EmendaSiopModal } from '../EmendaSiopModal';
@@ -58,6 +58,7 @@ import { ReservasParaLigar } from './ReservasParaLigar';
 
 type Aba = 'pedidos' | 'execucao' | 'contatos';
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
+const SEM_LINHAS_DO_PAINEL: LinhaPainelSiop[] = [];
 
 interface NotaDaEmenda {
   chave: string;
@@ -80,7 +81,6 @@ export const Emenda360Page: React.FC = () => {
   const navegar = useNavigateWithOrigin();
   const { data: pedidos = [], isLoading, isError, error, refetch } = usePedidosEmendas();
   const emendasQ = useEmendasSiop();
-  const { data: painelSiop = [] } = useEmendasDoPainelSiop();
   const { data: contatos = [] } = useContatosDasEmendas();
   const { data: notas = SEM_NOTAS } = useNotasDasLinhas();
   const { data: itensLista = [], isLoading: carregandoItens } = useItensCaep();
@@ -106,7 +106,7 @@ export const Emenda360Page: React.FC = () => {
   const codigo = e?.ano ? `${e.ano}${e.numero}` : null;
   const sobra = codigo ? sobras.find((s) => s.codigo === codigo) : undefined;
   const portal = codigo ? portalPorCodigo.get(codigo) : undefined;
-  const noPainel = useMemo(() => (codigo ? painelSiop.filter((l) => l.codigo === codigo) : []), [painelSiop, codigo]);
+  const { data: noPainel = SEM_LINHAS_DO_PAINEL } = useEmendaNoPainelSiop(codigo);
   // Todos os pedidos da emenda, inclusive os cancelados (a lista da emenda só traz os ativos). Na emenda registrada
   // conta também o pedido que nasceu dela ou foi ligado a ela antes da conferência com o SIOP.
   const daEmenda = useMemo(
