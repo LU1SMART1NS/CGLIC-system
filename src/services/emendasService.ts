@@ -1702,6 +1702,47 @@ export async function fetchEmendasSiop(): Promise<EmendaSiop[]> {
   }));
 }
 
+/** Linha da emenda no Painel do Orçamento Federal do SIOP (migration 252): a emenda numa ação e numa modalidade. */
+export interface LinhaPainelSiop {
+  /** Ano + 8 dígitos, como emenda_execucao_portal.codigo. */
+  codigo: string;
+  ano: number;
+  emenda: string;
+  acao: string;
+  modalidade: string;
+  autor: string | null;
+  dotacaoInicial: number | null;
+  dotacaoAtual: number | null;
+  empenhado: number | null;
+  liquidado: number | null;
+  pago: number | null;
+  /** Dia da base SIAFI do painel. */
+  baseSiafiEm: string | null;
+  lidoEm: string;
+}
+
+/** Emendas lidas do painel do SIOP pelo servidor, uma vez por dia (recurso emendas_siop_painel). */
+export async function fetchEmendasDoPainelSiop(): Promise<LinhaPainelSiop[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+    db().from('siop_painel_emendas').select('*').order('codigo').order('acao').order('modalidade').range(de, ate)
+  );
+  return linhas.map((l) => ({
+    codigo: String(l.codigo),
+    ano: num(l.ano),
+    emenda: String(l.emenda),
+    acao: String(l.acao),
+    modalidade: String(l.modalidade),
+    autor: l.autor ?? null,
+    dotacaoInicial: numOuNulo(l.dotacao_inicial),
+    dotacaoAtual: numOuNulo(l.dotacao_atual),
+    empenhado: numOuNulo(l.empenhado),
+    liquidado: numOuNulo(l.liquidado),
+    pago: numOuNulo(l.pago),
+    baseSiafiEm: l.base_siafi_em ?? null,
+    lidoEm: l.lido_em
+  }));
+}
+
 export async function fetchContatosDasEmendas(): Promise<ContatoDaEmenda[]> {
   const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_siop_contatos').select('*').order('id').range(de, ate));
   return linhas

@@ -32,6 +32,11 @@ const COM_EMENDA = pedido('p1', 'A1', 'EMPENHADO', { numeroNoAno: 1, anoDoNumero
 // Emenda de 2025 só no pedido, sem o valor do SIOP (como a da Bancada MG): valor desconhecido, não zero.
 const SEM_VALOR = pedido('p3', 'A1', 'AUTORIZADO', { numeroNoAno: 1, anoDoNumero: 2025, siopEmenda: '71140003', siopEmendaAno: 2025, siopValor: null, linhas: [linha('l3', 2)] });
 const PEDIDOS = [COM_EMENDA, pedido('p2', 'A1', 'RESERVADO'), SEM_VALOR];
+// Painel do Orçamento Federal do SIOP (migration 252): a emenda em duas linhas (ação e modalidade).
+const PAINEL = [
+  { codigo: '202642680021', ano: 2026, emenda: '42680021', acao: '21BM - Desenvolvimento de Políticas de Segurança Pública', modalidade: '90 - Aplicações Diretas', autor: 'Senadora Dois', dotacaoInicial: 300000, dotacaoAtual: 300000, empenhado: 0, liquidado: 0, pago: 0, baseSiafiEm: '2026-10-30', lidoEm: '2026-11-03T13:22:00Z' },
+  { codigo: '202642680021', ano: 2026, emenda: '42680021', acao: '2723 - Policiamento, Fiscalização', modalidade: '30 - Transferências a Estados e ao Distrito Federal', autor: 'Senadora Dois', dotacaoInicial: 200000, dotacaoAtual: 200000, empenhado: 0, liquidado: 0, pago: 0, baseSiafiEm: '2026-10-30', lidoEm: '2026-11-03T13:22:00Z' }
+];
 const NOTAS = new Map<string, NotaDaLinha>([
   ['l1', { linhaId: 'l1', nota: '2026NE000103', regra: 'SEI', motivo: null, contractKey: null, empenhoId: 'e1', valorEmpenhado: 300, valorLiquidado: 150, valorPago: 100, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: '2026-04-17', atualizadoEm: null }]
 ]);
@@ -46,6 +51,7 @@ vi.mock('../../../hooks/useEmendas', () => ({
   hojeEmBrasilia: () => '2026-10-23',
   usePedidosEmendas: () => ({ data: PEDIDOS, isLoading: false, isFetching: false, isError: false, error: null, refetch: vi.fn(), dataUpdatedAt: 0 }),
   useEmendasSiop: () => ({ data: EMENDAS, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
+  useEmendasDoPainelSiop: () => ({ data: PAINEL }),
   useContatosDasEmendas: () => ({ data: CONTATOS }),
   useNotasDasLinhas: () => ({ data: NOTAS }),
   useNotasSemPedido: () => ({ data: SEM_PEDIDO }),
@@ -195,6 +201,17 @@ describe('Emenda 360', () => {
     expect(cartao('sobra')).not.toContain('R$');
     expect(cartao('empenhado')).toContain('nenhuma nota ainda');
     expect(cartao('empenhado')).not.toContain('R$');
+  });
+
+  it('mostra a emenda como está no painel do SIOP, com o total e a base SIAFI; sem linha no painel, nada', () => {
+    const html = render('/emendas/emendas/2026/42680021');
+    expect(html).toContain('emenda-360-painel-siop');
+    expect(html).toContain('base SIAFI de 30/10/2026');
+    expect(html).toContain('21BM - Desenvolvimento de Políticas de Segurança Pública');
+    expect(html).toContain('30 - Transferências a Estados e ao Distrito Federal');
+    expect(html).toContain('Total da emenda');
+    expect(html).toContain('500.000,00');
+    expect(render('/emendas/emendas/2026/31660008')).not.toContain('emenda-360-painel-siop');
   });
 
   it('nº que não existe: emenda não encontrada', () => {

@@ -46,6 +46,7 @@ import {
   voltarEtapaPedido,
   fetchEmendasAContratar,
   fetchEmendasSiop,
+  fetchEmendasDoPainelSiop,
   fetchContatosDasEmendas,
   fetchAsparDosOrgaos,
   salvarEmendaSiop,
@@ -380,6 +381,11 @@ export function useCancelarPedido() {
 /** Emendas vistas no SIOP (migration 205): todos os que leem as emendas. */
 export function useEmendasSiop({ enabled = true }: LeituraOpcional = {}) {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-siop'], queryFn: fetchEmendasSiop, enabled });
+}
+
+/** Emendas como estão no Painel do Orçamento Federal do SIOP (migration 252), lidas pelo servidor uma vez por dia. */
+export function useEmendasDoPainelSiop({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-painel-siop'], queryFn: fetchEmendasDoPainelSiop, enabled, staleTime: 30 * 60_000 });
 }
 
 /** Contatos das emendas e ASPAR dos órgãos: só quem trata com eles, coordenador e gestor de emendas (o banco também). */

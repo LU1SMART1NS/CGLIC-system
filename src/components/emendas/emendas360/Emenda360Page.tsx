@@ -26,6 +26,7 @@ import {
   useCredorDiferente,
   useDiferencasDeEmpenho,
   useEmendasSiop,
+  useEmendasDoPainelSiop,
   useItensCaep,
   useKitsEmendas,
   useNotasDasLinhas,
@@ -52,6 +53,7 @@ import { SobraDaEmendaCartao } from '../parlamentares/SobraDaEmendaCartao';
 import { TabelaDePedidos } from '../parlamentares/TabelaDePedidos';
 import { useSobraDasEmendas } from '../parlamentares/useSobraDasEmendas';
 import { SiopDaBancada } from './SiopDaBancada';
+import { NoPainelDoSiop } from './NoPainelDoSiop';
 import { ReservasParaLigar } from './ReservasParaLigar';
 
 type Aba = 'pedidos' | 'execucao' | 'contatos';
@@ -78,6 +80,7 @@ export const Emenda360Page: React.FC = () => {
   const navegar = useNavigateWithOrigin();
   const { data: pedidos = [], isLoading, isError, error, refetch } = usePedidosEmendas();
   const emendasQ = useEmendasSiop();
+  const { data: painelSiop = [] } = useEmendasDoPainelSiop();
   const { data: contatos = [] } = useContatosDasEmendas();
   const { data: notas = SEM_NOTAS } = useNotasDasLinhas();
   const { data: itensLista = [], isLoading: carregandoItens } = useItensCaep();
@@ -103,6 +106,7 @@ export const Emenda360Page: React.FC = () => {
   const codigo = e?.ano ? `${e.ano}${e.numero}` : null;
   const sobra = codigo ? sobras.find((s) => s.codigo === codigo) : undefined;
   const portal = codigo ? portalPorCodigo.get(codigo) : undefined;
+  const noPainel = useMemo(() => (codigo ? painelSiop.filter((l) => l.codigo === codigo) : []), [painelSiop, codigo]);
   // Todos os pedidos da emenda, inclusive os cancelados (a lista da emenda só traz os ativos). Na emenda registrada
   // conta também o pedido que nasceu dela ou foi ligado a ela antes da conferência com o SIOP.
   const daEmenda = useMemo(
@@ -368,6 +372,7 @@ export const Emenda360Page: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               {sobra && <SobraDaEmendaCartao e={sobra} minimo={minimo} podeGerir={podeGerir} onNovoComSobra={setNovoPedido} />}
               {registrada && autor?.tipo === 'BANCADA' && <SiopDaBancada e={registrada} />}
+              <NoPainelDoSiop linhas={noPainel} valorRegistrado={registrada?.valor} />
               {registrada && (
                 <ReservasParaLigar
                   emenda={registrada}
