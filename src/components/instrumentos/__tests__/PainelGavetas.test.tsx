@@ -44,7 +44,7 @@ describe('GavetaDistribuicao — cartões organizados', () => {
 
   it('sem gestor primeiro, só com o lado que tem algo', () => {
     expect(html.indexOf('painel-distribuicao-sem-gestor')).toBeLessThan(html.indexOf('painel-distribuicao-gestor'));
-    expect(html).toContain('Distribuir');
+    expect(html).toContain('Ver contratos ›');
   });
   it('críticas somadas no cabeçalho e gestor com mais críticas antes', () => {
     expect(html).toContain('16 críticas');
@@ -94,5 +94,30 @@ describe('GavetaDistribuicao — barra de ocupação da Central', () => {
     const html = renderToStaticMarkup(<GavetaDistribuicao linhas={linhas} isLoading={false} onEscolherGestor={() => {}} onDistribuir={() => {}} ocupacoes={null} />);
     expect(html).not.toContain('painel-distribuicao-ocupacao');
     expect(html).toContain('70 instrumentos · maior carteira');
+  });
+});
+
+describe('GavetaDistribuicao — para onde vai o "Sem gestor"', () => {
+  const lado = (total: number) => ({ total, vencem90: 0, criticas: 0 });
+  const gestor = { gestor: { userId: 'ana', nome: 'Ana' }, atas: lado(2), contratos: lado(3) };
+  const render = (atas: number, contratos: number) =>
+    renderToStaticMarkup(<GavetaDistribuicao linhas={[gestor, { atas: lado(atas), contratos: lado(contratos) }]} isLoading={false} onEscolherGestor={() => {}} onDistribuir={() => {}} />);
+
+  it('só contratos: o cartão leva à Carteira de Contratos', () => {
+    const html = render(0, 6);
+    expect(html).toContain('Ver contratos ›');
+    expect(html).toContain('Contratos sem gestor: abrir a Carteira de Contratos');
+    expect(html).not.toContain('Distribuir ›');
+  });
+
+  it('só atas: o cartão continua levando à Central', () => {
+    expect(render(4, 0)).toContain('Atas sem gestor: abrir a Central de Distribuição');
+  });
+
+  it('atas e contratos: cada lado leva ao seu lugar', () => {
+    const html = render(4, 6);
+    expect(html).toContain('painel-distribuicao-sem-gestor-atas');
+    expect(html).toContain('painel-distribuicao-sem-gestor-contratos');
+    expect(html).not.toMatch(/<button[^>]*painel-distribuicao-sem-gestor"/);
   });
 });

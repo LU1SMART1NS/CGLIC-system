@@ -34,18 +34,62 @@ const Cartao: React.FC<{ sem?: boolean; onClick: () => void; rotulo: string; tes
   </button>
 );
 
+/** Para onde vai o "Sem gestor": atas à Central de Distribuição, contratos à Carteira de Contratos filtrada. */
+export type DestinoSemGestorDoPainel = 'ATAS' | 'CONTRATOS';
+
+/** O cartão "Sem gestor": um só botão quando só um lado tem instrumentos; com os dois, cada lado leva ao seu lugar. */
+const CartaoSemGestor: React.FC<{ semGestor: ResumoDoGestor; onDistribuir: (destino: DestinoSemGestorDoPainel) => void }> = ({ semGestor, onDistribuir }) => {
+  const { atas, contratos } = semGestor;
+  if (atas.total > 0 && contratos.total > 0) {
+    return (
+      <div className="pn-gcard pn-gcard--sem pn-gcard--partido" data-testid="painel-distribuicao-sem-gestor">
+        <span className="pn-gc-head">
+          <strong>Sem gestor</strong>
+        </span>
+        <span className="pn-gc-corpo">
+          <button type="button" className="pn-gc-lado-btn" onClick={() => onDistribuir('ATAS')} aria-label="Atas sem gestor: abrir a Central de Distribuição" data-testid="painel-distribuicao-sem-gestor-atas">
+            <Lado rotulo="Atas ›" lado={atas} comCriticas />
+          </button>
+          <button type="button" className="pn-gc-lado-btn" onClick={() => onDistribuir('CONTRATOS')} aria-label="Contratos sem gestor: abrir a Carteira de Contratos" data-testid="painel-distribuicao-sem-gestor-contratos">
+            <Lado rotulo="Contratos ›" lado={contratos} comCriticas />
+          </button>
+        </span>
+      </div>
+    );
+  }
+  const soContratos = atas.total === 0;
+  return (
+    <Cartao
+      sem
+      onClick={() => onDistribuir(soContratos ? 'CONTRATOS' : 'ATAS')}
+      rotulo={soContratos ? 'Contratos sem gestor: abrir a Carteira de Contratos' : 'Atas sem gestor: abrir a Central de Distribuição'}
+      testId="painel-distribuicao-sem-gestor"
+    >
+      <span className="pn-gc-head">
+        <strong>Sem gestor</strong>
+        <span className="pn-gc-ir" aria-hidden="true">{soContratos ? 'Ver contratos ›' : 'Distribuir ›'}</span>
+      </span>
+      <span className="pn-gc-corpo">
+        {atas.total > 0 && <Lado rotulo="Atas" lado={atas} comCriticas />}
+        {contratos.total > 0 && <Lado rotulo="Contratos" lado={contratos} comCriticas />}
+      </span>
+    </Cartao>
+  );
+};
+
 /**
- * Gaveta Distribuição (coordenador e consulta). "Sem gestor" vem primeiro e abre a Distribuição. Depois, um cartão por
- * gestor, com as pendências críticas no cabeçalho, as atas e os contratos vigentes (e quantos vencem em 90 dias) e uma
- * barra de ocupação, a mesma da coluna Ocupação da Central (carga ajustada ao nível, por complexidade, com a média da
- * equipe); sem ela, a barra mostra a carga em relação à maior carteira. Ordem: mais críticas, depois a maior carteira.
- * Gestor sem carteira vai para uma linha no rodapé. O cartão do gestor filtra o painel pela carteira dele.
+ * Gaveta Distribuição (coordenador e consulta). "Sem gestor" vem primeiro: as atas levam à Central de Distribuição e os
+ * contratos à Carteira de Contratos filtrada em "Sem gestor", onde cada linha diz onde o gestor se resolve. Depois, um
+ * cartão por gestor, com as pendências críticas no cabeçalho, as atas e os contratos vigentes (e quantos vencem em 90
+ * dias) e uma barra de ocupação, a mesma da coluna Ocupação da Central (carga ajustada ao nível, por complexidade, com a
+ * média da equipe); sem ela, a barra mostra a carga em relação à maior carteira. Ordem: mais críticas, depois a maior
+ * carteira. Gestor sem carteira vai para uma linha no rodapé. O cartão do gestor filtra o painel pela carteira dele.
  */
 export const GavetaDistribuicao: React.FC<{
   linhas: ResumoDoGestor[];
   isLoading: boolean;
   onEscolherGestor: (nome: string) => void;
-  onDistribuir: () => void;
+  onDistribuir: (destino: DestinoSemGestorDoPainel) => void;
   ocupacoes?: OcupacoesDaEquipe | null;
 }> = ({ linhas, isLoading, onEscolherGestor, onDistribuir, ocupacoes }) => {
   if (isLoading) return <SkeletonLoader variant="card" height="88px" />;
@@ -53,18 +97,7 @@ export const GavetaDistribuicao: React.FC<{
   return (
     <div className="pn-gdist">
       <div className="pn-gcards" data-testid="painel-distribuicao-cartoes">
-        {semGestor && (
-          <Cartao sem onClick={onDistribuir} rotulo="Sem gestor: abrir a Distribuição" testId="painel-distribuicao-sem-gestor">
-            <span className="pn-gc-head">
-              <strong>Sem gestor</strong>
-              <span className="pn-gc-ir" aria-hidden="true">Distribuir ›</span>
-            </span>
-            <span className="pn-gc-corpo">
-              {semGestor.atas.total > 0 && <Lado rotulo="Atas" lado={semGestor.atas} comCriticas />}
-              {semGestor.contratos.total > 0 && <Lado rotulo="Contratos" lado={semGestor.contratos} comCriticas />}
-            </span>
-          </Cartao>
-        )}
+        {semGestor && <CartaoSemGestor semGestor={semGestor} onDistribuir={onDistribuir} />}
         {gestores.map((g) => (
           <Cartao
             key={g.gestor.userId}
