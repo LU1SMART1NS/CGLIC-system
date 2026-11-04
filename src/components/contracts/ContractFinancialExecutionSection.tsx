@@ -641,7 +641,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
           {e.origem_vinculo === 'EMENDA' && (
             <Tooltip content="O Contratos.gov.br não lista esta nota neste contrato; ela aparece aqui pelo contrato do pedido de emenda. Inclua a nota no contrato lá: na próxima leitura a etiqueta sai.">
               <span data-testid="contract-financial-falta-incluir">
-                <AppButton variant="link" size="xs" type="button" onClick={() => navigate(`/vinculacao/notas-fora-do-contrato?situacao=TODAS&busca=${encodeURIComponent(e.numero_oficial)}`)}>
+                <AppButton variant="link" size="xs" type="button" onClick={() => navigate(`/vinculacao/empenhos-contrato?ver=sem-contrato&situacao=TODAS&busca=${encodeURIComponent(e.numero_oficial)}`)}>
                   <StatusBadge label="Falta incluir no Contratos.gov.br" variant="warning" size="sm" dot={false} />
                 </AppButton>
               </span>

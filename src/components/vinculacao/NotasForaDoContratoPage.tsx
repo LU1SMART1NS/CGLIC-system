@@ -9,6 +9,7 @@ import { ListaNaoCarregou } from '../fonte/ListaNaoCarregou';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAcoesInclusaoNaFonte, useNotasForaDoContrato } from '../../hooks/useNotasForaDoContrato';
+import { useEmpenhosForaDoContrato } from '../../hooks/useEmpenhosForaDoContrato';
 import type { NotaForaDoContrato } from '../../services/notasForaDoContratoService';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
@@ -36,6 +37,7 @@ import {
   motivosDoContrato,
   naCarteira,
   notaNoSegmento,
+  semNotasCitadasEmFatura,
   situacaoDaNota,
   type SegmentoNotaFora
 } from './notasForaDoContrato';
@@ -65,12 +67,14 @@ const rotulo: React.CSSProperties = { fontSize: '0.75rem', fontWeight: 800, text
  * não vincula à mão (decisão de 04/11/2026): indica o contrato onde incluir a nota lá e guarda a marca "Vou incluir". A
  * linha sai sozinha quando a sincronização trouxer a nota num contrato.
  */
-export const NotasForaDoContratoPage: React.FC = () => {
+export const NotasForaDoContratoPage: React.FC<{ alternador?: React.ReactNode }> = ({ alternador }) => {
   const navigate = useNavigateWithOrigin();
   const { role } = useAuth();
   const podeMarcar = role === 'admin' || role === 'gestor';
   const toast = useToast();
   const consulta = useNotasForaDoContrato();
+  // A nota que uma fatura já cita fica só em "Citadas em fatura" (não aparece duas vezes).
+  const citadas = useEmpenhosForaDoContrato();
   const acoes = useAcoesInclusaoNaFonte();
   const { contrato, escopo, showGestorFilter, isLoading: carregandoContratos, leituras: leiturasContratos, contratosNaoCarregaram } = useContratosDoFinanceiro();
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
@@ -86,13 +90,13 @@ export const NotasForaDoContratoPage: React.FC = () => {
   // Gestor: só as notas cujo contrato indicado é dele.
   const noEscopo = useMemo(() => {
     // Mais recentes primeiro (ordem padrão, antes de escolher no cabeçalho).
-    const linhas = [...(consulta.data ?? [])].sort((a, b) => (b.dataEmissao ?? '').localeCompare(a.dataEmissao ?? ''));
+    const linhas = semNotasCitadasEmFatura(consulta.data ?? [], citadas.data ?? []).sort((a, b) => (b.dataEmissao ?? '').localeCompare(a.dataEmissao ?? ''));
     if (!escopo) return linhas;
     return linhas.filter((n) => {
       const k = contratoIndicado(n);
       return k !== null && escopo.has(k);
     });
-  }, [consulta.data, escopo]);
+  }, [consulta.data, citadas.data, escopo]);
 
   const contagem = useMemo(
     () => ({
@@ -174,9 +178,10 @@ export const NotasForaDoContratoPage: React.FC = () => {
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <VinculacaoPageHeader
-        title="Notas fora do contrato"
-        subtitle="Notas que o Contratos.gov.br não lista em nenhum contrato. A correção é incluir a nota no contrato, lá."
-        hint={`O sistema não vincula a nota à mão: indica o contrato onde incluí-la no Contratos.gov.br. Com pedido de emenda, é o contrato do pedido; sem ele, os contratos do fornecedor na ordem: item do pedido, assinado depois da nota, sem notas da fonte e data mais próxima. Marque "Vou incluir" e inclua lá: a linha fica com seu nome e sai sozinha quando a sincronização trouxer a nota. Se não chegar em ${PRAZO_DA_MARCA_DIAS} dias, volta para "A incluir".`}
+        title="Empenhos ao contrato"
+        subtitle="Sem contrato: notas que o Contratos.gov.br não lista em nenhum contrato. A correção é incluir a nota no contrato, lá."
+        actions={alternador}
+        hint={`Sem contrato: o sistema não vincula a nota à mão: indica o contrato onde incluí-la no Contratos.gov.br. Com pedido de emenda, é o contrato do pedido; sem ele, os contratos do fornecedor na ordem: item do pedido, assinado depois da nota, sem notas da fonte e data mais próxima. Marque "Vou incluir" e inclua lá: a linha fica com seu nome e sai sozinha quando a sincronização trouxer a nota. Se não chegar em ${PRAZO_DA_MARCA_DIAS} dias, volta para "A incluir".`}
       />
 
       <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da fila" testIdPrefix="vinc-notas-fora-fontes" />

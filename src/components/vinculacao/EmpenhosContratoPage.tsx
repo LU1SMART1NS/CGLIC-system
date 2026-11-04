@@ -69,7 +69,7 @@ const COLUNAS = 6;
  * fatura. A correção é sempre lá, feita pelo próprio gestor; aqui ele confere o que aconteceu e marca "Vou corrigir".
  * A linha sai da fila quando a sincronização trouxer a correção (migration 117).
  */
-export const EmpenhosContratoPage: React.FC = () => {
+export const EmpenhosContratoPage: React.FC<{ alternador?: React.ReactNode }> = ({ alternador }) => {
   const navigate = useNavigateWithOrigin();
   const { role } = useAuth();
   const podeMarcar = role === 'admin' || role === 'gestor';
@@ -190,8 +190,9 @@ export const EmpenhosContratoPage: React.FC = () => {
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <VinculacaoPageHeader
-        title="Empenhos citados fora do contrato"
-        subtitle="Notas que uma fatura cita, mas que o Contratos.gov.br não lista no contrato da fatura."
+        title="Empenhos ao contrato"
+        subtitle="Citadas em fatura: notas que uma fatura cita, mas que o Contratos.gov.br não lista no contrato da fatura."
+        actions={alternador}
         hint={'Abra a conferência para ver o que aconteceu. A correção é sempre no Contratos.gov.br: incluir a nota no contrato, mudar a fatura de contrato ou corrigir o número. Marque "Vou corrigir" e corrija lá: a linha fica com seu nome e sai sozinha quando a sincronização trouxer a correção. Em contrato encerrado, se a correção não muda mais nada, deixe como está, com justificativa.'}
       />
 

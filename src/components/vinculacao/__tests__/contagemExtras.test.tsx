@@ -145,7 +145,7 @@ describe('números novos: Financeiro e Início', () => {
     vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 4, aoContrato: 0, notasForaDoContrato: 0 });
     expect(menu()).toContain('href="/vinculacao/empenhos-itens"');
     vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 4, aoContrato: 0, notasForaDoContrato: 5 });
-    expect(menu()).toContain('href="/vinculacao/notas-fora-do-contrato"');
+    expect(menu()).toContain('href="/vinculacao/empenhos-contrato?ver=sem-contrato"');
     definirContagemExtra('contratosAta', 1);
     expect(menu()).toContain('href="/vinculacao/contratos"');
   });
