@@ -30,7 +30,7 @@ import { PedidoModal } from '../PedidoModal';
 const autor = { id: 'A1', nome: 'Marcel van Hattem', tipo: 'DEPUTADO', uf: 'RS', partido: 'NOVO' } as AutorEmenda;
 const itens: ItemCaep[] = [];
 const emenda = (id: string, numero: string, valor: number | null): EmendaSiop => ({ id, numero, ano: 2026, autorId: 'A1', valor, gnd: null, vistaEm: '2026-10-28' }) as EmendaSiop;
-const abrir = (pedido: PedidoEmenda | null = null) =>
+const abrir = (pedido: PedidoEmenda | null = null, autorInicial: string | null = pedido ? null : 'A1') =>
   renderToStaticMarkup(
     <PedidoModal
       pedido={pedido}
@@ -41,7 +41,7 @@ const abrir = (pedido: PedidoEmenda | null = null) =>
       reservadoFora={new Map()}
       ultimoContato={new Map()}
       hoje="2026-10-29"
-      autorInicial={pedido ? null : 'A1'}
+      autorInicial={autorInicial}
       onClose={() => {}}
     />
   );
@@ -57,6 +57,37 @@ describe('reserva com a emenda (migration 243, protótipo aprovado em 29/10/2026
     expect(html).toContain('data-testid="emendas-pedido-emenda-nova"');
     expect(html).toContain('data-testid="emendas-pedido-teto"');
     expect(html).not.toContain('Órgão (parlamentar a definir)');
+  });
+
+  it('na lista do parlamentar, a emenda sem outro pedido leva a etiqueta "Sem pedido"', () => {
+    emendas.splice(0, emendas.length, emenda('e1', '41160011', 1918117), emenda('e2', '41160012', 500000));
+    pedidos.splice(0, pedidos.length, { id: 'p9', etapa: 'RESERVADO', emendaId: 'e2', siopEmenda: null, siopEmendaAno: null, linhas: [] } as unknown as PedidoEmenda);
+    try {
+      const html = abrir();
+      expect(html.match(/>Sem pedido</g)).toHaveLength(1);
+      expect(html).toMatch(/4116 0011 \/ 2026<\/b> <span class="reserva-etiqueta">Sem pedido<\/span>/);
+    } finally {
+      pedidos.splice(0, pedidos.length);
+    }
+  });
+
+  it('reserva nova sem parlamentar: lista as emendas sem pedido, mais novas primeiro, antes de escolher o parlamentar', () => {
+    emendas.splice(0, emendas.length, { ...emenda('e1', '41160011', 1918117), vistaEm: '2026-10-20' }, { ...emenda('e2', '41160012', null), vistaEm: '2026-10-28' }, emenda('e3', '41160013', 1000));
+    pedidos.splice(0, pedidos.length, { id: 'p9', etapa: 'RESERVADO', emendaId: 'e3', siopEmenda: null, siopEmendaAno: null, linhas: [] } as unknown as PedidoEmenda);
+    try {
+      const html = abrir(null, null);
+      expect(html).toContain('data-testid="emendas-pedido-busca-autor"');
+      expect(html).toContain('Emendas sem pedido · 2');
+      expect(html).toContain('data-testid="emendas-pedido-sem-pedido-e1"');
+      expect(html).not.toContain('data-testid="emendas-pedido-sem-pedido-e3"');
+      expect(html.indexOf('emendas-pedido-sem-pedido-e2')).toBeLessThan(html.indexOf('emendas-pedido-sem-pedido-e1'));
+      expect(html).toContain('Deputado · NOVO · RS · Emenda 4116 0011 / 2026 · R$');
+      expect(html).toContain('Emenda 4116 0012 / 2026 · valor a ler no SIOP');
+      // Com o parlamentar escolhido, a lista sai e entram as emendas dele.
+      expect(abrir()).not.toContain('emendas-pedido-sem-pedido');
+    } finally {
+      pedidos.splice(0, pedidos.length);
+    }
   });
 
   it('emenda registrada sem o valor: limite fica para a conferência; com duas emendas nenhuma vem escolhida', () => {

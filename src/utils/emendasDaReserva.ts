@@ -52,3 +52,14 @@ export function emendaSugerida(lista: EmendaParaAReserva[]): string | null {
   const [x] = lista;
   return x.aIndicar == null || x.aIndicar > 0.004 ? x.emenda.id : null;
 }
+
+/**
+ * Emendas registradas sem nenhum pedido ativo, da mais nova para a mais antiga (03/11/2026): a reserva nova as mostra
+ * antes da busca do parlamentar, porque o servidor registra sozinho as emendas do painel do SIOP (migration 252).
+ */
+export function emendasSemPedido(emendas: EmendaSiop[], pedidos: PedidoEmenda[]): EmendaSiop[] {
+  const ativos = pedidos.filter((p) => p.etapa !== 'CANCELADO');
+  return emendas
+    .filter((e) => !ativos.some((p) => pedidoDaEmenda(p, e)))
+    .sort((a, b) => b.ano - a.ano || b.vistaEm.localeCompare(a.vistaEm) || a.numero.localeCompare(b.numero));
+}

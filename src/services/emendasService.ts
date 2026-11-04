@@ -1641,7 +1641,11 @@ export interface EmendaSiop {
   foraCompraDireta?: LinhaForaDaCompraDireta[] | null;
   /** Dia da leitura no SIOP que deu esses números. */
   siopLidoEm?: string | null;
+  /** CAEP: registrada à mão ou pela conferência; PAINEL: registrada pelo servidor a partir do painel do SIOP (migration 252). */
+  origem?: OrigemDaEmenda;
 }
+
+export type OrigemDaEmenda = 'CAEP' | 'PAINEL';
 
 export interface LinhaForaDaCompraDireta {
   acao: string;
@@ -1698,8 +1702,111 @@ export async function fetchEmendasSiop(): Promise<EmendaSiop[]> {
     foraCompraDireta: Array.isArray(e.fora_compra_direta)
       ? e.fora_compra_direta.map((l: Record<string, any>) => ({ acao: String(l.acao ?? ''), modalidade: String(l.modalidade ?? ''), autorizado: num(l.autorizado), empenhado: num(l.empenhado) }))
       : null,
-    siopLidoEm: e.siop_lido_em ?? null
+    siopLidoEm: e.siop_lido_em ?? null,
+    origem: e.origem === 'PAINEL' ? 'PAINEL' : 'CAEP'
   }));
+}
+
+/** Emenda de compra direta do painel do SIOP que o servidor não registrou por não achar o parlamentar (migration 252). */
+export interface EmendaPainelSemParlamentar {
+  ano: number;
+  /** 8 dígitos: os 4 do autor e os 4 da emenda. */
+  numero: string;
+  /** Nome do autor como está no painel. */
+  autor: string | null;
+  tipoAutor: string | null;
+  uf: string | null;
+  /** Soma da compra direta (21BM, modalidade 90). */
+  valor: number | null;
+  gnd: Gnd | null;
+  foraCompraDireta: LinhaForaDaCompraDireta[];
+  baseSiafiEm: string | null;
+}
+
+export async function fetchEmendasPainelSemParlamentar(): Promise<EmendaPainelSemParlamentar[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+    db().from('v_emendas_painel_sem_parlamentar').select('*').order('ano', { ascending: false }).order('numero').range(de, ate)
+  );
+  return linhas.map((e) => ({
+    ano: num(e.ano),
+    numero: String(e.numero),
+    autor: e.autor ?? null,
+    tipoAutor: e.tipo_autor ?? null,
+    uf: e.uf ?? null,
+    valor: numOuNulo(e.valor),
+    gnd: e.gnd === 'GND-3' || e.gnd === 'GND-4' ? e.gnd : null,
+    foraCompraDireta: Array.isArray(e.fora_compra_direta)
+      ? e.fora_compra_direta.map((l: Record<string, any>) => ({ acao: String(l.acao ?? ''), modalidade: String(l.modalidade ?? ''), autorizado: num(l.autorizado), empenhado: num(l.empenhado) }))
+      : [],
+    baseSiafiEm: e.base_siafi_em ?? null
+  }));
+}
+
+/** Linha da emenda no Painel do Orçamento Federal do SIOP (migration 252): a emenda numa combinação dos agrupadores. */
+export interface LinhaPainelSiop {
+  /** Ano + 8 dígitos, como emenda_execucao_portal.codigo. */
+  codigo: string;
+  ano: number;
+  emenda: string;
+  autor: string | null;
+  orgao: string | null;
+  unidadeOrcamentaria: string | null;
+  acao: string | null;
+  localizador: string | null;
+  gnd: string | null;
+  modalidade: string | null;
+  naturezaDespesa: string | null;
+  dotacaoInicial: number | null;
+  dotacaoAtual: number | null;
+  empenhado: number | null;
+  liquidado: number | null;
+  pago: number | null;
+  /** Dia da base SIAFI do painel. */
+  baseSiafiEm: string | null;
+  lidoEm: string;
+}
+
+const COLUNAS_PAINEL_SIOP =
+  'codigo,ano,emenda,autor,orgao,unidade_orcamentaria,acao,localizador,gnd,modalidade,natureza_despesa,dotacao_inicial,dotacao_atual,empenhado,liquidado,pago,base_siafi_em,lido_em';
+
+function linhaPainelSiop(l: Record<string, any>): LinhaPainelSiop {
+  return {
+    codigo: String(l.codigo),
+    ano: num(l.ano),
+    emenda: String(l.emenda),
+    autor: l.autor ?? null,
+    orgao: l.orgao ?? null,
+    unidadeOrcamentaria: l.unidade_orcamentaria ?? null,
+    acao: l.acao ?? null,
+    localizador: l.localizador ?? null,
+    gnd: l.gnd ?? null,
+    modalidade: l.modalidade ?? null,
+    naturezaDespesa: l.natureza_despesa ?? null,
+    dotacaoInicial: numOuNulo(l.dotacao_inicial),
+    dotacaoAtual: numOuNulo(l.dotacao_atual),
+    empenhado: numOuNulo(l.empenhado),
+    liquidado: numOuNulo(l.liquidado),
+    pago: numOuNulo(l.pago),
+    baseSiafiEm: l.base_siafi_em ?? null,
+    lidoEm: l.lido_em
+  };
+}
+
+/**
+ * Linhas de uma emenda no painel do SIOP (o painel inteiro, de todos os órgãos, é grande demais para ler de uma vez
+ * no navegador; cada tela pede só a emenda que mostra).
+ */
+export async function fetchEmendaNoPainelSiop(codigo: string): Promise<LinhaPainelSiop[]> {
+  const { data, error } = await db()
+    .from('siop_painel_emendas')
+    .select(COLUNAS_PAINEL_SIOP)
+    .eq('codigo', codigo)
+    .order('acao')
+    .order('modalidade')
+    .order('gnd')
+    .limit(1000);
+  if (error) throw error;
+  return ((data ?? []) as Record<string, any>[]).map(linhaPainelSiop);
 }
 
 export async function fetchContatosDasEmendas(): Promise<ContatoDaEmenda[]> {

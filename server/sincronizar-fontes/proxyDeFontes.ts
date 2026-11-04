@@ -18,7 +18,9 @@ export const DESTINOS_DAS_FONTES: ReadonlyArray<readonly [prefixo: string, desti
   ['/api-senado/', 'https://legis.senado.leg.br/'],
   // Banco Central: IPCA oficial (SGS) e projeções do Focus, para o reajuste das atas; só o servidor lê
   ['/api-bcb/', 'https://api.bcb.gov.br/'],
-  ['/api-bcb-olinda/', 'https://olinda.bcb.gov.br/']
+  ['/api-bcb-olinda/', 'https://olinda.bcb.gov.br/'],
+  // SIOP: Painel do Orçamento Federal (QlikView), emendas parlamentares do MJSP; só o servidor lê
+  ['/api-siop/', 'https://www1.siop.planejamento.gov.br/']
 ];
 
 /** Identificação honesta do robô nas fontes oficiais. */

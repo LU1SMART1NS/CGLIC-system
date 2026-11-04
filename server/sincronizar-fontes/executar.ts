@@ -68,6 +68,11 @@ import {
   sincronizarAtasAMontar,
   testarAtasAMontar
 } from '../../src/services/atasAMontarSyncService';
+import {
+  ORCAMENTO_EMENDAS_SIOP_PAINEL_MS,
+  sincronizarEmendasDoPainelSiop,
+  testarEmendasDoPainelSiop
+} from '../../src/services/emendasPainelSiopSyncService';
 import { criarLeitorDeArquivos } from './leitorDeArquivos';
 import { medirEmendasDoPortal } from '../../src/services/emendasPortalService';
 import type { ResultadoSincronizacao } from '../../src/services/sincronizacaoFontesService';
@@ -79,12 +84,12 @@ import { lerAmbiente } from './ambiente';
  */
 export const ORCAMENTO_DE_TEMPO_MS = 100_000;
 
-export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias', 'cadastro_uasgs', 'itens_notas_siafi', 'saldo_contabil', 'autores_emendas', 'emendas_portal', 'reajuste_atas', 'notas_emendas_tesouro', 'execucao_emendas', 'atas_a_montar'] as const;
+export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias', 'cadastro_uasgs', 'itens_notas_siafi', 'saldo_contabil', 'autores_emendas', 'emendas_portal', 'reajuste_atas', 'notas_emendas_tesouro', 'execucao_emendas', 'atas_a_montar', 'emendas_siop_painel'] as const;
 export type RecursoDoServidor = (typeof RECURSOS_DO_SERVIDOR)[number];
 
 export interface PedidoDeSincronizacao {
   recurso: RecursoDoServidor;
-  /** Obrigatória para todos os recursos, exceto saldos_itens, cadastro_uasgs, autores_emendas, reajuste_atas, notas_emendas_tesouro, execucao_emendas e atas_a_montar, que valem para todas as carteiras. */
+  /** Obrigatória para todos os recursos, exceto saldos_itens, cadastro_uasgs, autores_emendas, reajuste_atas, notas_emendas_tesouro, execucao_emendas, atas_a_montar e emendas_siop_painel, que valem para todas as carteiras. */
   uasg?: string;
   /** Ignora a validade (só o coordenador). */
   forcar?: boolean;
@@ -139,6 +144,9 @@ export interface DependenciasDeExecucao {
   /** Execução de cada emenda dos pedidos pelo Portal da Transparência (migration 204), uma vez por dia. */
   sincronizarExecucaoDasEmendas: typeof sincronizarExecucaoDasEmendas;
   contarExecucaoEmendasPendentes: typeof contarExecucaoEmendasPendentes;
+  /** Emendas do Painel do Orçamento Federal do SIOP (migration 252), uma vez por dia. */
+  sincronizarEmendasDoPainelSiop: typeof sincronizarEmendasDoPainelSiop;
+  testarEmendasDoPainelSiop: typeof testarEmendasDoPainelSiop;
   /** Chave da API do Portal da Transparência (segredo PORTAL_TRANSPARENCIA_CHAVE da Edge Function). */
   chaveDoPortal: () => string | undefined;
   buscarContratosNasFontes: typeof buscarContratosNasFontes;
@@ -210,6 +218,8 @@ const PADRAO: DependenciasDeExecucao = {
   medirEmendasDoPortal,
   sincronizarExecucaoDasEmendas,
   contarExecucaoEmendasPendentes,
+  sincronizarEmendasDoPainelSiop,
+  testarEmendasDoPainelSiop,
   chaveDoPortal: () => lerAmbiente('PORTAL_TRANSPARENCIA_CHAVE')?.trim() || undefined,
   buscarContratosNasFontes,
   fetchArpsDasFontes,
@@ -223,7 +233,7 @@ export function validarPedido(corpo: unknown): { ok: true; pedido: PedidoDeSincr
   if (typeof recurso !== 'string' || !(RECURSOS_DO_SERVIDOR as readonly string[]).includes(recurso)) {
     return { ok: false, erro: `Recurso inválido. Use: ${RECURSOS_DO_SERVIDOR.join(', ')}.` };
   }
-  if (recurso !== 'saldos_itens' && recurso !== 'cadastro_uasgs' && recurso !== 'autores_emendas' && recurso !== 'emendas_portal' && recurso !== 'reajuste_atas' && recurso !== 'notas_emendas_tesouro' && recurso !== 'execucao_emendas' && recurso !== 'atas_a_montar') {
+  if (recurso !== 'saldos_itens' && recurso !== 'cadastro_uasgs' && recurso !== 'autores_emendas' && recurso !== 'emendas_portal' && recurso !== 'reajuste_atas' && recurso !== 'notas_emendas_tesouro' && recurso !== 'execucao_emendas' && recurso !== 'atas_a_montar' && recurso !== 'emendas_siop_painel') {
     if (typeof uasg !== 'string' || !UASGS_CGLIC.includes(uasg.trim())) {
       return { ok: false, erro: `UASG inválida. Use: ${UASGS_CGLIC.join(', ')}.` };
     }
@@ -279,6 +289,8 @@ export async function executarPedido(
       consulta = await deps.contarNotasEmendasTesouroPendentes(deps.chaveDoPortal());
     } else if (pedido.recurso === 'execucao_emendas') {
       consulta = await deps.contarExecucaoEmendasPendentes(deps.chaveDoPortal());
+    } else if (pedido.recurso === 'emendas_siop_painel') {
+      consulta = await deps.testarEmendasDoPainelSiop();
     } else if (pedido.recurso === 'emendas_portal') {
       consulta = await deps.medirEmendasDoPortal({ chave: deps.chaveDoPortal(), orcamentoMs: ORCAMENTO_DE_TEMPO_MS });
     } else if (pedido.recurso === 'itens_notas_siafi') {
@@ -316,6 +328,8 @@ export async function executarPedido(
     resultado = await deps.sincronizarNotasDasEmendasDoTesouro({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_NOTAS_EMENDAS_TESOURO_MS, chave: deps.chaveDoPortal() });
   } else if (pedido.recurso === 'execucao_emendas') {
     resultado = await deps.sincronizarExecucaoDasEmendas({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_EXECUCAO_EMENDAS_MS, chave: deps.chaveDoPortal() });
+  } else if (pedido.recurso === 'emendas_siop_painel') {
+    resultado = await deps.sincronizarEmendasDoPainelSiop({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_EMENDAS_SIOP_PAINEL_MS });
   } else if (pedido.recurso === 'emendas_portal') {
     // Medição: só existe em modo de teste (dry); não há o que gravar.
     resultado = { status: 'ERRO', erro: 'emendas_portal só roda em modo de teste (dry).' };

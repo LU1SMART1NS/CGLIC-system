@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import type { AutorEmenda, ContatoDaEmenda, EmendaSiop, ItemCaep, LinhaPedido, NotaDaLinha, NotaSemPedido, PedidoEmenda } from '../../../services/emendasService';
+import type { AutorEmenda, ContatoDaEmenda, EmendaPainelSemParlamentar, EmendaSiop, ItemCaep, LinhaPedido, NotaDaLinha, NotaSemPedido, PedidoEmenda } from '../../../services/emendasService';
 
 const A = '00031/2025-200331';
 const item: ItemCaep = { itemKey: `${A}-00001`, numeroAta: '00031/2025', codigoUasg: '200331', numeroItem: '00001', descricao: 'Carabina', codigoPdm: 1, valorUnitario: 100, vigenciaFinal: '2027-06-25', ataEncerrada: false, alocado: 100, nomeCurto: 'Carabina', fornecedor: 'FORNECEDOR A' };
@@ -24,7 +24,11 @@ const emendaSiop = (id: string, numero: string, vistaEm: string, extra: Partial<
 
 // Duas emendas sem pedido da Senadora Dois (uma sem contato há 13 dias, outra em conversa) e a emenda do pedido 1/2026 do
 // Deputado Um, que só existe no pedido (conferida no SIOP), com R$ 300 empenhados e R$ 100 pagos.
-const EMENDAS = [emendaSiop('e1', '42680021', '2026-10-10', { objeto: 'Viaturas para a PM', criadoPorNome: 'Luís' }), emendaSiop('e2', '42680022', '2026-10-20')];
+const EMENDAS = [emendaSiop('e1', '42680021', '2026-10-10', { objeto: 'Viaturas para a PM', criadoPorNome: 'Luís' }), emendaSiop('e2', '42680022', '2026-10-20', { origem: 'PAINEL' })];
+// Emenda do painel do SIOP que o servidor não registrou por não achar o parlamentar (migration 252).
+const SEM_PARLAMENTAR: EmendaPainelSemParlamentar[] = [
+  { ano: 2026, numero: '50010003', autor: 'Fulano de Tal', tipoAutor: 'Deputado Federal', uf: 'MG', valor: 750_000, gnd: 'GND-4', foraCompraDireta: [], baseSiafiEm: '2026-11-02' }
+];
 const CONTATOS: ContatoDaEmenda[] = [
   { id: 'c1', emendaId: 'e2', contatoEm: '2026-10-21', comQuem: 'ASPAR · PM · SP', meio: 'WHATSAPP', resumo: 'vão mandar os itens', criadoPorNome: null, criadoEm: '2026-10-21T12:00:00Z' }
 ];
@@ -32,6 +36,11 @@ const COM_EMENDA = pedido('p1', 'A1', 'EMPENHADO', { numeroNoAno: 1, anoDoNumero
 // Emenda de 2025 só no pedido, sem o valor do SIOP (como a da Bancada MG): valor desconhecido, não zero.
 const SEM_VALOR = pedido('p3', 'A1', 'AUTORIZADO', { numeroNoAno: 1, anoDoNumero: 2025, siopEmenda: '71140003', siopEmendaAno: 2025, siopValor: null, linhas: [linha('l3', 2)] });
 const PEDIDOS = [COM_EMENDA, pedido('p2', 'A1', 'RESERVADO'), SEM_VALOR];
+// Painel do Orçamento Federal do SIOP (migration 252): a emenda em duas linhas (ação e modalidade).
+const PAINEL = [
+  { codigo: '202642680021', ano: 2026, emenda: '42680021', autor: 'Senadora Dois', orgao: '30000 - Ministério da Justiça e Segurança Pública', unidadeOrcamentaria: '30911 - Fundo Nacional de Segurança Pública', acao: '21BM - Desenvolvimento de Políticas de Segurança Pública', localizador: '0001 - Nacional', gnd: '4', modalidade: '90 - Aplicações Diretas', naturezaDespesa: null, dotacaoInicial: 300000, dotacaoAtual: 300000, empenhado: 0, liquidado: 0, pago: 0, baseSiafiEm: '2026-10-30', lidoEm: '2026-11-03T13:22:00Z' },
+  { codigo: '202642680021', ano: 2026, emenda: '42680021', autor: 'Senadora Dois', orgao: '30000 - Ministério da Justiça e Segurança Pública', unidadeOrcamentaria: '30911 - Fundo Nacional de Segurança Pública', acao: '2723 - Policiamento, Fiscalização', localizador: '0001 - Nacional', gnd: '3', modalidade: '30 - Transferências a Estados e ao Distrito Federal', naturezaDespesa: null, dotacaoInicial: 200000, dotacaoAtual: 200000, empenhado: 0, liquidado: 0, pago: 0, baseSiafiEm: '2026-10-30', lidoEm: '2026-11-03T13:22:00Z' }
+];
 const NOTAS = new Map<string, NotaDaLinha>([
   ['l1', { linhaId: 'l1', nota: '2026NE000103', regra: 'SEI', motivo: null, contractKey: null, empenhoId: 'e1', valorEmpenhado: 300, valorLiquidado: 150, valorPago: 100, entregaPrevista: null, entregaPrevistaValor: null, emitidaEm: '2026-04-17', atualizadoEm: null }]
 ]);
@@ -46,6 +55,8 @@ vi.mock('../../../hooks/useEmendas', () => ({
   hojeEmBrasilia: () => '2026-10-23',
   usePedidosEmendas: () => ({ data: PEDIDOS, isLoading: false, isFetching: false, isError: false, error: null, refetch: vi.fn(), dataUpdatedAt: 0 }),
   useEmendasSiop: () => ({ data: EMENDAS, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
+  useEmendasPainelSemParlamentar: () => ({ data: SEM_PARLAMENTAR }),
+  useEmendaNoPainelSiop: (codigo: string | null) => ({ data: PAINEL.filter((l) => l.codigo === codigo) }),
   useContatosDasEmendas: () => ({ data: CONTATOS }),
   useNotasDasLinhas: () => ({ data: NOTAS }),
   useNotasSemPedido: () => ({ data: SEM_PEDIDO }),
@@ -88,8 +99,11 @@ describe('Emendas › Emendas (aba)', () => {
     perfil.gerir = true;
     const html = render('/emendas/emendas?situacao=sem');
     expect(html).toContain('emendas-por-emenda-tabela');
-    expect(html).toContain('Registrar emenda do SIOP');
+    // 03/11/2026: o servidor registra as emendas do painel sozinho; o cadastro à mão saiu.
+    expect(html).not.toContain('Registrar emenda do SIOP');
     expect(html).toContain('4268 0021');
+    expect(html).toContain('data-testid="emendas-emenda-do-siop-e2"');
+    expect(html).not.toContain('data-testid="emendas-emenda-do-siop-e1"');
     expect(html).toContain('Sem pedido · sem contato');
     expect(html).toContain('13 dias sem contato');
     expect(html).toContain('Sem pedido · em conversa');
@@ -102,10 +116,23 @@ describe('Emendas › Emendas (aba)', () => {
       const html = render('/emendas/emendas');
       expect(html).toContain('4268 0021');
       expect(html).not.toContain('Registrar emenda do SIOP');
+      expect(html).not.toContain('emendas-painel-sem-parlamentar');
       expect(html).not.toContain('Último contato');
     } finally {
       perfil.gerir = true;
     }
+  });
+
+  it('quem gere vê as emendas do painel sem parlamentar no cadastro, cada uma com o botão de escolher', () => {
+    perfil.gerir = true;
+    const html = render('/emendas/emendas');
+    expect(html).toContain('data-testid="emendas-painel-sem-parlamentar"');
+    expect(html).toContain('1 emenda do SIOP sem parlamentar no cadastro');
+    expect(html).toContain('5001 0003 / 2026');
+    expect(html).toContain('Fulano de Tal');
+    expect(html).toMatch(/R\$\s750\.000,00/);
+    expect(html).toContain('data-testid="emendas-painel-escolher-2026-50010003"');
+    expect(html).toContain('Escolher o parlamentar');
   });
 
   it('abre em Todas; a emenda que só existe no pedido entra com o empenhado, o pago e a sobra', () => {
@@ -195,6 +222,17 @@ describe('Emenda 360', () => {
     expect(cartao('sobra')).not.toContain('R$');
     expect(cartao('empenhado')).toContain('nenhuma nota ainda');
     expect(cartao('empenhado')).not.toContain('R$');
+  });
+
+  it('mostra a emenda como está no painel do SIOP, com o total e a base SIAFI; sem linha no painel, nada', () => {
+    const html = render('/emendas/emendas/2026/42680021');
+    expect(html).toContain('emenda-360-painel-siop');
+    expect(html).toContain('base SIAFI de 30/10/2026');
+    expect(html).toContain('21BM - Desenvolvimento de Políticas de Segurança Pública');
+    expect(html).toContain('30 - Transferências a Estados e ao Distrito Federal · GND 3 · 0001 - Nacional · 30911 - Fundo Nacional de Segurança Pública');
+    expect(html).toContain('Total da emenda');
+    expect(html).toContain('500.000,00');
+    expect(render('/emendas/emendas/2026/31660008')).not.toContain('emenda-360-painel-siop');
   });
 
   it('nº que não existe: emenda não encontrada', () => {

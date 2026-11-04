@@ -157,6 +157,7 @@ Situação em 14/10/2026: 126 arquivos, de `20260917000001` a `20261014000124`.
 | 187 | `20261025000187_emendas_empenho_x_pedido.sql` | Emendas, empenhado × pedido: view `v_emendas_empenho_x_pedido` compara, por emenda e item, as linhas dos pedidos já empenhados com as notas da emenda lidas no Portal (A_MAIS, A_MENOS, A_CONFERIR, IGUAL, SEM_NOTA). Avisos "Empenhado a mais/a menos" no Início e em Pedidos; `avisos_resolvidos` ganha o tipo EMPENHO, resolvido pelo gestor de emendas ou pelo coordenador (`resolver_aviso`/`reexibir_aviso`). |
 | 238 | `20261028000238_atas_a_montar.sql` | Atas a montar, entrega 1 (leitura pelo servidor, recurso `atas_a_montar`): `atas_a_montar_compras` (pregões de registro de preços homologados no PNCP: itens com resultado e leitura da minuta da ata do edital — descrição, CATMAT, gerenciador e participantes; só o servidor grava por `gravar_ata_a_montar_compra`), `atas_a_montar_rascunhos` (o que o gestor preenche, por `salvar_rascunho_ata_a_montar`, gestor e coordenador), view `v_atas_a_montar` (um fornecedor vencedor por linha, some quando a ata chega ao banco), fila `atas_a_montar_para_ler` (só servidor); agendamento de 2 em 2 horas no minuto 52. |
 | 240 | `20261029000240_divisao_da_ata_montada.sql` | Atas a montar, entrega 3 (D5): view `v_divisao_da_ata_montada` — a divisão do gerenciador entre as unidades internas planejada no Quadro 2 da montagem, por item da ata já publicada (ligada pela compra, pelo fornecedor e pelo número do item). Só sugestão: a janela "Alocação do item" oferece "Usar esta divisão" em item sem alocação e a gravação continua pelo `save_allocations_atomic`. |
+| 252 | `20261103000252_emendas_painel_siop.sql` | Emendas registradas sozinhas pelo Painel do Orçamento Federal do SIOP (recurso `emendas_siop_painel`, só o órgão 30000 - MJSP): `siop_painel_emendas` (foto a partir de 2026, uma linha por emenda × ação × GND × modalidade), `emenda_autor_codigos` (código do autor no SIOP → parlamentar ou bancada; as 27 bancadas da 155 não tinham código), `emendas_siop.origem` (CAEP ou PAINEL), views `v_emendas_do_painel` e `v_emendas_painel_sem_parlamentar`, `gravar_emendas_siop_painel` (só servidor, uma transação: troca a foto, aprende os códigos, registra a emenda nova de compra direta 21BM/90 com valor > 0 e, sem pedido, acompanha valor e GND do painel), `disparar_sincronizacao` com `x-region: sa-east-1`; agendamento diário às 13:22 UTC. |
 
 ## Por tema
 
@@ -167,7 +168,7 @@ Situação em 14/10/2026: 126 arquivos, de `20260917000001` a `20261014000124`.
 - **Ciclo de pagamento e previsão:** 22b, 45, 58, 60–63, 87–90; feriados 59, importação automática 228.
 - **Alocação e unidades internas:** 4, 6–9, 11, 21, 28, 29, 35; nota → unidade 55, 98; contratado por unidade 103, 110; unidade em uso 108.
 - **Vínculos automáticos:** item ↔ contrato 15, 48–50, 95, 100, 112, 115; nota ↔ item 94 (contrato de um item), 118 (pelo valor), 121 (SIAFI).
-- **Sincronização e cron:** 72, 76, 77, 78, 80, 82, 83, 87, 91, 95, 105, 109, 111, 121, 123, 238.
+- **Sincronização e cron:** 72, 76, 77, 78, 80, 82, 83, 87, 91, 95, 105, 109, 111, 121, 123, 238, 252.
 - **Segurança, perfis e RLS:** 2, 3, 6, 11, 20, 22–32, 33, 36, 47, 55, 65, 67, 68, 74, 75, 76, 84, 97, 98, 124.
 - **Limpezas e acertos de dados:** 41, 53, 60, 99, 101, 110.
 
@@ -194,6 +195,7 @@ Os jobs de sincronização chamam `disparar_sincronizacao(recurso, uasg)`, que a
 | sincronizar-cadastro-uasgs | :48 | cadastro de UASGs | 111 |
 | sincronizar-atas-a-montar | :52, de 2 em 2 h | atas a montar: pregões homologados, resultado dos itens e minuta da ata do edital (PNCP) | 238 |
 | sincronizar-autores-emendas | segunda-feira 06:40 UTC | deputados e senadores (Câmara e Senado), na região de São Paulo | 155, 156 |
+| sincronizar-emendas-siop-painel | todo dia 13:22 UTC (10:22 em Brasília) | emendas do MJSP no Painel do Orçamento Federal (SIOP), na região de São Paulo | 252 |
 | sincronizar-ordens-bancarias-200330 / -200331 | :53 / :57 | ordens bancárias | 83 (134 move a 200330) |
 | vincular-contratos-automaticamente | :55 | `executar_vinculos_automaticos(...,'CRON')` | 95 |
 | limpar-historico-do-cron | domingo 03:00 | apaga o histórico do cron com mais de 7 dias | 77 |

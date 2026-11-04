@@ -2,7 +2,7 @@
 
 Guia para quem vai trabalhar no código: como o sistema está montado, de onde vêm os dados, quem pode o quê e como publicar e diagnosticar. Visão geral e comandos estão no [README](README.md); as regras de negócio, em [docs/regras-de-dados.md](docs/regras-de-dados.md).
 
-Atualizado em 14/10/2026.
+Atualizado em 03/11/2026.
 
 ## 1. Visão geral
 
@@ -61,8 +61,8 @@ Os nomes exibidos dos perfis são editáveis pelo coordenador (migration 68). As
 - **Código:** `server/sincronizar-fontes/` (`index.ts` com `Deno.serve`, `handler.ts`, `executar.ts`, `proxyDeFontes.ts`, `supabaseServidor.ts`). Reaproveita os serviços de `src/services`.
 - **Empacotamento:** `scripts/build-sincronizar-fontes.mjs` junta tudo com rolldown num arquivo só (`supabase/functions/sincronizar-fontes/index.ts`, gerado e fora do git), troca o cliente do navegador pelo cliente do servidor e recusa o pacote se encontrar chave ou variável do navegador.
 - **Quem chama:** o pg_cron, com o cabeçalho `x-cron-secret` (nunca força), ou o coordenador logado, que pode forçar. A resposta é 202 e o trabalho segue em segundo plano. O modo `dry` só consulta e conta, sem gravar.
-- **Recursos** (`RECURSOS_DO_SERVIDOR` em `executar.ts`): `contratos`, `atas`, `saldos_itens`, `itens_contratos`, `unidades_itens`, `atas_participacao`, `contratos_participantes`, `empenhos`, `faturas`, `ordens_bancarias`, `cadastro_uasgs`, `itens_notas_siafi`.
-- **Fontes** (prefixos em `vercel.json`, `vite.config.ts` e `proxyDeFontes.ts`): `/api-arp` → Compras.gov.br dados abertos; `/api-pncp` → PNCP; `/api-contratos-gov` → Contratos.gov.br; `/api-sta` → STA do Tesouro; `/api-transparencia` → Portal da Transparência (só no servidor, exige chave).
+- **Recursos** (`RECURSOS_DO_SERVIDOR` em `executar.ts`): `contratos`, `atas`, `saldos_itens`, `itens_contratos`, `unidades_itens`, `atas_participacao`, `contratos_participantes`, `empenhos`, `faturas`, `ordens_bancarias`, `cadastro_uasgs`, `itens_notas_siafi`, e os demais da lista, entre eles `emendas_siop_painel` (emendas do Painel do Orçamento Federal do SIOP, migration 252).
+- **Fontes** (prefixos em `vercel.json`, `vite.config.ts` e `proxyDeFontes.ts`): `/api-arp` → Compras.gov.br dados abertos; `/api-pncp` → PNCP; `/api-contratos-gov` → Contratos.gov.br; `/api-sta` → STA do Tesouro; `/api-transparencia` → Portal da Transparência (só no servidor, exige chave). `/api-siop` → Painel do Orçamento Federal do SIOP (QlikView, só no servidor: sessão anônima, XML; a leitura em `src/services/siopPainelQlik.ts` limpa os filtros, liga os doze agrupadores e pede páginas grandes).
 - **Agendamento:** `disparar_sincronizacao(recurso, uasg)` (migration 77) lê o endereço e o segredo do Vault e chama a função. Jobs e horários em [docs/migrations.md](docs/migrations.md#jobs-do-pg_cron).
 - **Limites:** cada execução tem orçamento de ~100 s (a Edge Function para em 150 s); o que não couber fica para a próxima. Cada chamada a uma fonte tem 30 s. O recurso só roda se passou da validade e respeita a trava em `sincronizacao_fontes`.
 - **Instalação inicial:** `scripts/ativar-sincronizacao-no-servidor.sh` gera o segredo, publica a função, aplica as migrations, grava o Vault e faz um teste `dry`.

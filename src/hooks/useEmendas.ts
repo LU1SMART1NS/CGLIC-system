@@ -46,6 +46,8 @@ import {
   voltarEtapaPedido,
   fetchEmendasAContratar,
   fetchEmendasSiop,
+  fetchEmendaNoPainelSiop,
+  fetchEmendasPainelSemParlamentar,
   fetchContatosDasEmendas,
   fetchAsparDosOrgaos,
   salvarEmendaSiop,
@@ -380,6 +382,22 @@ export function useCancelarPedido() {
 /** Emendas vistas no SIOP (migration 205): todos os que leem as emendas. */
 export function useEmendasSiop({ enabled = true }: LeituraOpcional = {}) {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-siop'], queryFn: fetchEmendasSiop, enabled });
+}
+
+/** A emenda como está no Painel do Orçamento Federal do SIOP (migration 252), lida pelo servidor uma vez por dia. */
+export function useEmendaNoPainelSiop(codigo: string | null) {
+  return useQuery({
+    queryKey: [...CHAVE_EMENDAS, 'emenda-painel-siop', codigo],
+    queryFn: () => fetchEmendaNoPainelSiop(codigo as string),
+    enabled: Boolean(codigo),
+    staleTime: 30 * 60_000
+  });
+}
+
+/** Emendas do painel do SIOP sem parlamentar no cadastro (migration 252): só quem registra emendas. */
+export function useEmendasPainelSemParlamentar() {
+  const podeGerir = usePodeGerirEmendas();
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-painel-sem-parlamentar'], queryFn: fetchEmendasPainelSemParlamentar, enabled: podeGerir });
 }
 
 /** Contatos das emendas e ASPAR dos órgãos: só quem trata com eles, coordenador e gestor de emendas (o banco também). */

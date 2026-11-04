@@ -26,6 +26,7 @@ import {
   useCredorDiferente,
   useDiferencasDeEmpenho,
   useEmendasSiop,
+  useEmendaNoPainelSiop,
   useItensCaep,
   useKitsEmendas,
   useNotasDasLinhas,
@@ -40,7 +41,7 @@ import { emendasNaLista, NOME_ORGAO_ASPAR, numeroDaEmenda, orgaoDoBeneficiario, 
 import { ROTULO_SITUACAO_SOBRA, type SobraDaEmenda } from '../../../utils/emendasSobra';
 import { execucaoDosPedidos } from '../../../utils/emendasParlamentar';
 import { nomeDoPedido } from '../../../utils/emendasNomeDoPedido';
-import { nomeESigla, type LinhaPedido, type NotaDaLinha, type OrgaoAspar, type PedidoEmenda } from '../../../services/emendasService';
+import { nomeESigla, type LinhaPainelSiop, type LinhaPedido, type NotaDaLinha, type OrgaoAspar, type PedidoEmenda } from '../../../services/emendasService';
 import { linhaDoAutor } from '../emendasPartes';
 import { PedidoModal } from '../PedidoModal';
 import { EmendaSiopModal } from '../EmendaSiopModal';
@@ -52,10 +53,12 @@ import { SobraDaEmendaCartao } from '../parlamentares/SobraDaEmendaCartao';
 import { TabelaDePedidos } from '../parlamentares/TabelaDePedidos';
 import { useSobraDasEmendas } from '../parlamentares/useSobraDasEmendas';
 import { SiopDaBancada } from './SiopDaBancada';
+import { NoPainelDoSiop } from './NoPainelDoSiop';
 import { ReservasParaLigar } from './ReservasParaLigar';
 
 type Aba = 'pedidos' | 'execucao' | 'contatos';
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
+const SEM_LINHAS_DO_PAINEL: LinhaPainelSiop[] = [];
 
 interface NotaDaEmenda {
   chave: string;
@@ -103,6 +106,7 @@ export const Emenda360Page: React.FC = () => {
   const codigo = e?.ano ? `${e.ano}${e.numero}` : null;
   const sobra = codigo ? sobras.find((s) => s.codigo === codigo) : undefined;
   const portal = codigo ? portalPorCodigo.get(codigo) : undefined;
+  const { data: noPainel = SEM_LINHAS_DO_PAINEL } = useEmendaNoPainelSiop(codigo);
   // Todos os pedidos da emenda, inclusive os cancelados (a lista da emenda só traz os ativos). Na emenda registrada
   // conta também o pedido que nasceu dela ou foi ligado a ela antes da conferência com o SIOP.
   const daEmenda = useMemo(
@@ -368,6 +372,7 @@ export const Emenda360Page: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               {sobra && <SobraDaEmendaCartao e={sobra} minimo={minimo} podeGerir={podeGerir} onNovoComSobra={setNovoPedido} />}
               {registrada && autor?.tipo === 'BANCADA' && <SiopDaBancada e={registrada} />}
+              <NoPainelDoSiop linhas={noPainel} valorRegistrado={registrada?.valor} />
               {registrada && (
                 <ReservasParaLigar
                   emenda={registrada}
@@ -520,7 +525,7 @@ export const Emenda360Page: React.FC = () => {
           onClose={() => setNovoPedido(null)}
         />
       )}
-      {alterando && registrada && <EmendaSiopModal emenda={registrada} emendas={emendasQ.data ?? []} pedidos={pedidos} autores={autores} beneficiarios={beneficiariosLista} onClose={() => setAlterando(false)} />}
+      {alterando && registrada && <EmendaSiopModal emenda={registrada} emendas={emendasQ.data ?? []} pedidos={pedidos} autores={autores} onClose={() => setAlterando(false)} />}
       {registrando && registrada && <ContatoEmendaModal emenda={registrada} nomeDoAutor={autor?.nome ?? ''} uf={uf} orgaos={orgaos} onClose={() => setRegistrando(false)} />}
       {editandoAspar && uf && <AsparModal uf={uf} orgao={editandoAspar} atual={aspar.get(`${uf}:${editandoAspar}`) ?? null} onClose={() => setEditandoAspar(null)} />}
     </Instrument360Page>
