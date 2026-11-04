@@ -114,8 +114,9 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
 
   const { role } = useAuth();
   const saldosOnly = role === 'gestor_saldos';
-  const semQuantitativos = role === 'gestor';
   const ehGestor = role === 'gestor';
+  // Saldo dos itens (consumo e quantitativos) é do gestor de saldo: o gestor de atas e contratos não recebe esses avisos.
+  const semAvisosDeSaldo = ehGestor;
   // Coordenador e consulta escolhem um gestor: o painel inteiro passa a ser a carteira dele, com o mesmo recorte
   // que ele vê no próprio painel (useAssignedManagementScope / escopoDoGestor).
   const podeFiltrarGestor = role === 'admin' || role === 'leitor';
@@ -239,7 +240,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       const jaResolvidos = new Set(attention?.resolvidos || []);
       for (const item of [...(attention?.items || []), ...(attention?.resolvidos || [])]) {
         if (saldosOnly && item.category !== 'ATA_CRITICA' && item.category !== 'QUANTITATIVOS') continue;
-        if (semQuantitativos && item.category === 'QUANTITATIVOS') continue;
+        if (semAvisosDeSaldo && (item.category === 'ATA_CRITICA' || item.category === 'QUANTITATIVOS')) continue;
         if (item.taskId && tarefasConcluidas.has(item.taskId)) continue;
         const resolvido = resolvidosDoPainel ? jaResolvidos.has(item) : Boolean(item.avisoChave && avisosResolvidos.has(item.avisoChave));
         (resolvido ? resolvidos : ativos).push({ ...item, uasg });
@@ -256,7 +257,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     }
     return { allItems: ativos, itensResolvidos: resolvidos };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash200330.readModel, dash200331.readModel, uasgsAtivas, gestorEscolhido, scope200330.contractKeys, scope200331.contractKeys, saldosOnly, semQuantitativos, avisosPagamento, avisosResolvidos, resolvidosDoPainel, tarefasConcluidas]);
+  }, [dash200330.readModel, dash200331.readModel, uasgsAtivas, gestorEscolhido, scope200330.contractKeys, scope200331.contractKeys, saldosOnly, semAvisosDeSaldo, avisosPagamento, avisosResolvidos, resolvidosDoPainel, tarefasConcluidas]);
 
   const tabCounts = useMemo(() => {
     return {
@@ -314,13 +315,13 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       totalEmpenhado: sum((rm) => rm.financial.totalEmpenhado),
       // Só CRITICA: é o que o clique no card filtra. Urgentes aparecem na linha própria do card.
       criticalCount: allItems.filter((i) => i.severity === 'CRITICA').length,
-      // Gestor de Saldo: o total do banco soma avisos de todo tipo; conta só os de saldo, como a lista.
-      totalAlertasAtivos: saldosOnly ? allItems.length : sum((rm) => rm.attention.totalAlertasAtivos),
+      // Gestor de saldo e gestor de atas e contratos: o total do banco soma avisos de todo tipo; conta os da lista.
+      totalAlertasAtivos: saldosOnly || semAvisosDeSaldo ? allItems.length : sum((rm) => rm.attention.totalAlertasAtivos),
       urgenteCount,
       atencaoCount
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboards, allItems, saldosOnly]);
+  }, [dashboards, allItems, saldosOnly, semAvisosDeSaldo]);
 
   const activeCard: GestaoInstrumentosCardId | null = useMemo(() => {
     if (activeTab === 'SALDOS') return 'ARP';
@@ -631,6 +632,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
                     activeCard={activeCard}
                     onSelectCard={selectCardAndDock}
                     saldosOnly={saldosOnly}
+                    semSaldoDosItens={semAvisosDeSaldo}
                   />
                   <PainelBotoesGavetas botoes={botoesGavetas} aberta={gavetaAberta} onToggle={alternarGaveta} />
                   <SectionHeader
