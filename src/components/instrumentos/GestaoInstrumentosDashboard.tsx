@@ -115,8 +115,6 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const { role } = useAuth();
   const saldosOnly = role === 'gestor_saldos';
   const ehGestor = role === 'gestor';
-  // Saldo dos itens (consumo e quantitativos) é do gestor de saldo: o gestor de atas e contratos não recebe esses avisos.
-  const semAvisosDeSaldo = ehGestor;
   // Coordenador e consulta escolhem um gestor: o painel inteiro passa a ser a carteira dele, com o mesmo recorte
   // que ele vê no próprio painel (useAssignedManagementScope / escopoDoGestor).
   const podeFiltrarGestor = role === 'admin' || role === 'leitor';
@@ -137,7 +135,10 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   );
   const gestorNome = podeFiltrarGestor ? searchParams.get('gestor') || TODOS_OS_GESTORES : TODOS_OS_GESTORES;
   const gestorEscolhido = gestorNome ? gestores.find((g) => g.nome === gestorNome) : undefined;
-  const gestoresCarregando = Boolean(gestorNome) && (managers200330.isLoading || managers200331.isLoading || ataManagersLoading);
+  // Saldo dos itens (consumo e quantitativos) é do gestor de saldo: o gestor de atas e contratos não recebe esses avisos,
+  // nem quando o coordenador abre a carteira dele pelo filtro.
+  const semAvisosDeSaldo = ehGestor || Boolean(gestorNome);
+  const gestoresCarregando = Boolean(gestorNome) &&(managers200330.isLoading || managers200331.isLoading || ataManagersLoading);
 
   // Perfil "gestor" tem escopo ASSIGNED em contratos (role_domain_scopes,
   // migration 20260925000023), agora derivado também das Atas atribuídas
