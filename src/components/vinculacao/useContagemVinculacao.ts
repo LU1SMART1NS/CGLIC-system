@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../hooks/useVinculacaoEmpenhos';
 import { useEmpenhosForaDoContrato } from '../../hooks/useEmpenhosForaDoContrato';
 import { useNotasForaDoContrato } from '../../hooks/useNotasForaDoContrato';
-import { contratoIndicado, notaNoSegmento } from './notasForaDoContrato';
+import { contratoIndicado, notaNoSegmento, semNotasCitadasEmFatura } from './notasForaDoContrato';
 import { useContratosDoFinanceiro } from '../financeiro/useContratosDoFinanceiro';
 import { useTelaCarregada } from '../layout/useTelaCarregada';
 import { aguardaVinculoAosItens, contaNoMenu, pedeOGestor } from './vinculacaoEmpenhos';
@@ -33,7 +33,7 @@ export function useContagemVinculacao(): { aosItens: number; aoContrato: number;
     const aosItens = notas.filter((d) => aguardaVinculoAosItens(d) && conta(d.contractKey)).length;
     const aoContrato = foraDoContrato.filter((l) => pedeOGestor(l) && conta(l.contractKey)).length;
     // Notas fora do contrato (migration 256): "A incluir", pelo contrato indicado (o do gestor, no perfil gestor).
-    const notasForaDoContrato = notasFora.filter((n) => {
+    const notasForaDoContrato = semNotasCitadasEmFatura(notasFora, foraDoContrato).filter((n) => {
       const k = contratoIndicado(n);
       return notaNoSegmento(n, 'A_INCLUIR') && (k ? conta(k) : !escopo);
     }).length;

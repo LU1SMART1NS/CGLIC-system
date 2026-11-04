@@ -43,6 +43,8 @@ export interface EmpenhoForaDoContrato {
   numeroEmpenho: string;
   /** O registro que a fatura cita, quando o sistema o tem. */
   nota: {
+    /** Id do empenho no sistema (para não repetir a nota na visão "Sem contrato"). */
+    empenhoId: string;
     numeroOficial: string;
     uasgEmitente: string;
     dataEmissao: string | null;
@@ -102,6 +104,7 @@ export function linhaForaDoContrato(r: any): EmpenhoForaDoContrato {
     numeroEmpenho: String(r.numero_empenho ?? r.id_empenho_gov),
     nota: r.empenho_id
       ? {
+          empenhoId: String(r.empenho_id),
           numeroOficial: String(r.numero_oficial),
           uasgEmitente: String(r.uasg_emitente),
           dataEmissao: r.data_emissao ?? null,

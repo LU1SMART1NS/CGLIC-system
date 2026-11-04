@@ -1,4 +1,5 @@
 import type { ContratoDoFornecedor, NotaForaDoContrato } from '../../services/notasForaDoContratoService';
+import type { EmpenhoForaDoContrato } from '../../services/empenhosForaDoContratoService';
 
 /**
  * Regras da fila Vínculos › Notas fora do contrato (migration 256). O sistema não vincula: indica o contrato onde
@@ -72,3 +73,12 @@ export function fraseDaNota(n: NotaForaDoContrato, numeroDoContrato: (key: strin
 /** Situação "Na Carteira": em contrato pelo pedido ou sem contrato. */
 export type NaCarteira = 'PELO_PEDIDO' | 'SEM_CONTRATO';
 export const naCarteira = (n: Pick<NotaForaDoContrato, 'contratoPeloPedido'>): NaCarteira => (n.contratoPeloPedido ? 'PELO_PEDIDO' : 'SEM_CONTRATO');
+
+/**
+ * Tira as notas que uma fatura já cita fora do contrato: elas ficam só em "Citadas em fatura", que diz o contrato da
+ * fatura (as duas visões da aba Empenhos ao contrato não repetem a nota, nem o número do menu).
+ */
+export function semNotasCitadasEmFatura<T extends Pick<NotaForaDoContrato, 'empenhoId'>>(notas: T[], citadas: Array<Pick<EmpenhoForaDoContrato, 'nota'>>): T[] {
+  const ids = new Set(citadas.map((c) => c.nota?.empenhoId).filter(Boolean));
+  return ids.size === 0 ? [...notas] : notas.filter((n) => !ids.has(n.empenhoId));
+}

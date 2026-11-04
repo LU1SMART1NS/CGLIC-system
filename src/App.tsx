@@ -28,8 +28,8 @@ const ItensRoute = lazyComRecarga(() => import('./routes/ItensRoute').then((m) =
 const DistribuicaoEquipeRoute = lazyComRecarga(() => import('./routes/DistribuicaoEquipeRoute').then((m) => ({ default: m.DistribuicaoEquipeRoute })));
 const ContratosAtaPage = lazyComRecarga(() => import('./components/vinculacao/ContratosAtaPage').then((m) => ({ default: m.ContratosAtaPage })));
 const EmpenhosItensPage = lazyComRecarga(() => import('./components/vinculacao/EmpenhosItensPage').then((m) => ({ default: m.EmpenhosItensPage })));
-const NotasForaDoContratoPage = lazyComRecarga(() => import('./components/vinculacao/NotasForaDoContratoPage').then((m) => ({ default: m.NotasForaDoContratoPage })));
-const EmpenhosContratoPage = lazyComRecarga(() => import('./components/vinculacao/EmpenhosContratoPage').then((m) => ({ default: m.EmpenhosContratoPage })));
+const EmpenhosAoContratoPage = lazyComRecarga(() => import('./components/vinculacao/EmpenhosAoContratoPage').then((m) => ({ default: m.EmpenhosAoContratoPage })));
+const NotasForaDoContratoRedirect = lazyComRecarga(() => import('./components/vinculacao/EmpenhosAoContratoPage').then((m) => ({ default: m.NotasForaDoContratoRedirect })));
 const ItensUnidadesPage = lazyComRecarga(() => import('./components/alocacao/ItensUnidadesPage').then((m) => ({ default: m.ItensUnidadesPage })));
 const ContractsRoute = lazyComRecarga(() => import('./routes/ContractsRoute').then((m) => ({ default: m.ContractsRoute })));
 const Contract360Route = lazyComRecarga(() => import('./routes/Contract360Route').then((m) => ({ default: m.Contract360Route })));
@@ -272,18 +272,11 @@ const AppContent: React.FC = () => {
               path="/vinculacao/empenhos-contrato"
               element={
                 <RequireRole allowedRoles={['admin', 'gestor']}>
-                  <EmpenhosContratoPage />
+                  <EmpenhosAoContratoPage />
                 </RequireRole>
               }
             />
-            <Route
-              path="/vinculacao/notas-fora-do-contrato"
-              element={
-                <RequireRole allowedRoles={['admin', 'gestor']}>
-                  <NotasForaDoContratoPage />
-                </RequireRole>
-              }
-            />
+            <Route path="/vinculacao/notas-fora-do-contrato" element={<NotasForaDoContratoRedirect />} />
             <Route path="/vinculacao/itens-unidades" element={<Navigate to="/alocacao" replace />} />
             <Route
               path="/alocacao"

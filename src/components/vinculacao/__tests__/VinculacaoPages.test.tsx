@@ -232,7 +232,7 @@ describe('Vínculos → Empenhos ao contrato', () => {
 
   it('lista as notas a conferir do escopo do gestor, com o veredito e o botão Conferir, sem vincular à mão', () => {
     const html = render(<EmpenhosContratoPage />);
-    expect(html).toContain('Empenhos citados fora do contrato');
+    expect(html).toContain('Empenhos ao contrato');
     expect(html).toContain('2024NE000412');
     expect(html).toContain('Fora dos contratos');
     expect(html).toContain('vinc-ne-contrato-conferir-1490|g412');
@@ -497,7 +497,7 @@ describe('Vínculos: uma leitura falha, a faixa avisa e o resto fica', () => {
   it('Empenhos ao contrato: as notas não carregaram → faixa e "não carregaram", sem travar a tela', () => {
     vi.mocked(useEmpenhosForaDoContrato).mockReturnValue({ ...falhou(), isLoading: false } as any);
     const html = render(<EmpenhosContratoPage />);
-    expect(html).toContain('Empenhos citados fora do contrato');
+    expect(html).toContain('Empenhos ao contrato');
     expect(html).toContain('data-testid="vinc-ne-contrato-fontes-com-falha"');
     expect(html).toContain('<strong>Notas citadas fora do contrato</strong>');
     expect(html).toContain('data-testid="vinc-ne-contrato-nao-carregou"');

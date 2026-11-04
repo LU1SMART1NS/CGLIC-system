@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contratoIndicado, contratosSugeridos, motivosDoContrato, naCarteira, notaNoSegmento, situacaoDaNota } from '../notasForaDoContrato';
+import { contratoIndicado, contratosSugeridos, motivosDoContrato, naCarteira, notaNoSegmento, semNotasCitadasEmFatura, situacaoDaNota } from '../notasForaDoContrato';
 import { linhaNotaForaDoContrato, type ContratoDoFornecedor } from '../../../services/notasForaDoContratoService';
 
 const c = (k: string, extra: Partial<ContratoDoFornecedor> = {}): ContratoDoFornecedor => ({
@@ -59,5 +59,11 @@ describe('notas fora do contrato', () => {
     expect(naCarteira(n)).toBe('PELO_PEDIDO');
     expect(n.marca).toBeNull();
     expect(contratoIndicado(n)).toBe('200331-00238-2026');
+  });
+
+  it('nota já citada em fatura fica só em "Citadas em fatura"', () => {
+    const notas = [{ empenhoId: 'a' }, { empenhoId: 'b' }];
+    expect(semNotasCitadasEmFatura(notas, [{ nota: null }, { nota: { empenhoId: 'b' } as never }])).toEqual([{ empenhoId: 'a' }]);
+    expect(semNotasCitadasEmFatura(notas, [])).toEqual(notas);
   });
 });
