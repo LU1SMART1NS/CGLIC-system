@@ -39,6 +39,8 @@ import { PainelFiltros, TODAS_UASGS, TODOS_OS_GESTORES } from './PainelFiltros';
 import { PainelBotoesGavetas, PainelGaveta, type PainelBotaoGaveta, type PainelGavetaId } from './PainelGavetas';
 import { GavetaSituacao } from './GavetaSituacao';
 import { GavetaDistribuicaoConectada } from './GavetaDistribuicaoConectada';
+import { CENTRAL_DISTRIBUICAO_PATH } from '../carteira/ManagerAssign';
+import { SEM_GESTOR } from '../carteira/carteiraGestor';
 import { GavetaAlocacao } from './GavetaAlocacao';
 import { GavetaEmendasAContratar } from './GavetaEmendasAContratar';
 import { useEmendasAContratar } from '../../hooks/useEmendas';
@@ -541,7 +543,9 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
             mudarEndereco({ gestor: nome, gaveta: null });
             window.scrollTo({ top: 0 });
           }}
-          onDistribuir={() => navigate('/atas/distribuicao')}
+          onDistribuir={(destino) =>
+            navigate(destino === 'ATAS' ? CENTRAL_DISTRIBUICAO_PATH : `/contratos?gestor=${encodeURIComponent(SEM_GESTOR)}`)
+          }
         />
       )}
       {gavetaAberta === 'alocacao' && <GavetaAlocacao onAbrir={navigate} />}

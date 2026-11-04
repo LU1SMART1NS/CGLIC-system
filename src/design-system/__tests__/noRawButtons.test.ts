@@ -31,7 +31,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/instrument360/Instrument360HeroResumo.tsx': 1, // nome que volta ao cartão (barra azul do celular)
   'src/components/instrument360/Instrument360Tabs.tsx': 1, // abas
   'src/components/instrumentos/GestaoInstrumentosCategoryTabs.tsx': 1, // abas
-  'src/components/instrumentos/GavetaDistribuicao.tsx': 1, // cartão clicável de cada gestor
+  'src/components/instrumentos/GavetaDistribuicao.tsx': 3, // cartão clicável de cada gestor e os dois lados (Atas, Contratos) do "Sem gestor"
   'src/components/instrumentos/GavetaSituacao.tsx': 1, // trecho clicável da barra de faixas
   'src/components/instrumentos/GestaoInstrumentosDockStrip.tsx': 3, // nome que volta ao topo, números-filtro e botões das áreas (faixa encolhida)
   'src/components/instrumentos/PainelCartao.tsx': 1, // cartão de resumo do Início (filtra a lista ou abre a tela certa)

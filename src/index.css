@@ -1027,6 +1027,12 @@ html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que est
 .pn-gcard:hover { border-color: var(--border-color-hover); box-shadow: var(--shadow-sm); }
 .pn-gcard:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 .pn-gcard--sem { background: var(--color-warning-bg); border-color: var(--color-warning-border); }
+.pn-gcard--partido { cursor: default; }
+.pn-gc-lado-btn { display: flex; min-width: 0; margin: -4px; padding: 4px; border: 0; border-radius: var(--radius-sm); background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.pn-gc-lado-btn:hover { background: var(--bg-card); }
+.pn-gc-lado-btn:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 0; }
+.pn-gc-lado-btn + .pn-gc-lado-btn { padding-left: 12px; border-left: 1px solid var(--border-color); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.pn-gc-lado-btn > .pn-gc-lado { flex: 1; }
 .pn-gc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 0.85rem; }
 .pn-gc-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pn-gc-ir { flex: none; font-size: 0.78rem; font-weight: 700; color: var(--primary); }
