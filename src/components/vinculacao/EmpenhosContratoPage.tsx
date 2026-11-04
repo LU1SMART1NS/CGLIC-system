@@ -192,7 +192,7 @@ export const EmpenhosContratoPage: React.FC<{ alternador?: React.ReactNode }> = 
       <VinculacaoPageHeader
         title="Empenhos ao contrato"
         subtitle="Citadas em fatura: notas que uma fatura cita, mas que o Contratos.gov.br não lista no contrato da fatura."
-        actions={alternador}
+        viewToggle={alternador}
         hint={'Abra a conferência para ver o que aconteceu. A correção é sempre no Contratos.gov.br: incluir a nota no contrato, mudar a fatura de contrato ou corrigir o número. Marque "Vou corrigir" e corrija lá: a linha fica com seu nome e sai sozinha quando a sincronização trouxer a correção. Em contrato encerrado, se a correção não muda mais nada, deixe como está, com justificativa.'}
       />
 

@@ -180,7 +180,7 @@ export const NotasForaDoContratoPage: React.FC<{ alternador?: React.ReactNode }>
       <VinculacaoPageHeader
         title="Empenhos ao contrato"
         subtitle="Sem contrato: notas que o Contratos.gov.br não lista em nenhum contrato. A correção é incluir a nota no contrato, lá."
-        actions={alternador}
+        viewToggle={alternador}
         hint={`Sem contrato: o sistema não vincula a nota à mão: indica o contrato onde incluí-la no Contratos.gov.br. Com pedido de emenda, é o contrato do pedido; sem ele, os contratos do fornecedor na ordem: item do pedido, assinado depois da nota, sem notas da fonte e data mais próxima. Marque "Vou incluir" e inclua lá: a linha fica com seu nome e sai sozinha quando a sincronização trouxer a nota. Se não chegar em ${PRAZO_DA_MARCA_DIAS} dias, volta para "A incluir".`}
       />
 
