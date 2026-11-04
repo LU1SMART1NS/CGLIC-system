@@ -43,6 +43,11 @@ vi.mock('../../hooks/useEmendas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../hooks/useEmendas')>()),
   useEmendasAContratar: vi.fn(() => ({ data: [], isLoading: false, isError: false }))
 }));
+vi.mock('../../hooks/useTransferenciasTemporarias', () => ({
+  useTransferenciasTemporarias: () => ({ data: [] }),
+  useDesfazerTransferencia: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useMudarRetorno: () => ({ mutate: vi.fn(), isPending: false, isError: false })
+}));
 vi.mock('../../hooks/useRefreshItemSaldos', () => ({
   useRefreshItemSaldos: () => ({ refresh: vi.fn(), isRefreshing: false })
 }));

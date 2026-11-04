@@ -30,6 +30,12 @@ import { useCapacidadeDosGestores } from './useCapacidadeDosGestores';
 import { useDistribuicaoDaCarteira } from './useDistribuicaoDaCarteira';
 import { ROTAS_VINCULACAO } from '../../vinculacao/vinculacaoConfig';
 import { chaveGestaoAta } from '../../../utils/ataIdentidade';
+import { useTransferenciasTemporarias } from '../../../hooks/useTransferenciasTemporarias';
+import type { DistribuicaoLinha } from './distribuicaoEquipe';
+import { AusenciasFila } from './AusenciasFila';
+import { TransferirTemporariamenteModal } from './TransferirTemporariamenteModal';
+import { AvisoAusencias } from './AvisoAusencias';
+import { emCurso, hojeISO, recebidasPor, retornoChegou } from './transferenciaTemporaria';
 
 const AMBAR = 'var(--color-warning-solid)';
 const VERMELHO = 'var(--color-danger)';
@@ -68,6 +74,11 @@ export const DistribuicaoEquipePage: React.FC = () => {
   // "Para quem atribuo?" aberto: alvos (carteira inteira de um gestor ou itens marcados), de quem saem e o que fazer ao salvar.
   const [transferencia, setTransferencia] = React.useState<{ targets: ManagerTarget[]; origem: string | null; done?: () => void; provaveis?: number } | null>(null);
 
+  // Transferências temporárias (férias, licença…): aba Ausências e a parte temporária da carteira de quem assumiu.
+  const { data: transferencias = [] } = useTransferenciasTemporarias();
+  const [temporaria, setTemporaria] = React.useState<{ linha: DistribuicaoLinha; userId: string } | null>(null);
+  const recebidasDe = React.useCallback((gestorNome: string) => recebidasPor(transferencias, nivelDe(gestorNome).userId), [transferencias, nivelDe]);
+
   // Fila aberta (?aba=); trocar de fila limpa a busca, os filtros e a ordenação da anterior.
   const [searchParams, setSearchParams] = useSearchParams();
   const abaParam = searchParams.get('aba');
@@ -98,7 +109,12 @@ export const DistribuicaoEquipePage: React.FC = () => {
   // "Gestor diferente da ata" só aparece quando há caso: o vínculo automático não cria divergência (migration 95).
   // "Histórico sem gestor" também some quando está vazia.
   const historico = pendencias.atasHistoricoSemGestor;
-  const filaVazia = (abaDaUrl === 'DIVERGENCIAS' && divergencias.length === 0) || (abaDaUrl === 'HISTORICO' && historico.length === 0);
+  const ausentes = emCurso(transferencias);
+  const retornosHoje = ausentes.filter((t) => retornoChegou(t, hojeISO())).length;
+  const filaVazia =
+    (abaDaUrl === 'DIVERGENCIAS' && divergencias.length === 0) ||
+    (abaDaUrl === 'HISTORICO' && historico.length === 0) ||
+    (abaDaUrl === 'AUSENCIAS' && transferencias.length === 0);
   const aba: Fila = filaVazia ? FILA_INICIAL : abaDaUrl;
   const totalInstrumentos = totais.atas.vigentes + totais.contratos.vigentes;
   // A carteira sem gestor fica nas filas; a Equipe mostra só quem tem carteira.
@@ -131,6 +147,18 @@ export const DistribuicaoEquipePage: React.FC = () => {
             count: divergencias.length,
             dot: VERMELHO,
             title: 'Contratos vinculados fora da regra'
+          }
+        ]
+      : []),
+    // Ausências só aparece quando já houve transferência temporária.
+    ...(transferencias.length > 0
+      ? [
+          {
+            id: 'AUSENCIAS' as const,
+            label: 'Ausências',
+            count: ausentes.length,
+            dot: retornosHoje > 0 ? AMBAR : undefined,
+            title: 'Férias, licenças e afastamentos: carteiras transferidas até o retorno'
           }
         ]
       : [])
@@ -192,6 +220,8 @@ export const DistribuicaoEquipePage: React.FC = () => {
             </NoticeBar>
           )}
 
+          <AvisoAusencias transferencias={transferencias} onVer={aba === 'AUSENCIAS' ? undefined : () => trocarAba('AUSENCIAS')} />
+
           <CarteiraSegmentTabs segments={segmentos} active={aba} onSelect={trocarAba} testIdPrefix="distribuicao-aba" ariaLabel="Filas de distribuição" />
 
           {aba === 'EQUIPE' && (
@@ -204,8 +234,19 @@ export const DistribuicaoEquipePage: React.FC = () => {
               canAjustar={canAjustar}
               aVincularDe={aVincularDe}
               onTransfer={(targets, origem, done) => setTransferencia({ targets, origem, done })}
+              recebidasDe={recebidasDe}
+              onTransferirTemporariamente={
+                canAjustar
+                  ? (linha) => {
+                      const userId = linha.gestorNome ? nivelDe(linha.gestorNome).userId : null;
+                      if (userId) setTemporaria({ linha, userId });
+                    }
+                  : undefined
+              }
             />
           )}
+
+          {aba === 'AUSENCIAS' && <AusenciasFila transferencias={transferencias} podeAlterar={canAjustar} />}
 
           {aba === 'ATAS' && (
             <AtasSemGestorFila
@@ -238,6 +279,15 @@ export const DistribuicaoEquipePage: React.FC = () => {
               divergencias={divergencias}
               podeAlinhar={canAssign}
               onAlinhar={(d) => setTransferencia({ targets: [{ tipo: 'ATA', ataKey: d.chaveAta }], origem: d.gestorAta ?? null })}
+            />
+          )}
+
+          {temporaria && (
+            <TransferirTemporariamenteModal
+              ausente={{ nome: temporaria.linha.gestorNome as string, userId: temporaria.userId }}
+              linha={temporaria.linha}
+              links={links}
+              onClose={() => setTemporaria(null)}
             />
           )}
 

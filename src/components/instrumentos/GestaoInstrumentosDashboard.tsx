@@ -38,6 +38,10 @@ import { EmptyState } from '../../design-system/components/EmptyState';
 import { PainelFiltros, TODAS_UASGS, TODOS_OS_GESTORES } from './PainelFiltros';
 import { PainelBotoesGavetas, PainelGaveta, type PainelBotaoGaveta, type PainelGavetaId } from './PainelGavetas';
 import { GavetaSituacao } from './GavetaSituacao';
+import { useTransferenciasTemporarias } from '../../hooks/useTransferenciasTemporarias';
+import { AvisoAusencias } from '../atas/distribuicao/AvisoAusencias';
+import { AvisoMinhaAusencia } from '../atas/distribuicao/AvisoMinhaAusencia';
+import { ausenciaDe } from '../atas/distribuicao/transferenciaTemporaria';
 import { GavetaDistribuicaoConectada } from './GavetaDistribuicaoConectada';
 import { GavetaAlocacao } from './GavetaAlocacao';
 import { GavetaEmendasAContratar } from './GavetaEmendasAContratar';
@@ -112,7 +116,9 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const ataManagersQuery = useAllAtaManagers();
   const { data: ataManagers, isLoading: ataManagersLoading } = ataManagersQuery;
 
-  const { role } = useAuth();
+  const { role, user } = useAuth();
+  // Férias, licença…: avisos de quem está fora (coordenador) e do que o gestor recebeu ou deixou com colegas.
+  const { data: transferencias = [] } = useTransferenciasTemporarias();
   const saldosOnly = role === 'gestor_saldos';
   const ehGestor = role === 'gestor';
   // Saldo dos itens (consumo e quantitativos) é do gestor de saldo: o gestor de atas e contratos não recebe esses avisos.
@@ -602,7 +608,16 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
         testIdPrefix="inicio-fontes"
       />
 
-      {semCarteira ? (
+      {role === 'admin' && <AvisoAusencias transferencias={transferencias} onVer={() => navigate('/atas/distribuicao?aba=AUSENCIAS')} />}
+      {ehGestor && <AvisoMinhaAusencia transferencias={transferencias} userId={user?.id} />}
+
+      {semCarteira && ausenciaDe(transferencias, user?.id) ? (
+        <EmptyState
+          title="Sua carteira está com colegas durante a sua ausência"
+          description="As atas e os contratos voltam para você quando a coordenação desfizer a transferência temporária."
+          testId="instrumentos-carteira-transferida"
+        />
+      ) : semCarteira ? (
         <EmptyState
           title="Você ainda não tem atas ou contratos atribuídos"
           description="Este painel mostra a sua carteira. Quando a coordenação distribuir atas ou contratos para você, os números e as pendências aparecem aqui."
