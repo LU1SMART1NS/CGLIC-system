@@ -28,6 +28,7 @@ const ItensRoute = lazyComRecarga(() => import('./routes/ItensRoute').then((m) =
 const DistribuicaoEquipeRoute = lazyComRecarga(() => import('./routes/DistribuicaoEquipeRoute').then((m) => ({ default: m.DistribuicaoEquipeRoute })));
 const ContratosAtaPage = lazyComRecarga(() => import('./components/vinculacao/ContratosAtaPage').then((m) => ({ default: m.ContratosAtaPage })));
 const EmpenhosItensPage = lazyComRecarga(() => import('./components/vinculacao/EmpenhosItensPage').then((m) => ({ default: m.EmpenhosItensPage })));
+const NotasForaDoContratoPage = lazyComRecarga(() => import('./components/vinculacao/NotasForaDoContratoPage').then((m) => ({ default: m.NotasForaDoContratoPage })));
 const EmpenhosContratoPage = lazyComRecarga(() => import('./components/vinculacao/EmpenhosContratoPage').then((m) => ({ default: m.EmpenhosContratoPage })));
 const ItensUnidadesPage = lazyComRecarga(() => import('./components/alocacao/ItensUnidadesPage').then((m) => ({ default: m.ItensUnidadesPage })));
 const ContractsRoute = lazyComRecarga(() => import('./routes/ContractsRoute').then((m) => ({ default: m.ContractsRoute })));
@@ -272,6 +273,14 @@ const AppContent: React.FC = () => {
               element={
                 <RequireRole allowedRoles={['admin', 'gestor']}>
                   <EmpenhosContratoPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/vinculacao/notas-fora-do-contrato"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor']}>
+                  <NotasForaDoContratoPage />
                 </RequireRole>
               }
             />

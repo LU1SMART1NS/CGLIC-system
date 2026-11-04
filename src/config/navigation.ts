@@ -22,7 +22,8 @@ import {
   ScrollText,
   ClipboardList,
   Building,
-  Contact
+  Contact,
+  FileWarning
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -73,7 +74,7 @@ export interface NavItem {
  * - Carteira: Atas (Registradas /atas · A montar /atas/montar) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
- * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
+ * - Vínculos: Contratos à ata · Empenhos ao contrato · Notas fora do contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
  * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
  * - Emendas: Parlamentares (/emendas/parlamentares) · Emendas (/emendas/emendas) · Pedidos (/emendas/pedidos) · Itens
  *   (/emendas/itens: Por item · Por kit). Cada linha abre a tela 360 (Pedido, Parlamentar, Emenda), como na Carteira.
@@ -233,6 +234,15 @@ export const navigationConfig: NavItem[] = [
         route: '/vinculacao/empenhos-contrato',
         status: 'active',
         matchPrefixes: ['/vinculacao/empenhos-contrato'],
+        allowedRoles: ['admin', 'gestor']
+      },
+      {
+        id: 'vinculacao-notas-fora-do-contrato',
+        label: 'Notas fora do contrato',
+        icon: FileWarning,
+        route: '/vinculacao/notas-fora-do-contrato',
+        status: 'active',
+        matchPrefixes: ['/vinculacao/notas-fora-do-contrato'],
         allowedRoles: ['admin', 'gestor']
       },
       {
@@ -503,6 +513,7 @@ const staticRouteLabels: Record<string, string> = {
   '/vinculacao/contratos': 'Contratos à ata',
   '/vinculacao/empenhos-itens': 'Empenhos aos itens',
   '/vinculacao/empenhos-contrato': 'Empenhos ao contrato',
+  '/vinculacao/notas-fora-do-contrato': 'Notas fora do contrato',
   '/alocacao': 'Alocação',
   '/admin/departamentos': 'Unidades Internas',
   '/admin/usuarios': 'Usuários e Servidores',

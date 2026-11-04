@@ -22,8 +22,11 @@ export interface NormalizedContractEmpenho {
   outros_contratos?: string[];
   /** CNPJ/CPF do credor da NE (para alertar credor diferente do fornecedor do contrato). */
   credor_cnpj_cpf?: string;
-  /** FONTE: listado pelo Contratos.gov.br. MANUAL: vinculado pela equipe (migration 85). */
-  origem_vinculo?: 'FONTE' | 'MANUAL';
+  /**
+   * FONTE: listado pelo Contratos.gov.br. MANUAL: vinculado pela equipe (migration 85). EMENDA: só pelo contrato do pedido
+   * de emenda; o Contratos.gov.br não lista a nota (migration 255).
+   */
+  origem_vinculo?: 'FONTE' | 'MANUAL' | 'EMENDA';
   vinculado_por_nome?: string;
   motivo_manual?: string;
   vinculado_em?: string;
@@ -80,7 +83,7 @@ export function prepareContractEmpenhosList(
     situacao: e.situacao || 'EMITIDO',
     outros_contratos: Array.isArray(e.outros_contratos) ? e.outros_contratos.map(String) : [],
     credor_cnpj_cpf: e.credor_cnpj_cpf || undefined,
-    origem_vinculo: e.origem_vinculo === 'MANUAL' ? ('MANUAL' as const) : ('FONTE' as const),
+    origem_vinculo: e.origem_vinculo === 'MANUAL' || e.origem_vinculo === 'EMENDA' ? (e.origem_vinculo as 'MANUAL' | 'EMENDA') : ('FONTE' as const),
     vinculado_por_nome: e.vinculado_por_nome || undefined,
     motivo_manual: e.motivo_manual || undefined,
     vinculado_em: e.vinculado_em || undefined

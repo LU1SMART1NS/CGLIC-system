@@ -178,6 +178,15 @@ export const EmpenhosCarteiraTable: React.FC<EmpenhosCarteiraTableProps> = ({
                           + {outros} {outros === 1 ? 'contrato' : 'contratos'}
                         </div>
                       )}
+                      {row.faltaIncluirNaFonte && (
+                        <span
+                          data-testid={`empenhos-falta-incluir-${row.numero}`}
+                          title="O Contratos.gov.br não lista esta nota em nenhum contrato; aqui ela aparece pelo contrato do pedido de emenda. Inclua a nota no contrato lá (Vínculos › Notas fora do contrato)."
+                          style={{ display: 'inline-block', marginTop: '0.2rem' }}
+                        >
+                          <StatusBadge label="Falta incluir no Contratos.gov.br" variant="warning" size="sm" dot={false} />
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td data-label="Emissão" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>

@@ -48,7 +48,7 @@ describe('número no ícone das áreas', () => {
   beforeEach(() => {
     zerarContagensExtras();
     vi.mocked(useAuth).mockReturnValue({ role: 'admin' } as any);
-    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 3, aoContrato: 2 });
+    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 3, aoContrato: 2, notasForaDoContrato: 0 });
     vi.mocked(useContagemFinanceiro).mockReturnValue(null);
   });
 
@@ -142,8 +142,10 @@ describe('números novos: Financeiro e Início', () => {
   });
 
   it('Vínculos abre na primeira fila com pendência', () => {
-    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 4, aoContrato: 0 });
+    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 4, aoContrato: 0, notasForaDoContrato: 0 });
     expect(menu()).toContain('href="/vinculacao/empenhos-itens"');
+    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 4, aoContrato: 0, notasForaDoContrato: 5 });
+    expect(menu()).toContain('href="/vinculacao/notas-fora-do-contrato"');
     definirContagemExtra('contratosAta', 1);
     expect(menu()).toContain('href="/vinculacao/contratos"');
   });
