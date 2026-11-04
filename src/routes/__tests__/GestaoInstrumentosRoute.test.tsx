@@ -524,6 +524,33 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
       expect(html).not.toContain('data-testid="instrumentos-sem-carteira"');
     });
 
+    it('perfil gestor: sem os avisos de saldo dos itens (são do gestor de saldo); os outros avisos ficam', () => {
+      painel({
+        ...mockReadModel,
+        attention: {
+          ...mockReadModel.attention,
+          items: [
+            ...mockReadModel.attention.items,
+            { id: 'ATT-QUANT-1', category: 'QUANTITATIVOS', severity: 'ATENCAO', title: 'Quantitativos do item a conferir', numeroAta: '12/2026' }
+          ]
+        }
+      });
+      vi.mocked(authModule.useAuth).mockReturnValue({ user: { id: 'u1' }, role: 'gestor', loading: false } as any);
+      vi.spyOn(useAllContractManagersModule, 'useAllContractManagers').mockReturnValue({
+        data: { '200331-00015-2026': { contractKey: '200331-00015-2026', uasg: '200331', numero: '15', ano: 2026, gestorUserId: 'u1', gestorNome: 'Ana Costa', createdAt: '', updatedAt: '' } },
+        isLoading: false,
+        isError: false
+      } as any);
+
+      const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
+
+      // Ficam pagamento, tarefas e reajuste (4 em cada UASG); saem o consumo crítico e os quantitativos.
+      expect(html).toContain('Todas<span class="segment-pill__count">8</span>');
+      expect(html).toContain('Saldos<span class="segment-pill__count">0</span>');
+      expect(html).not.toContain('Ata 12/2026');
+      expect(html).not.toContain('Saldo crítico');
+    });
+
     it('lista viva dos resolvidos não carregou: o resolvido pelo painel continua resolvido, os outros avisos ficam e a faixa avisa', () => {
       const comResolvido: ManagementDashboardReadModel = {
         ...mockReadModel,

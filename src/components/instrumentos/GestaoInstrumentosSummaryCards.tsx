@@ -32,6 +32,8 @@ interface GestaoInstrumentosSummaryCardsProps {
   onSelectCard: (card: GestaoInstrumentosCardId) => void;
   /** Gestor de Saldo: card de Atas e card de alertas contando só os avisos de saldo; contratos e valor ficam fora. */
   saldosOnly?: boolean;
+  /** Gestor de atas e contratos: o saldo dos itens é do gestor de saldo; o card de Atas fica sem as linhas de saldo. */
+  semSaldoDosItens?: boolean;
 }
 
 function formatPercent(part: number, total: number): string {
@@ -47,7 +49,8 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
   counts,
   activeCard,
   onSelectCard,
-  saldosOnly = false
+  saldosOnly = false,
+  semSaldoDosItens = false
 }) => {
   const saldoDisponivel = counts.valorVigenteTotal - counts.totalEmpenhado;
 
@@ -62,7 +65,7 @@ export const GestaoInstrumentosSummaryCards: React.FC<GestaoInstrumentosSummaryC
         ativo={activeCard === 'ARP'}
         onClick={() => onSelectCard('ARP')}
         testId="instrumentos-card-arp"
-        linhas={[
+        linhas={semSaldoDosItens ? [] : [
           { rotulo: `Saldo crítico (>${SALDO_RULES.criticoAcimaDePct}%)`, valor: counts.itensCriticosArp, tom: seHouver(counts.itensCriticosArp, 'danger') },
           { rotulo: `Saldo em atenção (${SALDO_RULES.atencaoAcimaDePct}–${SALDO_RULES.criticoAcimaDePct}%)`, valor: counts.itensProximosLimiteArp, tom: seHouver(counts.itensProximosLimiteArp, 'warning') }
         ]}
