@@ -6,19 +6,21 @@ import { linhaForaDoContrato } from '../../../services/empenhosForaDoContratoSer
 vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'admin' })) }));
 vi.mock('../../../hooks/useVinculacaoEmpenhos', () => ({ useEmpenhosParaVincularAosItens: vi.fn() }));
 vi.mock('../../../hooks/useEmpenhosForaDoContrato', () => ({ useEmpenhosForaDoContrato: vi.fn() }));
+vi.mock('../../../hooks/useNotasForaDoContrato', () => ({ useNotasForaDoContrato: vi.fn() }));
 vi.mock('../../financeiro/useContratosDoFinanceiro', () => ({ useContratosDoFinanceiro: vi.fn() }));
 vi.mock('../../layout/useTelaCarregada', () => ({ useTelaCarregada: vi.fn(() => true) }));
 
 import { useAuth } from '../../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../../hooks/useVinculacaoEmpenhos';
 import { useEmpenhosForaDoContrato } from '../../../hooks/useEmpenhosForaDoContrato';
+import { useNotasForaDoContrato } from '../../../hooks/useNotasForaDoContrato';
 import { useContratosDoFinanceiro } from '../../financeiro/useContratosDoFinanceiro';
 import { useTelaCarregada } from '../../layout/useTelaCarregada';
 import { useContagemVinculacao } from '../useContagemVinculacao';
 
 const Numero: React.FC = () => {
   const n = useContagemVinculacao();
-  return <span>{n ? `${n.aosItens}/${n.aoContrato}` : 'nulo'}</span>;
+  return <span>{n ? `${n.aosItens}/${n.aoContrato}/${n.notasForaDoContrato}` : 'nulo'}</span>;
 };
 const render = () => renderToStaticMarkup(<Numero />);
 const nota = (ne: string, contractKey: string, situacao = 'A_DISTRIBUIR') =>
@@ -35,17 +37,25 @@ describe('número do menu Vínculos (empenhos)', () => {
     vi.mocked(useTelaCarregada).mockReturnValue(true);
     vi.mocked(useEmpenhosParaVincularAosItens).mockReturnValue({ data: [nota('a', 'VIG'), nota('b', 'VIG', 'REVISAR'), nota('c', 'ENC'), nota('d', 'SEM'), nota('e', 'VIG', 'DISTRIBUIDA')] } as any);
     vi.mocked(useEmpenhosForaDoContrato).mockReturnValue({ data: [fora(1, 'VIG'), fora(2, 'ENC'), fora(3, 'SEM'), fora(4, 'VIG', 'CORRIGINDO')] } as any);
+    // Notas fora do contrato: VIG sem marca conta; ENC fica fora; marcada há pouco não conta.
+    vi.mocked(useNotasForaDoContrato).mockReturnValue({
+      data: [
+        { marca: null, contratoPeloPedido: 'VIG', contratosDoFornecedor: [] },
+        { marca: null, contratoPeloPedido: 'ENC', contratosDoFornecedor: [] },
+        { marca: { contractKey: 'SEM', observacao: null, porNome: null, em: new Date().toISOString() }, contratoPeloPedido: null, contratosDoFornecedor: [] }
+      ]
+    } as any);
     contratos(null);
   });
 
   it('conta só contratos vigentes (sem data de fim conta como vigente); encerrados ficam fora', () => {
-    expect(render()).toContain('3/2');
+    expect(render()).toContain('3/2/1');
   });
 
   it('gestor: só os próprios contratos', () => {
     vi.mocked(useAuth).mockReturnValue({ role: 'gestor' } as any);
     contratos(new Set(['ENC', 'SEM']));
-    expect(render()).toContain('1/1');
+    expect(render()).toContain('1/1/0');
   });
 
   it('espera a carteira para saber quais contratos estão encerrados', () => {

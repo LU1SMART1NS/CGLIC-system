@@ -11,7 +11,7 @@ export interface PendenciaDaArea {
 }
 
 export interface FontesDoMenu {
-  empenhos: { aosItens: number; aoContrato: number } | null;
+  empenhos: { aosItens: number; aoContrato: number; notasForaDoContrato?: number } | null;
   financeiro: { total: number; urgente: boolean } | null;
   extras: ContagensExtras;
   /** UASGs sem grupo (GTI) confirmado, com e sem sugestão; só o coordenador recebe número. */
@@ -57,11 +57,20 @@ export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gr
   const contratos = extras.contratosAta ?? 0;
   const aoContrato = empenhos?.aoContrato ?? 0;
   const aosItens = empenhos?.aosItens ?? 0;
-  const vinc = contratos + aoContrato + aosItens;
+  // Notas fora do contrato: sem vermelho (não travam pagamento; decisão D7 de 04/11/2026).
+  const notasFora = empenhos?.notasForaDoContrato ?? 0;
+  const vinc = contratos + aoContrato + notasFora + aosItens;
   if (vinc > 0) {
     r.vinculacao = {
       contagem: vinc,
-      destino: contratos > 0 ? ROTAS_VINCULACAO.contratos : aoContrato > 0 ? ROTAS_VINCULACAO.empenhosContrato : ROTAS_VINCULACAO.empenhosItens
+      destino:
+        contratos > 0
+          ? ROTAS_VINCULACAO.contratos
+          : aoContrato > 0
+            ? ROTAS_VINCULACAO.empenhosContrato
+            : notasFora > 0
+              ? ROTAS_VINCULACAO.notasForaDoContrato
+              : ROTAS_VINCULACAO.empenhosItens
     };
   }
 

@@ -6,7 +6,7 @@ const colunaAusente = (error: any) =>
 
 interface VinculoGravado {
   empenho_id: string;
-  origem?: 'FONTE' | 'MANUAL';
+  origem?: 'FONTE' | 'MANUAL' | 'EMENDA';
   vinculado_por_nome?: string | null;
   motivo_manual?: string | null;
   created_at?: string | null;
@@ -58,7 +58,7 @@ export async function fetchContractEmpenhosFromDb(contractKey: string): Promise<
     return {
       ...r,
       outros_contratos: (outrosPorEmpenho.get(String(r.empenho_id)) ?? []).sort(),
-      origem_vinculo: v?.origem === 'MANUAL' ? 'MANUAL' : 'FONTE',
+      origem_vinculo: v?.origem === 'MANUAL' || v?.origem === 'EMENDA' ? v.origem : 'FONTE',
       vinculado_por_nome: v?.vinculado_por_nome ?? undefined,
       motivo_manual: v?.motivo_manual ?? undefined,
       vinculado_em: v?.created_at ?? undefined
