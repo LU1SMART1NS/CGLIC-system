@@ -17,14 +17,21 @@ import { AlterarNivelModal } from './AlterarNivelModal';
 import { OcupacaoBarra, escalaDeOcupacao } from './OcupacaoBarra';
 import { PESO_COMPLEXIDADE } from './complexidade';
 import { ROTULO_NIVEL, avaliarSubida, type AvaliacaoSubida, type NivelGestor, type NivelRegistrado } from './nivelGestor';
+import { diaMes, textoQuantidade, type Recebidas } from './transferenciaTemporaria';
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
-const CarteiraCell: React.FC<{ l: DistribuicaoLinha }> = ({ l }) => (
+const CarteiraCell: React.FC<{ l: DistribuicaoLinha; recebidas?: Recebidas[] }> = ({ l, recebidas = [] }) => (
   <div title={`Valor registrado das atas: ${formatCurrencyCompact(l.atas.valor)} · Valor vigente dos contratos: ${formatCurrencyCompact(l.contratos.valor)}`}>
     <div style={{ fontWeight: 800 }}>
       {plural(l.atas.vigentes, 'ata', 'atas')} · {plural(l.contratos.vigentes, 'contrato', 'contratos')}
     </div>
+    {/* Recebidas de colegas ausentes: já estão na conta acima; aqui só se diz quanto é temporário. */}
+    {recebidas.map((r) => (
+      <div key={r.transferencia.id} style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-info-text-strong)' }}>
+        inclui {textoQuantidade(r.atas, r.contratos)} de {r.transferencia.ausenteNome} até {diaMes(r.transferencia.retornoPrevisto)}
+      </div>
+    ))}
   </div>
 );
 
@@ -137,10 +144,14 @@ interface EquipeFilaProps {
   nivelDe: (gestorNome: string) => NivelDoGestor;
   /** Desde quando o gestor atual cuida do instrumento (para os critérios de subida). */
   gestorDesde: (tipo: 'ATA' | 'CONTRATO', chave: string) => string | undefined;
+  /** O que o gestor recebeu de colegas ausentes (transferência temporária em curso). */
+  recebidasDe?: (gestorNome: string) => Recebidas[];
+  /** Abre a transferência temporária (férias, licença…) da carteira inteira; só o coordenador. */
+  onTransferirTemporariamente?: (linha: DistribuicaoLinha) => void;
 }
 
 /** Carga de cada gestor: nível, carteira vigente, ocupação (com a complexidade) e pressão do momento. */
-export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaOcupacao, canAssign, canAjustar, aVincularDe, onTransfer, nivelDe, gestorDesde }) => {
+export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaOcupacao, canAssign, canAjustar, aVincularDe, onTransfer, nivelDe, gestorDesde, recebidasDe, onTransferirTemporariamente }) => {
   const [expanded, setExpanded] = React.useState<string | null>(null);
   const [alterando, setAlterando] = React.useState<{ nome: string; userId: string; sugerido?: NivelGestor; motivo?: string } | null>(null);
   const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
@@ -244,7 +255,7 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaOcupacao, c
                           />
                         </td>
                         <td data-label="Carteira" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                          <CarteiraCell l={l} />
+                          <CarteiraCell l={l} recebidas={recebidasDe?.(nome)} />
                         </td>
                         <td data-label="Ocupação" style={carteiraTd} data-testid={`distribuicao-ocupacao-${nome}`}>
                           <OcupacaoBarra l={l} escala={escala} media={mediaOcupacao} />
@@ -270,6 +281,17 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaOcupacao, c
                                 data-testid={`distribuicao-transferir-${nome}`}
                                 title="Passar toda a carteira vigente deste gestor para outra pessoa"
                                />
+                            )}
+                            {onTransferirTemporariamente && (l.ataKeys.length > 0 || l.contractKeys.length > 0) && (
+                              <ActionButton
+                                action="transferirTemporariamente"
+                                label="Temporariamente"
+                                type="button"
+                                size="sm"
+                                onClick={() => onTransferirTemporariamente(l)}
+                                data-testid={`distribuicao-transferir-temp-${nome}`}
+                                title="Férias, licença…: passar a carteira até o retorno e desfazer depois"
+                              />
                             )}
                           </div>
                         </td>
