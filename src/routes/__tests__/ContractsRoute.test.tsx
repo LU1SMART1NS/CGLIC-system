@@ -21,6 +21,7 @@ vi.mock('react-router-dom', () => ({
 }));
 
 // Situação da sincronização dos contratos (consulta ao banco): fora do teste, carteira em dia.
+vi.mock('../../hooks/useUsers', () => ({ useUsers: () => ({ data: undefined }) }));
 vi.mock('../../hooks/useSincronizacaoContratos', () => ({
   useSincronizacaoContratos: () => ({
     ultimoSucessoEm: null,

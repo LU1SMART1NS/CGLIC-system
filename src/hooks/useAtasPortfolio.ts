@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { atribuicaoValida, useIdsGestoresAtivos } from './useGestoresAtivos';
 import { useQueries, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { RECURSO_ATAS } from '../services/syncService';
 import { useAtualizacaoNoServidor } from './useAtualizacaoNoServidor';
@@ -127,13 +128,15 @@ export function useAtasPortfolio() {
   // Gestor por ata (mesma fonte do detalhe da Ata e do Início), indexado pela chave de gestão (chaveGestaoDaArp).
   const ataManagersQuery = useAllAtaManagers();
   const { data: ataManagers } = ataManagersQuery;
+  // Atribuição a quem não é mais gestor ativo vale como "Sem gestor" (mesma regra da gaveta Distribuição do Início).
+  const idsGestoresAtivos = useIdsGestoresAtivos();
   const gestorByAta = useMemo(() => {
     const map: Record<string, string> = {};
     for (const [ataKey, manager] of Object.entries(ataManagers || {})) {
-      if (manager?.gestorNome) map[ataKey] = manager.gestorNome;
+      if (manager?.gestorNome && atribuicaoValida(manager.gestorUserId, idsGestoresAtivos)) map[ataKey] = manager.gestorNome;
     }
     return map;
-  }, [ataManagers]);
+  }, [ataManagers, idsGestoresAtivos]);
 
   // Consumo de saldo por item (mesma fonte do detalhe da Ata e do Início).
   // Atas vencidas, canceladas ou sem data não geram alerta de saldo (mesma regra do Início).

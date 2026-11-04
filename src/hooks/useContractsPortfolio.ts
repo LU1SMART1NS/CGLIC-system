@@ -12,6 +12,7 @@ import { UASGS_CGLIC } from '../config/unidadesGestoras';
 import type { ContractPortfolioRow } from '../components/contracts/portfolio/ContractsPortfolioTable';
 import type { DashboardAttentionItem } from '../types/managementDashboard';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
+import { atribuicaoValida, useIdsGestoresAtivos } from './useGestoresAtivos';
 
 /** UASGs consolidadas — mesmo escopo já usado no Início (/instrumentos), para que os painéis reportem os mesmos números. */
 const UASGS = UASGS_CGLIC;
@@ -84,15 +85,18 @@ export function useContractsPortfolio({ pendencias: comPendencias = true, enable
     { enabled: enabled && comPendencias && !scope200331.isLoading }
   );
 
+  // Atribuição a quem não é mais gestor ativo (virou coordenador, consulta ou foi inativado) vale como "Sem gestor":
+  // mesma regra da gaveta Distribuição do Início, para o contrato aparecer no filtro e na Central.
+  const idsGestoresAtivos = useIdsGestoresAtivos();
   const gestorByContractKey = useMemo(() => {
     const map = new Map<string, string>();
     for (const managers of [managers200330.data, managers200331.data]) {
       for (const [key, manager] of Object.entries(managers || {})) {
-        if (manager?.gestorNome) map.set(key, manager.gestorNome);
+        if (manager?.gestorNome && atribuicaoValida(manager.gestorUserId, idsGestoresAtivos)) map.set(key, manager.gestorNome);
       }
     }
     return map;
-  }, [managers200330.data, managers200331.data]);
+  }, [managers200330.data, managers200331.data, idsGestoresAtivos]);
 
   /** Todos os alertas do Funil Único de Atenção das duas UASGs (de contratos e de atas). */
   // Na versão leve o painel não é lido; mesmo que outra tela o tenha posto no cache, as pendências ficam de fora.

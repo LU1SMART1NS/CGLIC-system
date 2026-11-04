@@ -37,6 +37,8 @@ vi.mock('../useAssignedManagementScope', async (orig) => ({
 vi.mock('../useAllContractManagers', () => ({
   useAllContractManagers: (uasg: string) => consulta(uasg === '200331' ? { '200331-00002-2025': { gestorNome: 'Ana' } } : {})
 }));
+// Sem a lista de usuários, as atribuições valem como estão (a regra do gestor ativo tem teste próprio).
+vi.mock('../useUsers', () => ({ useUsers: () => ({ data: undefined }) }));
 vi.mock('../useAtaManagers', () => ({ useArpItemContractLinks: () => consulta([{ ataKey: '00010/2024-200331', contractKey: '200331-00002-2025' }]) }));
 vi.mock('../useManagementDashboard', () => ({
   useManagementDashboard: (filtros: { uasg: string }, opts: { enabled?: boolean }) => {
