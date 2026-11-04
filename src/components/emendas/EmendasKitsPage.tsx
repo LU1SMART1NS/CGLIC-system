@@ -159,7 +159,7 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem, 
     }
   };
 
-  // Só o kit que nenhum pedido usa; o de pedido só se desativa (migration 251).
+  // Só o kit que nenhum pedido usa; o de pedido só se desativa (migration 253).
   const excluirKit = async (k: KitEmenda) => {
     const ok = await confirm({ title: 'Excluir kit', message: `Excluir ${k.nome}? Nenhum pedido usa este kit. A exclusão não pode ser desfeita.`, confirmLabel: 'Excluir', tone: 'danger' });
     if (!ok) return;

@@ -122,7 +122,7 @@ export interface KitEmenda {
   ativo: boolean;
   versao: number;
   itens: ItemDoKit[];
-  /** Pedidos com o kit, mesmo cancelados: com algum, o kit só se desativa (migration 251). */
+  /** Pedidos com o kit, mesmo cancelados: com algum, o kit só se desativa (migration 253). */
   pedidos: number;
   atualizadoPorNome: string | null;
   atualizadoEm: string | null;
@@ -341,7 +341,7 @@ export async function salvarKitEmenda(k: KitParaSalvar): Promise<{ id: string; v
   return data as { id: string; versao: number };
 }
 
-/** Exclui o kit que nenhum pedido usa; o banco confere de novo (migration 251). */
+/** Exclui o kit que nenhum pedido usa; o banco confere de novo (migration 253). */
 export async function excluirKitEmenda(k: Pick<KitEmenda, 'id' | 'versao'>): Promise<void> {
   const { error } = await db().rpc('excluir_kit_emenda', { p_id: k.id, p_versao: k.versao });
   if (error) throw new Error(mensagemDoBanco(error));
