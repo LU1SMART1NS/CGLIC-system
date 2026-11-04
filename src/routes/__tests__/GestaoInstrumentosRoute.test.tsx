@@ -12,10 +12,12 @@ import type { ManagementDashboardReadModel } from '../../types/managementDashboa
 import * as authModule from '../../context/AuthContext';
 import * as resolverAvisoModule from '../../components/avisos/ResolverAviso';
 
+// Endereço da tela (ex.: ?gestor=… do filtro do coordenador); cada teste começa sem parâmetros.
+const endereco = vi.hoisted(() => ({ params: '' }));
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
   useLocation: () => ({ pathname: '/instrumentos' }),
-  useSearchParams: () => [new URLSearchParams(), vi.fn()]
+  useSearchParams: () => [new URLSearchParams(endereco.params), vi.fn()]
 }));
 
 // Situação da sincronização dos contratos (consulta ao banco): fora do teste, carteira em dia.
@@ -205,6 +207,7 @@ const mockReadModel: ManagementDashboardReadModel = {
 describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão e Monitoramento (Lei 14.133)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    endereco.params = '';
     vi.spyOn(useAllContractManagersModule, 'useAllContractManagers').mockReturnValue({
       data: { '200331-00015-2026': { contractKey: '200331-00015-2026', uasg: '200331', numero: '15', ano: 2026, gestorNome: 'Ana Costa', createdAt: '', updatedAt: '' } },
       isLoading: false,
@@ -549,6 +552,32 @@ describe('GestaoInstrumentosRoute & Componentes — Painel Unificado de Gestão 
       expect(html).toContain('Saldos<span class="segment-pill__count">0</span>');
       expect(html).not.toContain('Ata 12/2026');
       expect(html).not.toContain('Saldo crítico');
+    });
+
+    it('coordenador com um gestor escolhido no filtro: o mesmo recorte do gestor, sem os avisos de saldo dos itens', () => {
+      painel();
+      vi.mocked(authModule.useAuth).mockReturnValue({ user: { id: 'c1' }, role: 'admin', loading: false } as any);
+      vi.spyOn(useAllContractManagersModule, 'useAllContractManagers').mockReturnValue({
+        data: { '200331-00015-2026': { contractKey: '200331-00015-2026', uasg: '200331', numero: '15', ano: 2026, gestorUserId: 'u1', gestorNome: 'Ana Costa', createdAt: '', updatedAt: '' } },
+        isLoading: false,
+        isError: false
+      } as any);
+      endereco.params = 'gestor=Ana+Costa';
+
+      const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
+
+      expect(html).toContain('Saldos<span class="segment-pill__count">0</span>');
+      expect(html).not.toContain('Saldo crítico');
+    });
+
+    it('coordenador sem gestor escolhido: continua vendo os avisos de saldo dos itens', () => {
+      painel();
+      vi.mocked(authModule.useAuth).mockReturnValue({ user: { id: 'c1' }, role: 'admin', loading: false } as any);
+
+      const html = renderToStaticMarkup(<GestaoInstrumentosRoute />);
+
+      expect(html).not.toContain('Saldos<span class="segment-pill__count">0</span>');
+      expect(html).toContain('Saldo crítico');
     });
 
     it('lista viva dos resolvidos não carregou: o resolvido pelo painel continua resolvido, os outros avisos ficam e a faixa avisa', () => {
