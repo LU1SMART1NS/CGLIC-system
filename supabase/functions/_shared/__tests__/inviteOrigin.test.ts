@@ -2,19 +2,19 @@ import { describe, it, expect } from 'vitest';
 import { resolveInviteRedirect, ALLOWED_INVITE_ORIGINS } from '../inviteOrigin';
 
 describe('resolveInviteRedirect — allow-list de origem do redirectTo do convite', () => {
-  it('domínio novo (bloqueado pelo firewall do MJ) -> redirectTo aponta a cglic.vercel.app', () => {
+  it('domínio oficial -> redirectTo em comprassusp.app', () => {
     const result = resolveInviteRedirect('https://comprassusp.app');
-    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
+    expect(result).toEqual({ ok: true, redirectTo: 'https://comprassusp.app/definir-senha' });
   });
 
-  it('cglic.vercel.app -> redirectTo continua em cglic.vercel.app', () => {
+  it('cglic.vercel.app -> redirectTo leva ao domínio oficial', () => {
     const result = resolveInviteRedirect('https://cglic.vercel.app');
-    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
+    expect(result).toEqual({ ok: true, redirectTo: 'https://comprassusp.app/definir-senha' });
   });
 
-  it('domínio protegido por SSO da Vercel -> redirectTo aponta a cglic.vercel.app', () => {
+  it('domínio protegido por SSO da Vercel -> redirectTo leva ao domínio oficial', () => {
     const result = resolveInviteRedirect('https://cglic-lu1smart1ns-projects.vercel.app');
-    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
+    expect(result).toEqual({ ok: true, redirectTo: 'https://comprassusp.app/definir-senha' });
   });
 
   it('origin permitido (localhost de desenvolvimento) -> redirectTo correto', () => {
@@ -24,7 +24,7 @@ describe('resolveInviteRedirect — allow-list de origem do redirectTo do convit
 
   it('tolera barra final na origem recebida', () => {
     const result = resolveInviteRedirect('https://comprassusp.app/');
-    expect(result).toEqual({ ok: true, redirectTo: 'https://cglic.vercel.app/definir-senha' });
+    expect(result).toEqual({ ok: true, redirectTo: 'https://comprassusp.app/definir-senha' });
   });
 
   it('origin não permitido (domínio arbitrário) -> convite rejeitado, sem redirectTo', () => {
