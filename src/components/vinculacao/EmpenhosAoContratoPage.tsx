@@ -22,7 +22,7 @@ export const EmpenhosAoContratoPage: React.FC = () => {
   const alternador = (
     <CarteiraSegmentTabs
       testIdPrefix="vinc-empenhos-contrato-ver"
-      ariaLabel="Ver"
+      ariaLabel="Ver por"
       active={ver}
       onSelect={(v) => trocar(v as VerEmpenhosAoContrato)}
       segments={[
