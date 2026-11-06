@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchReajusteDaAta,
   fetchResumoReajusteAtas,
+  excluirReajusteAta,
   informarPrecoApostilamento,
   informarReajusteAta,
   informarTermoConformidade,
@@ -54,6 +55,11 @@ export function useAcoesReajuste(numeroAta: string, uasg: string) {
     retry: 0,
     onSettled: aoTerminar
   });
+  const excluirReajuste = useMutation({
+    mutationFn: excluirReajusteAta,
+    retry: 0,
+    onSettled: aoTerminar
+  });
   const informarPreco = useMutation({
     mutationFn: informarPrecoApostilamento,
     retry: 0,
@@ -63,5 +69,5 @@ export function useAcoesReajuste(numeroAta: string, uasg: string) {
       queryClient.invalidateQueries({ queryKey: ['emendas'] });
     }
   });
-  return { informarTermo, informarPercentual, informarPreco };
+  return { informarTermo, informarPercentual, informarPreco, excluirReajuste };
 }

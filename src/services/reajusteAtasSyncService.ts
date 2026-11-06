@@ -356,6 +356,10 @@ interface ReajusteParaGravar {
   indice: string | null;
   sei_citado: string | null;
   sei_citado_conformidade: boolean;
+  /** SEI do próprio documento (rodapé do SEI). */
+  sei_documento: string | null;
+  /** Valores em reais do documento: o banco acha neles o preço novo de cada item (migration 258). */
+  valores_documento: number[];
 }
 
 /** Termo aditivo de prorrogação lido (ata_termos_prorrogacao, migration 222). */
@@ -413,7 +417,8 @@ async function lerDocumentosDaAta(
       inicioVigencia: ata.data_vigencia_inicial,
       publicadoEm: publicado,
       dataAssinatura: leitura.dataAssinatura,
-      tituloFalaDeAditivo: /aditivo|prorroga/i.test(titulo)
+      tituloFalaDeAditivo: /aditivo|prorroga/i.test(titulo),
+      inicioDaProrrogacao: leitura.inicioDaProrrogacao
     };
     const r = leitura.reajustes[0];
     if (r) {
@@ -429,7 +434,9 @@ async function lerDocumentosDaAta(
           periodo_fim: r.periodoFim,
           indice: r.indice,
           sei_citado: r.seiCitado,
-          sei_citado_conformidade: r.seiEhConformidade
+          sei_citado_conformidade: r.seiEhConformidade,
+          sei_documento: leitura.seiDoDocumento,
+          valores_documento: r.percentual != null ? leitura.valores : []
         });
       }
     } else if (leitura.aplicaReajusteSemPercentual) {
@@ -446,7 +453,9 @@ async function lerDocumentosDaAta(
           periodo_fim: null,
           indice: null,
           sei_citado: null,
-          sei_citado_conformidade: false
+          sei_citado_conformidade: false,
+          sei_documento: leitura.seiDoDocumento,
+          valores_documento: []
         });
       }
     }
