@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lerClausulaDoEdital, lerReajustesDoDocumento, lerTermoDeProrrogacao, normalizarTexto, resolverEfeito } from '../reajusteFontesParser';
+import { lerClausulaDoEdital, lerInicioDaProrrogacao, lerReajustesDoDocumento, lerSeiDoDocumento, lerTermoDeProrrogacao, lerValoresEmReais, normalizarTexto, resolverEfeito } from '../reajusteFontesParser';
 
 // Trechos reais dos documentos publicados no PNCP (23/10/2026), só a parte da cláusula.
 const TERMO_ADITIVO_COM_CICLO =
@@ -188,5 +188,52 @@ describe('lerTermoDeProrrogacao (migration 222)', () => {
 
   it('apostilamento de reajuste não é termo de prorrogação', () => {
     expect(lerTermoDeProrrogacao('APOSTILAMENTO. REAJUSTAR o valor unitário dos itens da Ata pelo IPCA.', 'REAJUSTAR o valor unitário')).toBeNull();
+  });
+});
+
+// Termo aditivo da ata 00056/2025 (PNCP, documento 2, lido em 06/11/2026): trechos do texto extraído do PDF.
+const TERMO_56_2025 = [
+  '1.1.1. A prorrogação do prazo de vigência da Ata, por mais 1 (um) ano, contado a partir do\ndia 17/09/2026 a 16/09/2027, com lastro no art. 84 da Lei nº 14.133, de 2021;',
+  '2.1. Segue a tabela atualizada com os valores unitários reajustados pelo IPCA/IBGE de\n4,724910% (36905641), considerando o período do orçamento estimado de 06/2025 a 05/2026\n(35590786), para aplicação no novo ciclo de vigência da Ata.',
+  'U\nN\nD\n183 1228 1411 R$ 273.00\n0,00\n4,72\n491\n0%\n285.\n899,\n00\nR$ 403.384.58\n1,60\nTOTAL R$ 403.403.489\n,00',
+  'informando o\ncódigo verificador 36938954 e o código CRC F67CFFC6',
+  'Referência: Processo nº 08020.002712/2025-01 SEI nº 36938954'
+].join('\n');
+
+describe('termo aditivo: SEI, prorrogação e preço novo (migration 258)', () => {
+  it('lê o SEI do próprio termo pelo rodapé, não o SEI citado na cláusula', () => {
+    const l = lerReajustesDoDocumento(TERMO_56_2025);
+    expect(l.seiDoDocumento).toBe('36938954');
+    expect(l.reajustes[0].seiCitado).toBe('35590786');
+  });
+
+  it('sem o rodapé, usa o código verificador; colado ao CRC, não vale', () => {
+    expect(lerSeiDoDocumento('código verificador 36938954 e o código CRC F67CFFC6')).toBe('36938954');
+    expect(lerSeiDoDocumento('código verificador 3504929635 e o código CRC')).toBeNull();
+  });
+
+  it('lê o primeiro dia da prorrogação, com dia e mês de um algarismo', () => {
+    expect(lerInicioDaProrrogacao(TERMO_56_2025)).toBe('2026-09-17');
+    expect(lerInicioDaProrrogacao('A prorrogação do prazo de validade da Ata, por mais 1 (um) ano, contado a partir do dia 25/3/2026 a 24/3/2027')).toBe('2026-03-25');
+    expect(lerInicioDaProrrogacao('por mais 1 (um) ano, compreendendo o período de 04/11/2026 a 03/11/2027, prorrogação')).toBeNull();
+    expect(lerInicioDaProrrogacao('prorrogação do prazo de vigência da Ata, por mais 1 (um) ano, compreendendo o período de 04/11/2026 a 03/11/2027')).toBe('2026-11-04');
+  });
+
+  it('junta a célula quebrada da tabela ("285.\\n899,\\n00") e não inventa valor colado a outro número', () => {
+    const v = lerValoresEmReais(TERMO_56_2025);
+    expect(v).toContain(285899);
+    expect(v).toContain(403403489);
+    expect(lerValoresEmReais('Unidade 1043 196,91 5,17%')).toEqual([196.91, 5.17]);
+    expect(lerValoresEmReais('11043196,91')).toEqual([11043196.91]);
+    expect(lerValoresEmReais('R$ 167,1575')).toEqual([167.16]);
+  });
+
+  it('efeitos no primeiro dia da prorrogação escrito no termo, perto do aniversário da ata', () => {
+    const ctx = { inicioVigencia: '2025-09-16', publicadoEm: '2026-09-14', dataAssinatura: '2026-09-14', tituloFalaDeAditivo: true };
+    const r = { efeitoInicio: null, noNovoCiclo: true, aPartirDaAssinatura: false };
+    expect(resolverEfeito(r, ctx)).toBe('2026-09-16');
+    expect(resolverEfeito(r, { ...ctx, inicioDaProrrogacao: '2026-09-17' })).toBe('2026-09-17');
+    // Uma data longe do aniversário (outro trecho do termo) não muda o ciclo.
+    expect(resolverEfeito(r, { ...ctx, inicioDaProrrogacao: '2027-09-17' })).toBe('2026-09-16');
   });
 });

@@ -1,7 +1,9 @@
 import React from 'react';
-import { AppButton, DataTable, EmptyState, MetricStrip, NoticeBar, SectionHeader, StatusBadge, type Column } from '../../../design-system';
+import { ActionButton, AppButton, ConfirmDialog, DataTable, EmptyState, MetricStrip, NoticeBar, SectionHeader, StatusBadge, useToast, type Column } from '../../../design-system';
+import { useAcoesReajuste } from '../../../hooks/useReajusteAtas';
+import { ehConflitoEdicao, MENSAGEM_CONFLITO_EDICAO } from '../../../utils/conflitoEdicao';
 import type { ArpItemRecord } from '../../../types';
-import type { CicloReajuste, ItemReajuste, ReajusteDaAta } from '../../../services/reajusteAtasService';
+import type { CicloReajuste, ItemReajuste, ReajusteDaAta, ReajustePublicado } from '../../../services/reajusteAtasService';
 import { formatCurrency, formatCurrencyCompact, formatNumber } from '../../../utils/format';
 import { formatDateBR } from '../../../services/temporalEngineService';
 import { ReajusteLinhaDoTempo } from './ReajusteLinhaDoTempo';
@@ -51,6 +53,9 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
   const [percentualDe, setPercentualDe] = React.useState<{ ciclo: CicloReajuste | null } | null>(null);
   const [mesesAbertos, setMesesAbertos] = React.useState<Set<number>>(new Set());
   const [precoAberto, setPrecoAberto] = React.useState(false);
+  const [excluirDe, setExcluirDe] = React.useState<{ ciclo: CicloReajuste; reajuste: ReajustePublicado } | null>(null);
+  const { excluirReajuste } = useAcoesReajuste(numeroAta, uasg);
+  const toast = useToast();
 
   if (isLoading && !dados.parametros) {
     return <div style={{ padding: '1rem', color: 'var(--text-secondary)' }}>Carregando o reajuste da ata…</div>;
@@ -335,17 +340,22 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
                               {pub.documentoTitulo ? (pub.documentoTitulo.length > 70 ? `${pub.documentoTitulo.slice(0, 70)}…` : pub.documentoTitulo) : pub.origem === 'INFORMADO' ? 'Informado pelo gestor' : 'Documento do PNCP'}
                               <div style={sub}>
                                 {pub.documentoPublicadoEm ? `publicado em ${formatDateBR(pub.documentoPublicadoEm)}` : ''}
-                                {pub.seiApostilamento && (
+                                {(pub.seiApostilamento ?? pub.seiDocumento) && (
                                   <>
                                     {pub.documentoPublicadoEm ? ' · ' : ''}
-                                    <NumeroSeiEtiqueta numero={pub.seiApostilamento} testId="reajuste-apostilamento-sei" />
+                                    <NumeroSeiEtiqueta numero={(pub.seiApostilamento ?? pub.seiDocumento) as string} testId="reajuste-apostilamento-sei" />
                                   </>
                                 )}
                               </div>
                               {podeEditar && (
-                                <AppButton variant="outline" size="xs" onClick={() => abrirPercentual(c)} data-testid={`reajuste-corrigir-${c.ciclo}`}>
-                                  {c.situacao === 'PUBLICADO_SEM_PERCENTUAL' ? 'Informar percentual' : 'Corrigir'}
-                                </AppButton>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                                  <AppButton variant="outline" size="xs" onClick={() => abrirPercentual(c)} data-testid={`reajuste-corrigir-${c.ciclo}`}>
+                                    {c.situacao === 'PUBLICADO_SEM_PERCENTUAL' ? 'Informar percentual' : 'Corrigir'}
+                                  </AppButton>
+                                  {pub.origem === 'INFORMADO' && (
+                                    <ActionButton action="excluir" size="xs" onClick={() => setExcluirDe({ ciclo: c, reajuste: pub })} data-testid={`reajuste-excluir-${c.ciclo}`} />
+                                  )}
+                                </div>
                               )}
                             </>
                           ) : c.situacao === 'DEVIDO' ? 'Sem apostilamento' : '—'}
@@ -410,8 +420,34 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
             uasg={uasg}
             ciclo={percentualDe?.ciclo ?? null}
             publicado={percentualDe?.ciclo ? publicadoDoCiclo(percentualDe.ciclo, publicados) : null}
+            publicados={publicados}
             versao={parametros.versao}
             onFechar={() => setPercentualDe(null)}
+          />
+          <ConfirmDialog
+            isOpen={Boolean(excluirDe)}
+            title="Excluir reajuste informado"
+            tone="danger"
+            confirmLabel="Excluir reajuste"
+            isLoading={excluirReajuste.isPending}
+            message={excluirDe ? (
+              <>
+                O {excluirDe.ciclo.ciclo}º reajuste ({excluirDe.reajuste.percentual != null ? percentual(excluirDe.reajuste.percentual) : 'sem percentual'}
+                {excluirDe.reajuste.seiApostilamento ? `, SEI ${excluirDe.reajuste.seiApostilamento}` : ''}) sai da ata e a projeção é refeita.
+                Só o reajuste informado pelo gestor pode ser excluído; o lido do PNCP continua.
+              </>
+            ) : null}
+            onCancel={() => setExcluirDe(null)}
+            onConfirm={async () => {
+              if (!excluirDe) return;
+              try {
+                await excluirReajuste.mutateAsync({ ataId, reajusteId: excluirDe.reajuste.id, versao: parametros.versao });
+                toast.success('Reajuste excluído. A projeção foi refeita.');
+                setExcluirDe(null);
+              } catch (err) {
+                toast.error(ehConflitoEdicao(err) ? MENSAGEM_CONFLITO_EDICAO : (err as Error)?.message || 'Não foi possível excluir o reajuste.');
+              }
+            }}
           />
           <InformarPrecoApostilamentoModal
             aberto={precoAberto}

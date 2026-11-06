@@ -80,6 +80,8 @@ export interface ReajustePublicado {
   documentoTitulo: string | null;
   documentoPublicadoEm: string | null;
   seiCitado: string | null;
+  /** SEI do próprio documento publicado no PNCP (migration 258). */
+  seiDocumento: string | null;
   seiApostilamento: string | null;
   informadoEm: string | null;
 }
@@ -221,6 +223,7 @@ function paraPublicado(r: any): ReajustePublicado {
     documentoTitulo: r.documento_titulo ?? null,
     documentoPublicadoEm: data(r.documento_publicado_em),
     seiCitado: r.sei_citado ?? null,
+    seiDocumento: r.sei_documento ?? null,
     seiApostilamento: r.sei_apostilamento ?? null,
     informadoEm: r.informado_em ?? null
   };
@@ -400,6 +403,16 @@ export async function informarReajusteAta(p: {
     p_periodo_fim: p.periodoFim,
     p_efeito_inicio: p.efeitoInicio,
     p_sei: p.sei.trim(),
+    ...versaoVista(p.versao)
+  });
+  if (error) throw erroDaGravacao(error);
+}
+
+/** Exclui o reajuste informado pelo gestor (registrado por engano ou repetido). O lido do PNCP não sai (migration 258). */
+export async function excluirReajusteAta(p: { ataId: string; reajusteId: string; versao?: number | null }): Promise<void> {
+  const { error } = await requireSupabase().rpc('excluir_reajuste_ata', {
+    p_ata_id: p.ataId,
+    p_reajuste_id: p.reajusteId,
     ...versaoVista(p.versao)
   });
   if (error) throw erroDaGravacao(error);
