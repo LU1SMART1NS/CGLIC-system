@@ -68,10 +68,34 @@ describe('AtaReajusteTab', () => {
     expect(html).toContain('conta do sistema: 5,17%, confere');
     expect(html).toContain('out/2024 a set/2025');
     expect(html).toContain('PRIMEIRO TERMO ADITIVO DA ATA DE REGISTRO DE PREÇOS');
-    expect(html).toContain('ESTEIRA ERGOMÉTRICA PARA EXERCÍCIOS');
-    expect(html).toContain('+5,17% já aplicado');
     expect(html).toContain('Os preços estão em dia');
     expect(html).toContain('data-testid="reajuste-linha-do-tempo"');
+  });
+
+  it('item em dia: a projeção vira uma linha e a tabela fica recolhida', () => {
+    const html = desenhar();
+    expect(html).toContain('Nada a aplicar no item: o reajuste de 5,17% com efeitos desde 09/01/2026 já está no preço, e não há novo reajuste até o fim da vigência.');
+    expect(html).toContain('data-testid="reajuste-ver-itens"');
+    expect(html).not.toContain('data-testid="reajuste-itens"');
+    expect(html).not.toContain('a aplicar<');
+  });
+
+  it('preço devido com sobra de arredondamento não mostra "a aplicar" (ata 00056/2025, 06/11/2026)', () => {
+    const it0 = { ...ATA_93.itens[0], precoHomologado: 273000, precoAtual: 285899, precoDevido: 285899.0043, percentualNoPreco: 4.72 };
+    const html = desenhar({ dados: { ...ATA_93, itens: [it0] }, saldos: [{ numeroItem: '1', saldo: 174 }] });
+    expect(html).toContain('Nada a aplicar');
+    expect(html).not.toContain('R$ 0,75');
+  });
+
+  it('item com pendência: tabela inteira, com homologado e saldo nas colunas de preço e impacto', () => {
+    const it0 = { ...ATA_93.itens[0], situacao: 'DEVIDO' as const, precoAtual: 14695, percentualNoPreco: 0, precoDevido: 15454.73 };
+    const html = desenhar({ dados: { ...ATA_93, itens: [it0] } });
+    expect(html).toContain('data-testid="reajuste-itens"');
+    expect(html).not.toContain('data-testid="reajuste-itens-resumo"');
+    expect(html).toContain('ESTEIRA ERGOMÉTRICA PARA EXERCÍCIOS');
+    expect(html).toContain('homologado R$');
+    expect(html).toContain('saldo 324');
+    expect(html).toContain('a aplicar');
   });
 
   it('mostra o SEI do próprio termo lido do PNCP e não oferece excluir o reajuste do PNCP', () => {

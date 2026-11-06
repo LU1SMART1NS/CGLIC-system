@@ -112,13 +112,44 @@ export interface ImpactoDoItem {
 
 const numeroCanonico = (n: string) => (/^\d+$/.test(n.trim()) ? String(Number(n)) : n.trim());
 
+/**
+ * Quanto `novo` passa de `atual`, por unidade, contado em centavos. O preço devido vem do banco com mais casas que o
+ * centavo: a sobra de arredondamento não é reajuste (06/11/2026: ata 00056/2025 em dia mostrava "R$ 0,75 a aplicar").
+ */
+export function acrescimoEmCentavos(novo: number, atual: number): number {
+  const diferenca = Math.round(novo * 100) - Math.round(atual * 100);
+  return diferenca > 0 ? diferenca / 100 : 0;
+}
+
 export function impactoDoItem(item: ItemReajuste, saldos: SaldoDoItem[]): ImpactoDoItem {
   const s = saldos.find((x) => numeroCanonico(x.numeroItem) === numeroCanonico(item.numeroItem));
   const saldo = Math.max(s?.saldo ?? 0, 0);
   const base = Math.max(item.precoDevido, item.precoAtual);
-  const devido = saldo * Math.max(item.precoDevido - item.precoAtual, 0);
-  const proximo = item.precoProjetado != null ? saldo * Math.max(item.precoProjetado - base, 0) : 0;
+  const devido = saldo * acrescimoEmCentavos(item.precoDevido, item.precoAtual);
+  const proximo = item.precoProjetado != null ? saldo * acrescimoEmCentavos(item.precoProjetado, base) : 0;
   return { devido, proximo, saldo };
+}
+
+/** Situações em que o item não tem nada a aplicar agora nem reajuste à frente. */
+const SITUACOES_SEM_PENDENCIA: ReadonlySet<SituacaoItemReajuste> = new Set(['EM_DIA', 'SEM_REAJUSTE']);
+
+/**
+ * Frase da "Projeção por item" quando nenhum item tem o que aplicar nem próximo reajuste com impacto: a tabela fica
+ * recolhida e esta linha diz por quê. `null` quando há pendência (a tabela aparece inteira).
+ */
+export function resumoSemPendencia(dados: ReajusteDaAta, saldos: SaldoDoItem[]): string | null {
+  const { itens, ciclos } = dados;
+  if (itens.length === 0) return null;
+  if (!itens.every((i) => SITUACOES_SEM_PENDENCIA.has(i.situacao) && !i.proximoEfeito)) return null;
+  const totais = totaisDaAta(itens, saldos);
+  if (totais.devido > 0 || totais.proximo > 0) return null;
+  const qtd = itens.length === 1 ? 'no item' : `nos ${itens.length} itens`;
+  if (itens.every((i) => i.situacao === 'SEM_REAJUSTE')) return `Nada a aplicar ${qtd}: o edital não tem cláusula de reajuste.`;
+  const ultimo = ultimoReajuste(ciclos);
+  const jaNoPreco = ultimo
+    ? `o reajuste${ultimo.percentual != null ? ` de ${percentual(ultimo.percentual)}` : ''} com efeitos desde ${formatDateBR(ultimo.efeitoInicio)} já está no preço`
+    : 'os preços estão em dia';
+  return `Nada a aplicar ${qtd}: ${jaNoPreco}${proximoCiclo(ciclos) ? '.' : ', e não há novo reajuste até o fim da vigência.'}`;
 }
 
 export function totaisDaAta(itens: ItemReajuste[], saldos: SaldoDoItem[]): { devido: number; proximo: number } {

@@ -55,6 +55,12 @@ describe('impacto no saldo', () => {
     expect(impactoDoItem(i, [{ numeroItem: '00001', saldo: -7 }])).toEqual({ devido: 0, proximo: 0, saldo: 0 });
   });
 
+  it('sobra abaixo do centavo não é reajuste', () => {
+    const i = { ...ATA_32.itens[0], precoAtual: 285899, precoDevido: 285899.0043 };
+    expect(impactoDoItem(i, [{ numeroItem: '1', saldo: 174 }]).devido).toBe(0);
+    expect(impactoDoItem({ ...i, precoDevido: 285899.01 }, [{ numeroItem: '1', saldo: 174 }]).devido).toBeCloseTo(1.74, 2);
+  });
+
   it('próximo: preço projetado sobre o maior entre o devido e o atual', () => {
     const i = ATA_39.itens[0];
     expect(impactoDoItem(i, [{ numeroItem: '2', saldo: 102 }]).proximo).toBeCloseTo(102 * 5701.66, 2);
