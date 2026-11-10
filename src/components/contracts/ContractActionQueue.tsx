@@ -17,7 +17,7 @@ import { AvisosResolvidosLista, BotaoResolvido, EspacoResolvido, useResolverAvis
 import { AvisoCarregando } from '../../design-system';
 import type { ContractActionItem, ContractActionQueue as ActionQueueData } from '../../services/contractActionQueueService';
 
-export type Contract360Tab = 'acoes' | 'plano' | 'itens' | 'financeiro' | 'pagamentos' | 'historico';
+export type Contract360Tab = 'acoes' | 'plano' | 'itens' | 'financeiro' | 'pagamentos' | 'fiscalizacao' | 'historico';
 
 interface ContractActionQueueProps {
   queue: ActionQueueData;

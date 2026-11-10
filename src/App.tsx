@@ -45,6 +45,8 @@ const DefinirSenhaRoute = lazyComRecarga(() => import('./routes/DefinirSenhaRout
 const RedefinirSenhaRoute = lazyComRecarga(() => import('./routes/RedefinirSenhaRoute').then((m) => ({ default: m.RedefinirSenhaRoute })));
 const AlertRulesRoute = lazyComRecarga(() => import('./routes/AlertRulesRoute').then((m) => ({ default: m.AlertRulesRoute })));
 const HolidaysRoute = lazyComRecarga(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
+const FiscalizacaoInicioPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoInicioPage').then((m) => ({ default: m.FiscalizacaoInicioPage })));
+const FiscalizacaoDistribuicaoPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoDistribuicaoPage').then((m) => ({ default: m.FiscalizacaoDistribuicaoPage })));
 const EmendasInicioPage = lazyComRecarga(() => import('./components/emendas/EmendasInicioPage').then((m) => ({ default: m.EmendasInicioPage })));
 const EmendasPedidosPage = lazyComRecarga(() => import('./components/emendas/EmendasPedidosPage').then((m) => ({ default: m.EmendasPedidosPage })));
 const EmendasItensEKitsPage = lazyComRecarga(() => import('./components/emendas/EmendasItensEKitsPage').then((m) => ({ default: m.EmendasItensEKitsPage })));
@@ -332,7 +334,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/contratos"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']}>
                   <ContractsRoute />
                 </RequireRole>
               }
@@ -340,7 +342,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/contratos/:contractKey"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']}>
                   <Contract360Route />
                 </RequireRole>
               }
@@ -522,6 +524,23 @@ const AppContent: React.FC = () => {
               element={
                 <RequireRole allowedRoles={['admin', 'gestor_emendas']}>
                   <EmendasAsparPage />
+                </RequireRole>
+              }
+            />
+            {/* Fiscalização de contratos pela SFC/CGLIC (migration 259): Painel no Início e Distribuição do coordenador. */}
+            <Route
+              path="/fiscalizacao/inicio"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoInicioPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/distribuicao"
+              element={
+                <RequireRole allowedRoles={['admin']}>
+                  <FiscalizacaoDistribuicaoPage />
                 </RequireRole>
               }
             />

@@ -22,16 +22,25 @@ const abas = (role: AppRole, rota: string) => {
 
 describe('abas do Início (grupos como em Ajustes)', () => {
   it('coordenador: Atas e Contratos · Emendas, e embaixo Painel · Distribuição', () => {
-    expect(abas('admin', '/instrumentos')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas'], paginas: ['Painel', 'Distribuição'] });
-    expect(abas('admin', '/atas/distribuicao')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas'], paginas: ['Painel', 'Distribuição'] });
+    expect(abas('admin', '/instrumentos')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: ['Painel', 'Distribuição'] });
+    expect(abas('admin', '/atas/distribuicao')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: ['Painel', 'Distribuição'] });
   });
 
   it('em Emendas, que tem uma página só, a segunda linha some', () => {
-    expect(abas('admin', '/emendas/inicio')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas'], paginas: [] });
+    expect(abas('admin', '/emendas/inicio')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: [] });
+  });
+
+  it('coordenador: em Fiscalização, Painel · Distribuição; a consulta só o Painel', () => {
+    expect(abas('admin', '/fiscalizacao/distribuicao')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: ['Painel', 'Distribuição'] });
+    expect(abas('leitor', '/fiscalizacao/inicio')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: [] });
+  });
+
+  it('o gestor de fiscalização tem só o Painel dele, sem abas, como o gestor de emendas', () => {
+    expect(abas('gestor_fiscalizacao', '/fiscalizacao/inicio').html).toBe('');
   });
 
   it('a consulta vê só a linha dos grupos; o gestor não vê abas', () => {
-    expect(abas('leitor', '/instrumentos')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas'], paginas: [] });
+    expect(abas('leitor', '/instrumentos')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: [] });
     expect(abas('gestor', '/instrumentos').html).toBe('');
   });
 });

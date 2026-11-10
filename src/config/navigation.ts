@@ -22,7 +22,8 @@ import {
   ScrollText,
   ClipboardList,
   Building,
-  Contact
+  Contact,
+  ClipboardCheck
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -68,7 +69,8 @@ export interface NavItem {
  * Navegação do CGLIC em dois níveis: o menu chave (trilha de ícones no desktop,
  * barra inferior no celular) lista as áreas, e as páginas de cada área aparecem
  * como abas no topo da página (`AreaTabs`). As rotas são as mesmas de antes.
- * - Início, em dois grupos como Ajustes: Atas e Contratos (Painel /instrumentos · Distribuição /atas/distribuicao) e
+ * - Início, em grupos como Ajustes: Atas e Contratos (Painel /instrumentos · Distribuição /atas/distribuicao), Fiscalização
+ *   (Painel /fiscalizacao/inicio · Distribuição /fiscalizacao/distribuicao; o gestor de fiscalização vê só o Painel dele) e
  *   Emendas (/emendas/inicio, coordenador e consulta). O gestor de emendas tem o Painel dele em /emendas/inicio.
  * - Carteira: Atas (Registradas /atas · A montar /atas/montar) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
@@ -132,6 +134,38 @@ export const navigationConfig: NavItem[] = [
         matchPrefixes: ['/emendas/inicio'],
         allowedRoles: ['admin', 'leitor'],
         group: 'Emendas'
+      },
+      {
+        // Fiscalização de contratos (migration 259): o gestor de fiscalização tem só o Painel dele, como o gestor de
+        // emendas; o coordenador e a consulta veem o grupo Fiscalização (Painel · Distribuição) no Início deles.
+        id: 'fiscalizacao-inicio',
+        label: 'Painel',
+        icon: LayoutDashboard,
+        route: '/fiscalizacao/inicio',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/inicio'],
+        allowedRoles: ['gestor_fiscalizacao']
+      },
+      {
+        id: 'fiscalizacao-inicio-coordenador',
+        label: 'Painel',
+        icon: ClipboardCheck,
+        route: '/fiscalizacao/inicio',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/inicio'],
+        allowedRoles: ['admin', 'leitor'],
+        group: 'Fiscalização'
+      },
+      {
+        // Só o coordenador decide quem fiscaliza cada contrato e escolhe o fiscal da SFC/CGLIC.
+        id: 'fiscalizacao-distribuicao',
+        label: 'Distribuição',
+        icon: UsersRound,
+        route: '/fiscalizacao/distribuicao',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/distribuicao'],
+        allowedRoles: ['admin'],
+        group: 'Fiscalização'
       }
     ]
   },
@@ -175,7 +209,7 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/contratos'],
         // Gestor de saldo cuida da alocação: sem contratos (o empenhado por unidade fica na Alocação e no Item).
-        allowedRoles: ['admin', 'gestor', 'leitor'],
+        allowedRoles: ['admin', 'gestor', 'leitor', 'gestor_fiscalizacao'],
         group: 'Contratos'
       },
       {
@@ -440,7 +474,9 @@ export const navigationConfig: NavItem[] = [
 
 /** Primeira tela do perfil ao entrar no sistema: o gestor de emendas tem o próprio Início. */
 export function rotaInicialDoPerfil(role: AppRole | null): string {
-  return role === 'gestor_emendas' ? '/emendas/inicio' : '/instrumentos';
+  if (role === 'gestor_emendas') return '/emendas/inicio';
+  if (role === 'gestor_fiscalizacao') return '/fiscalizacao/inicio';
+  return '/instrumentos';
 }
 
 /**

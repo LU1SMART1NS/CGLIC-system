@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
-import { KeyRound, Shield, UserCheck, Coins, Eye, ScrollText } from 'lucide-react';
+import { KeyRound, Shield, UserCheck, Coins, Eye, ScrollText, ClipboardCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { AppCard } from '../../design-system/components/AppCard';
@@ -106,6 +106,18 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
       { label: 'Atas e Itens', description: 'Consulta, sem contratos; o reajuste dos preços da ata só para consulta' }
     ],
     scope: 'Itens alocados à CAEP'
+  },
+  {
+    id: 'gestor_fiscalizacao',
+    label: 'Gestor de Fiscalização',
+    description: 'Servidor da SFC/CGLIC: fiscaliza a execução dos contratos de emenda e dos que o coordenador indicar.',
+    icon: ClipboardCheck,
+    areas: [
+      { label: 'Início', description: 'Os contratos em que é fiscal ou substituto e o que falta fazer em cada um' },
+      { label: 'Fiscalização', description: 'Registro do processo de fiscalização dos contratos dele' },
+      { label: 'Contratos', description: 'Consulta, com a aba Fiscalização no Contrato 360' }
+    ],
+    scope: 'Contratos em que é fiscal ou substituto'
   },
   {
     id: 'leitor',

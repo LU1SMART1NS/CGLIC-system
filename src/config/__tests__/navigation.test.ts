@@ -29,7 +29,10 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Painel', '/instrumentos', 'Atas e Contratos'],
         ['Distribuição', '/atas/distribuicao', 'Atas e Contratos'],
         ['Painel', '/emendas/inicio', undefined],
-        ['Emendas', '/emendas/inicio', 'Emendas']
+        ['Emendas', '/emendas/inicio', 'Emendas'],
+        ['Painel', '/fiscalizacao/inicio', undefined],
+        ['Painel', '/fiscalizacao/inicio', 'Fiscalização'],
+        ['Distribuição', '/fiscalizacao/distribuicao', 'Fiscalização']
       ]);
       expect(area.children![0].matchPrefixes).toContain('/prazos');
     });
@@ -359,16 +362,30 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       expect(inicioDoCoordenador?.children?.map((c) => [c.label, c.route])).toEqual([
         ['Painel', '/instrumentos'],
         ['Distribuição', '/atas/distribuicao'],
-        ['Emendas', '/emendas/inicio']
+        ['Emendas', '/emendas/inicio'],
+        ['Painel', '/fiscalizacao/inicio'],
+        ['Distribuição', '/fiscalizacao/distribuicao']
       ]);
       const inicioDaConsulta = filterNavigationByRole(navigationConfig, 'leitor').find((i) => i.id === 'visao-geral');
       expect(inicioDaConsulta?.children?.map((c) => [c.label, c.route])).toEqual([
         ['Painel', '/instrumentos'],
-        ['Emendas', '/emendas/inicio']
+        ['Emendas', '/emendas/inicio'],
+        ['Painel', '/fiscalizacao/inicio']
       ]);
       for (const role of ['gestor', 'gestor_saldos'] as const) {
         const inicio = filterNavigationByRole(navigationConfig, role).find((i) => i.id === 'visao-geral');
         expect(inicio?.children?.map((c) => c.route)).not.toContain('/emendas/inicio');
+      }
+    });
+
+    it('o gestor de fiscalização vê o Painel dele no Início e só Contratos na Carteira; a Distribuição é do coordenador', () => {
+      const menu = filterNavigationByRole(navigationConfig, 'gestor_fiscalizacao');
+      expect(menu.find((i) => i.id === 'visao-geral')?.children?.map((c) => [c.label, c.route, c.group])).toEqual([['Painel', '/fiscalizacao/inicio', undefined]]);
+      expect(menu.find((i) => i.id === 'carteira')?.children?.map((c) => c.route)).toEqual(['/contratos']);
+      expect(menu.map((i) => i.id)).not.toContain('emendas');
+      for (const role of ['gestor', 'gestor_saldos', 'gestor_emendas', 'leitor'] as const) {
+        const inicio = filterNavigationByRole(navigationConfig, role).find((i) => i.id === 'visao-geral');
+        expect(inicio?.children?.map((c) => c.route)).not.toContain('/fiscalizacao/distribuicao');
       }
     });
 
