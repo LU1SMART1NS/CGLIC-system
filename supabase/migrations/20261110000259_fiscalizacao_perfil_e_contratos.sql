@@ -118,7 +118,7 @@ STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-  SELECT COALESCE(array_agg(DISTINCT p.siop_emenda ORDER BY p.siop_emenda) FILTER (WHERE p.siop_emenda IS NOT NULL), ARRAY[]::TEXT[])
+  SELECT COALESCE(array_agg(DISTINCT p.siop_emenda::TEXT ORDER BY p.siop_emenda::TEXT) FILTER (WHERE p.siop_emenda IS NOT NULL), ARRAY[]::TEXT[])
     FROM public.emenda_linha_notas n
     JOIN public.emenda_pedido_linhas l ON l.id = n.linha_id AND NOT l.cancelada
     JOIN public.emenda_pedidos p ON p.id = l.pedido_id AND p.etapa <> 'CANCELADO'
@@ -162,7 +162,7 @@ BEGIN
   END IF;
   RETURN QUERY
   WITH emendas AS (
-    SELECT n.contract_key AS chave, array_agg(DISTINCT p.siop_emenda ORDER BY p.siop_emenda) FILTER (WHERE p.siop_emenda IS NOT NULL) AS lista, TRUE AS de_emenda
+    SELECT n.contract_key AS chave, array_agg(DISTINCT p.siop_emenda::TEXT ORDER BY p.siop_emenda::TEXT) FILTER (WHERE p.siop_emenda IS NOT NULL) AS lista, TRUE AS de_emenda
       FROM public.emenda_linha_notas n
       JOIN public.emenda_pedido_linhas l ON l.id = n.linha_id AND NOT l.cancelada
       JOIN public.emenda_pedidos p ON p.id = l.pedido_id AND p.etapa <> 'CANCELADO'
