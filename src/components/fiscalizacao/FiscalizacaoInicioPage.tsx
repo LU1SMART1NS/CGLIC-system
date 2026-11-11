@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Clock, FolderOpen, LayoutDashboard, ScrollText } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -7,12 +8,17 @@ import { SectionHeader } from '../../design-system/components/SectionHeader';
 import { AppButton } from '../../design-system/components/AppButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
-import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
+import { DataTable, type Column } from '../../design-system/components/DataTable';
+import { carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { ComVoce, type ItemComVoce } from '../instrumentos/ComVoce';
 import { PainelCartao, PainelCartoes } from '../instrumentos/PainelCartao';
+import { PainelComFaixa, PainelFaixa, type PainelFaixaChip } from '../instrumentos/PainelFaixa';
+import { PainelBotoesGavetas, PainelGaveta, type PainelBotaoGaveta, type PainelGavetaId } from '../instrumentos/PainelGavetas';
+import { PainelFiltros, TODOS_OS_GESTORES } from '../instrumentos/PainelFiltros';
+import { scrollToDock } from '../instrument360/instrument360Dock';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { useAuth } from '../../context/AuthContext';
@@ -20,7 +26,7 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useContratosFiscalizacao, useEntregasFiscalizacao } from '../../hooks/useFiscalizacao';
 import { prazoDaEntrega } from '../../utils/fiscalizacaoEntregas';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, comSfc, dataBR, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato } from '../../utils/fiscalizacao';
+import { NOME_SFC, cargaPorFiscal, comSfc, dataBR, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, type CargaDoFiscal } from '../../utils/fiscalizacao';
 import { useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
 
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
@@ -31,9 +37,10 @@ type Segmento = 'AUTUAR' | 'PORTARIA' | 'TODAS';
 
 /**
  * Início › Painel da fiscalização (migration 259). O gestor de fiscalização vê os contratos em que é fiscal ou substituto
- * e o que falta em cada um; o coordenador e a consulta veem todos os contratos com a SFC/CGLIC. Como nos outros Painéis
- * (decisão de 11/11/2026): "Com você" só do coordenador (definir, desfazer ausência); o que falta nos contratos fica em
- * Pendências da fiscalização (A autuar · Sem portaria · Todas).
+ * e o que falta em cada um; o coordenador e a consulta veem todos os contratos com a SFC/CGLIC e podem escolher um fiscal
+ * (o Painel passa a ser o dele, como o filtro Gestor em Atas e Contratos). Mesma moldura dos outros Painéis
+ * (PainelComFaixa, 11/11/2026): cartões e "Ver mais" encolhem numa faixa azul fixa, "Com você" só do coordenador, e as
+ * abas das Pendências (A autuar · Sem portaria · Todos) grudam embaixo da faixa.
  */
 export const FiscalizacaoInicioPage: React.FC = () => {
   const { user, role } = useAuth();
@@ -43,30 +50,48 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   const [autuando, setAutuando] = useState<ContratoFiscalizacao | null>(null);
   const [segmentoEscolhido, setSegmento] = useState<Segmento | null>(null);
   const [busca, setBusca] = useState('');
-  const [filtroFiscal, setFiltroFiscal] = useState('');
   const { fiscais } = useFiscaisAtivos();
+  const [params, setParams] = useSearchParams();
+  const dockRef = useRef<HTMLDivElement>(null);
   const transferencias = useTransferenciasFiscalizacao();
   const coordenador = role === 'admin';
   const fiscal = role === 'gestor_fiscalizacao';
   const contratos = useMemo(() => data ?? [], [data]);
 
-  const daSfc = useMemo(() => contratos.filter((c) => comSfc(c) && (!fiscal || ehDoFiscal(c, user?.id))), [contratos, fiscal, user?.id]);
-  const titular = daSfc.filter((c) => !fiscal || c.fiscalUserId === user?.id);
+  // Escopo: o fiscal vê os dele; o coordenador e a consulta escolhem um fiscal no filtro do topo (?fiscal=).
+  const fiscalEscolhido = fiscal ? '' : params.get('fiscal') ?? TODOS_OS_GESTORES;
+  const nomeEscolhido = fiscais.find((f) => f.id === fiscalEscolhido)?.nome ?? '';
+  const escopo = fiscal ? user?.id ?? null : fiscalEscolhido || null;
+  const mudarEndereco = useCallback(
+    (mudancas: Record<string, string | null>) =>
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          Object.entries(mudancas).forEach(([k, v]) => (v ? next.set(k, v) : next.delete(k)));
+          return next;
+        },
+        { replace: true }
+      ),
+    [setParams]
+  );
+  const daSfc = useMemo(() => contratos.filter((c) => comSfc(c) && (!escopo || ehDoFiscal(c, escopo))), [contratos, escopo]);
+  const titular = daSfc.filter((c) => !escopo || c.fiscalUserId === escopo);
   const aDefinir = contratos.filter((c) => c.situacao === 'A_DEFINIR');
   const pendencias = useMemo(() => daSfc.flatMap(pendenciasDoContrato), [daSfc]);
   const aAutuar = pendencias.filter((p) => p.tipo === 'AUTUAR');
   const semPortaria = pendencias.filter((p) => p.tipo === 'PORTARIA');
   const mistas = daSfc.filter((c) => c.situacao === 'MISTA').length;
   const minhasEntregas = useMemo(
-    () => (entregasConsulta.data ?? []).filter((e) => e.responsavel === 'SFC' && (!fiscal || e.fiscalUserId === user?.id || e.substitutoUserId === user?.id)),
-    [entregasConsulta.data, fiscal, user?.id]
+    () => (entregasConsulta.data ?? []).filter((e) => e.responsavel === 'SFC' && (!escopo || e.fiscalUserId === escopo || e.substitutoUserId === escopo)),
+    [entregasConsulta.data, escopo]
   );
   const vencidas = minhasEntregas.filter((e) => prazoDaEntrega(e).tom === 'danger');
   const aVencer = minhasEntregas.filter((e) => prazoDaEntrega(e).tom === 'warning' && prazoDaEntrega(e).dias !== null);
   const noExercito = minhasEntregas.filter((e) => e.etapa === 'CONTROLADO');
   const entregasCarregando = entregasConsulta.isLoading;
 
-  // "Com você": só as decisões do coordenador.
+  // "Com você": só as decisões do coordenador, e só no Painel geral (escolhido um fiscal, o Painel é o dele).
+  const comVoceVisivel = coordenador && !escopo;
   const comVoce: ItemComVoce[] = [];
   if (coordenador && aDefinir.length > 0) {
     comVoce.push({ chave: 'definir', titulo: `Definir quem fiscaliza ${aDefinir.length} ${aDefinir.length === 1 ? 'contrato' : 'contratos'} de emenda`, detalhe: `Chegaram do Contratos.gov.br sem decisão. A sugestão é a ${NOME_SFC}.`, acao: 'Distribuir', onAcao: () => navigate('/fiscalizacao/distribuicao') });
@@ -90,17 +115,54 @@ export const FiscalizacaoInicioPage: React.FC = () => {
     const q = busca.trim().toLowerCase();
     return doSegmento.filter(
       (c) =>
-        (!q || `${numeroDoContrato(c)} ${c.fornecedor ?? ''} ${c.emendas.join(' ')} ${c.fiscalNome ?? ''}`.toLowerCase().includes(q)) &&
-        (!filtroFiscal || c.fiscalUserId === filtroFiscal || c.substitutoUserId === filtroFiscal)
+        !q || `${numeroDoContrato(c)} ${c.fornecedor ?? ''} ${c.emendas.join(' ')} ${c.fiscalNome ?? ''}`.toLowerCase().includes(q)
     );
-  }, [doSegmento, busca, filtroFiscal]);
-  const filtrosAtivos = Boolean(busca || filtroFiscal);
+  }, [doSegmento, busca]);
+  const filtrosAtivos = Boolean(busca);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(filtrados, (c: ContratoFiscalizacao) => c.contractKey, POR_PAGINA);
   const podeAutuar = (c: ContratoFiscalizacao) => !c.processoSei && (coordenador || (fiscal && ehDoFiscal(c, user?.id)));
+  // Como em Atas e Contratos: cartão e aba levam à lista com a faixa encolhida.
   const irPara = (sg: Segmento) => {
     setSegmento(sg);
-    document.getElementById('fisc-inicio-pendencias')?.scrollIntoView({ behavior: 'smooth' });
+    scrollToDock(dockRef.current);
   };
+
+  // "Ver mais": Distribuição (carga de cada fiscal) para o coordenador no Painel geral, como em Atas e Contratos.
+  const gavetasDisponiveis: PainelGavetaId[] = coordenador && !escopo ? ['distribuicao'] : [];
+  const gavetaUrl = params.get('gaveta') as PainelGavetaId | null;
+  const gavetaAberta: PainelGavetaId | null = gavetaUrl && gavetasDisponiveis.includes(gavetaUrl) ? gavetaUrl : null;
+  const rolarParaGaveta = useRef(false);
+  const alternarGaveta = (id: PainelGavetaId) => {
+    rolarParaGaveta.current = gavetaAberta !== id;
+    mudarEndereco({ gaveta: gavetaAberta === id ? null : id });
+  };
+  useEffect(() => {
+    if (!gavetaAberta || !rolarParaGaveta.current) return;
+    rolarParaGaveta.current = false;
+    scrollToDock(dockRef.current);
+  }, [gavetaAberta]);
+  const carga = useMemo(() => cargaPorFiscal(contratos, fiscais), [contratos, fiscais]);
+  const ausentes = transferencias.data ?? [];
+  const botoesGavetas: PainelBotaoGaveta[] = gavetasDisponiveis.map((id) => ({
+    id,
+    resumo: `${carga.length} ${carga.length === 1 ? 'fiscal' : 'fiscais'}${ausentes.length ? ` · ${ausentes.length} ${ausentes.length === 1 ? 'ausente' : 'ausentes'}` : ''}`,
+    atencao: ausentes.length > 0
+  }));
+  const colunasCarga: Column<CargaDoFiscal>[] = [
+    { key: 'nome', header: 'Fiscal', render: (f) => <span style={{ ...carteiraValor, fontWeight: 700 }}>{f.nome}</span> },
+    { key: 'contratos', header: 'Contratos', align: 'right', render: (f) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{f.contratos}</span> },
+    { key: 'substituto', header: 'Como substituto', align: 'right', render: (f) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{f.comoSubstituto}</span> },
+    { key: 'autuar', header: 'A autuar', align: 'right', render: (f) => <span style={{ ...carteiraValor, ...carteiraNumero, color: f.aAutuar ? 'var(--color-warning-text)' : undefined }}>{f.aAutuar}</span> },
+    { key: 'portaria', header: 'Sem portaria', align: 'right', render: (f) => <span style={{ ...carteiraValor, ...carteiraNumero, color: f.semPortaria ? 'var(--color-warning-text)' : undefined }}>{f.semPortaria}</span> }
+  ];
+
+  const qtd = (n: number) => String(n);
+  const chipsDaFaixa: PainelFaixaChip[] = [
+    { id: 'contratos', rotulo: escopo ? 'Contratos' : `Com a ${NOME_SFC}`, valor: qtd(escopo ? titular.length : daSfc.length), ativo: segmento === 'TODAS', onClick: () => irPara('TODAS') },
+    { id: 'autuar', rotulo: 'A autuar', valor: qtd(aAutuar.length), ativo: segmento === 'AUTUAR', onClick: () => irPara('AUTUAR') },
+    { id: 'vencidas', rotulo: 'Entregas vencidas', valor: entregasCarregando ? '…' : qtd(vencidas.length), perigo: vencidas.length > 0, onClick: () => navigate('/fiscalizacao/entregas?prazo=danger') },
+    ...(!fiscal && !escopo ? [{ id: 'definir', rotulo: 'A definir', valor: qtd(aDefinir.length), perigo: aDefinir.length > 0, onClick: () => navigate(coordenador ? '/fiscalizacao/distribuicao' : '/fiscalizacao/inicio') }] : [])
+  ];
 
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -111,21 +173,31 @@ export const FiscalizacaoInicioPage: React.FC = () => {
         icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="fisc-inicio-atualizar" tooltipTitle="Recarregar a fiscalização" />}
       />
+      {!fiscal && (
+        <PainelFiltros
+          gestor={{ rotulo: 'Fiscal', valor: fiscalEscolhido, opcoes: fiscais.map((f) => ({ value: f.id, label: f.nome })), onChange: (id) => mudarEndereco({ fiscal: id || null, gaveta: null }) }}
+          onLimpar={() => mudarEndereco({ fiscal: null })}
+        />
+      )}
       {isLoading ? (
         <SkeletonLoader variant="card" count={3} testId="fisc-inicio-carregando" />
       ) : isError ? (
         <ErrorState title="Não foi possível carregar a fiscalização" message={error?.message || 'Falha ao consultar a fiscalização dos contratos.'} onRetry={() => refetch()} testId="fisc-inicio-erro" />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <PainelComFaixa
+          dockRef={dockRef}
+          faixa={<PainelFaixa titulo={`Início${nomeEscolhido ? ` · ${nomeEscolhido}` : ''}`} chips={chipsDaFaixa} gavetas={gavetasDisponiveis} gavetaAberta={gavetaAberta} onToggleGaveta={alternarGaveta} testId="fisc-inicio-faixa" />}
+          topo={
+            <>
           <PainelCartoes testId="fisc-inicio-cartoes">
             <PainelCartao
-              rotulo={fiscal ? 'Meus contratos' : `Com a ${NOME_SFC}`}
+              rotulo={fiscal ? 'Meus contratos' : escopo ? `Contratos de ${nomeEscolhido}` : `Com a ${NOME_SFC}`}
               icone={<FolderOpen size={16} />}
               tom="primary"
-              valor={String(fiscal ? titular.length : daSfc.length)}
-              unidade={(fiscal ? titular.length : daSfc.length) === 1 ? 'contrato' : 'contratos'}
+              valor={String(escopo ? titular.length : daSfc.length)}
+              unidade={(escopo ? titular.length : daSfc.length) === 1 ? 'contrato' : 'contratos'}
               linhas={[
-                fiscal ? { rotulo: 'Como substituto', valor: String(daSfc.length - titular.length) } : { rotulo: 'Fiscalização mista', valor: String(mistas) },
+                escopo ? { rotulo: 'Como substituto', valor: String(daSfc.length - titular.length) } : { rotulo: 'Fiscalização mista', valor: String(mistas) },
                 { rotulo: 'Processo a autuar', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined },
                 { rotulo: 'Sem portaria registrada', valor: String(semPortaria.length), tom: semPortaria.length ? 'warning' : undefined }
               ]}
@@ -155,7 +227,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               onClick={() => navigate('/fiscalizacao/entregas?fase=EXECUCAO')}
               testId="fisc-cartao-exercito"
             />
-            {!fiscal && (
+            {!fiscal && !escopo && (
               <PainelCartao
                 rotulo="Contratos a definir"
                 icone={<ScrollText size={16} />}
@@ -168,56 +240,76 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               />
             )}
           </PainelCartoes>
-
-          {coordenador && <ComVoce itens={comVoce} testId="fisc-com-voce" />}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} id="fisc-inicio-pendencias">
-            <SectionHeader className="section-header--flush" title="Pendências da fiscalização" subtitle={fiscal ? 'O que falta nos contratos que você fiscaliza. A linha abre o Contrato 360.' : `O que falta nos contratos com a ${NOME_SFC}. A linha abre o Contrato 360.`} />
+              <PainelBotoesGavetas botoes={botoesGavetas} aberta={gavetaAberta} onToggle={alternarGaveta} />
+              {comVoceVisivel && <ComVoce itens={comVoce} testId="fisc-com-voce" />}
+              <SectionHeader
+                className="section-header--flush"
+                title="Pendências da fiscalização"
+                subtitle={fiscal ? 'O que falta nos contratos que você fiscaliza. A linha abre o Contrato 360.' : `O que falta nos contratos com a ${NOME_SFC}. A linha abre o Contrato 360.`}
+              />
+            </>
+          }
+          trilho={
             <CarteiraSegmentTabs<Segmento>
               testIdPrefix="fisc-inicio"
               ariaLabel="Pendências da fiscalização"
               active={segmento}
-              onSelect={setSegmento}
+              onSelect={irPara}
               segments={[
                 { id: 'AUTUAR', label: 'A autuar', count: contaSeg('AUTUAR'), dot: aAutuar.length ? 'var(--color-warning-solid)' : undefined },
                 { id: 'PORTARIA', label: 'Sem portaria', count: contaSeg('PORTARIA'), dot: semPortaria.length ? 'var(--color-warning-solid)' : undefined },
                 { id: 'TODAS', label: fiscal ? 'Meus contratos' : 'Todos os contratos', count: contaSeg('TODAS') }
               ]}
             />
-            <CarteiraFilterBar
-              busca={busca}
-              searchPlaceholder="Buscar por contrato, fornecedor, emenda ou fiscal..."
-              onChangeBusca={setBusca}
-              hasActiveFilters={filtrosAtivos}
-              onResetFilters={() => { setBusca(''); setFiltroFiscal(''); }}
-              counter={carteiraCounter(filtrados.length, doSegmento.length, filtrosAtivos, 'contrato', 'contratos')}
-              testIdPrefix="fisc-inicio"
+          }
+        >
+          {gavetaAberta === 'distribuicao' && (
+            <PainelGaveta
+              id="distribuicao"
+              onFechar={() => alternarGaveta('distribuicao')}
+              subtitulo="Clique num fiscal para ver o painel dele."
+              hint="Contratos com a SFC/CGLIC de cada fiscal (titular e substituto) e o que falta autuar ou registrar. Transferir e ausências ficam em Distribuição › Equipe."
             >
-              {!fiscal && (
-                <CarteiraFilterButton label="Fiscal" value={filtroFiscal} emptyValue="" options={fiscais.map((f) => ({ value: f.id, label: f.nome, count: doSegmento.filter((c) => c.fiscalUserId === f.id || c.substitutoUserId === f.id).length }))} onChange={setFiltroFiscal} testId="fisc-inicio-filtro-fiscal" />
-              )}
-            </CarteiraFilterBar>
-            <AdminListShell
-              testId="fisc-inicio-lista"
-              isLoading={false}
-              isError={false}
-              isEmpty={filtrados.length === 0}
-              emptyTitle={filtrosAtivos ? 'Nenhum contrato atende à busca.' : segmento === 'TODAS' ? 'Nenhum contrato com a SFC/CGLIC.' : 'Nada pendente aqui.'}
-              emptyDescription={filtrosAtivos ? 'Ajuste a busca ou o filtro.' : segmento === 'TODAS' ? 'Os contratos aparecem quando o coordenador decide a fiscalização.' : 'Escolha outra aba para ver os demais contratos.'}
-            >
-              <ContratosFiscalizacaoTabela
-                contratos={pageItems}
-                testId="fisc-inicio-tabela"
-                rowActions={(c) =>
-                  podeAutuar(c) ? (
-                    <AppButton variant="outline" size="sm" onClick={() => setAutuando(c)} data-testid={`fisc-inicio-autuar-${c.contractKey}`}>Registrar</AppButton>
-                  ) : null
-                }
+              <DataTable<CargaDoFiscal>
+                testId="fisc-inicio-carga"
+                className="data-table-container--flush"
+                data={carga}
+                keyExtractor={(f) => f.userId}
+                columns={colunasCarga}
+                rowOpen={(f) => () => mudarEndereco({ fiscal: f.userId, gaveta: null })}
+                emptyMessage="Nenhum servidor com o perfil Gestor de Fiscalização."
               />
-              <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={filtrados.length} onChange={setPage} testIdPrefix="fisc-inicio" />
-            </AdminListShell>
-          </div>
-        </div>
+            </PainelGaveta>
+          )}
+          <CarteiraFilterBar
+            busca={busca}
+            searchPlaceholder="Buscar por contrato, fornecedor, emenda ou fiscal..."
+            onChangeBusca={setBusca}
+            hasActiveFilters={filtrosAtivos}
+            onResetFilters={() => setBusca('')}
+            counter={carteiraCounter(filtrados.length, doSegmento.length, filtrosAtivos, 'contrato', 'contratos')}
+            testIdPrefix="fisc-inicio"
+          />
+          <AdminListShell
+            testId="fisc-inicio-lista"
+            isLoading={false}
+            isError={false}
+            isEmpty={filtrados.length === 0}
+            emptyTitle={filtrosAtivos ? 'Nenhum contrato atende à busca.' : segmento === 'TODAS' ? 'Nenhum contrato com a SFC/CGLIC.' : 'Nada pendente aqui.'}
+            emptyDescription={filtrosAtivos ? 'Ajuste a busca.' : segmento === 'TODAS' ? 'Os contratos aparecem quando o coordenador decide a fiscalização.' : 'Escolha outra aba para ver os demais contratos.'}
+          >
+            <ContratosFiscalizacaoTabela
+              contratos={pageItems}
+              testId="fisc-inicio-tabela"
+              rowActions={(c) =>
+                podeAutuar(c) ? (
+                  <AppButton variant="outline" size="sm" onClick={() => setAutuando(c)} data-testid={`fisc-inicio-autuar-${c.contractKey}`}>Registrar</AppButton>
+                ) : null
+              }
+            />
+            <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={filtrados.length} onChange={setPage} testIdPrefix="fisc-inicio" />
+          </AdminListShell>
+        </PainelComFaixa>
       )}
       {autuando && <RegistrarProcessoModal key={autuando.contractKey} contrato={autuando} onClose={() => setAutuando(null)} />}
     </PageContainer>

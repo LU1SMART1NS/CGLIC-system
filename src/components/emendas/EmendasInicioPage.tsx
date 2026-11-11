@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Boxes, Check, ClipboardList, LayoutDashboard } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
@@ -18,7 +18,9 @@ import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { carteiraDetalhe, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
-import { PainelBotoesGavetas, PainelGaveta, type PainelGavetaId } from '../instrumentos/PainelGavetas';
+import { PainelBotoesGavetas, PainelGaveta, type PainelBotaoGaveta, type PainelGavetaId } from '../instrumentos/PainelGavetas';
+import { PainelComFaixa, PainelFaixa, type PainelFaixaChip } from '../instrumentos/PainelFaixa';
+import { scrollToDock } from '../instrument360/instrument360Dock';
 import { PainelCartao, PainelCartoes, type PainelCartaoLinha } from '../instrumentos/PainelCartao';
 import {
   hojeEmBrasilia,
@@ -126,8 +128,12 @@ export const EmendasInicioPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const gavetaUrl = searchParams.get('gaveta') as PainelGavetaId | null;
   const gavetaAberta: PainelGavetaId | null = gavetaUrl && GAVETAS.includes(gavetaUrl) ? gavetaUrl : null;
+  // Como no Painel de Atas e Contratos: ao abrir, a gaveta vem para logo abaixo da faixa azul.
+  const dockRef = useRef<HTMLDivElement>(null);
+  const rolarParaGaveta = useRef(false);
   const alternarGaveta = useCallback(
-    (id: PainelGavetaId) =>
+    (id: PainelGavetaId) => {
+      rolarParaGaveta.current = gavetaAberta !== id;
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
@@ -136,9 +142,15 @@ export const EmendasInicioPage: React.FC = () => {
           return next;
         },
         { replace: true }
-      ),
-    [setSearchParams]
+      );
+    },
+    [setSearchParams, gavetaAberta]
   );
+  useEffect(() => {
+    if (!gavetaAberta || !rolarParaGaveta.current) return;
+    rolarParaGaveta.current = false;
+    scrollToDock(dockRef.current);
+  }, [gavetaAberta]);
   const fecharGaveta = () => gavetaAberta && alternarGaveta(gavetaAberta);
 
   const carregando = isLoading || carregandoItens;
@@ -501,6 +513,76 @@ export const EmendasInicioPage: React.FC = () => {
 
   const valorSemPedido = semPedidoPorEmenda.reduce((t, g) => t + g.valor, 0);
 
+  // Gavetas do "Ver mais" e números da faixa azul (moldura comum dos Painéis: PainelComFaixa).
+  const botoesGavetas: PainelBotaoGaveta[] = [
+      {
+        id: 'emendasSemPedido',
+        resumo: carregandoEmendas
+          ? undefined
+          : contaSemPedido.total === 0
+            ? 'em dia'
+            : `${plural(contaSemPedido.total, 'emenda', 'emendas')}${contaSemPedido.urgentes ? ` · ${formatNumber(contaSemPedido.urgentes)} ${contaSemPedido.urgentes === 1 ? 'urgente' : 'urgentes'}` : ''}`,
+        atencao: contaSemPedido.total > 0
+      },
+      ...(semEmenda.length > 0
+        ? [
+            {
+              id: 'reservaSemEmenda' as const,
+              resumo: carregando ? undefined : plural(semEmenda.length, 'reserva', 'reservas'),
+              atencao: true
+            }
+          ]
+        : []),
+      ...(semAno.length > 0
+        ? [
+            {
+              id: 'emendasSemAno' as const,
+              resumo: carregando ? undefined : plural(semAno.length, 'pedido', 'pedidos'),
+              atencao: true
+            }
+          ]
+        : []),
+      {
+        id: 'saldoLivre',
+        resumo: carregando
+          ? undefined
+          : r.livrePertoDoFim.length === 0
+            ? 'em dia'
+            : `${plural(r.livrePertoDoFim.length, 'item', 'itens')}${passaramDoCorte ? ` · ${formatNumber(passaramDoCorte)} fora do prazo` : ''}`,
+        atencao: r.livrePertoDoFim.length > 0
+      },
+      {
+        id: 'empenhoAConferir',
+        resumo: consultaEmpenho.isLoading ? undefined : aConferir.length === 0 ? 'em dia' : plural(aConferir.length, 'emenda', 'emendas'),
+        atencao: false
+      },
+      {
+        id: 'notasSemPedido',
+        resumo: carregandoSemPedido ? undefined : semPedido.length === 0 ? 'em dia' : `${plural(semPedido.length, 'nota', 'notas')} · ${formatCurrencyCompact(valorSemPedido)}`,
+        atencao: semPedido.length > 0
+      },
+      {
+        id: 'sobraEmenda',
+        resumo: carregando ? undefined : sobras.length === 0 ? 'nenhuma' : `${plural(sobras.length, 'emenda', 'emendas')} · ${formatCurrencyCompact(valorDasSobras)}`,
+        atencao: sobras.length > 0
+      },
+      {
+        id: 'semNomeCurto',
+        resumo: carregando
+          ? undefined
+          : nomesARevisar.length === 0
+            ? 'todos com nome'
+            : [r.semNomeCurto.length > 0 && `${plural(r.semNomeCurto.length, 'item', 'itens')} sem nome`, r.nomeLongo.length > 0 && `${r.nomeLongo.length} com nome longo`].filter(Boolean).join(' · '),
+        atencao: nomesARevisar.length > 0
+      }
+    ];
+  const chipsDaFaixa: PainelFaixaChip[] = [
+    { id: 'graves', rotulo: 'Pedem ação', valor: valor(graves), perigo: graves > 0, onClick: () => navigate('/emendas/pedidos?aviso=grave') },
+    { id: 'antes', rotulo: 'Antes do empenho', valor: valor(r.antesDoEmpenho), onClick: () => navigate('/emendas/pedidos?ano=todos') },
+    { id: 'empenhados', rotulo: 'Empenhados', valor: valor(r.empenhados), onClick: () => navigate(`/emendas/pedidos?etapa=${r.porEtapa.EMPENHADO ? 'EMPENHADO' : 'CONTRATACAO'}`) },
+    { id: 'livre', rotulo: 'Livre', valor: `${valor(r.livre)} un.`, onClick: () => navigate('/emendas/itens') }
+  ];
+
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
@@ -511,396 +593,353 @@ export const EmendasInicioPage: React.FC = () => {
         actions={<HeaderRefreshAction onRefresh={recarregar} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="emendas-inicio-atualizar" tooltipTitle="Recarregar pedidos, notas e saldo" />}
       />
 
-      <PainelCartoes testId="emendas-inicio-cartoes">
-        <PainelCartao
-          rotulo="Pedem ação já"
-          icone={<AlertTriangle size={16} />}
-          tom="danger"
-          valor={valor(graves)}
-          unidade={graves === 1 ? 'pedido' : 'pedidos'}
-          linhas={linhasGraves}
-          onClick={() => navigate('/emendas/pedidos?aviso=grave')}
-          testId="emendas-inicio-cartao-graves"
-        >
-          {!carregando && linhasGraves.length === 0 && <span style={carteiraDetalhe}>Nenhum aviso vermelho hoje.</span>}
-        </PainelCartao>
-        <PainelCartao
-          rotulo="Antes do empenho"
-          icone={<ClipboardList size={16} />}
-          tom="primary"
-          valor={valor(r.antesDoEmpenho)}
-          unidade={r.antesDoEmpenho === 1 ? 'pedido' : 'pedidos'}
-          linhas={linhasAntes}
-          onClick={() => navigate('/emendas/pedidos?ano=todos')}
-          testId="emendas-inicio-cartao-antes"
-        />
-        <PainelCartao
-          rotulo="Empenhados"
-          icone={<Check size={16} />}
-          tom="success"
-          valor={valor(r.empenhados)}
-          unidade={r.empenhados === 1 ? 'pedido' : 'pedidos'}
-          linhas={[
-            { rotulo: 'Itens com nota de empenho', valor: `${formatNumber(r.linhasComNota)} de ${formatNumber(r.linhasEmpenhadas)}` },
-            { rotulo: 'Em contratação', valor: formatNumber(r.porEtapa.CONTRATACAO ?? 0) }
-          ]}
-          onClick={() => navigate(`/emendas/pedidos?etapa=${r.porEtapa.EMPENHADO ? 'EMPENHADO' : 'CONTRATACAO'}`)}
-          testId="emendas-inicio-cartao-empenhados"
-        />
-        <PainelCartao
-          rotulo="Livre para indicar"
-          icone={<Boxes size={16} />}
-          tom="amber"
-          valor={valor(r.livre)}
-          unidade="un."
-          linhas={[
-            { rotulo: `Alocado à CAEP em ${plural(r.itensVigentes, 'item', 'itens')}`, valor: formatNumber(r.alocado) },
-            { rotulo: 'Reservado a parlamentares', valor: formatNumber(r.reservado) }
-          ]}
-          onClick={() => navigate('/emendas/itens')}
-          testId="emendas-inicio-cartao-livre"
-        >
-          <ProgressBar value={Math.min(r.reservado, r.alocado)} max={r.alocado} showPercent={false} height="4px" colorScheme="primary" testId="emendas-inicio-barra-reservado" />
-        </PainelCartao>
-      </PainelCartoes>
+      <PainelComFaixa
+        dockRef={dockRef}
+        faixa={
+          <PainelFaixa
+            titulo="Início"
+            chips={chipsDaFaixa}
+            // Oito gavetas não cabem numa faixa: ela repete só as que pedem atenção (e a aberta).
+            gavetas={botoesGavetas.filter((b) => b.atencao || b.id === gavetaAberta).map((b) => b.id)}
+            gavetaAberta={gavetaAberta}
+            onToggleGaveta={alternarGaveta}
+            testId="emendas-inicio-faixa"
+          />
+        }
+        topo={
+          <>
+              <PainelCartoes testId="emendas-inicio-cartoes">
+                <PainelCartao
+                  rotulo="Pedem ação já"
+                  icone={<AlertTriangle size={16} />}
+                  tom="danger"
+                  valor={valor(graves)}
+                  unidade={graves === 1 ? 'pedido' : 'pedidos'}
+                  linhas={linhasGraves}
+                  onClick={() => navigate('/emendas/pedidos?aviso=grave')}
+                  testId="emendas-inicio-cartao-graves"
+                >
+                  {!carregando && linhasGraves.length === 0 && <span style={carteiraDetalhe}>Nenhum aviso vermelho hoje.</span>}
+                </PainelCartao>
+                <PainelCartao
+                  rotulo="Antes do empenho"
+                  icone={<ClipboardList size={16} />}
+                  tom="primary"
+                  valor={valor(r.antesDoEmpenho)}
+                  unidade={r.antesDoEmpenho === 1 ? 'pedido' : 'pedidos'}
+                  linhas={linhasAntes}
+                  onClick={() => navigate('/emendas/pedidos?ano=todos')}
+                  testId="emendas-inicio-cartao-antes"
+                />
+                <PainelCartao
+                  rotulo="Empenhados"
+                  icone={<Check size={16} />}
+                  tom="success"
+                  valor={valor(r.empenhados)}
+                  unidade={r.empenhados === 1 ? 'pedido' : 'pedidos'}
+                  linhas={[
+                    { rotulo: 'Itens com nota de empenho', valor: `${formatNumber(r.linhasComNota)} de ${formatNumber(r.linhasEmpenhadas)}` },
+                    { rotulo: 'Em contratação', valor: formatNumber(r.porEtapa.CONTRATACAO ?? 0) }
+                  ]}
+                  onClick={() => navigate(`/emendas/pedidos?etapa=${r.porEtapa.EMPENHADO ? 'EMPENHADO' : 'CONTRATACAO'}`)}
+                  testId="emendas-inicio-cartao-empenhados"
+                />
+                <PainelCartao
+                  rotulo="Livre para indicar"
+                  icone={<Boxes size={16} />}
+                  tom="amber"
+                  valor={valor(r.livre)}
+                  unidade="un."
+                  linhas={[
+                    { rotulo: `Alocado à CAEP em ${plural(r.itensVigentes, 'item', 'itens')}`, valor: formatNumber(r.alocado) },
+                    { rotulo: 'Reservado a parlamentares', valor: formatNumber(r.reservado) }
+                  ]}
+                  onClick={() => navigate('/emendas/itens')}
+                  testId="emendas-inicio-cartao-livre"
+                >
+                  <ProgressBar value={Math.min(r.reservado, r.alocado)} max={r.alocado} showPercent={false} height="4px" colorScheme="primary" testId="emendas-inicio-barra-reservado" />
+                </PainelCartao>
+              </PainelCartoes>
 
-      <PainelBotoesGavetas
-        botoes={[
-          {
-            id: 'emendasSemPedido',
-            resumo: carregandoEmendas
-              ? undefined
-              : contaSemPedido.total === 0
-                ? 'em dia'
-                : `${plural(contaSemPedido.total, 'emenda', 'emendas')}${contaSemPedido.urgentes ? ` · ${formatNumber(contaSemPedido.urgentes)} ${contaSemPedido.urgentes === 1 ? 'urgente' : 'urgentes'}` : ''}`,
-            atencao: contaSemPedido.total > 0
-          },
-          ...(semEmenda.length > 0
-            ? [
-                {
-                  id: 'reservaSemEmenda' as const,
-                  resumo: carregando ? undefined : plural(semEmenda.length, 'reserva', 'reservas'),
-                  atencao: true
-                }
-              ]
-            : []),
-          ...(semAno.length > 0
-            ? [
-                {
-                  id: 'emendasSemAno' as const,
-                  resumo: carregando ? undefined : plural(semAno.length, 'pedido', 'pedidos'),
-                  atencao: true
-                }
-              ]
-            : []),
-          {
-            id: 'saldoLivre',
-            resumo: carregando
-              ? undefined
-              : r.livrePertoDoFim.length === 0
-                ? 'em dia'
-                : `${plural(r.livrePertoDoFim.length, 'item', 'itens')}${passaramDoCorte ? ` · ${formatNumber(passaramDoCorte)} fora do prazo` : ''}`,
-            atencao: r.livrePertoDoFim.length > 0
-          },
-          {
-            id: 'empenhoAConferir',
-            resumo: consultaEmpenho.isLoading ? undefined : aConferir.length === 0 ? 'em dia' : plural(aConferir.length, 'emenda', 'emendas'),
-            atencao: false
-          },
-          {
-            id: 'notasSemPedido',
-            resumo: carregandoSemPedido ? undefined : semPedido.length === 0 ? 'em dia' : `${plural(semPedido.length, 'nota', 'notas')} · ${formatCurrencyCompact(valorSemPedido)}`,
-            atencao: semPedido.length > 0
-          },
-          {
-            id: 'sobraEmenda',
-            resumo: carregando ? undefined : sobras.length === 0 ? 'nenhuma' : `${plural(sobras.length, 'emenda', 'emendas')} · ${formatCurrencyCompact(valorDasSobras)}`,
-            atencao: sobras.length > 0
-          },
-          {
-            id: 'semNomeCurto',
-            resumo: carregando
-              ? undefined
-              : nomesARevisar.length === 0
-                ? 'todos com nome'
-                : [r.semNomeCurto.length > 0 && `${plural(r.semNomeCurto.length, 'item', 'itens')} sem nome`, r.nomeLongo.length > 0 && `${r.nomeLongo.length} com nome longo`].filter(Boolean).join(' · '),
-            atencao: nomesARevisar.length > 0
-          }
-        ]}
-        aberta={gavetaAberta}
-        onToggle={alternarGaveta}
-      />
-      {gavetaAberta === 'emendasSemPedido' && (
-        <PainelGaveta
-          id="emendasSemPedido"
-          subtitulo="Clique na linha para abrir a emenda."
-          hint={`Emendas que a CAEP viu no SIOP e que ainda não viraram pedido. Avisam desde o dia do registro e ficam urgentes com ${diasSemContatoParaUrgente()} dias sem contato registrado com a assessoria do parlamentar ou com a ASPAR dos órgãos (Ajustes › Regras de Alertas).`}
-          onFechar={fecharGaveta}
-        >
-          {emendasSemPedido.length === 0 ? (
-            <EmptyState title={carregandoEmendas ? 'Carregando…' : 'Nenhuma emenda sem pedido.'} testId="emendas-inicio-sem-pedido-vazio" />
-          ) : (
-            <DataTable<EmendaNaLista>
-              testId="emendas-inicio-sem-pedido"
-              className="data-table-container--flush"
-              data={emendasSemPedido}
-              keyExtractor={(l) => l.chave}
-              columns={colunasEmendasSemPedido}
-              rowOpen={(e) => () => navigate(rotaDaEmenda(e))}
-            />
-          )}
-        </PainelGaveta>
-      )}
-      {gavetaAberta === 'reservaSemEmenda' && (
-        <PainelGaveta
-          id="reservaSemEmenda"
-          subtitulo="Clique na linha para abrir a reserva e informar a emenda (ou cancelar)."
-          hint="Desde 29/10/2026 todo pedido nasce com a emenda, que sai na minuta do ofício. Estas reservas são de antes e ainda não têm emenda: no pedido, use Informar a emenda; na Emenda 360, a reserva do mesmo parlamentar aparece para ligar. Sem a emenda, a reserva não pode ser alterada."
-          onFechar={fecharGaveta}
-        >
-          <DataTable<PedidoEmenda>
-            testId="emendas-inicio-sem-emenda"
-            className="data-table-container--flush"
-            data={semEmenda}
-            keyExtractor={(p) => p.id}
-            columns={colunasSemEmenda}
-            rowOpen={(p) => () => navigate(rotaDoPedido(p))}
-          />
-        </PainelGaveta>
-      )}
-      {gavetaAberta === 'emendasSemAno' && (
-        <PainelGaveta
-          id="emendasSemAno"
-          subtitulo="Clique na linha para abrir o pedido e informar o ano na conferência."
-          hint="Pedidos com o número da emenda, mas sem o ano (quase todos vieram da planilha). Sem o ano, o pedido não ganha número, não entra no filtro de nenhum ano e o sistema não lê o empenhado da emenda no Portal da Transparência nem calcula a sobra."
-          onFechar={fecharGaveta}
-        >
-          <DataTable<PedidoEmenda>
-            testId="emendas-inicio-sem-ano"
-            className="data-table-container--flush"
-            data={semAno}
-            keyExtractor={(p) => p.id}
-            columns={colunasSemAno}
-            rowOpen={(p) => () => navigate(rotaDoPedido(p))}
-          />
-        </PainelGaveta>
-      )}
-      {gavetaAberta === 'saldoLivre' && (
-        <PainelGaveta
-          id="saldoLivre"
-          subtitulo="Clique na linha para abrir o item."
-          hint={`Saldo da CAEP ainda sem parlamentar em atas que acabam em até ${avisoIndicacaoDias()} dias. Depois do prazo de indicação (${corteIndicacaoDias()} dias antes do fim da ata) não dá mais para reservar; o gestor de saldo pode remanejar.`}
-          onFechar={fecharGaveta}
-        >
-          {r.livrePertoDoFim.length === 0 ? (
-            <EmptyState title={carregando ? 'Carregando…' : 'Nenhum item com saldo a vencer.'} testId="emendas-inicio-livre-vazio" />
-          ) : (
-            <DataTable<ItemLivrePertoDoFim>
-              testId="emendas-inicio-livre"
-              className="data-table-container--flush"
-              data={r.livrePertoDoFim}
-              keyExtractor={(x) => x.item.itemKey}
-              columns={colunasLivre}
-              rowOpen={(x) => () => navigate(`/emendas/itens?busca=${encodeURIComponent(`${x.item.numeroAta} item ${Number(x.item.numeroItem)}`)}`)}
-            />
-          )}
-        </PainelGaveta>
-      )}
-      {gavetaAberta === 'sobraEmenda' && (
-        <PainelGaveta
-          id="sobraEmenda"
-          subtitulo="Clique na linha para abrir o parlamentar."
-          hint="Emendas do ano, individuais e de bancada, com valor a indicar que compra pelo menos o item mais barato que a CAEP ainda oferece: valor no SIOP menos o maior entre os ofícios e o empenhado pela SENASP (notas da emenda no Portal da Transparência, ou as ligadas no sistema). Na bancada, o valor no SIOP é só a compra direta (ação 21BM, modalidade 90). O que não for empenhado até o fim do ano perde o crédito."
-          onFechar={fecharGaveta}
-        >
-          {sobras.length === 0 ? (
-            <EmptyState title={carregando ? 'Carregando…' : 'Nenhuma emenda do ano com valor a indicar.'} testId="emendas-inicio-sobra-vazio" />
-          ) : (
-            <>
-            <CarteiraSegmentTabs<'todas' | 'individuais' | 'bancadas'>
-              testIdPrefix="emendas-inicio-a-indicar"
-              ariaLabel="Tipo de emenda"
-              active={tipoDoAIndicar}
-              onSelect={setTipoDoAIndicar}
-              segments={[
-                { id: 'todas', label: 'Todas', count: sobras.length },
-                { id: 'individuais', label: 'Individuais', count: sobras.filter((e) => !ehBancada(e)).length },
-                { id: 'bancadas', label: 'Bancadas', count: sobras.filter(ehBancada).length }
-              ]}
-            />
-            <DataTable<SobraDaEmenda>
-              testId="emendas-inicio-sobra"
-              className="data-table-container--flush"
-              data={sobrasDoTipo}
-              keyExtractor={(e) => e.codigo}
-              columns={colunasSobra}
-              rowOpen={(e) => () => navigate(e.autorId ? `/emendas/parlamentares/${encodeURIComponent(e.autorId)}` : '/emendas/parlamentares')}
-            />
-            </>
-          )}
-        </PainelGaveta>
-      )}
-      {gavetaAberta === 'semNomeCurto' && (
-        <PainelGaveta
-          id="semNomeCurto"
-          subtitulo={podeGerir ? 'Clique no lápis para dar o nome.' : 'Clique na linha para abrir o item.'}
-          hint={`Item alocado à CAEP em ata vigente sem o nome na ata assinada (o quadro do parlamentar mostra o começo da descrição do catálogo) ou com nome acima de ${NOME_LONGO} letras (nas listas aparece cortado em ${NOME_NA_LISTA}). Encurtar o nome muda também o quadro do ofício: a decisão é da CAEP.`}
-          onFechar={fecharGaveta}
-        >
-          {nomesARevisar.length === 0 ? (
-            <EmptyState title={carregando ? 'Carregando…' : 'Todos os itens das atas vigentes têm o nome da ata assinada, sem nomes longos.'} testId="emendas-inicio-sem-nome-vazio" />
-          ) : (
-            <DataTable<ItemCaep>
-              testId="emendas-inicio-sem-nome"
-              className="data-table-container--flush"
-              data={nomesARevisar}
-              keyExtractor={(i) => i.itemKey}
-              columns={colunasSemNome}
-              rowOpen={(i) => () => navigate(`/emendas/itens?busca=${encodeURIComponent(`${i.numeroAta} item ${Number(i.numeroItem)}`)}`)}
-              rowActions={
-                podeGerir
-                  ? (i) => <ActionButton action="editar" iconOnly label={`Nome na ata assinada e GND de ${nomeDoItem(i, i.itemKey)}`} onClick={() => setEditando(i)} data-testid={`emendas-inicio-nome-${i.itemKey}`} />
-                  : undefined
-              }
-            />
-          )}
-        </PainelGaveta>
-      )}
-      {gavetaAberta === 'empenhoAConferir' && (
-        <PainelGaveta
-          id="empenhoAConferir"
-          subtitulo="Clique na linha para abrir o pedido."
-          hint="Pedidos empenhados cuja nota citada no despacho do SEI ainda não está no sistema, não foi lida no Portal da Transparência ou foi empenhada em reais. Não conta nos avisos; a lista encolhe sozinha quando as notas chegam."
-          onFechar={fecharGaveta}
-        >
-          {aConferir.length === 0 ? (
-            <EmptyState title={consultaEmpenho.isLoading ? 'Carregando…' : 'Nenhuma emenda esperando nota.'} testId="emendas-inicio-a-conferir-vazio" />
-          ) : (
-            <DataTable<EmendaAConferir>
-              testId="emendas-inicio-a-conferir"
-              className="data-table-container--flush"
-              data={aConferir}
-              keyExtractor={(e) => e.emenda}
-              columns={colunasAConferir}
-              rowOpen={(e) => () => navigate(`/emendas/pedidos/id/${encodeURIComponent(e.pedidoIds[0])}`)}
-            />
-          )}
-        </PainelGaveta>
-      )}
-      {gavetaAberta === 'notasSemPedido' && (
-        <PainelGaveta
-          id="notasSemPedido"
-          subtitulo="Ligue a emenda ao pedido ou marque como resolvido."
-          hint="Notas de material (3.3.90.30 e 4.4.90.52) da UG 200330 do ano com o número de uma emenda no plano interno que nenhum pedido tem: o valor a indicar de uma emenda antiga que completou um pedido, número trocado num pedido ou emenda executada fora do sistema. O pedido provável tem itens do mesmo fornecedor com o mesmo valor; o sistema só sugere. Se a emenda não é da CAEP, marque como resolvido."
-          onFechar={fecharGaveta}
-        >
-          {semPedido.length === 0 ? (
-            <EmptyState title={carregandoSemPedido ? 'Carregando…' : 'Toda nota de emenda do ano tem pedido no sistema.'} testId="emendas-inicio-sem-pedido-vazio" />
-          ) : (
-            <DataTable<EmendaSemPedido>
-              testId="emendas-inicio-sem-pedido"
-              className="data-table-container--flush"
-              data={semPedidoPorEmenda}
-              keyExtractor={(g) => g.chave}
-              columns={colunasSemPedido}
-              rowOpen={(g) => (g.sugestao ? () => navigate(`/emendas/pedidos/id/${encodeURIComponent(g.sugestao!.pedidoId)}`) : undefined)}
-              rowActions={
-                podeGerir
-                  ? (g) => (
-                      <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
-                        <AppButton size="xs" variant="secondary" onClick={() => setLigando(g)} data-testid={`emendas-inicio-sem-pedido-ligar-${g.emenda}`}>
-                          {g.sugestao ? `Ligar ao ${pedidoPorId.get(g.sugestao.pedidoId) ? pedidoEmTexto(pedidoPorId.get(g.sugestao.pedidoId)!) : 'pedido'}` : 'Escolher pedido'}
-                        </AppButton>
-                        <BotaoResolvido
-                          onClick={() =>
-                            abrirResolvido({
-                              tipo: 'AVISO',
-                              chave: chaveNotaSemPedido(g.notas[0]),
-                              outrasChaves: g.notas.slice(1).map(chaveNotaSemPedido),
-                              titulo: tituloEmendaSemPedido(g),
-                              contexto: g.planoInterno ?? undefined
-                            })
-                          }
-                          testId={`emendas-inicio-sem-pedido-resolver-${g.emenda}`}
-                        />
-                      </span>
-                    )
-                  : undefined
-              }
-            />
-          )}
-          <AvisosResolvidosLista
-            itens={semPedidoResolvidas.map((n) => ({ chave: chaveNotaSemPedido(n), titulo: tituloSemPedido(n), contexto: n.planoInterno ?? undefined }))}
-            porChave={resolvidos}
-            podeReexibir={podeGerir}
-            onReexibir={(chave) => reexibir.mutate({ chave })}
-            reexibindo={reexibir.isPending}
-            testId="emendas-inicio-sem-pedido-resolvidos"
-          />
-          {dialogResolvido}
-          {ligando && <LigarEmendaModal emenda={ligando} onClose={() => setLigando(null)} />}
-        </PainelGaveta>
-      )}
-      {editando && <DadosItemModal item={editando} onClose={() => setEditando(null)} />}
-
-      <SectionHeader
-        title="Pendências dos pedidos"
-        subtitle="Os mesmos avisos da lista de Pedidos."
-        className="section-header--flush"
-        actions={<ActionButton action="abrir" size="sm" label="Ver em Pedidos" onClick={abrirPedidos} data-testid="emendas-inicio-ver-pedidos" />}
-      />
-      <CarteiraSegmentTabs<Segmento>
-        testIdPrefix="emendas-inicio-aba"
-        ariaLabel="Gravidade do aviso"
-        active={segmento}
-        onSelect={(s) => {
-          setSegmento(s);
-          setFiltroAviso('');
-        }}
-        segments={[
-          { id: 'graves', label: 'Urgentes', count: graves, dot: 'var(--color-danger)', title: 'Avisos vermelhos: pedem ação já' },
-          { id: 'atencao', label: 'Atenção', count: atencao, dot: 'var(--color-warning-solid)', title: 'Avisos amarelos' },
-          { id: 'todas', label: 'Todas', count: r.pedidosComAviso.length }
-        ]}
-      />
-      <CarteiraFilterBar
-        busca={busca}
-        searchPlaceholder="Buscar por parlamentar, item ou ata..."
-        onChangeBusca={setBusca}
-        hasActiveFilters={filtrosAtivos}
-        onResetFilters={() => {
-          setBusca('');
-          setFiltroAviso('');
-        }}
-        counter={carteiraCounter(lista.length, doSegmento.length, filtrosAtivos, 'pedido', 'pedidos')}
-        testIdPrefix="emendas-inicio"
+              <PainelBotoesGavetas botoes={botoesGavetas} aberta={gavetaAberta} onToggle={alternarGaveta} />
+              <SectionHeader
+                title="Pendências dos pedidos"
+                subtitle="Os mesmos avisos da lista de Pedidos."
+                className="section-header--flush"
+                actions={<ActionButton action="abrir" size="sm" label="Ver em Pedidos" onClick={abrirPedidos} data-testid="emendas-inicio-ver-pedidos" />}
+              />
+          </>
+        }
+        trilho={
+              <CarteiraSegmentTabs<Segmento>
+                testIdPrefix="emendas-inicio-aba"
+                ariaLabel="Gravidade do aviso"
+                active={segmento}
+                onSelect={(s) => {
+                  setSegmento(s);
+                  setFiltroAviso('');
+                  scrollToDock(dockRef.current);
+                }}
+                segments={[
+                  { id: 'graves', label: 'Urgentes', count: graves, dot: 'var(--color-danger)', title: 'Avisos vermelhos: pedem ação já' },
+                  { id: 'atencao', label: 'Atenção', count: atencao, dot: 'var(--color-warning-solid)', title: 'Avisos amarelos' },
+                  { id: 'todas', label: 'Todas', count: r.pedidosComAviso.length }
+                ]}
+              />
+        }
       >
-        <CarteiraFilterButton label="Aviso" value={filtroAviso} emptyValue="" options={opcoesDeAviso} onChange={(v) => setFiltroAviso(v as TipoAviso | '')} testId="emendas-inicio-filtro-aviso" />
-      </CarteiraFilterBar>
+          {gavetaAberta === 'emendasSemPedido' && (
+            <PainelGaveta
+              id="emendasSemPedido"
+              subtitulo="Clique na linha para abrir a emenda."
+              hint={`Emendas que a CAEP viu no SIOP e que ainda não viraram pedido. Avisam desde o dia do registro e ficam urgentes com ${diasSemContatoParaUrgente()} dias sem contato registrado com a assessoria do parlamentar ou com a ASPAR dos órgãos (Ajustes › Regras de Alertas).`}
+              onFechar={fecharGaveta}
+            >
+              {emendasSemPedido.length === 0 ? (
+                <EmptyState title={carregandoEmendas ? 'Carregando…' : 'Nenhuma emenda sem pedido.'} testId="emendas-inicio-sem-pedido-vazio" />
+              ) : (
+                <DataTable<EmendaNaLista>
+                  testId="emendas-inicio-sem-pedido"
+                  className="data-table-container--flush"
+                  data={emendasSemPedido}
+                  keyExtractor={(l) => l.chave}
+                  columns={colunasEmendasSemPedido}
+                  rowOpen={(e) => () => navigate(rotaDaEmenda(e))}
+                />
+              )}
+            </PainelGaveta>
+          )}
+          {gavetaAberta === 'reservaSemEmenda' && (
+            <PainelGaveta
+              id="reservaSemEmenda"
+              subtitulo="Clique na linha para abrir a reserva e informar a emenda (ou cancelar)."
+              hint="Desde 29/10/2026 todo pedido nasce com a emenda, que sai na minuta do ofício. Estas reservas são de antes e ainda não têm emenda: no pedido, use Informar a emenda; na Emenda 360, a reserva do mesmo parlamentar aparece para ligar. Sem a emenda, a reserva não pode ser alterada."
+              onFechar={fecharGaveta}
+            >
+              <DataTable<PedidoEmenda>
+                testId="emendas-inicio-sem-emenda"
+                className="data-table-container--flush"
+                data={semEmenda}
+                keyExtractor={(p) => p.id}
+                columns={colunasSemEmenda}
+                rowOpen={(p) => () => navigate(rotaDoPedido(p))}
+              />
+            </PainelGaveta>
+          )}
+          {gavetaAberta === 'emendasSemAno' && (
+            <PainelGaveta
+              id="emendasSemAno"
+              subtitulo="Clique na linha para abrir o pedido e informar o ano na conferência."
+              hint="Pedidos com o número da emenda, mas sem o ano (quase todos vieram da planilha). Sem o ano, o pedido não ganha número, não entra no filtro de nenhum ano e o sistema não lê o empenhado da emenda no Portal da Transparência nem calcula a sobra."
+              onFechar={fecharGaveta}
+            >
+              <DataTable<PedidoEmenda>
+                testId="emendas-inicio-sem-ano"
+                className="data-table-container--flush"
+                data={semAno}
+                keyExtractor={(p) => p.id}
+                columns={colunasSemAno}
+                rowOpen={(p) => () => navigate(rotaDoPedido(p))}
+              />
+            </PainelGaveta>
+          )}
+          {gavetaAberta === 'saldoLivre' && (
+            <PainelGaveta
+              id="saldoLivre"
+              subtitulo="Clique na linha para abrir o item."
+              hint={`Saldo da CAEP ainda sem parlamentar em atas que acabam em até ${avisoIndicacaoDias()} dias. Depois do prazo de indicação (${corteIndicacaoDias()} dias antes do fim da ata) não dá mais para reservar; o gestor de saldo pode remanejar.`}
+              onFechar={fecharGaveta}
+            >
+              {r.livrePertoDoFim.length === 0 ? (
+                <EmptyState title={carregando ? 'Carregando…' : 'Nenhum item com saldo a vencer.'} testId="emendas-inicio-livre-vazio" />
+              ) : (
+                <DataTable<ItemLivrePertoDoFim>
+                  testId="emendas-inicio-livre"
+                  className="data-table-container--flush"
+                  data={r.livrePertoDoFim}
+                  keyExtractor={(x) => x.item.itemKey}
+                  columns={colunasLivre}
+                  rowOpen={(x) => () => navigate(`/emendas/itens?busca=${encodeURIComponent(`${x.item.numeroAta} item ${Number(x.item.numeroItem)}`)}`)}
+                />
+              )}
+            </PainelGaveta>
+          )}
+          {gavetaAberta === 'sobraEmenda' && (
+            <PainelGaveta
+              id="sobraEmenda"
+              subtitulo="Clique na linha para abrir o parlamentar."
+              hint="Emendas do ano, individuais e de bancada, com valor a indicar que compra pelo menos o item mais barato que a CAEP ainda oferece: valor no SIOP menos o maior entre os ofícios e o empenhado pela SENASP (notas da emenda no Portal da Transparência, ou as ligadas no sistema). Na bancada, o valor no SIOP é só a compra direta (ação 21BM, modalidade 90). O que não for empenhado até o fim do ano perde o crédito."
+              onFechar={fecharGaveta}
+            >
+              {sobras.length === 0 ? (
+                <EmptyState title={carregando ? 'Carregando…' : 'Nenhuma emenda do ano com valor a indicar.'} testId="emendas-inicio-sobra-vazio" />
+              ) : (
+                <>
+                <CarteiraSegmentTabs<'todas' | 'individuais' | 'bancadas'>
+                  testIdPrefix="emendas-inicio-a-indicar"
+                  ariaLabel="Tipo de emenda"
+                  active={tipoDoAIndicar}
+                  onSelect={setTipoDoAIndicar}
+                  segments={[
+                    { id: 'todas', label: 'Todas', count: sobras.length },
+                    { id: 'individuais', label: 'Individuais', count: sobras.filter((e) => !ehBancada(e)).length },
+                    { id: 'bancadas', label: 'Bancadas', count: sobras.filter(ehBancada).length }
+                  ]}
+                />
+                <DataTable<SobraDaEmenda>
+                  testId="emendas-inicio-sobra"
+                  className="data-table-container--flush"
+                  data={sobrasDoTipo}
+                  keyExtractor={(e) => e.codigo}
+                  columns={colunasSobra}
+                  rowOpen={(e) => () => navigate(e.autorId ? `/emendas/parlamentares/${encodeURIComponent(e.autorId)}` : '/emendas/parlamentares')}
+                />
+                </>
+              )}
+            </PainelGaveta>
+          )}
+          {gavetaAberta === 'semNomeCurto' && (
+            <PainelGaveta
+              id="semNomeCurto"
+              subtitulo={podeGerir ? 'Clique no lápis para dar o nome.' : 'Clique na linha para abrir o item.'}
+              hint={`Item alocado à CAEP em ata vigente sem o nome na ata assinada (o quadro do parlamentar mostra o começo da descrição do catálogo) ou com nome acima de ${NOME_LONGO} letras (nas listas aparece cortado em ${NOME_NA_LISTA}). Encurtar o nome muda também o quadro do ofício: a decisão é da CAEP.`}
+              onFechar={fecharGaveta}
+            >
+              {nomesARevisar.length === 0 ? (
+                <EmptyState title={carregando ? 'Carregando…' : 'Todos os itens das atas vigentes têm o nome da ata assinada, sem nomes longos.'} testId="emendas-inicio-sem-nome-vazio" />
+              ) : (
+                <DataTable<ItemCaep>
+                  testId="emendas-inicio-sem-nome"
+                  className="data-table-container--flush"
+                  data={nomesARevisar}
+                  keyExtractor={(i) => i.itemKey}
+                  columns={colunasSemNome}
+                  rowOpen={(i) => () => navigate(`/emendas/itens?busca=${encodeURIComponent(`${i.numeroAta} item ${Number(i.numeroItem)}`)}`)}
+                  rowActions={
+                    podeGerir
+                      ? (i) => <ActionButton action="editar" iconOnly label={`Nome na ata assinada e GND de ${nomeDoItem(i, i.itemKey)}`} onClick={() => setEditando(i)} data-testid={`emendas-inicio-nome-${i.itemKey}`} />
+                      : undefined
+                  }
+                />
+              )}
+            </PainelGaveta>
+          )}
+          {gavetaAberta === 'empenhoAConferir' && (
+            <PainelGaveta
+              id="empenhoAConferir"
+              subtitulo="Clique na linha para abrir o pedido."
+              hint="Pedidos empenhados cuja nota citada no despacho do SEI ainda não está no sistema, não foi lida no Portal da Transparência ou foi empenhada em reais. Não conta nos avisos; a lista encolhe sozinha quando as notas chegam."
+              onFechar={fecharGaveta}
+            >
+              {aConferir.length === 0 ? (
+                <EmptyState title={consultaEmpenho.isLoading ? 'Carregando…' : 'Nenhuma emenda esperando nota.'} testId="emendas-inicio-a-conferir-vazio" />
+              ) : (
+                <DataTable<EmendaAConferir>
+                  testId="emendas-inicio-a-conferir"
+                  className="data-table-container--flush"
+                  data={aConferir}
+                  keyExtractor={(e) => e.emenda}
+                  columns={colunasAConferir}
+                  rowOpen={(e) => () => navigate(`/emendas/pedidos/id/${encodeURIComponent(e.pedidoIds[0])}`)}
+                />
+              )}
+            </PainelGaveta>
+          )}
+          {gavetaAberta === 'notasSemPedido' && (
+            <PainelGaveta
+              id="notasSemPedido"
+              subtitulo="Ligue a emenda ao pedido ou marque como resolvido."
+              hint="Notas de material (3.3.90.30 e 4.4.90.52) da UG 200330 do ano com o número de uma emenda no plano interno que nenhum pedido tem: o valor a indicar de uma emenda antiga que completou um pedido, número trocado num pedido ou emenda executada fora do sistema. O pedido provável tem itens do mesmo fornecedor com o mesmo valor; o sistema só sugere. Se a emenda não é da CAEP, marque como resolvido."
+              onFechar={fecharGaveta}
+            >
+              {semPedido.length === 0 ? (
+                <EmptyState title={carregandoSemPedido ? 'Carregando…' : 'Toda nota de emenda do ano tem pedido no sistema.'} testId="emendas-inicio-sem-pedido-vazio" />
+              ) : (
+                <DataTable<EmendaSemPedido>
+                  testId="emendas-inicio-sem-pedido"
+                  className="data-table-container--flush"
+                  data={semPedidoPorEmenda}
+                  keyExtractor={(g) => g.chave}
+                  columns={colunasSemPedido}
+                  rowOpen={(g) => (g.sugestao ? () => navigate(`/emendas/pedidos/id/${encodeURIComponent(g.sugestao!.pedidoId)}`) : undefined)}
+                  rowActions={
+                    podeGerir
+                      ? (g) => (
+                          <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                            <AppButton size="xs" variant="secondary" onClick={() => setLigando(g)} data-testid={`emendas-inicio-sem-pedido-ligar-${g.emenda}`}>
+                              {g.sugestao ? `Ligar ao ${pedidoPorId.get(g.sugestao.pedidoId) ? pedidoEmTexto(pedidoPorId.get(g.sugestao.pedidoId)!) : 'pedido'}` : 'Escolher pedido'}
+                            </AppButton>
+                            <BotaoResolvido
+                              onClick={() =>
+                                abrirResolvido({
+                                  tipo: 'AVISO',
+                                  chave: chaveNotaSemPedido(g.notas[0]),
+                                  outrasChaves: g.notas.slice(1).map(chaveNotaSemPedido),
+                                  titulo: tituloEmendaSemPedido(g),
+                                  contexto: g.planoInterno ?? undefined
+                                })
+                              }
+                              testId={`emendas-inicio-sem-pedido-resolver-${g.emenda}`}
+                            />
+                          </span>
+                        )
+                      : undefined
+                  }
+                />
+              )}
+              <AvisosResolvidosLista
+                itens={semPedidoResolvidas.map((n) => ({ chave: chaveNotaSemPedido(n), titulo: tituloSemPedido(n), contexto: n.planoInterno ?? undefined }))}
+                porChave={resolvidos}
+                podeReexibir={podeGerir}
+                onReexibir={(chave) => reexibir.mutate({ chave })}
+                reexibindo={reexibir.isPending}
+                testId="emendas-inicio-sem-pedido-resolvidos"
+              />
+              {dialogResolvido}
+              {ligando && <LigarEmendaModal emenda={ligando} onClose={() => setLigando(null)} />}
+            </PainelGaveta>
+          )}
+          {editando && <DadosItemModal item={editando} onClose={() => setEditando(null)} />}
 
-      <AdminListShell
-        testId="emendas-inicio-lista"
-        isLoading={carregando}
-        isError={isError}
-        errorTitle="Não foi possível carregar os pedidos"
-        errorMessage={(error as Error | null)?.message || 'Falha ao consultar os pedidos.'}
-        onRetry={() => refetch()}
-        isEmpty={!carregando && lista.length === 0}
-        emptyTitle={r.pedidosComAviso.length === 0 ? 'Nenhum pedido com aviso.' : 'Nenhum pedido com este aviso.'}
-        emptyDescription={r.pedidosComAviso.length === 0 ? 'Quando um pedido precisar de atenção, ele aparece aqui.' : 'Ajuste a busca ou escolha outro aviso.'}
-      >
-        <DataTable<PedidoComAviso>
-          testId="emendas-inicio-pedidos"
-          className="data-table-container--flush emendas-tabela-topo"
-          data={pageItems}
-          keyExtractor={chave}
-          sort={{ key: sortKey, dir: sortDir }}
-          onSort={toggle}
-          columns={colunas}
-          rowOpen={(l) => () => navigate(rotaDoPedido(l.pedido))}
-        />
-        <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={lista.length} onChange={setPage} testIdPrefix="emendas-inicio" />
-      </AdminListShell>
+          <CarteiraFilterBar
+            busca={busca}
+            searchPlaceholder="Buscar por parlamentar, item ou ata..."
+            onChangeBusca={setBusca}
+            hasActiveFilters={filtrosAtivos}
+            onResetFilters={() => {
+              setBusca('');
+              setFiltroAviso('');
+            }}
+            counter={carteiraCounter(lista.length, doSegmento.length, filtrosAtivos, 'pedido', 'pedidos')}
+            testIdPrefix="emendas-inicio"
+          >
+            <CarteiraFilterButton label="Aviso" value={filtroAviso} emptyValue="" options={opcoesDeAviso} onChange={(v) => setFiltroAviso(v as TipoAviso | '')} testId="emendas-inicio-filtro-aviso" />
+          </CarteiraFilterBar>
+
+          <AdminListShell
+            testId="emendas-inicio-lista"
+            isLoading={carregando}
+            isError={isError}
+            errorTitle="Não foi possível carregar os pedidos"
+            errorMessage={(error as Error | null)?.message || 'Falha ao consultar os pedidos.'}
+            onRetry={() => refetch()}
+            isEmpty={!carregando && lista.length === 0}
+            emptyTitle={r.pedidosComAviso.length === 0 ? 'Nenhum pedido com aviso.' : 'Nenhum pedido com este aviso.'}
+            emptyDescription={r.pedidosComAviso.length === 0 ? 'Quando um pedido precisar de atenção, ele aparece aqui.' : 'Ajuste a busca ou escolha outro aviso.'}
+          >
+            <DataTable<PedidoComAviso>
+              testId="emendas-inicio-pedidos"
+              className="data-table-container--flush emendas-tabela-topo"
+              data={pageItems}
+              keyExtractor={chave}
+              sort={{ key: sortKey, dir: sortDir }}
+              onSort={toggle}
+              columns={colunas}
+              rowOpen={(l) => () => navigate(rotaDoPedido(l.pedido))}
+            />
+            <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={lista.length} onChange={setPage} testIdPrefix="emendas-inicio" />
+          </AdminListShell>
+      </PainelComFaixa>
     </PageContainer>
   );
 };
