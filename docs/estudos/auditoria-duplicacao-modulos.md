@@ -27,7 +27,7 @@ Nada aqui muda o sistema. O estudo é leitura do código da main (migrations at�
 | Gestores de ata/contrato e fiscais com nome diferente do perfil | 0 |
 | Gestores sem `gestor_user_id` | 0 |
 | Entregas da fiscalização com quantidade ou beneficiário diferente da linha do pedido | 0 de 2.046 |
-| Atas com `valor_total` diferente da soma dos itens | 38 (**19 delas guardam só a parte da SENASP**, ver 1.1) |
+| Atas com `valor_total` diferente da soma dos itens | 38: 18 de participação ou adesão (só a parte da SENASP, de propósito) e 20 da CGLIC (total da fonte; 15 delas com preço apostilado), ver 1.1 |
 
 ---
 
@@ -39,8 +39,10 @@ Nada aqui muda o sistema. O estudo é leitura do código da main (migrations at�
   - `informar_preco_apostilamento` (migration 247, linha 159);
   - `aplicar_preco_do_termo` (migration 258, linhas 104 e 442);
   - `espelhar_participacao_na_carteira` (migration 145).
-- **Hoje:** 19 atas estão com o valor da SENASP. Na próxima sincronização voltam ao total. O painel Distribuição lê esse campo (`useDistribuicaoDaCarteira.ts:40`) e mostra um valor que oscila.
-- **Ligação certa:** `valor_total` só para o valor da fonte. O "valor da SENASP" vem de uma view sobre `itens_ata`. Tirar o `UPDATE ... valor_total` das três funções.
+- **Os dois significados são de propósito por tipo de ata** (migration 114): ata da CGLIC = total da fonte; ata de participação ou adesão = parte da SENASP. As 18 de participação/adesão divergentes estão certas.
+- **O erro:** o apostilamento e o preço do termo aplicam a conta da SENASP também às atas da CGLIC. A sincronização das atas (a cada hora, minuto 15) devolve o total da fonte. O valor fica errado por até 1 h depois de cada apostilamento. O painel Distribuição lê esse campo (`useDistribuicaoDaCarteira.ts:40`).
+- **Hoje:** nenhuma ata da CGLIC está com o valor errado, porque a sincronização já corrigiu. Mas 15 atas da CGLIC com preço apostilado (06/11/2026) mostram o total da fonte, que usa o preço antigo, enquanto os itens já mostram o preço novo.
+- **Ligação certa:** decidir o que é o "valor" da ata da CGLIC depois do apostilamento (total da fonte ou soma homologada × preço vigente). Em seguida, uma regra só para as três funções e para a sincronização.
 
 ### 1.2 Juntar beneficiários falha quando o beneficiário já está na Fiscalização ou numa emenda
 - **Onde:** `juntar_beneficiarios_emenda` (última versão na migration 172, linhas 168 a 174). A função só repassa `emenda_pedido_linhas.beneficiario_id` e depois apaga o beneficiário que sai.
@@ -210,7 +212,7 @@ As vazias usadas por funções do banco (`*_ausente_da_fonte`, `correcoes_*`, `v
 
 ## 6. Ordem sugerida de entregas
 
-1. **Valor total da ata (1.1)**: uma migration que tira os 3 `UPDATE` e recalcula as 19 atas, mais uma view do valor da SENASP.
+1. **Valor total da ata (1.1)**: decidir o valor da ata da CGLIC depois do apostilamento e usar uma regra só nas três funções e na sincronização.
 2. **Juntar beneficiários (1.2)**: repassar `emendas_siop`, `fisc_entregas` e o grupo.
 3. **Ordem de Fornecimento numa fonte só (1.3)**: Mesa, Andamento e Fiscalização lendo `emenda_pedido_ordens`. Depois, apagar as colunas antigas.
 4. **Entregas × linha do pedido (1.4)**: leitura pela linha, ou conferência com aviso.
