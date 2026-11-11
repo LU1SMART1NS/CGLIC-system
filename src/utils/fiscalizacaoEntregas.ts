@@ -41,6 +41,9 @@ export function etapaDef(id: EtapaEntrega): EtapaDef {
 
 export const ordemDaEtapa = (id: EtapaEntrega) => ETAPAS_ENTREGA.findIndex((e) => e.id === id);
 
+/** A fiscalização do item acabou: Ofício à SAL (emenda) ou Finalizado (sem emenda). */
+export const itemConcluido = (e: Pick<EntregaFiscalizacao, 'etapa'>) => e.etapa === 'SAL' || e.etapa === 'FINALIZADO';
+
 /** Já chegou ao beneficiário (Entregue em diante). */
 export const foiEntregue = (e: Pick<EntregaFiscalizacao, 'etapa'>) => ordemDaEtapa(e.etapa) >= ordemDaEtapa('ENTREGUE');
 
