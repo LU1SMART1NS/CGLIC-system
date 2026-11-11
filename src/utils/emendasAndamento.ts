@@ -220,8 +220,11 @@ export function andamentoDoPedido(
     minuta.estado = 'FEITA';
     minuta.feito = p.oficioEm ? dataBR(p.oficioEm) : doPlanilha ? 'sem data no controle anterior' : null;
   } else if (esta('MINUTA')) {
+    // Com o prazo gravado na minuta pelo preço de hoje (migration 246), vale ele: é o mesmo do aviso "Prazo do ofício
+    // vencido". Sem ele (minuta antiga), os 30 dias da minuta.
     const desde = p.devolvidoEm ?? p.minutaEm;
-    const ate = desde ? somaDias(desde, AVISO_SEM_OFICIO_DIAS) : null;
+    const ate = p.minutaValidaAte ?? (desde ? somaDias(desde, AVISO_SEM_OFICIO_DIAS) : null);
+    if (p.minutaValidaAte) minuta.regra = 'ofício até o prazo gravado com a minuta; depois dele, nova minuta com o preço do dia';
     minuta.prazo = ate ? dataBR(ate) : null;
     minuta.vencido = Boolean(ate && diasEntre(hoje, ate) < 0);
     minuta.estado = minuta.vencido ? 'COBRAR' : 'AGUARDANDO';
