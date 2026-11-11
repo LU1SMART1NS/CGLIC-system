@@ -8,6 +8,7 @@ Levantamentos e medições feitos antes de mudar o sistema. Nenhum estudo altera
 |---|---|---|
 | [auditoria-vinculos-sei-plano.md](auditoria-vinculos-sei-plano.md) | 24/10/2026 | O sistema vincula certo (contrato à ata, quantidade do item, nota ao contrato e ao item)? Plano em fases com o SEI como prova. |
 | [modelo-gestao-cplcga-sei.md](modelo-gestao-cplcga-sei.md) | 25/10/2026 | Como a CCGA (ex-CPLCGA) organiza o trabalho: os cinco Planos e os modelos lidos no SEI. |
+| [auditoria-duplicacao-modulos.md](auditoria-duplicacao-modulos.md) | 11/11/2026 | Onde a mesma informação é guardada em dois lugares e quais ligações faltam entre os módulos. |
 | [projecao-reajuste-atas.md](projecao-reajuste-atas.md) e [projecao-reajuste-itens.csv](projecao-reajuste-itens.csv) | 23/10/2026 | Quanto cada item das atas pode reajustar. |
 
 ## Financeiro
