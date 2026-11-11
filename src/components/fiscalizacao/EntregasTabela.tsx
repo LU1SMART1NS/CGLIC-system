@@ -141,7 +141,17 @@ export const EntregasTabela: React.FC<{
         </>
       )
     },
-    { key: 'origem', header: 'Origem', render: (e) => (e.emenda ? <span style={carteiraValor}>Emenda {e.emenda}</span> : <span style={carteiraDetalhe}>Sem emenda</span>) },
+    {
+      key: 'origem',
+      header: 'Origem',
+      render: (e) => (
+        <>
+          {e.emenda ? <span style={carteiraValor}>Emenda {e.emenda}</span> : e.programaTexto ? <span style={carteiraValor}>{e.programaTexto}</span> : <span style={carteiraDetalhe}>Sem emenda</span>}
+          {e.emenda && e.programaTexto && <div style={carteiraDetalhe}>{e.programaTexto}</div>}
+          {e.origem === 'CARGA' && <div style={carteiraDetalhe}>da planilha da {NOME_SFC}</div>}
+        </>
+      )
+    },
     { key: 'etapa', header: 'Etapa', minWidth: '170px', render: (e) => <CelulaEtapa e={e} /> },
     { key: 'prazo', header: 'Prazo', render: (e) => <CelulaPrazo e={e} /> }
   ];

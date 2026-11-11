@@ -6,6 +6,7 @@ import { AppDateInput, AppInput, AppSelect, AppTextarea } from '../../design-sys
 import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { useToast } from '../../design-system/components/Toast';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
+import { mascaraProcessoSei, processoSeiValido } from '../../utils/mascaras';
 import { useDefinirFiscalizacao, useDesfazerTransferenciaFiscal, useFiscaisAtivos, useRegistrarProcessoFiscalizacao, useTransferirContratosFiscal, useTransferirFiscalTemporaria } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao, DecisaoFiscalizacao, TransferenciaFiscal } from '../../services/fiscalizacaoService';
 import { MOTIVO_MINIMO, NOME_SFC, dataBR, decisaoPedeMotivo, decisaoSugerida, deEmenda, hojeEmBrasilia, numeroDoContrato, type CargaDoFiscal } from '../../utils/fiscalizacao';
@@ -112,7 +113,7 @@ export const RegistrarProcessoModal: React.FC<{ contrato: ContratoFiscalizacao; 
   const [sei, setSei] = useState(contrato.processoSei ?? '');
   const [data, setData] = useState(() => contrato.autuadoEm ?? hojeEmBrasilia());
   const hoje = hojeEmBrasilia();
-  const ok = seiValido(sei) && Boolean(data) && data <= hoje;
+  const ok = processoSeiValido(sei) && Boolean(data) && data <= hoje;
   return (
     <Modal
       isOpen
@@ -143,7 +144,7 @@ export const RegistrarProcessoModal: React.FC<{ contrato: ContratoFiscalizacao; 
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-        <AppInput label="Processo no SEI" value={sei} onChange={(ev) => setSei(ev.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="ex.: 34472015" hint="Número do processo de acompanhamento contratual." data-testid="fisc-processo-sei" />
+        <AppInput label="Processo no SEI" value={sei} onChange={(ev) => setSei(mascaraProcessoSei(ev.target.value))} inputMode="numeric" placeholder="ex.: 08020.017653/2026-49" hint="Número do processo de acompanhamento contratual." data-testid="fisc-processo-sei" />
         <AppDateInput label="Autuado em" value={data} onValueChange={setData} max={hoje} />
       </div>
     </Modal>

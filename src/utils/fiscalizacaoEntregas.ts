@@ -75,12 +75,12 @@ export function bloqueioDaEtapa(entregas: Pick<EntregaFiscalizacao, 'responsavel
 }
 
 /** Nome do beneficiário nas listas: sigla, e o nome por extenso embaixo. */
-export function rotuloDoBeneficiario(e: Pick<EntregaFiscalizacao, 'beneficiarioSigla' | 'beneficiarioNome' | 'beneficiarioRazao'>): { principal: string; detalhe: string | null } {
-  const principal = e.beneficiarioSigla || e.beneficiarioNome || e.beneficiarioRazao || 'Beneficiário a informar';
+export function rotuloDoBeneficiario(e: Pick<EntregaFiscalizacao, 'beneficiarioSigla' | 'beneficiarioNome' | 'beneficiarioRazao'> & Partial<Pick<EntregaFiscalizacao, 'beneficiarioTexto'>>): { principal: string; detalhe: string | null } {
+  const principal = e.beneficiarioSigla || e.beneficiarioNome || e.beneficiarioRazao || e.beneficiarioTexto || 'Beneficiário a informar';
   const detalhe = e.beneficiarioSigla ? e.beneficiarioNome || e.beneficiarioRazao : e.beneficiarioNome ? e.beneficiarioRazao : null;
   return { principal, detalhe: detalhe && detalhe !== principal ? detalhe : null };
 }
 
-export function nomeDoItem(e: Pick<EntregaFiscalizacao, 'itemNome' | 'itemDescricao' | 'itemKey'>): string {
-  return e.itemNome || e.itemDescricao || e.itemKey || 'Item';
+export function nomeDoItem(e: Pick<EntregaFiscalizacao, 'itemNome' | 'itemDescricao' | 'itemKey'> & Partial<Pick<EntregaFiscalizacao, 'itemTexto'>>): string {
+  return e.itemNome || e.itemDescricao || e.itemTexto || e.itemKey || 'Item';
 }

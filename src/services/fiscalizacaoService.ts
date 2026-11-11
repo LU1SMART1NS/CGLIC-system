@@ -97,6 +97,7 @@ export async function registrarProcessoFiscalizacao(input: { contractKey: string
   const { error } = await cliente().rpc('registrar_processo_fiscalizacao', {
     p_contract_key: input.contractKey,
     p_processo_sei: input.processoSei.replace(/\D/g, ''),
+    // a RPC formata o número do processo (NUP): 08020.017653/2026-49
     p_autuado_em: input.autuadoEm
   });
   if (error) throw mapPostgresErrorToAppError(error);
@@ -124,10 +125,14 @@ export interface EntregaFiscalizacao {
   itemKey: string | null;
   itemNome: string | null;
   itemDescricao: string | null;
+  /** Carga da planilha: o item como está na planilha (não há linha de pedido). */
+  itemTexto: string | null;
   beneficiarioId: string | null;
   beneficiarioNome: string | null;
   beneficiarioSigla: string | null;
   beneficiarioRazao: string | null;
+  /** Carga da planilha: o destinatário como está na planilha (sem cadastro do beneficiário). */
+  beneficiarioTexto: string | null;
   municipio: string | null;
   uf: string | null;
   quantidade: number;
@@ -140,6 +145,10 @@ export interface EntregaFiscalizacao {
   prevista: string | null;
   entregueEm: string | null;
   divididaDe: string | null;
+  /** Programa da carga (Projeto Pegasus, BNDES · Fogo Zero), até o cadastro de programas. */
+  programaTexto: string | null;
+  /** Linha da planilha da SFC/CGLIC que originou ou atualizou a entrega. */
+  cargaLinha: number | null;
   faturadoEm: string | null;
   pagoEm: string | null;
   atualizadoPorNome: string | null;
@@ -160,10 +169,12 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
     itemKey: r.item_key || null,
     itemNome: r.item_nome || null,
     itemDescricao: r.item_descricao || null,
+    itemTexto: r.item_texto || null,
     beneficiarioId: r.beneficiario_id || null,
     beneficiarioNome: r.beneficiario_nome || null,
     beneficiarioSigla: r.beneficiario_sigla || null,
     beneficiarioRazao: r.beneficiario_razao || null,
+    beneficiarioTexto: r.beneficiario_texto || null,
     municipio: r.municipio || null,
     uf: r.uf || null,
     quantidade: Number(r.quantidade) || 0,
@@ -176,6 +187,8 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
     prevista: r.prevista || null,
     entregueEm: r.entregue_em || null,
     divididaDe: r.dividida_de || null,
+    programaTexto: r.programa_texto || null,
+    cargaLinha: r.carga_linha == null ? null : Number(r.carga_linha),
     faturadoEm: r.faturado_em || null,
     pagoEm: r.pago_em || null,
     atualizadoPorNome: r.atualizado_por_nome || null,
