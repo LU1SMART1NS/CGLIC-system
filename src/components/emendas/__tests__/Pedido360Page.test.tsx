@@ -80,6 +80,7 @@ vi.mock('../../../hooks/useEmendas', () => ({
   useMapaGruposBeneficiarios: () => new Map()
 }));
 vi.mock('../../../hooks/useEmendasQuadro', () => ({ usePrecosParaEmenda: () => ({ precos: undefined, ipca: null, semPrevisao: false }) }));
+vi.mock('../../../hooks/useFiscalizacao', () => ({ useEntregasDoPedido: () => ({ porLinha: new Map(), consulta: { data: [] } }) }));
 vi.mock('../PedidoModal', () => ({ PedidoModal: () => null }));
 vi.mock('../EtapaPedidoModal', () => ({ EtapaPedidoModal: () => null }));
 vi.mock('../AnulacaoModal', () => ({ AnulacaoModal: () => null }));

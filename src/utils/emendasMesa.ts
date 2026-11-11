@@ -66,16 +66,35 @@ export interface LinhaDaMesa {
   acoes: AcaoDaMesa[];
 }
 
-/** Os 6 passos de cada item depois da nota (D5): Nota · Na CCGA · Contrato · Faturado · Liquidado · Pago. */
-export const PASSOS_DO_ITEM = ['Nota', 'Na CCGA', 'Contrato', 'Faturado', 'Liquidado', 'Pago'] as const;
+/**
+ * Os 10 passos de cada item depois da nota (protótipo da Fiscalização aprovado em 10/11/2026): Nota · Na CCGA ·
+ * Contrato · Informações · Ordem · Produção · Entregue · Recebido · Pago · Ofício à SAL. Do contrato em diante, com a
+ * SFC/CGLIC acompanhando, os passos vêm das entregas da Fiscalização (migration 263); sem ela, das notas (faturado =
+ * entregue, liquidado = recebido) e da Ordem registrada no pedido.
+ */
+export const PASSOS_DO_ITEM = ['Nota', 'Na CCGA', 'Contrato', 'Informações', 'Ordem', 'Produção', 'Entregue', 'Recebido', 'Pago', 'Ofício à SAL'] as const;
+export const PASSO = { NOTA: 0, CCGA: 1, CONTRATO: 2, INFORMACOES: 3, ORDEM: 4, PRODUCAO: 5, ENTREGUE: 6, RECEBIDO: 7, PAGO: 8, SAL: 9 } as const;
 const PASSO_NO_TEXTO: Array<[string, string]> = [
   ['com nota', 'com nota'],
   ['na CCGA', 'na CCGA'],
   ['com contrato', 'com contrato'],
-  ['faturado', 'faturados'],
-  ['liquidado', 'liquidados'],
-  ['pago', 'pagos']
+  ['com as informações enviadas', 'com as informações enviadas'],
+  ['com a Ordem de Fornecimento', 'com a Ordem de Fornecimento'],
+  ['em produção', 'em produção'],
+  ['entregue', 'entregues'],
+  ['recebido', 'recebidos'],
+  ['pago', 'pagos'],
+  ['com o Ofício à SAL', 'com o Ofício à SAL']
 ];
+
+/** Entrega da Fiscalização ligada à linha do pedido (o que a régua precisa). */
+export interface EntregaDaRegua {
+  quantidade: number;
+  responsavel: 'SFC' | 'AREA';
+  etapa: string;
+  etapaEm: string | null;
+  entregueEm: string | null;
+}
 
 export interface ItemDaMesa {
   chave: string;
@@ -83,9 +102,11 @@ export interface ItemDaMesa {
   nome: string;
   /** "00068/2025"; null para kit. */
   ata: string | null;
-  /** -1: ainda sem nota (empenho anulado, rodada nova); 0..5: PASSOS_DO_ITEM. */
+  /** -1: ainda sem nota (empenho anulado, rodada nova); 0..9: PASSOS_DO_ITEM. */
   passo: number;
   devolvido: boolean;
+  /** Parado fora da governança da SENASP (ex.: "Aguardando o Exército"): o passo atual em vermelho. */
+  parado?: string | null;
   /** Texto curto depois do passo: data, contrato ou motivo. */
   onde: string | null;
   /** Espera a CAEP: devolvido ou a enviar à CCGA. */
@@ -164,36 +185,32 @@ export function passoDoItem(p: PedidoEmenda, l: LinhaPedido, notas: Map<string, 
   if (linhaContratada(l, notas)) {
     if (quase(n.valorPago, n.valorEmpenhado))
       return {
-        passo: 5,
+        passo: PASSO.PAGO,
         devolvido: false,
         onde: n.pagoEm ? `em ${dataBR(n.pagoEm)}` : null
       };
+    // Sem a Fiscalização acompanhando: liquidado = recebido e faturado = entregue (a nota fiscal sai na entrega).
     if (quase(n.valorLiquidado, n.valorEmpenhado))
       return {
-        passo: 4,
+        passo: PASSO.RECEBIDO,
         devolvido: false,
-        onde: n.liquidadoEm ? `em ${dataBR(n.liquidadoEm)}` : null
+        onde: n.liquidadoEm ? `liquidado em ${dataBR(n.liquidadoEm)}` : 'liquidado'
       };
     if (n.faturas || n.faturadoEm)
       return {
-        passo: 3,
+        passo: PASSO.ENTREGUE,
         devolvido: false,
-        onde: n.faturadoEm ? `em ${dataBR(n.faturadoEm)}` : null
+        onde: n.faturadoEm ? `faturado em ${dataBR(n.faturadoEm)}` : 'faturado'
       };
+    // Informação e Ordem de Fornecimento registradas no pedido (migration 250).
+    const o = p.ordens?.find((x) => x.contractKey === n.contractKey);
+    const contrato = [`Contrato ${numeroDaChave(n.contractKey!)}`, n.contratoAssinadoEm ? `assinado em ${dataBR(n.contratoAssinadoEm)}` : null];
+    if (o?.ordemEm) return { passo: PASSO.ORDEM, devolvido: false, onde: [...contrato, `Ordem de Fornecimento em ${dataBR(o.ordemEm)}`].filter(Boolean).join(' · ') };
+    if (o?.informacaoEm) return { passo: PASSO.INFORMACOES, devolvido: false, onde: [...contrato, `informações em ${dataBR(o.informacaoEm)}`].filter(Boolean).join(' · ') };
     return {
-      passo: 2,
+      passo: PASSO.CONTRATO,
       devolvido: false,
-      // Com a Ordem de Fornecimento emitida (migration 250), o item espera a entrega a partir dela.
-      onde: [
-        `Contrato ${numeroDaChave(n.contractKey!)}`,
-        n.contratoAssinadoEm ? `assinado em ${dataBR(n.contratoAssinadoEm)}` : null,
-        (() => {
-          const o = p.ordens?.find((x) => x.contractKey === n.contractKey);
-          return o?.ordemEm ? `Ordem de Fornecimento em ${dataBR(o.ordemEm)}` : null;
-        })()
-      ]
-        .filter(Boolean)
-        .join(' · ')
+      onde: contrato.filter(Boolean).join(' · ')
     };
   }
   if (l.ccgaSituacao === 'DEVOLVIDA')
@@ -216,8 +233,74 @@ export function passoDoItem(p: PedidoEmenda, l: LinhaPedido, notas: Map<string, 
   };
 }
 
+const PASSO_DA_ETAPA: Record<string, number> = {
+  INFO_PEDIDA: PASSO.CONTRATO,
+  INFO_ENVIADA: PASSO.INFORMACOES,
+  ORDEM: PASSO.ORDEM,
+  PRODUCAO: PASSO.PRODUCAO,
+  CONTROLADO: PASSO.PRODUCAO,
+  TRANSITO: PASSO.PRODUCAO,
+  RETIRADA: PASSO.PRODUCAO,
+  ENTREGUE: PASSO.ENTREGUE,
+  TRP: PASSO.ENTREGUE,
+  TRD: PASSO.RECEBIDO,
+  PAGAMENTO: PASSO.RECEBIDO,
+  SAL: PASSO.SAL,
+  FINALIZADO: PASSO.SAL
+};
+const ONDE_DA_ETAPA: Record<string, string> = {
+  INFO_PEDIDA: 'aguardando as informações à SFC/CGLIC',
+  INFO_ENVIADA: 'informações enviadas à SFC/CGLIC',
+  ORDEM: 'Ordem de Fornecimento enviada',
+  PRODUCAO: 'em produção',
+  CONTROLADO: 'aguardando o Exército',
+  TRANSITO: 'em trânsito',
+  RETIRADA: 'aguardando retirada',
+  ENTREGUE: 'entregue',
+  TRP: 'recebimento provisório',
+  TRD: 'recebimento definitivo',
+  PAGAMENTO: 'enviado para pagamento e doação',
+  SAL: 'Ofício à SAL enviado',
+  FINALIZADO: 'fiscalização finalizada'
+};
+
+/**
+ * Passos da linha: um por entrega da Fiscalização (entrega parcial = mais de uma parte) ou, sem entrega, o da nota.
+ * Entrega da área requisitante não tem etapa na SFC/CGLIC: segue pelas notas, com o aviso.
+ */
+export function passosDaLinha(
+  p: PedidoEmenda,
+  l: LinhaPedido,
+  notas: Map<string, NotaDaLinha>,
+  entregas?: EntregaDaRegua[]
+): Array<{ passo: number; devolvido: boolean; onde: string | null; quantidade: number; parado: string | null }> {
+  const pelaNota = passoDoItem(p, l, notas);
+  const doSfc = (entregas ?? []).filter((e) => e.responsavel === 'SFC');
+  if (!entregas?.length || pelaNota.passo < PASSO.CONTRATO) return [{ ...pelaNota, quantidade: l.quantidade, parado: null }];
+  const n = notas.get(l.id);
+  const pago = Boolean(n && quase(n.valorPago, n.valorEmpenhado));
+  const partes = entregas.map((e) => {
+    if (e.responsavel === 'AREA') return { ...pelaNota, onde: [pelaNota.onde, 'fiscalização da área requisitante'].filter(Boolean).join(' · '), quantidade: e.quantidade, parado: null };
+    let passo = PASSO_DA_ETAPA[e.etapa] ?? PASSO.CONTRATO;
+    if (passo === PASSO.RECEBIDO && pago) passo = PASSO.PAGO;
+    const data = e.etapa === 'ENTREGUE' || e.etapa === 'TRP' ? e.entregueEm ?? e.etapaEm : e.etapaEm;
+    const onde = [ONDE_DA_ETAPA[e.etapa], data ? `em ${dataBR(data)}` : null, passo === PASSO.PAGO && n?.pagoEm ? `pago em ${dataBR(n.pagoEm)}` : null].filter(Boolean).join(' ');
+    return { passo, devolvido: false, onde, quantidade: e.quantidade, parado: e.etapa === 'CONTROLADO' ? 'Aguardando o Exército' : null };
+  });
+  if (partes.length > 1 || doSfc.reduce((s, e) => s + e.quantidade, 0) < l.quantidade) {
+    for (const x of partes) x.onde = [x.onde, `parte de ${l.quantidade}`].filter(Boolean).join(' · ');
+  }
+  return partes;
+}
+
 /** O quadro "Onde está cada item" (D5–D8): só a partir da nota de empenho. */
-export function itensDaMesa(p: PedidoEmenda, itens: Map<string, ItemCaep>, notas: Map<string, NotaDaLinha>, beneficiarios: Map<string, BeneficiarioEmenda>): ItensDaMesa | null {
+export function itensDaMesa(
+  p: PedidoEmenda,
+  itens: Map<string, ItemCaep>,
+  notas: Map<string, NotaDaLinha>,
+  beneficiarios: Map<string, BeneficiarioEmenda>,
+  entregas?: Map<string, EntregaDaRegua[]>
+): ItensDaMesa | null {
   const linhas = linhasAtivas(p);
   if (p.etapa === 'CANCELADO' || linhas.length === 0) return null;
   if (!jaEmpenhado(p.etapa) && !linhas.some((l) => notas.get(l.id)?.nota)) return null;
@@ -234,24 +317,26 @@ export function itensDaMesa(p: PedidoEmenda, itens: Map<string, ItemCaep>, notas
       pendente: false,
       resumo: ''
     };
-    const s = passoDoItem(p, l, notas);
     const nome = nomeDaLinhaDoPedido({ ...l, quantidade: 1 }, itens, 40).replace(/^1×?\s+/, '');
     const ata = l.tipo === 'ITEM' && l.itemKey ? ataDoItem(l.itemKey).split('-')[0] : null;
-    // Linhas iguais se juntam: mesmo item, mesmo beneficiário, mesmo passo (D5).
-    const chaveI = `${nome}|${ata}|${s.passo}|${s.devolvido}|${s.onde}`;
-    const igual = g.itens.find((x) => x.chave === chaveI);
-    if (igual) igual.quantidade += l.quantidade;
-    else
-      g.itens.push({
-        chave: chaveI,
-        quantidade: l.quantidade,
-        nome,
-        ata,
-        passo: s.passo,
-        devolvido: s.devolvido,
-        onde: s.onde,
-        comVoce: s.devolvido || (s.passo === 0 && jaEmpenhado(p.etapa))
-      });
+    for (const s of passosDaLinha(p, l, notas, entregas?.get(l.id))) {
+      // Linhas iguais se juntam: mesmo item, mesmo beneficiário, mesmo passo (D5).
+      const chaveI = `${nome}|${ata}|${s.passo}|${s.devolvido}|${s.parado ?? ''}|${s.onde}`;
+      const igual = g.itens.find((x) => x.chave === chaveI);
+      if (igual) igual.quantidade += s.quantidade;
+      else
+        g.itens.push({
+          chave: chaveI,
+          quantidade: s.quantidade,
+          nome,
+          ata,
+          passo: s.passo,
+          devolvido: s.devolvido,
+          parado: s.parado,
+          onde: s.onde,
+          comVoce: s.devolvido || (s.passo === 0 && jaEmpenhado(p.etapa))
+        });
+    }
     grupos.set(chaveB, g);
   }
   const ordem = (x: ItemDaMesa) => (x.devolvido ? -2 : x.passo);
@@ -264,9 +349,9 @@ export function itensDaMesa(p: PedidoEmenda, itens: Map<string, ItemCaep>, notas
   lista.sort((a, b) => Number(b.pendente) - Number(a.pendente) || Math.min(...a.itens.map(ordem)) - Math.min(...b.itens.map(ordem)) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const todos = lista.flatMap((g) => g.itens);
   const total = todos.length;
-  const passos = new Set(todos.map((x) => `${x.passo}|${x.devolvido}`));
+  const passos = new Set(todos.map((x) => `${x.passo}|${x.devolvido}|${x.parado ?? ''}`));
   const uma =
-    passos.size === 1 && !todos[0].devolvido && todos[0].passo >= 0
+    passos.size === 1 && !todos[0].devolvido && !todos[0].parado && todos[0].passo >= 0
       ? {
           // Do contrato em diante, o mesmo detalhe da linha do item (contrato, assinatura, Ordem, data) quando é um só.
           texto: `${linhas.length === 1 ? 'O item está' : `Os ${linhas.length} itens estão`} ${PASSO_NO_TEXTO[todos[0].passo][linhas.length === 1 ? 0 : 1]}${todos[0].passo === 0 && jaEmpenhado(p.etapa) && p.etapa === 'EMPENHADO' ? ', a enviar à CCGA' : ''}${todos[0].passo >= 2 && new Set(todos.map((x) => x.onde)).size === 1 && todos[0].onde ? ` · ${todos[0].onde}` : ''}.`,
@@ -286,11 +371,13 @@ export function itensDaMesa(p: PedidoEmenda, itens: Map<string, ItemCaep>, notas
 export function resumoDosItens(xs: ItemDaMesa[]): string {
   const dev = xs.filter((x) => x.devolvido).reduce((n, x) => n + x.quantidade, 0);
   const sem = xs.filter((x) => x.passo < 0).reduce((n, x) => n + x.quantidade, 0);
+  const parados = xs.filter((x) => x.parado).reduce((n, x) => n + x.quantidade, 0);
   const partes: string[] = [];
   if (dev) partes.push(`${dev} ${dev === 1 ? 'devolvido' : 'devolvidos'}`);
+  if (parados) partes.push(`${parados} ${parados === 1 ? 'parado' : 'parados'} no Exército`);
   if (sem) partes.push(`${sem} sem nota`);
   for (let i = 0; i < PASSOS_DO_ITEM.length; i++) {
-    const n = xs.filter((x) => !x.devolvido && x.passo === i).reduce((s, x) => s + x.quantidade, 0);
+    const n = xs.filter((x) => !x.devolvido && !x.parado && x.passo === i).reduce((s, x) => s + x.quantidade, 0);
     if (n) partes.push(`${n} ${PASSO_NO_TEXTO[i][n === 1 ? 0 : 1]}`);
   }
   return partes.join(' · ');
@@ -328,7 +415,9 @@ export function mesaDoPedido(
   hoje: string,
   podeGerir: boolean,
   beneficiarios: Map<string, BeneficiarioEmenda>,
-  precos?: Map<string, PrecoDoItem>
+  precos?: Map<string, PrecoDoItem>,
+  /** Entregas da Fiscalização por linha do pedido (régua do item, migration 263). */
+  entregas?: Map<string, EntregaDaRegua[]>
 ): MesaDoPedido {
   const cancelado = p.etapa === 'CANCELADO';
   const andamento = andamentoDoPedido(p, itens, notas, hoje, podeGerir, precos);
@@ -847,7 +936,7 @@ export function mesaDoPedido(
   return {
     comVoce: ordenar(comVoce),
     comOutros: ordenar(comOutros),
-    itens: itensDaMesa(p, itens, notas, beneficiarios),
+    itens: itensDaMesa(p, itens, notas, beneficiarios, entregas),
     fases,
     passos,
     historico
