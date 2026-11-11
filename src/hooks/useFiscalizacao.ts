@@ -15,11 +15,17 @@ import {
   fetchContratosFiscalizacao,
   registrarProcessoFiscalizacao,
   type ContratoFiscalizacao,
-  type DefinirFiscalizacaoInput
+  type DefinirFiscalizacaoInput,
+  desfazerTransferenciaFiscal,
+  fetchTransferenciasFiscal,
+  transferirContratosFiscal,
+  transferirContratosFiscalTemporaria,
+  type TransferenciaFiscal
 } from '../services/fiscalizacaoService';
 
 export const FISCALIZACAO_CONTRATOS_KEY = ['fiscalizacao', 'contratos'] as const;
 export const FISCALIZACAO_ENTREGAS_KEY = ['fiscalizacao', 'entregas'] as const;
+export const FISCALIZACAO_TRANSFERENCIAS_KEY = ['fiscalizacao', 'transferencias'] as const;
 
 /** Quem lê a fiscalização (fiscalizacao.view, migration 259). */
 export function podeVerFiscalizacao(role: string | null | undefined): boolean {
@@ -105,3 +111,32 @@ export const useMudarEtapaEntregas = () => useMutacaoDeEntregas(mudarEtapaEntreg
 export const useDividirEntrega = () => useMutacaoDeEntregas(dividirEntrega);
 export const useDefinirPrevistaEntregas = () => useMutacaoDeEntregas(definirPrevistaEntregas);
 export const useDefinirResponsavelEntregas = () => useMutacaoDeEntregas(definirResponsavelEntregas);
+
+/** Ausências de fiscal em curso (migration 261). */
+export function useTransferenciasFiscalizacao() {
+  const { role } = useAuth();
+  return useQuery<TransferenciaFiscal[], Error>({
+    queryKey: FISCALIZACAO_TRANSFERENCIAS_KEY,
+    queryFn: fetchTransferenciasFiscal,
+    enabled: podeVerFiscalizacao(role),
+    staleTime: 60 * 1000
+  });
+}
+
+/** Transferir e desfazer mexem no fiscal dos contratos: recarrega contratos, entregas e ausências. */
+function useMutacaoDeFiscal<I, R>(fn: (input: I) => Promise<R>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY }),
+        qc.invalidateQueries({ queryKey: FISCALIZACAO_ENTREGAS_KEY }),
+        qc.invalidateQueries({ queryKey: FISCALIZACAO_TRANSFERENCIAS_KEY })
+      ])
+  });
+}
+
+export const useTransferirContratosFiscal = () => useMutacaoDeFiscal(transferirContratosFiscal);
+export const useTransferirFiscalTemporaria = () => useMutacaoDeFiscal(transferirContratosFiscalTemporaria);
+export const useDesfazerTransferenciaFiscal = () => useMutacaoDeFiscal(desfazerTransferenciaFiscal);

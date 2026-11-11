@@ -51,6 +51,8 @@ import { useEmendasAContratar } from '../../hooks/useEmendas';
 import { enviosParaContratar } from '../../utils/emendasCcga';
 import { contarFaixas, criticasPorInstrumento, resumoPorGestor, type InstrumentoNoPainel } from './painelResumo';
 import { formatNumber } from '../../utils/format';
+import { ComVoce, type ItemComVoce } from './ComVoce';
+import { ROTAS_VINCULACAO } from '../vinculacao/vinculacaoConfig';
 
 type TipoFilter = 'TODOS' | 'ARP' | 'CONTRATO';
 
@@ -474,6 +476,24 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     scrollToDock(dockRef.current);
   }, [gavetaAberta]);
 
+  // "Com você" do coordenador (decisão de 11/11/2026): as decisões que são só dele. O gestor já vê só a carteira dele,
+  // e as Pendências são o "com você" dele. Escolhido um gestor, o Painel é o daquele gestor: sem o bloco.
+  const comVoceVisivel = role === 'admin' && !gestorNome;
+  const qtd = (n: number, um: string, varios: string) => `${formatNumber(n)} ${n === 1 ? um : varios}`;
+  const comVoce: ItemComVoce[] = [];
+  if (comVoceVisivel && (extras.atasSemGestor ?? 0) > 0) {
+    const n = extras.atasSemGestor as number;
+    comVoce.push({ chave: 'atas-sem-gestor', titulo: `Atribuir gestor a ${qtd(n, 'ata', 'atas')}`, detalhe: 'Vigentes ou com contrato vigente. Os contratos vinculados seguem o gestor da ata.', acao: 'Distribuir', onAcao: () => navigate(`${CENTRAL_DISTRIBUICAO_PATH}?aba=ATAS`) });
+  }
+  if (comVoceVisivel && (extras.gestorDiferente ?? 0) > 0) {
+    const n = extras.gestorDiferente as number;
+    comVoce.push({ chave: 'gestor-diferente', titulo: `Conferir ${qtd(n, 'contrato', 'contratos')} com gestor diferente da ata`, detalhe: 'Contrato vinculado deve seguir o gestor da ata.', acao: 'Conferir', onAcao: () => navigate(`${CENTRAL_DISTRIBUICAO_PATH}?aba=DIVERGENCIAS`) });
+  }
+  if (comVoceVisivel && (extras.contratosAta ?? 0) > 0) {
+    const n = extras.contratosAta as number;
+    comVoce.push({ chave: 'contratos-a-vincular', titulo: `Vincular ${qtd(n, 'contrato', 'contratos')} à ata`, detalhe: 'Sem item de ata vinculado: o contrato só segue o gestor da ata depois do vínculo.', acao: 'Vincular', onAcao: () => navigate(ROTAS_VINCULACAO.contratos) });
+  }
+
   const vencem90Contratos = summaryCounts.contratosEmAtencao60a90d + summaryCounts.contratosAVencer30d;
   const botoesGavetas: PainelBotaoGaveta[] = gavetasDisponiveis.map((id) => {
     if (id === 'situacao') {
@@ -655,6 +675,9 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
                     semSaldoDosItens={semAvisosDeSaldo}
                   />
                   <PainelBotoesGavetas botoes={botoesGavetas} aberta={gavetaAberta} onToggle={alternarGaveta} />
+                  {comVoceVisivel && (
+                    <ComVoce itens={comVoce} testId="instrumentos-com-voce" carregando={extras.atasSemGestor === null || extras.gestorDiferente === null || extras.contratosAta === null} />
+                  )}
                   <SectionHeader
                     title="Pendências da carteira"
                     subtitle="Saldos, reajustes, pagamentos, tarefas e lembretes que exigem sua ação."
