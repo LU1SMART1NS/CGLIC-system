@@ -157,7 +157,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
             />
             {!fiscal && (
               <PainelCartao
-                rotulo="Contratos de emenda a definir"
+                rotulo="Contratos a definir"
                 icone={<ScrollText size={16} />}
                 tom={aDefinir.length ? 'danger' : 'success'}
                 valor={aDefinir.length ? String(aDefinir.length) : 'Em dia'}
@@ -172,7 +172,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
           {coordenador && <ComVoce itens={comVoce} testId="fisc-com-voce" />}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} id="fisc-inicio-pendencias">
-            <SectionHeader title="Pendências da fiscalização" subtitle={fiscal ? 'O que falta nos contratos que você fiscaliza. A linha abre o Contrato 360.' : `O que falta nos contratos com a ${NOME_SFC}. A linha abre o Contrato 360.`} />
+            <SectionHeader className="section-header--flush" title="Pendências da fiscalização" subtitle={fiscal ? 'O que falta nos contratos que você fiscaliza. A linha abre o Contrato 360.' : `O que falta nos contratos com a ${NOME_SFC}. A linha abre o Contrato 360.`} />
             <CarteiraSegmentTabs<Segmento>
               testIdPrefix="fisc-inicio"
               ariaLabel="Pendências da fiscalização"
