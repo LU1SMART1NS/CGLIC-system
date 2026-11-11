@@ -145,7 +145,7 @@ export const HistoricoDaEntrega: React.FC<{ entregaId: string }> = ({ entregaId 
     <ul style={{ margin: 0, padding: '0.25rem 0 0.25rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.8rem' }} data-testid={`fisc-historico-${entregaId}`}>
       {itens.map((m) => (
         <li key={m.id}>
-          <b>{m.etapa ? etapaDef(m.etapa).nome : m.tipo === 'DIVISAO' ? 'Divisão' : m.tipo === 'PREVISTA' ? `Data prevista: ${dataBR(m.data)}` : m.tipo === 'RESPONSAVEL' ? 'Quem fiscaliza' : 'Registro'}</b>
+          <b>{m.etapa ? etapaDef(m.etapa).nome : m.tipo === 'DIVISAO' ? 'Divisão' : m.tipo === 'PREVISTA' ? `Data prevista: ${dataBR(m.data)}` : m.tipo === 'RESPONSAVEL' ? 'Quem fiscaliza' : m.tipo === 'ITEM' ? 'Item da ata' : m.tipo === 'PROGRAMA' ? 'Programa' : 'Registro'}</b>
           {m.etapa && m.data && <span> em {dataBR(m.data)}</span>}
           {m.documentoSei && (
             <span style={{ marginLeft: '0.4rem' }}>
