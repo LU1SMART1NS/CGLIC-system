@@ -26,21 +26,21 @@ describe('abas do Início (grupos como em Ajustes)', () => {
     expect(abas('admin', '/atas/distribuicao')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: ['Painel', 'Distribuição'] });
   });
 
-  it('em Emendas, que tem uma página só, a segunda linha some', () => {
-    expect(abas('admin', '/emendas/inicio')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: [] });
+  it('em Emendas, que tem uma página só, a segunda linha mostra o Painel (padrão do Início)', () => {
+    expect(abas('admin', '/emendas/inicio')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: ['Painel'] });
   });
 
   it('coordenador: em Fiscalização, Painel · Distribuição; a consulta só o Painel', () => {
     expect(abas('admin', '/fiscalizacao/distribuicao')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: ['Painel', 'Distribuição'] });
-    expect(abas('leitor', '/fiscalizacao/inicio')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: [] });
+    expect(abas('leitor', '/fiscalizacao/inicio')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: ['Painel'] });
   });
 
   it('o gestor de fiscalização tem só o Painel dele, sem abas, como o gestor de emendas', () => {
     expect(abas('gestor_fiscalizacao', '/fiscalizacao/inicio').html).toBe('');
   });
 
-  it('a consulta vê só a linha dos grupos; o gestor não vê abas', () => {
-    expect(abas('leitor', '/instrumentos')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: [] });
+  it('a consulta vê os grupos e o Painel de cada um; o gestor não vê abas', () => {
+    expect(abas('leitor', '/instrumentos')).toMatchObject({ grupos: ['Atas e Contratos', 'Emendas', 'Fiscalização'], paginas: ['Painel'] });
     expect(abas('gestor', '/instrumentos').html).toBe('');
   });
 });

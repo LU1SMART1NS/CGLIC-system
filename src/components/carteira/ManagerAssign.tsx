@@ -18,7 +18,7 @@ export interface DestinoSemGestor {
 const DESTINO_CENTRAL: DestinoSemGestor = {
   rotulo: 'Sem gestor · atribuir na Central',
   para: CENTRAL_DISTRIBUICAO_PATH,
-  dica: 'A atribuição de gestor é feita na Central de Distribuição'
+  dica: 'A atribuição de gestor é feita em Início › Distribuição'
 };
 
 /**
@@ -37,7 +37,7 @@ export function destinoContratoSemGestor(opts: {
   if (opts.atas.length > 0) {
     const semGestor = opts.atas.find((a) => !opts.ataTemGestor(a));
     return semGestor
-      ? { rotulo: 'Ata sem gestor · Central', para: CENTRAL_DISTRIBUICAO_PATH, dica: `A Ata ${semGestor} está sem gestor: o contrato herda o gestor que ela receber na Central de Distribuição` }
+      ? { rotulo: 'Ata sem gestor · Central', para: CENTRAL_DISTRIBUICAO_PATH, dica: `A Ata ${semGestor} está sem gestor: o contrato herda o gestor que ela receber em Início › Distribuição` }
       : DESTINO_CENTRAL;
   }
   if (opts.naoPertenceAAta) {

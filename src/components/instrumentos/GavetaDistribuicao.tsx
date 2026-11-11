@@ -47,7 +47,7 @@ const CartaoSemGestor: React.FC<{ semGestor: ResumoDoGestor; onDistribuir: (dest
           <strong>Sem gestor</strong>
         </span>
         <span className="pn-gc-corpo">
-          <button type="button" className="pn-gc-lado-btn" onClick={() => onDistribuir('ATAS')} aria-label="Atas sem gestor: abrir a Central de Distribuição" data-testid="painel-distribuicao-sem-gestor-atas">
+          <button type="button" className="pn-gc-lado-btn" onClick={() => onDistribuir('ATAS')} aria-label="Atas sem gestor: abrir a Distribuição" data-testid="painel-distribuicao-sem-gestor-atas">
             <Lado rotulo="Atas ›" lado={atas} comCriticas />
           </button>
           <button type="button" className="pn-gc-lado-btn" onClick={() => onDistribuir('CONTRATOS')} aria-label="Contratos sem gestor: abrir a Carteira de Contratos" data-testid="painel-distribuicao-sem-gestor-contratos">
@@ -62,7 +62,7 @@ const CartaoSemGestor: React.FC<{ semGestor: ResumoDoGestor; onDistribuir: (dest
     <Cartao
       sem
       onClick={() => onDistribuir(soContratos ? 'CONTRATOS' : 'ATAS')}
-      rotulo={soContratos ? 'Contratos sem gestor: abrir a Carteira de Contratos' : 'Atas sem gestor: abrir a Central de Distribuição'}
+      rotulo={soContratos ? 'Contratos sem gestor: abrir a Carteira de Contratos' : 'Atas sem gestor: abrir a Distribuição'}
       testId="painel-distribuicao-sem-gestor"
     >
       <span className="pn-gc-head">

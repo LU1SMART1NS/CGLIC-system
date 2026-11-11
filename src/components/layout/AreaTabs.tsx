@@ -102,7 +102,7 @@ export const AreaTabs: React.FC = () => {
       </div>
       <div id={AREA_TABS_ACTIONS_ID} className="area-tabs-actions" />
       </div>
-      {subTabs.length > 1 && (
+      {(subTabs.length > 1 || (area.segundaLinhaSempre && subTabs.length === 1)) && (
         <div className="area-subtabs ds-tabs-scroll" role="group" aria-label={`Páginas de ${activeGroup}`}>
           {subTabs.map((tab) => renderLink(tab, 'area-subtab'))}
         </div>

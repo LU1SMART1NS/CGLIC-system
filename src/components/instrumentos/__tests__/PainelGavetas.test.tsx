@@ -111,7 +111,7 @@ describe('GavetaDistribuicao — para onde vai o "Sem gestor"', () => {
   });
 
   it('só atas: o cartão continua levando à Central', () => {
-    expect(render(4, 0)).toContain('Atas sem gestor: abrir a Central de Distribuição');
+    expect(render(4, 0)).toContain('Atas sem gestor: abrir a Distribuição');
   });
 
   it('atas e contratos: cada lado leva ao seu lugar', () => {

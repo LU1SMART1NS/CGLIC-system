@@ -44,15 +44,15 @@ describe('fiscalização do contrato', () => {
     expect(ehDoFiscal(x, undefined)).toBe(false);
   });
 
-  it('carga por fiscal conta titular, substituto e a autuar', () => {
+  it('carga por fiscal conta titular, substituto, a autuar e sem portaria', () => {
     const lista = [
       c({ contractKey: 'a', situacao: 'SFC', fiscalUserId: 'u1', substitutoUserId: 'u2' }),
       c({ contractKey: 'b', situacao: 'MISTA', fiscalUserId: 'u1', processoSei: '1234567', autuadoEm: '2026-01-01' }),
       c({ contractKey: 'c', situacao: 'AREA', fiscalUserId: null })
     ];
     const carga = cargaPorFiscal(lista, [{ id: 'u2', nome: 'Bia' }, { id: 'u1', nome: 'Ana' }]);
-    expect(carga[0]).toEqual({ userId: 'u1', nome: 'Ana', contratos: 2, comoSubstituto: 0, aAutuar: 1 });
-    expect(carga[1]).toEqual({ userId: 'u2', nome: 'Bia', contratos: 0, comoSubstituto: 1, aAutuar: 0 });
+    expect(carga[0]).toEqual({ userId: 'u1', nome: 'Ana', contratos: 2, comoSubstituto: 0, aAutuar: 1, semPortaria: 2 });
+    expect(carga[1]).toEqual({ userId: 'u2', nome: 'Bia', contratos: 0, comoSubstituto: 1, aAutuar: 0, semPortaria: 0 });
   });
 
   it('número do contrato pela chave quando a fonte não traz', () => {

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ClipboardCheck, FileSignature, FolderOpen, Users, ScrollText } from 'lucide-react';
+import { FileSignature, FolderOpen, LayoutDashboard, Users, ScrollText } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
@@ -78,7 +78,8 @@ export const FiscalizacaoInicioPage: React.FC = () => {
       <PageHeader
         title="Início"
         subtitle={fiscal ? 'Os contratos que você fiscaliza e o que falta em cada um.' : `Resumo da fiscalização dos contratos pela ${NOME_SFC} e o que exige sua atenção.`}
-        icon={<ClipboardCheck size={26} color="var(--primary)" aria-hidden="true" />}
+        hint={`Contrato de emenda chega "A definir", com sugestão ${NOME_SFC}; o coordenador decide na Distribuição. Depois da decisão, o fiscal autua o processo de fiscalização e registra a portaria.`}
+        icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="fisc-inicio-atualizar" tooltipTitle="Recarregar a fiscalização" />}
       />
       {isLoading ? (
@@ -128,7 +129,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
                 valor={String(new Set(daSfc.map((c) => c.fiscalUserId).filter(Boolean)).size)}
                 unidade="com contratos"
                 linhas={[]}
-                onClick={() => navigate(coordenador ? '/fiscalizacao/distribuicao?segmento=SFC' : '/fiscalizacao/inicio')}
+                onClick={() => navigate(coordenador ? '/fiscalizacao/distribuicao?segmento=EQUIPE' : '/fiscalizacao/inicio')}
                 testId="fisc-cartao-fiscais"
               />
             )}
