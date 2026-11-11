@@ -59,7 +59,7 @@ export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ cont
             )}
             {podeAutuar && (
               <AppButton variant={contrato.processoSei ? 'outline' : 'primary'} size="sm" onClick={() => setAutuando(true)} data-testid="fisc-contrato-processo">
-                {contrato.processoSei ? 'Corrigir processo' : 'Registrar processo'}
+                {contrato.processoSei ? 'Corrigir SEI do contrato' : 'Registrar SEI do contrato'}
               </AppButton>
             )}
           </div>
@@ -80,7 +80,7 @@ export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ cont
             </NoticeBar>
           )}
           {podeAutuar && !contrato.processoSei && (
-            <NoticeBar tone="info" testId="fisc-contrato-autuar">Falta registrar o processo de fiscalização (número SEI e data da autuação).</NoticeBar>
+            <NoticeBar tone="info" testId="fisc-contrato-autuar">Falta registrar o número SEI do contrato (vale para a autuação).</NoticeBar>
           )}
           <div style={grade}>
             <Campo rotulo="Fiscalização"><CelulaSituacao c={contrato} /></Campo>
@@ -96,11 +96,11 @@ export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ cont
               </Campo>
             )}
             {comSfc(contrato) && (
-              <Campo rotulo="Processo de fiscalização">
+              <Campo rotulo="SEI do contrato">
                 {contrato.processoSei ? (
                   <>
                     <NumeroSeiEtiqueta numero={contrato.processoSei} testId="fisc-contrato-processo-sei" />
-                    <div style={carteiraDetalhe}>autuado em {dataBR(contrato.autuadoEm)}</div>
+                    <div style={carteiraDetalhe}>contrato de {dataBR(contrato.autuadoEm)}</div>
                   </>
                 ) : (
                   <span style={carteiraDetalhe}>A autuar</span>

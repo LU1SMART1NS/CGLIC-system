@@ -95,12 +95,11 @@ export async function definirFiscalizacaoContrato(input: DefinirFiscalizacaoInpu
   if (error) throw mapPostgresErrorToAppError(error);
 }
 
-/** Autuação do processo de fiscalização (fiscal, substituto ou coordenador). */
+/** Autuação pelo número SEI do contrato (fiscal, substituto ou coordenador; migration 266). */
 export async function registrarProcessoFiscalizacao(input: { contractKey: string; processoSei: string; autuadoEm: string }): Promise<void> {
   const { error } = await cliente().rpc('registrar_processo_fiscalizacao', {
     p_contract_key: input.contractKey,
     p_processo_sei: input.processoSei.replace(/\D/g, ''),
-    // a RPC formata o número do processo (NUP): 08020.017653/2026-49
     p_autuado_em: input.autuadoEm
   });
   if (error) throw mapPostgresErrorToAppError(error);
