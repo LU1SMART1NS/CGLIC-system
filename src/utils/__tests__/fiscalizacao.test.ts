@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { linhaParaContrato } from '../../services/fiscalizacaoService';
-import { cargaPorFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato } from '../fiscalizacao';
+import { cargaPorFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato, substitutosDoTitular } from '../fiscalizacao';
 
 const base: ContratoFiscalizacao = {
   contractKey: '200331-00055-2026', uasg: '200331', numero: '00055/2026', fornecedor: 'CONDOR', objeto: null, assinatura: '2026-01-29', vigenciaFim: '2027-01-29',
@@ -68,5 +68,23 @@ describe('fiscalização do contrato', () => {
     expect(x.emendas).toEqual(['1']);
     expect(x.fiscalNome).toBe('Ana');
     expect(x.processoSei).toBeNull();
+  });
+});
+
+describe('substitutosDoTitular', () => {
+  it('lista os substitutos dos contratos do titular, do mais frequente ao menos, só com a SFC/CGLIC', () => {
+    const lista = [
+      c({ contractKey: 'a', situacao: 'SFC', fiscalUserId: 'u1', substitutoUserId: 's1', substitutoNome: 'Bia' }),
+      c({ contractKey: 'b', situacao: 'SFC', fiscalUserId: 'u1', substitutoUserId: 's2', substitutoNome: 'Ana' }),
+      c({ contractKey: 'c', situacao: 'MISTA', fiscalUserId: 'u1', substitutoUserId: 's2', substitutoNome: 'Ana' }),
+      c({ contractKey: 'd', situacao: 'SFC', fiscalUserId: 'u1', substitutoUserId: null }),
+      c({ contractKey: 'e', situacao: 'SFC', fiscalUserId: 'u9', substitutoUserId: 's1', substitutoNome: 'Bia' }),
+      c({ contractKey: 'f', situacao: 'AREA', fiscalUserId: null, substitutoUserId: null })
+    ];
+    expect(substitutosDoTitular(lista, 'u1')).toEqual([
+      { userId: 's2', nome: 'Ana', contratos: 2 },
+      { userId: 's1', nome: 'Bia', contratos: 1 }
+    ]);
+    expect(substitutosDoTitular(lista, 'u3')).toEqual([]);
   });
 });
