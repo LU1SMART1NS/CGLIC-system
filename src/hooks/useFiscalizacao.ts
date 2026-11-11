@@ -44,12 +44,12 @@ export function podeVerFiscalizacao(role: string | null | undefined): boolean {
 }
 
 /** Contratos com a situação da fiscalização (decisão do coordenador ou padrão). */
-export function useContratosFiscalizacao() {
+export function useContratosFiscalizacao({ enabled = true }: { enabled?: boolean } = {}) {
   const { role } = useAuth();
   return useQuery<ContratoFiscalizacao[], Error>({
     queryKey: FISCALIZACAO_CONTRATOS_KEY,
     queryFn: fetchContratosFiscalizacao,
-    enabled: podeVerFiscalizacao(role),
+    enabled: enabled && podeVerFiscalizacao(role),
     staleTime: 60 * 1000
   });
 }

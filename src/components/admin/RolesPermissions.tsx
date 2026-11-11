@@ -115,7 +115,8 @@ export const PROFILE_DEFINITIONS: ProfileDefinition[] = [
     areas: [
       { label: 'Início', description: 'Os contratos em que é fiscal ou substituto e o que falta fazer em cada um' },
       { label: 'Fiscalização', description: 'Registro do processo de fiscalização dos contratos dele' },
-      { label: 'Contratos', description: 'Consulta, com a aba Fiscalização no Contrato 360' }
+      { label: 'Contratos', description: 'Consulta, com a aba Fiscalização no Contrato 360' },
+      { label: 'Execução financeira', description: 'Consulta de pagamentos e empenhos' }
     ],
     scope: 'Contratos em que é fiscal ou substituto'
   },
