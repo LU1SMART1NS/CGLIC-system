@@ -384,6 +384,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const menu = filterNavigationByRole(navigationConfig, 'gestor_fiscalizacao');
       expect(menu.find((i) => i.id === 'visao-geral')?.children?.map((c) => [c.label, c.route, c.group])).toEqual([['Painel', '/fiscalizacao/inicio', undefined]]);
       expect(menu.find((i) => i.id === 'carteira')?.children?.map((c) => c.route)).toEqual(['/contratos']);
+      // Financeiro em consulta: acompanha empenhos e pagamentos dos contratos que fiscaliza.
+      expect(menu.find((i) => i.id === 'execucao-financeira')?.children?.map((c) => c.route)).toEqual(['/empenhos', '/pagamentos']);
       expect(menu.find((i) => i.id === 'fiscalizacao')?.children?.map((c) => c.route)).toEqual(['/fiscalizacao/programas', '/fiscalizacao/contratos', '/fiscalizacao/beneficiarios', '/fiscalizacao/itens']);
       // O cadastro dos programas fica em Ajustes › Gestão, para o gestor de fiscalização e o admin.
       expect(menu.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.route)).toContain('/configuracoes/programas');

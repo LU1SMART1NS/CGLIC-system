@@ -372,7 +372,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/pagamentos"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']}>
                   <PaymentsRoute />
                 </RequireRole>
               }
@@ -380,7 +380,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/pagamentos/previsao"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']}>
                   <PrevisaoRoute />
                 </RequireRole>
               }
@@ -390,7 +390,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/empenhos"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']}>
                   <FinancialExecutionRoute />
                 </RequireRole>
               }

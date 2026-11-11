@@ -300,7 +300,8 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/empenhos'],
         // Gestor de saldo fica fora do Financeiro: o empenhado que ele usa já aparece no Item e na Alocação.
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        // O gestor de fiscalização consulta (sem gravar), como a consulta: acompanha o pagamento dos contratos que fiscaliza.
+        allowedRoles: ['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']
       },
       {
         id: 'execucao-pagamentos',
@@ -309,7 +310,7 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         route: '/pagamentos',
         matchPrefixes: ['/pagamentos'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']
       }
     ]
   },

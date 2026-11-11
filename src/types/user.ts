@@ -491,7 +491,7 @@ export const SYSTEM_ROLES: RoleDefinition[] = [
     id: 'gestor_fiscalizacao',
     nome: 'Gestor de Fiscalização',
     badgeColor: '#0e7490',
-    descricao: 'Servidor da SFC/CGLIC que fiscaliza a execução dos contratos de emenda e dos que o coordenador indicar: autuação, Ordem de Fornecimento, entregas e recebimento. Consulta os contratos; sem financeiro, alocação ou administração.',
+    descricao: 'Servidor da SFC/CGLIC que fiscaliza a execução dos contratos de emenda e dos que o coordenador indicar: autuação, Ordem de Fornecimento, entregas e recebimento. Consulta os contratos e o Financeiro dos contratos em que é fiscal; sem alocação ou administração.',
     isCustom: false,
     permissoes: {
       contractScope: 'ASSIGNED',
