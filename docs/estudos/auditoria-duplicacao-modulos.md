@@ -50,15 +50,16 @@ Nada aqui muda o sistema. O estudo é leitura do código da main (migrations at�
 - **Efeito:** a junção dá erro de chave estrangeira, ou perde o grupo.
 - **Ligação certa:** a função repassa todas as tabelas que apontam para o beneficiário, inclusive o grupo.
 
-### 1.3 A Mesa e o Andamento do pedido leem a Ordem de Fornecimento de uma coluna abandonada
-- **Onde:** `emenda_pedidos.ordem_fornecimento_em` e `ordem_fornecimento_documento_sei` (migration 245). A migration 250 passou a Ordem para `emenda_pedido_ordens` (242 registros, um por pedido × contrato) e diz que as colunas antigas "saem numa limpeza depois que o código deixar de lê-las".
-- **O código ainda lê:** `emendasService.ts:1001` → `emendasMesa.ts:487, 610, 834, 856`, `emendasAndamento.ts:323, 389` e `EtapaPedidoModal.tsx:192`.
-- **Efeito:** a etapa "Ordem" da Mesa e do Andamento olha uma coluna que nenhum pedido preencheu, e ignora as Ordens registradas por contrato.
-- **Há ainda um terceiro lugar:** `fisc_entregas.etapa = 'ORDEM'`. A RPC da fiscalização devolve a ORDEM a `emenda_pedido_ordens`, mas não a INFO_ENVIADA.
-- **Ligação certa:** `emenda_pedido_ordens` como fonte única. Mesa, Andamento e Fiscalização leem dali. Depois, apagar as duas colunas e a RPC antiga.
+### 1.3 Ordem de Fornecimento: registro antigo sem uso e Informação de mão única
+- **Onde:** `emenda_pedidos.ordem_fornecimento_em` e `ordem_fornecimento_documento_sei` (migration 245). A migration 250 passou a Ordem para `emenda_pedido_ordens` (242 registros, um por pedido × contrato).
+- **Correção desta leitura (11/11/2026):** a Mesa e o Andamento **já usam** a Ordem por contrato. A coluna antiga só aparecia num caminho de compatibilidade que nunca disparava, porque nenhum pedido a usou. Não havia tela errada.
+- **O que havia de fato:**
+  - código, RPC e colunas mortos;
+  - uma via de mão única: a Ordem registrada na Fiscalização chegava ao pedido, mas a Informação (INFO_ENVIADA) não. A volta do pedido para as entregas já existia em `fisc_criar_entregas_do_contrato`.
+- **Feito:** PR #512 e migration 271 (Informação da Fiscalização no pedido; colunas e RPC antigas apagadas).
 
 ### 1.4 Entregas da fiscalização são cópia da linha do pedido e nunca se atualizam
-- **Onde:** `fisc_criar_entregas_do_contrato` (migration 260, linhas 125 a 140). A função copia `item_key`, `beneficiario_id`, `quantidade` e `contract_key` da linha do pedido e da nota. Só cria entregas, não atualiza as que já existem.
+- **Onde:** `fisc_criar_entregas_do_contrato` (migration 260, linhas 125 a 140). A função copia `item_key`, `beneficiario_id`, `quantidade` e `contract_key` da linha do pedido e da nota. Depois só faz a etapa avançar (Informação e Ordem do pedido); não atualiza quantidade, beneficiário nem contrato.
 - **O que pode mudar depois:** a linha pode ser cancelada ou anulada, ou mudar pelo ofício retificador. `emendas_ligar_notas` refaz a nota e o contrato da linha de hora em hora.
 - **Hoje:** 0 divergências em 2.046 entregas de emenda. O risco é a próxima retificação.
 - **Ligação certa:** nas entregas de origem EMENDA, ler quantidade, beneficiário e contrato da linha (por `emenda_linha_id`), ou ter uma conferência hora a hora com aviso. A cópia só se justifica na origem CARGA (planilha da SFC) e no fracionamento.
@@ -214,7 +215,7 @@ As vazias usadas por funções do banco (`*_ausente_da_fonte`, `correcoes_*`, `v
 
 1. **Valor total da ata (1.1)**: decidir o valor da ata da CGLIC depois do apostilamento e usar uma regra só nas três funções e na sincronização.
 2. **Juntar beneficiários (1.2)**: repassar `emendas_siop`, `fisc_entregas` e o grupo.
-3. **Ordem de Fornecimento numa fonte só (1.3)**: Mesa, Andamento e Fiscalização lendo `emenda_pedido_ordens`. Depois, apagar as colunas antigas.
+3. **Ordem de Fornecimento numa fonte só (1.3)**: PR #512, migration 271.
 4. **Entregas × linha do pedido (1.4)**: leitura pela linha, ou conferência com aviso.
 5. **Gestor e fiscal pelo id (2.2)**, que o dado de hoje permite trocar sem risco, e **perfis lidos do banco (2.3)**.
 6. **Vigia de chaves órfãs e formato único da `ata_key` (2.1)**, depois o gatilho na troca do número da ata.
