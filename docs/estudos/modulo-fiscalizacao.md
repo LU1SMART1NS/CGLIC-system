@@ -173,7 +173,7 @@ Cada entrega segue o fluxo de sempre: protótipo aprovado → migration testada 
 - **D7** — Local de entrega = endereço de entrega do cadastro do beneficiário (`emenda_beneficiarios.entrega_*`). A entrega não guarda endereço. Destinatários da planilha fora do cadastro (2023–2025, programas) precisam ser cadastrados ou casados na carga.
 - **D8** — Gestor de emendas só lê. A única etapa dele é **Informações enviadas** (a CAEP ou outro setor manda à SFC as informações do processo de fiscalização; hoje é a Informação da ComprasSUSP em `emenda_pedido_ordens`). Para programa, o setor responsável pelo programa faz essa etapa.
 
-Protótipo aprovado em 10/11/2026 (versão 6). Entrega 1 (perfil, fiscalização do contrato, Distribuição e Painel): migration 259.
+Protótipo aprovado em 10/11/2026 (versão 6). Entrega 1 (perfil, fiscalização do contrato, Distribuição e Painel): migration 259. Entrega 2 (entregas e etapas): migration 260 — as entregas de emenda nascem das linhas do pedido quando o contrato fica com a SFC/CGLIC (e de hora em hora, às :04); a Ordem registrada pela SFC/CGLIC grava também no pedido de emenda.
 
 ## 7. Perguntas da rodada (respostas de 10/11/2026)
 

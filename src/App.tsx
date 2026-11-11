@@ -46,6 +46,7 @@ const RedefinirSenhaRoute = lazyComRecarga(() => import('./routes/RedefinirSenha
 const AlertRulesRoute = lazyComRecarga(() => import('./routes/AlertRulesRoute').then((m) => ({ default: m.AlertRulesRoute })));
 const HolidaysRoute = lazyComRecarga(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
 const FiscalizacaoInicioPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoInicioPage').then((m) => ({ default: m.FiscalizacaoInicioPage })));
+const FiscalizacaoEntregasPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoEntregasPage').then((m) => ({ default: m.FiscalizacaoEntregasPage })));
 const FiscalizacaoDistribuicaoPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoDistribuicaoPage').then((m) => ({ default: m.FiscalizacaoDistribuicaoPage })));
 const EmendasInicioPage = lazyComRecarga(() => import('./components/emendas/EmendasInicioPage').then((m) => ({ default: m.EmendasInicioPage })));
 const EmendasPedidosPage = lazyComRecarga(() => import('./components/emendas/EmendasPedidosPage').then((m) => ({ default: m.EmendasPedidosPage })));
@@ -533,6 +534,14 @@ const AppContent: React.FC = () => {
               element={
                 <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
                   <FiscalizacaoInicioPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/entregas"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoEntregasPage />
                 </RequireRole>
               }
             />

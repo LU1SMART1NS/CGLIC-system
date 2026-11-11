@@ -101,3 +101,145 @@ export async function registrarProcessoFiscalizacao(input: { contractKey: string
   });
   if (error) throw mapPostgresErrorToAppError(error);
 }
+
+// ── Entregas (migration 260) ─────────────────────────────────────────────────────────────────────
+
+export type EtapaEntrega =
+  | 'INFO_PEDIDA' | 'INFO_ENVIADA' | 'ORDEM'
+  | 'PRODUCAO' | 'CONTROLADO' | 'TRANSITO' | 'RETIRADA'
+  | 'ENTREGUE' | 'TRP' | 'TRD'
+  | 'PAGAMENTO' | 'SAL' | 'FINALIZADO';
+export type ResponsavelEntrega = 'SFC' | 'AREA';
+
+/** Entrega acompanhada pela fiscalização: item do contrato × beneficiário × quantidade. */
+export interface EntregaFiscalizacao {
+  id: string;
+  contractKey: string;
+  contratoNumero: string;
+  fornecedor: string | null;
+  fiscalUserId: string | null;
+  fiscalNome: string | null;
+  substitutoUserId: string | null;
+  fiscalizacao: DecisaoFiscalizacao;
+  itemKey: string | null;
+  itemNome: string | null;
+  itemDescricao: string | null;
+  beneficiarioId: string | null;
+  beneficiarioNome: string | null;
+  beneficiarioSigla: string | null;
+  beneficiarioRazao: string | null;
+  municipio: string | null;
+  uf: string | null;
+  quantidade: number;
+  origem: 'EMENDA' | 'CARGA' | 'MANUAL';
+  emenda: string | null;
+  pedidoId: string | null;
+  responsavel: ResponsavelEntrega;
+  etapa: EtapaEntrega;
+  etapaEm: string | null;
+  prevista: string | null;
+  entregueEm: string | null;
+  divididaDe: string | null;
+  faturadoEm: string | null;
+  pagoEm: string | null;
+  atualizadoPorNome: string | null;
+  atualizadoEm: string | null;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export function linhaParaEntrega(r: any): EntregaFiscalizacao {
+  return {
+    id: r.id,
+    contractKey: r.contract_key,
+    contratoNumero: r.contrato_numero || r.contract_key,
+    fornecedor: r.fornecedor || null,
+    fiscalUserId: r.fiscal_user_id || null,
+    fiscalNome: r.fiscal_nome || null,
+    substitutoUserId: r.substituto_user_id || null,
+    fiscalizacao: r.fiscalizacao,
+    itemKey: r.item_key || null,
+    itemNome: r.item_nome || null,
+    itemDescricao: r.item_descricao || null,
+    beneficiarioId: r.beneficiario_id || null,
+    beneficiarioNome: r.beneficiario_nome || null,
+    beneficiarioSigla: r.beneficiario_sigla || null,
+    beneficiarioRazao: r.beneficiario_razao || null,
+    municipio: r.municipio || null,
+    uf: r.uf || null,
+    quantidade: Number(r.quantidade) || 0,
+    origem: r.origem,
+    emenda: r.emenda || null,
+    pedidoId: r.pedido_id || null,
+    responsavel: r.responsavel,
+    etapa: r.etapa,
+    etapaEm: r.etapa_em || null,
+    prevista: r.prevista || null,
+    entregueEm: r.entregue_em || null,
+    divididaDe: r.dividida_de || null,
+    faturadoEm: r.faturado_em || null,
+    pagoEm: r.pago_em || null,
+    atualizadoPorNome: r.atualizado_por_nome || null,
+    atualizadoEm: r.atualizado_em || null
+  };
+}
+
+export interface MovimentoEntrega {
+  id: string;
+  tipo: 'CRIADA' | 'ETAPA' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA';
+  etapa: EtapaEntrega | null;
+  data: string | null;
+  documentoSei: string | null;
+  observacao: string | null;
+  criadoPorNome: string | null;
+  criadoEm: string;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/** Entregas de um contrato ou de todos (RPC fisc_entregas_lista). */
+export async function fetchEntregasFiscalizacao(contractKey?: string | null): Promise<EntregaFiscalizacao[]> {
+  const { data, error } = await cliente().rpc('fisc_entregas_lista', { p_contrato: contractKey ?? null });
+  if (error) throw mapPostgresErrorToAppError(error);
+  return ((data || []) as unknown[]).map(linhaParaEntrega);
+}
+
+export async function fetchMovimentosDaEntrega(entregaId: string): Promise<MovimentoEntrega[]> {
+  const { data, error } = await cliente().rpc('fisc_movimentos_da_entrega', { p_entrega: entregaId });
+  if (error) throw mapPostgresErrorToAppError(error);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data || []) as any[]).map((m) => ({
+    id: m.id,
+    tipo: m.tipo,
+    etapa: m.etapa || null,
+    data: m.data || null,
+    documentoSei: m.documento_sei || null,
+    observacao: m.observacao || null,
+    criadoPorNome: m.criado_por_nome || null,
+    criadoEm: m.criado_em
+  }));
+}
+
+export async function mudarEtapaEntregas(input: { ids: string[]; etapa: EtapaEntrega; data: string; documentoSei: string | null; observacao: string | null }): Promise<void> {
+  const { error } = await cliente().rpc('mudar_etapa_entregas', {
+    p_ids: input.ids,
+    p_etapa: input.etapa,
+    p_data: input.data,
+    p_documento_sei: (input.documentoSei || '').replace(/\D/g, '') || null,
+    p_observacao: (input.observacao || '').trim() || null
+  });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+export async function dividirEntrega(input: { id: string; quantidade: number }): Promise<void> {
+  const { error } = await cliente().rpc('dividir_entrega', { p_id: input.id, p_quantidade: input.quantidade });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+export async function definirPrevistaEntregas(input: { ids: string[]; prevista: string | null }): Promise<void> {
+  const { error } = await cliente().rpc('definir_prevista_entregas', { p_ids: input.ids, p_prevista: input.prevista });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+export async function definirResponsavelEntregas(input: { ids: string[]; responsavel: ResponsavelEntrega; motivo: string }): Promise<void> {
+  const { error } = await cliente().rpc('definir_responsavel_entregas', { p_ids: input.ids, p_responsavel: input.responsavel, p_motivo: input.motivo.trim() });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
