@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useItensDaAtaDoContrato } from '../../hooks/useFiscalizacao';
 import { MapPin } from 'lucide-react';
 import { enderecoDeEntrega } from '../../utils/fiscalizacaoResumo';
 import { Modal } from '../../design-system/components/Modal';
@@ -17,6 +18,7 @@ import { buildAtaItemPath } from '../../hooks/useAta';
 import { CelulaPrazo, HistoricoDaEntrega } from './EntregasTabela';
 import { DividirEntregaModal, MudarEtapaModal, PrevistaModal, ResponsavelModal } from './EntregasModais';
 import { ReguaDoItem } from './ReguaDoItem';
+import { LigarItemDaAtaModal } from './LigarItemDaAtaModal';
 
 type Acao = 'etapa' | 'parcial' | 'prevista' | 'responsavel';
 
@@ -36,12 +38,17 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
   const { user, role } = useAuth();
   const navigate = useNavigateWithOrigin();
   const [acao, setAcao] = useState<Acao | null>(null);
+  const [ligando, setLigando] = useState(false);
   const podeAgir = role === 'admin' || (role === 'gestor_fiscalizacao' && e.fiscalUserId === user?.id);
   const b = rotuloDoBeneficiario(e);
   const endereco = enderecoDeEntrega(e);
   const area = e.responsavel === 'AREA';
   const k = ataEItemDaChave(e.itemKey);
+  // O link só aparece quando o contrato já tem item da ata para escolher (sem ata, a mesa aponta para a Vinculação).
+  const itensDaAta = useItensDaAtaDoContrato(podeAgir && !e.itemKey ? e.contractKey : null);
+  const podeLigar = podeAgir && !e.itemKey && (itensDaAta.data?.length ?? 0) > 0;
   const fechar = () => { setAcao(null); onClose(); };
+  if (ligando) return <LigarItemDaAtaModal contractKey={e.contractKey} contratoNumero={e.contratoNumero} foco={e.id} onClose={fechar} />;
   if (acao === 'etapa') return <MudarEtapaModal entregas={[e]} onClose={fechar} />;
   if (acao === 'parcial') return <DividirEntregaModal entrega={e} onClose={fechar} />;
   if (acao === 'prevista') return <PrevistaModal entregas={[e]} onClose={fechar} />;
@@ -102,7 +109,14 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
                 {e.itemDescricao && <div style={carteiraDetalhe} title={e.itemDescricao}>{e.itemDescricao.length > 60 ? `${e.itemDescricao.slice(0, 60)}…` : e.itemDescricao}</div>}
               </>
             ) : (
-              <span style={carteiraDetalhe}>da planilha · sem item da ata</span>
+              <>
+                <span style={carteiraDetalhe}>da planilha · sem item da ata</span>
+                {podeLigar && (
+                  <div>
+                    <AppButton size="xs" variant="link" onClick={() => setLigando(true)} data-testid="fisc-janela-ligar">Ligar ao item da ata</AppButton>
+                  </div>
+                )}
+              </>
             )}
           </Campo>
           <Campo rotulo="Origem">

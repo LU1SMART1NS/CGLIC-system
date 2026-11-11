@@ -11,7 +11,8 @@ import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, ehDoFiscal } from '../../utils/fiscalizacao';
 import { nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario } from '../../utils/fiscalizacaoEntregas';
 import { MudarEtapaModal, PrevistaModal } from './EntregasModais';
-import { COR, comQuemEstaOItem, itens, linhasDoContrato, type Linha, type Tom } from '../../utils/fiscalizacaoMesa';
+import { COR, comQuemEstaOItem, itens, linhaDeLigacao, linhasDoContrato, type Linha, type Tom } from '../../utils/fiscalizacaoMesa';
+import { LigarItemDaAtaModal } from './LigarItemDaAtaModal';
 import { DefinirFiscalizacaoModal, RegistrarProcessoModal } from './FiscalizacaoModais';
 import { JanelaDoItem } from './JanelaDoItem';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -19,7 +20,7 @@ import { DataTable } from '../../design-system/components/DataTable';
 import { CelulaItem, CelulaSituacaoDoItem } from './EntregasTabela';
 import { ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
 
-type Janela = { tipo: 'etapa' | 'prevista'; itens: EntregaFiscalizacao[] } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'quem' } | null;
+type Janela = { tipo: 'etapa' | 'prevista'; itens: EntregaFiscalizacao[] } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'quem' } | { tipo: 'ligar' } | null;
 
 const lista: React.CSSProperties = { border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' };
 const bloco: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.4rem' };
@@ -74,7 +75,13 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
   const [janela, setJanela] = useState<Janela>(null);
   const coordenador = role === 'admin';
   const podeAgir = Boolean(c && (coordenador || (role === 'gestor_fiscalizacao' && ehDoFiscal(c, user?.id))));
-  const { comVoce, comOutros } = useMemo(() => linhasDoContrato(es, Boolean(c && !c.processoSei), (tipo, l) => setJanela({ tipo, itens: l }), () => setJanela({ tipo: 'processo' })), [es, c]);
+  const { comVoce, comOutros } = useMemo(() => {
+    const r = linhasDoContrato(es, Boolean(c && !c.processoSei), (tipo, l) => setJanela({ tipo, itens: l }), () => setJanela({ tipo: 'processo' }));
+    // Itens da planilha sem item da ata (migration 268): com o fiscal quando o contrato já tem itens de ata; senão, espera a Vinculação.
+    const linha = linhaDeLigacao(es, Boolean(c?.atas?.length), () => setJanela({ tipo: 'ligar' }));
+    if (linha) (linha.tom === 'espera' ? r.comOutros : r.comVoce).unshift(linha);
+    return r;
+  }, [es, c]);
   const grupos = useMemo(() => {
     const m = new Map<string, EntregaFiscalizacao[]>();
     for (const e of es) {
@@ -210,6 +217,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
       {janela?.tipo === 'prevista' && <PrevistaModal entregas={janela.itens} onClose={fechar} />}
       {janela?.tipo === 'item' && <JanelaDoItem e={janela.item} onClose={fechar} noContrato />}
       {janela?.tipo === 'processo' && <RegistrarProcessoModal contrato={c} onClose={fechar} />}
+      {janela?.tipo === 'ligar' && <LigarItemDaAtaModal contractKey={c.contractKey} contratoNumero={c.numero} onClose={fechar} />}
       {janela?.tipo === 'quem' && <DefinirFiscalizacaoModal contrato={c} onClose={fechar} />}
     </div>
   );

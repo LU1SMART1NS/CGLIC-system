@@ -1,6 +1,7 @@
 import type { EntregaFiscalizacao } from '../services/fiscalizacaoService';
 import { NOME_SFC, dataBR } from './fiscalizacao';
 import { prazoDaEntrega, rotuloDoBeneficiario } from './fiscalizacaoEntregas';
+import { gruposALigar } from './fiscalizacaoLigacao';
 
 /* Regras da mesa do Contrato 360 › Fiscalização (Com você · Com outros) e de "com quem está o item", usadas também nas abas Contratos e Itens. */
 
@@ -64,4 +65,17 @@ export function comQuemEstaOItem(e: EntregaFiscalizacao): 'VOCE' | 'OUTROS' | 'F
   if (EM_EXECUCAO.has(e.etapa)) return !e.prevista || prazoDaEntrega(e).tom === 'danger' ? 'VOCE' : 'OUTROS';
   if (e.etapa === 'PAGAMENTO') return e.pagoEm ? 'VOCE' : 'OUTROS';
   return 'VOCE';
+}
+
+/**
+ * Itens da planilha sem item da ata (migration 268): uma linha só, com quantos itens e quantos nomes escritos. Com o
+ * fiscal quando o contrato tem itens de ata para escolher; senão, espera a Vinculação (Contratos à ata).
+ */
+export function linhaDeLigacao(es: EntregaFiscalizacao[], temItensDaAta: boolean, ligar: () => void): Linha | null {
+  const gs = gruposALigar(es);
+  if (!gs.length) return null;
+  const n = gs.reduce((t, g) => t + g.es.length, 0);
+  const nomes = gs.length === 1 ? `"${gs[0].texto}"` : `${gs.length} nomes escritos na planilha`;
+  if (!temItensDaAta) return { chave: 'ligar', tom: 'espera', quem: 'Vinculação', titulo: `Ligar o contrato à ata · ${itens(n)} da planilha esperam`, detalhe: `${nomes} · depois os itens se ligam pelo nome`, acoes: [] };
+  return { chave: 'ligar', tom: 'eu', titulo: `Ligar ao item da ata · ${itens(n)} da planilha`, detalhe: `${nomes} · uma escolha por nome`, acoes: [{ rotulo: 'Ligar ao item da ata', principal: true, faz: ligar }] };
 }

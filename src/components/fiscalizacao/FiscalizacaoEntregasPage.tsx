@@ -52,6 +52,7 @@ export const FiscalizacaoEntregasPage: React.FC = () => {
   const [uf, setUf] = useState('');
   const [fase, setFase] = useState(params.get('fase') ?? '');
   const [programa, setPrograma] = useState('');
+  const [itemAta, setItemAta] = useState(params.get('itemAta') ?? '');
   const entregas = useMemo(() => data ?? [], [data]);
 
   const doFiscal = useMemo(() => entregas.filter((e) => !fiscal || e.fiscalUserId === fiscal), [entregas, fiscal]);
@@ -68,6 +69,7 @@ export const FiscalizacaoEntregasPage: React.FC = () => {
         if (uf && e.uf !== uf) return false;
         if (fase && faseDa(e) !== fase) return false;
         if (programa && e.programaTexto !== programa) return false;
+        if (itemAta && (itemAta === 'SEM') !== !e.itemKey) return false;
         return true;
       })
       .sort((a, b) => {
@@ -75,8 +77,8 @@ export const FiscalizacaoEntregasPage: React.FC = () => {
         const pb = prazoDaEntrega(b).dias ?? 99999;
         return pa - pb || a.contratoNumero.localeCompare(b.contratoNumero);
       });
-  }, [doSeg, busca, prazo, quem, uf, fase, programa]);
-  const ativos = Boolean(busca || prazo || quem || uf || fase || programa || (fiscal && !ehFiscal));
+  }, [doSeg, busca, prazo, quem, uf, fase, programa, itemAta]);
+  const ativos = Boolean(busca || prazo || quem || uf || fase || programa || itemAta || (fiscal && !ehFiscal));
   const chave = useCallback((e: EntregaFiscalizacao) => e.id, []);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(filtradas, chave, POR_PAGINA);
   const ufs = useMemo(() => [...new Set(doSeg.map((e) => e.uf).filter((x): x is string => Boolean(x)))].sort(), [doSeg]);
@@ -109,7 +111,7 @@ export const FiscalizacaoEntregasPage: React.FC = () => {
         searchPlaceholder="Buscar por contrato, item, beneficiário, cidade ou emenda..."
         onChangeBusca={setBusca}
         hasActiveFilters={ativos}
-        onResetFilters={() => { setBusca(''); setPrazo(''); setQuem(''); setUf(''); setFase(''); setPrograma(''); setFiscal(ehFiscal && user?.id ? user.id : ''); }}
+        onResetFilters={() => { setBusca(''); setPrazo(''); setQuem(''); setUf(''); setFase(''); setPrograma(''); setItemAta(''); setFiscal(ehFiscal && user?.id ? user.id : ''); }}
         counter={carteiraCounter(filtradas.length, doSeg.length, ativos, 'item', 'itens')}
         testIdPrefix="fisc-entregas"
       >
@@ -117,6 +119,7 @@ export const FiscalizacaoEntregasPage: React.FC = () => {
         <CarteiraFilterButton label="Prazo" value={prazo} emptyValue="" options={[{ value: 'danger', label: 'Vencido', count: contaPrazo('danger') }, { value: 'warning', label: 'Vence em 15 dias', count: contaPrazo('warning') }, { value: 'neutral', label: 'Em dia ou sem prazo', count: contaPrazo('neutral') }, { value: 'entregue', label: 'Entregue', count: contaPrazo('entregue') }]} onChange={setPrazo} testId="fisc-entregas-filtro-prazo" />
         <CarteiraFilterButton label="Fase" value={fase} emptyValue="" options={FASES_ENTREGA.map((f) => ({ value: f.id, label: f.nome, count: doSeg.filter((e) => faseDa(e) === f.id).length }))} onChange={setFase} testId="fisc-entregas-filtro-fase" />
         <CarteiraFilterButton label="Programa" value={programa} emptyValue="" options={progs.map((p) => ({ value: p, label: p, count: doSeg.filter((e) => e.programaTexto === p).length }))} onChange={setPrograma} testId="fisc-entregas-filtro-programa" />
+        <CarteiraFilterButton label="Item da ata" value={itemAta} emptyValue="" options={[{ value: 'SEM', label: 'Sem item da ata (da planilha)', count: doSeg.filter((e) => !e.itemKey).length }, { value: 'COM', label: 'Com item da ata', count: doSeg.filter((e) => Boolean(e.itemKey)).length }]} onChange={setItemAta} testId="fisc-entregas-filtro-item-ata" />
         <CarteiraFilterButton label="UF" value={uf} emptyValue="" options={ufs.map((u) => ({ value: u, label: u, count: doSeg.filter((e) => e.uf === u).length }))} onChange={setUf} testId="fisc-entregas-filtro-uf" />
         <CarteiraFilterButton label="Quem fiscaliza" value={quem} emptyValue="" options={[{ value: 'SFC', label: NOME_SFC, count: doSeg.filter((e) => e.responsavel === 'SFC').length }, { value: 'AREA', label: 'Área requisitante', count: doSeg.filter((e) => e.responsavel === 'AREA').length }]} onChange={setQuem} testId="fisc-entregas-filtro-quem" />
       </CarteiraFilterBar>

@@ -27,7 +27,10 @@ import {
   excluirProgramaFiscalizacao,
   fetchProgramasFiscalizacao,
   salvarProgramaFiscalizacao,
-  type ProgramaFiscalizacao
+  type ProgramaFiscalizacao,
+  fetchItensDaAtaDoContrato,
+  ligarItensAoItemDaAta,
+  type ItemDaAtaDoContrato
 } from '../services/fiscalizacaoService';
 
 export const FISCALIZACAO_CONTRATOS_KEY = ['fiscalizacao', 'contratos'] as const;
@@ -192,3 +195,15 @@ function useMutacaoDePrograma<I, R>(fn: (input: I) => Promise<R>) {
 export const useSalvarProgramaFiscalizacao = () => useMutacaoDePrograma(salvarProgramaFiscalizacao);
 export const useExcluirProgramaFiscalizacao = () => useMutacaoDePrograma(excluirProgramaFiscalizacao);
 export const useDefinirProgramaDasEntregas = () => useMutacaoDePrograma(definirProgramaDasEntregas);
+
+/** Itens da ata ligados ao contrato (para ligar os itens da planilha, migration 268). */
+export function useItensDaAtaDoContrato(contractKey: string | null | undefined) {
+  return useQuery<ItemDaAtaDoContrato[], Error>({
+    queryKey: ['fiscalizacao', 'itens-da-ata', contractKey],
+    queryFn: () => fetchItensDaAtaDoContrato(contractKey as string),
+    enabled: Boolean(contractKey),
+    staleTime: 5 * 60 * 1000
+  });
+}
+
+export const useLigarItensAoItemDaAta = () => useMutacaoDeEntregas(async (input: { ids: string[]; itemKey: string }) => { await ligarItensAoItemDaAta(input); });

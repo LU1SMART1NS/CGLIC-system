@@ -211,7 +211,7 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
 
 export interface MovimentoEntrega {
   id: string;
-  tipo: 'CRIADA' | 'ETAPA' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA';
+  tipo: 'CRIADA' | 'ETAPA' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM';
   etapa: EtapaEntrega | null;
   data: string | null;
   documentoSei: string | null;
@@ -449,4 +449,43 @@ export async function definirProgramaDasEntregas(input: { programaId: string; in
   const { data, error } = await cliente().rpc('definir_programa_das_entregas', { p_programa: input.programaId, p_incluir: input.incluir, p_retirar: input.retirar });
   if (error) throw mapPostgresErrorToAppError(error);
   return { incluidos: Number(data?.incluidos) || 0, retirados: Number(data?.retirados) || 0 };
+}
+
+// ── Item da ata dos itens da planilha (migration 268) ─────────────────────────────────────────────
+
+/** Item da ata ligado ao contrato (arp_item_contract_links), para escolher a qual item pertence um item da planilha. */
+export interface ItemDaAtaDoContrato {
+  itemKey: string;
+  ata: string;
+  numero: string;
+  /** Nome curto da CAEP; sem ele, null (a tela usa a descrição). */
+  nome: string | null;
+  descricao: string | null;
+  contratado: number | null;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export function linhaParaItemDaAta(r: any): ItemDaAtaDoContrato {
+  return {
+    itemKey: r.item_key,
+    ata: String(r.item_key).split('-')[0],
+    numero: String(r.item_key).split('-')[2],
+    nome: r.nome_curto || null,
+    descricao: r.descricao_item || null,
+    contratado: r.contratado == null ? null : Number(r.contratado)
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+export async function fetchItensDaAtaDoContrato(contractKey: string): Promise<ItemDaAtaDoContrato[]> {
+  const { data, error } = await cliente().rpc('fisc_itens_da_ata_do_contrato', { p_contract_key: contractKey });
+  if (error) throw mapPostgresErrorToAppError(error);
+  return (data || []).map(linhaParaItemDaAta);
+}
+
+/** Liga itens da planilha (mesmo contrato) a um item da ata; o histórico registra quem conferiu. */
+export async function ligarItensAoItemDaAta(input: { ids: string[]; itemKey: string }): Promise<number> {
+  const { data, error } = await cliente().rpc('ligar_entregas_ao_item_da_ata', { p_ids: input.ids, p_item_key: input.itemKey });
+  if (error) throw mapPostgresErrorToAppError(error);
+  return Number(data) || 0;
 }
