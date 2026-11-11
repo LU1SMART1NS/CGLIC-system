@@ -5,8 +5,13 @@ import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
 import { SectionHeader } from '../../design-system/components/SectionHeader';
 import { AppButton } from '../../design-system/components/AppButton';
-import { CarteiraDetailLabel } from '../carteira/CarteiraDetailLabel';
-import { carteiraDetalhe } from '../carteira/carteiraStyles';
+import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
+import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
+import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
+import { CarteiraPagination } from '../carteira/CarteiraPagination';
+import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
+import { AdminListShell } from '../admin/shared/AdminListShell';
+import { ComVoce, type ItemComVoce } from '../instrumentos/ComVoce';
 import { PainelCartao, PainelCartoes } from '../instrumentos/PainelCartao';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
@@ -15,35 +20,20 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useContratosFiscalizacao, useEntregasFiscalizacao } from '../../hooks/useFiscalizacao';
 import { prazoDaEntrega } from '../../utils/fiscalizacaoEntregas';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, comSfc, ehDoFiscal, numeroDoContrato, pendenciasDoContrato, type PendenciaFiscalizacao } from '../../utils/fiscalizacao';
+import { NOME_SFC, comSfc, dataBR, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato } from '../../utils/fiscalizacao';
+import { useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
+
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
 import { RegistrarProcessoModal } from './FiscalizacaoModais';
 
-const lista: React.CSSProperties = { border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' };
-const linhaDaLista: React.CSSProperties = { display: 'grid', gridTemplateColumns: '12px minmax(0, 1fr)', gap: '0.2rem 0.7rem', padding: '0.65rem 0.75rem', borderTop: '1px solid var(--border)', alignItems: 'start' };
-const marca: React.CSSProperties = { width: 10, height: 10, borderRadius: '50%', background: 'var(--primary)', marginTop: '0.3rem' };
-const LIMITE = 5;
-
-/** Linha de "Com você", no desenho do Pedido 360 › Andamento. */
-const LinhaComVoce: React.FC<{ titulo: string; detalhe: string; acao: string; onAcao: () => void; testId: string }> = ({ titulo, detalhe, acao, onAcao, testId }) => (
-  <div style={linhaDaLista} data-testid={testId}>
-    <span style={marca} aria-hidden="true" />
-    <div style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '0.4rem 0.8rem' }}>
-      <div style={{ minWidth: 0, flex: '1 1 260px' }}>
-        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{titulo}</div>
-        <div style={{ ...carteiraDetalhe, fontSize: '0.8rem' }}>{detalhe}</div>
-      </div>
-      <div style={{ marginLeft: 'auto' }}>
-        <AppButton size="sm" variant="primary" onClick={onAcao}>{acao}</AppButton>
-      </div>
-    </div>
-  </div>
-);
+const POR_PAGINA = 25;
+type Segmento = 'AUTUAR' | 'PORTARIA' | 'TODAS';
 
 /**
  * Início › Painel da fiscalização (migration 259). O gestor de fiscalização vê os contratos em que é fiscal ou substituto
- * e o que falta em cada um; o coordenador e a consulta veem todos os contratos com a SFC/CGLIC. "Com você" só para quem
- * age: o fiscal (autuar o processo) e o coordenador (contratos de emenda a definir).
+ * e o que falta em cada um; o coordenador e a consulta veem todos os contratos com a SFC/CGLIC. Como nos outros Painéis
+ * (decisão de 11/11/2026): "Com você" só do coordenador (definir, desfazer ausência); o que falta nos contratos fica em
+ * Pendências da fiscalização (A autuar · Sem portaria · Todas).
  */
 export const FiscalizacaoInicioPage: React.FC = () => {
   const { user, role } = useAuth();
@@ -51,7 +41,11 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useContratosFiscalizacao();
   const entregasConsulta = useEntregasFiscalizacao(null);
   const [autuando, setAutuando] = useState<ContratoFiscalizacao | null>(null);
-  const [todas, setTodas] = useState(false);
+  const [segmentoEscolhido, setSegmento] = useState<Segmento | null>(null);
+  const [busca, setBusca] = useState('');
+  const [filtroFiscal, setFiltroFiscal] = useState('');
+  const { fiscais } = useFiscaisAtivos();
+  const transferencias = useTransferenciasFiscalizacao();
   const coordenador = role === 'admin';
   const fiscal = role === 'gestor_fiscalizacao';
   const contratos = useMemo(() => data ?? [], [data]);
@@ -72,16 +66,41 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   const noExercito = minhasEntregas.filter((e) => e.etapa === 'CONTROLADO');
   const entregasCarregando = entregasConsulta.isLoading;
 
-  const comVoce: Array<{ chave: string; titulo: string; detalhe: string; acao: string; onAcao: () => void }> = [];
+  // "Com você": só as decisões do coordenador.
+  const comVoce: ItemComVoce[] = [];
   if (coordenador && aDefinir.length > 0) {
     comVoce.push({ chave: 'definir', titulo: `Definir quem fiscaliza ${aDefinir.length} ${aDefinir.length === 1 ? 'contrato' : 'contratos'} de emenda`, detalhe: `Chegaram do Contratos.gov.br sem decisão. A sugestão é a ${NOME_SFC}.`, acao: 'Distribuir', onAcao: () => navigate('/fiscalizacao/distribuicao') });
   }
-  if (fiscal || coordenador) {
-    aAutuar
-      .filter((p: PendenciaFiscalizacao) => coordenador || ehDoFiscal(p.contrato, user?.id))
-      .forEach((p) => comVoce.push({ chave: p.chave, titulo: `Autuar o processo de fiscalização do contrato ${numeroDoContrato(p.contrato)}`, detalhe: `${p.contrato.fornecedor ?? ''}${p.contrato.fiscalNome ? ` · fiscal ${p.contrato.fiscalNome}` : ''}`, acao: 'Registrar', onAcao: () => setAutuando(p.contrato) }));
+  if (coordenador) {
+    const hoje = hojeEmBrasilia();
+    (transferencias.data ?? [])
+      .filter((t) => t.retornoPrevisto <= hoje)
+      .forEach((t) => comVoce.push({ chave: `retorno-${t.id}`, titulo: `Devolver os contratos de ${t.ausenteNome}`, detalhe: `Retorno previsto em ${dataBR(t.retornoPrevisto)}; os contratos estão com ${t.destinoNome}.`, acao: 'Desfazer', onAcao: () => navigate('/fiscalizacao/distribuicao?segmento=EQUIPE') }));
   }
-  const visiveis = todas ? comVoce : comVoce.slice(0, LIMITE);
+
+  // Sem escolha, abre na primeira aba com algo pendente.
+  const segmento: Segmento = segmentoEscolhido ?? (aAutuar.length ? 'AUTUAR' : semPortaria.length ? 'PORTARIA' : 'TODAS');
+  // Pendências: contratos do escopo com o que falta (processo a autuar, portaria); "Todas" lista todos os contratos.
+  const contaSeg = (sg: Segmento) => (sg === 'TODAS' ? daSfc.length : sg === 'AUTUAR' ? aAutuar.length : semPortaria.length);
+  const doSegmento = useMemo(
+    () => (segmento === 'TODAS' ? daSfc : daSfc.filter((c) => pendenciasDoContrato(c).some((p) => p.tipo === segmento))),
+    [daSfc, segmento]
+  );
+  const filtrados = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    return doSegmento.filter(
+      (c) =>
+        (!q || `${numeroDoContrato(c)} ${c.fornecedor ?? ''} ${c.emendas.join(' ')} ${c.fiscalNome ?? ''}`.toLowerCase().includes(q)) &&
+        (!filtroFiscal || c.fiscalUserId === filtroFiscal || c.substitutoUserId === filtroFiscal)
+    );
+  }, [doSegmento, busca, filtroFiscal]);
+  const filtrosAtivos = Boolean(busca || filtroFiscal);
+  const { currentPage, setPage, pageItems } = useCarteiraPagination(filtrados, (c: ContratoFiscalizacao) => c.contractKey, POR_PAGINA);
+  const podeAutuar = (c: ContratoFiscalizacao) => !c.processoSei && (coordenador || (fiscal && ehDoFiscal(c, user?.id)));
+  const irPara = (sg: Segmento) => {
+    setSegmento(sg);
+    document.getElementById('fisc-inicio-pendencias')?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -110,7 +129,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
                 { rotulo: 'Processo a autuar', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined },
                 { rotulo: 'Sem portaria registrada', valor: String(semPortaria.length), tom: semPortaria.length ? 'warning' : undefined }
               ]}
-              onClick={() => document.getElementById('fisc-inicio-contratos')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => irPara(aAutuar.length ? 'AUTUAR' : semPortaria.length ? 'PORTARIA' : 'TODAS')}
               testId="fisc-cartao-contratos"
             />
             <PainelCartao
@@ -150,29 +169,53 @@ export const FiscalizacaoInicioPage: React.FC = () => {
             )}
           </PainelCartoes>
 
-          {(fiscal || coordenador) && (
-            <section style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }} id="fisc-inicio-com-voce" data-testid="fisc-com-voce">
-              <CarteiraDetailLabel>Com você{comVoce.length ? ` · ${comVoce.length}` : ''}</CarteiraDetailLabel>
-              <div style={{ ...lista, borderLeft: '4px solid var(--primary)' }}>
-                <div style={{ marginTop: '-1px' }}>
-                  {comVoce.length === 0 ? (
-                    <div style={{ ...linhaDaLista, gridTemplateColumns: '1fr' }}><span style={{ fontWeight: 600 }}>Nada com você agora.</span></div>
-                  ) : (
-                    visiveis.map((l) => <LinhaComVoce key={l.chave} titulo={l.titulo} detalhe={l.detalhe} acao={l.acao} onAcao={l.onAcao} testId={`fisc-com-voce-${l.chave}`} />)
-                  )}
-                  {!todas && comVoce.length > LIMITE && (
-                    <div style={{ padding: '0.5rem 0.75rem', borderTop: '1px solid var(--border)' }}>
-                      <AppButton size="xs" variant="link" onClick={() => setTodas(true)}>e mais {comVoce.length - LIMITE}</AppButton>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-          )}
+          {coordenador && <ComVoce itens={comVoce} testId="fisc-com-voce" />}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }} id="fisc-inicio-contratos">
-            <SectionHeader title={fiscal ? 'Meus contratos' : `Contratos com a ${NOME_SFC}`} subtitle="A linha abre o Contrato 360 na aba Fiscalização" />
-            <ContratosFiscalizacaoTabela contratos={daSfc} testId="fisc-inicio-tabela" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} id="fisc-inicio-pendencias">
+            <SectionHeader title="Pendências da fiscalização" subtitle={fiscal ? 'O que falta nos contratos que você fiscaliza. A linha abre o Contrato 360.' : `O que falta nos contratos com a ${NOME_SFC}. A linha abre o Contrato 360.`} />
+            <CarteiraSegmentTabs<Segmento>
+              testIdPrefix="fisc-inicio"
+              ariaLabel="Pendências da fiscalização"
+              active={segmento}
+              onSelect={setSegmento}
+              segments={[
+                { id: 'AUTUAR', label: 'A autuar', count: contaSeg('AUTUAR'), dot: aAutuar.length ? 'var(--color-warning-solid)' : undefined },
+                { id: 'PORTARIA', label: 'Sem portaria', count: contaSeg('PORTARIA'), dot: semPortaria.length ? 'var(--color-warning-solid)' : undefined },
+                { id: 'TODAS', label: fiscal ? 'Meus contratos' : 'Todos os contratos', count: contaSeg('TODAS') }
+              ]}
+            />
+            <CarteiraFilterBar
+              busca={busca}
+              searchPlaceholder="Buscar por contrato, fornecedor, emenda ou fiscal..."
+              onChangeBusca={setBusca}
+              hasActiveFilters={filtrosAtivos}
+              onResetFilters={() => { setBusca(''); setFiltroFiscal(''); }}
+              counter={carteiraCounter(filtrados.length, doSegmento.length, filtrosAtivos, 'contrato', 'contratos')}
+              testIdPrefix="fisc-inicio"
+            >
+              {!fiscal && (
+                <CarteiraFilterButton label="Fiscal" value={filtroFiscal} emptyValue="" options={fiscais.map((f) => ({ value: f.id, label: f.nome, count: doSegmento.filter((c) => c.fiscalUserId === f.id || c.substitutoUserId === f.id).length }))} onChange={setFiltroFiscal} testId="fisc-inicio-filtro-fiscal" />
+              )}
+            </CarteiraFilterBar>
+            <AdminListShell
+              testId="fisc-inicio-lista"
+              isLoading={false}
+              isError={false}
+              isEmpty={filtrados.length === 0}
+              emptyTitle={filtrosAtivos ? 'Nenhum contrato atende à busca.' : segmento === 'TODAS' ? 'Nenhum contrato com a SFC/CGLIC.' : 'Nada pendente aqui.'}
+              emptyDescription={filtrosAtivos ? 'Ajuste a busca ou o filtro.' : segmento === 'TODAS' ? 'Os contratos aparecem quando o coordenador decide a fiscalização.' : 'Escolha outra aba para ver os demais contratos.'}
+            >
+              <ContratosFiscalizacaoTabela
+                contratos={pageItems}
+                testId="fisc-inicio-tabela"
+                rowActions={(c) =>
+                  podeAutuar(c) ? (
+                    <AppButton variant="outline" size="sm" onClick={() => setAutuando(c)} data-testid={`fisc-inicio-autuar-${c.contractKey}`}>Registrar</AppButton>
+                  ) : null
+                }
+              />
+              <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={filtrados.length} onChange={setPage} testIdPrefix="fisc-inicio" />
+            </AdminListShell>
           </div>
         </div>
       )}

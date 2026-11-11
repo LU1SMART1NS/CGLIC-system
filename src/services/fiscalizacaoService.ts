@@ -243,3 +243,90 @@ export async function definirResponsavelEntregas(input: { ids: string[]; respons
   const { error } = await cliente().rpc('definir_responsavel_entregas', { p_ids: input.ids, p_responsavel: input.responsavel, p_motivo: input.motivo.trim() });
   if (error) throw mapPostgresErrorToAppError(error);
 }
+
+// ---- Transferência dos contratos de um fiscal (migration 261) -------------------------------------------------------
+
+/** Ausência de fiscal (férias, licença…): contratos com quem assumiu até o retorno. */
+export interface TransferenciaFiscal {
+  id: string;
+  ausenteUserId: string;
+  ausenteNome: string;
+  destinoUserId: string;
+  destinoNome: string;
+  motivo: 'FERIAS' | 'LICENCA' | 'AFASTAMENTO' | 'OUTRO';
+  /** AAAA-MM-DD. */
+  inicio: string;
+  retornoPrevisto: string;
+  seiNumero: string | null;
+  desfeitaEm: string | null;
+  /** Contratos que foram com quem assumiu. */
+  contratos: number;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export function linhaParaTransferenciaFiscal(r: any): TransferenciaFiscal {
+  return {
+    id: r.id,
+    ausenteUserId: r.ausente_user_id,
+    ausenteNome: r.ausente_nome,
+    destinoUserId: r.destino_user_id,
+    destinoNome: r.destino_nome,
+    motivo: r.motivo,
+    inicio: r.inicio,
+    retornoPrevisto: r.retorno_previsto,
+    seiNumero: r.sei_numero || null,
+    desfeitaEm: r.desfeita_em || null,
+    contratos: Array.isArray(r.fisc_transferencias_temporarias_itens) ? r.fisc_transferencias_temporarias_itens[0]?.count ?? 0 : 0
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/** Ausências em curso (as desfeitas não pesam na tela). Sem a tabela (migration 261 ainda não aplicada), vazio. */
+export async function fetchTransferenciasFiscal(): Promise<TransferenciaFiscal[]> {
+  const { data, error } = await cliente()
+    .from('fisc_transferencias_temporarias')
+    .select('id, ausente_user_id, ausente_nome, destino_user_id, destino_nome, motivo, inicio, retorno_previsto, sei_numero, desfeita_em, fisc_transferencias_temporarias_itens(count)')
+    .is('desfeita_em', null)
+    .order('retorno_previsto', { ascending: true });
+  if (error) {
+    if (error.code === '42P01' || error.code === 'PGRST205') return [];
+    throw mapPostgresErrorToAppError(error);
+  }
+  return ((data || []) as unknown[]).map(linhaParaTransferenciaFiscal);
+}
+
+export async function transferirContratosFiscal(input: { origemUserId: string; destinoUserId: string }): Promise<{ fiscal: number; substituto: number }> {
+  const { data, error } = await cliente().rpc('transferir_contratos_fiscal', { p_origem_user_id: input.origemUserId, p_destino_user_id: input.destinoUserId });
+  if (error) throw mapPostgresErrorToAppError(error);
+  const r = (data ?? {}) as { fiscal?: number; substituto?: number };
+  return { fiscal: r.fiscal ?? 0, substituto: r.substituto ?? 0 };
+}
+
+export interface TransferirFiscalTemporariaInput {
+  ausenteUserId: string;
+  destinoUserId: string;
+  motivo: TransferenciaFiscal['motivo'];
+  inicio: string;
+  retornoPrevisto: string;
+  seiNumero: string | null;
+}
+
+export async function transferirContratosFiscalTemporaria(input: TransferirFiscalTemporariaInput): Promise<{ contratos: number }> {
+  const { data, error } = await cliente().rpc('transferir_contratos_fiscal_temporaria', {
+    p_ausente_user_id: input.ausenteUserId,
+    p_destino_user_id: input.destinoUserId,
+    p_motivo: input.motivo,
+    p_inicio: input.inicio,
+    p_retorno_previsto: input.retornoPrevisto,
+    p_sei_numero: input.seiNumero
+  });
+  if (error) throw mapPostgresErrorToAppError(error);
+  return { contratos: ((data ?? {}) as { contratos?: number }).contratos ?? 0 };
+}
+
+export async function desfazerTransferenciaFiscal(id: string): Promise<{ devolvidos: number; ficaram: number }> {
+  const { data, error } = await cliente().rpc('desfazer_transferencia_fiscal', { p_id: id });
+  if (error) throw mapPostgresErrorToAppError(error);
+  const r = (data ?? {}) as { devolvidos?: number; ficaram?: number };
+  return { devolvidos: r.devolvidos ?? 0, ficaram: r.ficaram ?? 0 };
+}

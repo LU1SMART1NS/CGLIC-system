@@ -247,8 +247,10 @@ export const EmendasInicioPage: React.FC = () => {
   // ---- Cartões (desenho do Painel): número grande e até três linhas rótulo/valor ----------------------------------
   const valor = (n: number) => (carregando ? '—' : formatNumber(n));
   const gravesPorTipo = TIPOS_AVISO.filter((t) => avisoGrave({ tipo: t }) && r.porTipo[t] > 0);
-  const linhasGraves: PainelCartaoLinha[] = gravesPorTipo.slice(0, 3).map((t) => ({ rotulo: ROTULO_AVISO[t], valor: formatNumber(r.porTipo[t]), tom: 'danger' }));
-  const outrosGraves = gravesPorTipo.slice(3).reduce((s, t) => s + r.porTipo[t], 0);
+  // Três linhas no máximo, como nos outros Painéis: com mais de três tipos, dois e "Outros avisos vermelhos".
+  const cabem = gravesPorTipo.length > 3 ? 2 : 3;
+  const linhasGraves: PainelCartaoLinha[] = gravesPorTipo.slice(0, cabem).map((t) => ({ rotulo: ROTULO_AVISO[t], valor: formatNumber(r.porTipo[t]), tom: 'danger' }));
+  const outrosGraves = gravesPorTipo.slice(cabem).reduce((s, t) => s + r.porTipo[t], 0);
   if (outrosGraves > 0) linhasGraves.push({ rotulo: 'Outros avisos vermelhos', valor: formatNumber(outrosGraves), tom: 'danger' });
   const porFase = (etapas: readonly EtapaPedido[]) => etapas.filter((e) => !jaEmpenhado(e)).reduce((s, e) => s + (r.porEtapa[e] ?? 0), 0);
   const linhasAntes: PainelCartaoLinha[] = FASES_PEDIDO.filter((f) => f.etapas.some((e) => !jaEmpenhado(e))).map((f) => ({ rotulo: f.nome, valor: formatNumber(porFase(f.etapas)) }));

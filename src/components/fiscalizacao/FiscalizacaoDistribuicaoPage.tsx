@@ -12,7 +12,7 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { colors } from '../../design-system/tokens';
-import { useContratosFiscalizacao, useFiscaisAtivos } from '../../hooks/useFiscalizacao';
+import { useContratosFiscalizacao, useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, cargaPorFiscal, deEmenda, numeroDoContrato, segmentoDoContrato, type SegmentoDistribuicao } from '../../utils/fiscalizacao';
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
@@ -33,6 +33,7 @@ const ABAS: Aba[] = ['EQUIPE', 'A_DEFINIR', 'SFC', 'MISTA', 'AREA', 'TODOS'];
 export const FiscalizacaoDistribuicaoPage: React.FC = () => {
   const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useContratosFiscalizacao();
   const { fiscais } = useFiscaisAtivos();
+  const transferencias = useTransferenciasFiscalizacao();
   const [params, setParams] = useSearchParams();
   const contratos = useMemo(() => data ?? [], [data]);
   const aDefinir = contratos.filter((c) => segmentoDoContrato(c) === 'A_DEFINIR').length;
@@ -87,7 +88,7 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
         ]}
       />
       {aba === 'EQUIPE' ? (
-        <FiscaisEquipe carga={carga} contratos={contratos} />
+        <FiscaisEquipe carga={carga} contratos={contratos} transferencias={transferencias.data ?? []} />
       ) : (
       <>
       <CarteiraFilterBar
