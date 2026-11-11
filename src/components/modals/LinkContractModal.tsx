@@ -250,7 +250,7 @@ const LinkContractModalAberto: React.FC<LinkContractModalProps> = ({
         gestorUserId: ataManagers?.[chaveGestao]?.gestorUserId ?? null
       });
     } catch (err: any) {
-      toast.error(`Contrato vinculado, mas o gestor não foi trocado: ${err?.message || 'erro desconhecido'}. Troque na Central de Distribuição.`);
+      toast.error(`Contrato vinculado, mas o gestor não foi trocado: ${err?.message || 'erro desconhecido'}. Troque em Início › Distribuição.`);
     }
   };
 
@@ -498,7 +498,7 @@ const LinkContractModalAberto: React.FC<LinkContractModalProps> = ({
                           )}
                           {descartadoParaEstaAta && (
                             <span
-                              title="O coordenador descartou esta ata para o contrato na Central de Distribuição. Se vincular, o descarte é desfeito."
+                              title="O coordenador descartou esta ata para o contrato em Início › Distribuição. Se vincular, o descarte é desfeito."
                               style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}
                             >
                               Descartado para esta ata

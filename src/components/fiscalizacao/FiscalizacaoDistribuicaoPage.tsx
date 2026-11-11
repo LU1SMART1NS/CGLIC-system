@@ -4,28 +4,29 @@ import { UsersRound } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
-import { SectionHeader } from '../../design-system/components/SectionHeader';
-import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { AppButton } from '../../design-system/components/AppButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
-import { carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { colors } from '../../design-system/tokens';
 import { useContratosFiscalizacao, useFiscaisAtivos } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, cargaPorFiscal, deEmenda, numeroDoContrato, segmentoDoContrato, type CargaDoFiscal, type SegmentoDistribuicao } from '../../utils/fiscalizacao';
+import { NOME_SFC, cargaPorFiscal, deEmenda, numeroDoContrato, segmentoDoContrato, type SegmentoDistribuicao } from '../../utils/fiscalizacao';
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
 import { DefinirFiscalizacaoModal } from './FiscalizacaoModais';
+import { FiscaisEquipe } from './FiscaisEquipe';
 
 const POR_PAGINA = 25;
-const SEGMENTOS: SegmentoDistribuicao[] = ['A_DEFINIR', 'SFC', 'MISTA', 'AREA', 'TODOS'];
+/** Abas no desenho da Distribuição de Atas e Contratos: primeiro a Equipe, depois as filas de contratos. */
+type Aba = 'EQUIPE' | SegmentoDistribuicao;
+const ABAS: Aba[] = ['EQUIPE', 'A_DEFINIR', 'SFC', 'MISTA', 'AREA', 'TODOS'];
 
 /**
  * Início › Fiscalização › Distribuição (só o coordenador): quem fiscaliza cada contrato vigente e o fiscal da SFC/CGLIC.
+ * A aba Equipe vem primeiro, como em Atas e Contratos; a página abre em "A definir" enquanto houver contrato a definir.
  * Contrato de emenda chega "A definir" (sugestão SFC/CGLIC); sem emenda fica com a área requisitante até o coordenador
  * decidir o contrário (migration 259).
  */
@@ -33,12 +34,15 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
   const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useContratosFiscalizacao();
   const { fiscais } = useFiscaisAtivos();
   const [params, setParams] = useSearchParams();
-  const seg = (SEGMENTOS as string[]).includes(params.get('segmento') ?? '') ? (params.get('segmento') as SegmentoDistribuicao) : 'A_DEFINIR';
+  const contratos = useMemo(() => data ?? [], [data]);
+  const aDefinir = contratos.filter((c) => segmentoDoContrato(c) === 'A_DEFINIR').length;
+  const pedida = params.get('segmento') ?? '';
+  const aba: Aba = (ABAS as string[]).includes(pedida) ? (pedida as Aba) : isLoading || aDefinir > 0 ? 'A_DEFINIR' : 'EQUIPE';
+  const seg: SegmentoDistribuicao = aba === 'EQUIPE' ? 'TODOS' : aba;
   const [busca, setBusca] = useState('');
   const [fiscal, setFiscal] = useState('');
   const [origem, setOrigem] = useState('');
   const [editando, setEditando] = useState<ContratoFiscalizacao | null>(null);
-  const contratos = useMemo(() => data ?? [], [data]);
 
   const conta = (s: SegmentoDistribuicao) => contratos.filter((c) => s === 'TODOS' || segmentoDoContrato(c) === s).length;
   const doSeg = useMemo(() => contratos.filter((c) => seg === 'TODOS' || segmentoDoContrato(c) === seg), [contratos, seg]);
@@ -58,12 +62,6 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
   const { currentPage, setPage, pageItems } = useCarteiraPagination(filtrados, chave, POR_PAGINA);
   const carga = useMemo(() => cargaPorFiscal(contratos, fiscais), [contratos, fiscais]);
 
-  const colunasCarga: Column<CargaDoFiscal>[] = [
-    { key: 'nome', header: 'Fiscal', render: (f) => <span style={carteiraValor}>{f.nome}</span> },
-    { key: 'contratos', header: 'Contratos', align: 'right', render: (f) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{f.contratos}</span> },
-    { key: 'substituto', header: 'Como substituto', align: 'right', render: (f) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{f.comoSubstituto}</span> },
-    { key: 'autuar', header: 'A autuar', align: 'right', render: (f) => <span style={{ ...carteiraValor, ...carteiraNumero, color: f.aAutuar ? 'var(--color-warning-text)' : undefined }}>{f.aAutuar}</span> }
-  ];
 
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -74,12 +72,13 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
         icon={<UsersRound size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="fisc-dist-atualizar" tooltipTitle="Recarregar os contratos" />}
       />
-      <CarteiraSegmentTabs<SegmentoDistribuicao>
+      <CarteiraSegmentTabs<Aba>
         testIdPrefix="fisc-dist"
-        ariaLabel="Quem fiscaliza"
-        active={seg}
-        onSelect={(s) => setParams(s === 'A_DEFINIR' ? {} : { segmento: s }, { replace: true })}
+        ariaLabel="Equipe e quem fiscaliza"
+        active={aba}
+        onSelect={(s) => setParams({ segmento: s }, { replace: true })}
         segments={[
+          { id: 'EQUIPE', label: 'Equipe', count: carga.length, title: 'Carga de cada fiscal' },
           { id: 'A_DEFINIR', label: 'A definir', count: conta('A_DEFINIR'), dot: 'var(--color-warning-solid)' },
           { id: 'SFC', label: NOME_SFC, count: conta('SFC'), dot: 'var(--primary)' },
           { id: 'MISTA', label: 'Mista', count: conta('MISTA'), dot: colors.semantic.purple.solid },
@@ -87,6 +86,10 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
           { id: 'TODOS', label: 'Todos', count: conta('TODOS') }
         ]}
       />
+      {aba === 'EQUIPE' ? (
+        <FiscaisEquipe carga={carga} contratos={contratos} />
+      ) : (
+      <>
       <CarteiraFilterBar
         busca={busca}
         searchPlaceholder="Buscar por contrato, fornecedor, emenda ou fiscal..."
@@ -121,10 +124,8 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
         />
         <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={filtrados.length} onChange={setPage} testIdPrefix="fisc-dist" />
       </AdminListShell>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-        <SectionHeader title="Carga por fiscal" subtitle={`Servidores ativos com o perfil Gestor de Fiscalização`} />
-        <DataTable<CargaDoFiscal> testId="fisc-carga" className="data-table-container--flush" data={carga} keyExtractor={(f) => f.userId} columns={colunasCarga} emptyMessage="Nenhum servidor com o perfil Gestor de Fiscalização." />
-      </div>
+      </>
+      )}
       {editando && <DefinirFiscalizacaoModal key={editando.contractKey} contrato={editando} onClose={() => setEditando(null)} />}
     </PageContainer>
   );

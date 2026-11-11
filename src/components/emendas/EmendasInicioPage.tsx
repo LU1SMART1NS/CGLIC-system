@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import { AlertTriangle, Boxes, Check, ClipboardList, LayoutDashboard } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
@@ -104,8 +103,7 @@ const plural = (n: number, um: string, varios: string) => `${formatNumber(n)} ${
 export const EmendasInicioPage: React.FC = () => {
   // Com origem: o Pedido 360 volta para o Início com a gaveta aberta (?gaveta=).
   const navigate = useNavigateWithOrigin();
-  // Para o gestor de emendas esta é o Início; o coordenador a abre na aba Emendas do Início dele.
-  const { role } = useAuth();
+  // Título "Início" para todos: o gestor de emendas a tem como Início; o coordenador e a consulta, em Início › Emendas › Painel.
   const { data: pedidos = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = usePedidosEmendas();
   const { data: notas = SEM_NOTAS, refetch: recarregarNotas } = useNotasDasLinhas();
   const { data: itensLista = [], isLoading: carregandoItens, refetch: recarregarItens } = useItensCaep();
@@ -504,7 +502,7 @@ export const EmendasInicioPage: React.FC = () => {
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
-        title={role === 'gestor_emendas' ? 'Início' : 'Emendas'}
+        title="Início"
         subtitle="Pedidos dos parlamentares e saldo da CAEP que pedem atenção."
         hint={`Os avisos são os mesmos da lista de Pedidos, do mais urgente ao menos urgente. Os prazos de indicação (${avisoIndicacaoDias()} e ${corteIndicacaoDias()} dias antes do fim da ata) ficam em Ajustes › Regras de Alertas.`}
         icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}

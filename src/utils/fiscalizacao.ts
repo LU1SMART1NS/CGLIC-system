@@ -66,9 +66,11 @@ export interface CargaDoFiscal {
   contratos: number;
   comoSubstituto: number;
   aAutuar: number;
+  /** Contratos do fiscal (titular) sem portaria registrada. */
+  semPortaria: number;
 }
 
-/** Contratos por fiscal (titular), com os que ele substitui e os que faltam autuar. */
+/** Contratos por fiscal (titular), com os que ele substitui, os que faltam autuar e os sem portaria. */
 export function cargaPorFiscal(contratos: ContratoFiscalizacao[], fiscais: Array<{ id: string; nome: string }>): CargaDoFiscal[] {
   return fiscais
     .map((f) => {
@@ -78,7 +80,8 @@ export function cargaPorFiscal(contratos: ContratoFiscalizacao[], fiscais: Array
         nome: f.nome,
         contratos: titular.length,
         comoSubstituto: contratos.filter((c) => comSfc(c) && c.substitutoUserId === f.id).length,
-        aAutuar: titular.filter((c) => !c.processoSei).length
+        aAutuar: titular.filter((c) => !c.processoSei).length,
+        semPortaria: titular.filter((c) => !c.portariaSei).length
       };
     })
     .sort((a, b) => b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));

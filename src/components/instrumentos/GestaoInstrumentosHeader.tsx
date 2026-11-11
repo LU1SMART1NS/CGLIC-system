@@ -19,6 +19,7 @@ export const GestaoInstrumentosHeader: React.FC<GestaoInstrumentosHeaderProps> =
     <PageHeader
       title="Início"
       subtitle="Resumo da carteira de atas e contratos e o que exige sua atenção."
+      hint="Os cartões contam a carteira no filtro de UASG e gestor. As pendências juntam saldos, reajustes, pagamentos, tarefas e lembretes, da mais urgente à menos urgente; os prazos ficam em Ajustes › Regras de Alertas."
       icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
       actions={
         <HeaderRefreshAction

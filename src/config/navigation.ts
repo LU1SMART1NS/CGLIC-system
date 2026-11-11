@@ -55,6 +55,11 @@ export interface NavItem {
    * filtro — ver `filterNavigationByRole`.
    */
   allowedRoles?: AppRole[];
+  /**
+   * Área com grupos: mostra a segunda linha (páginas do grupo) mesmo quando o grupo tem uma página só. No Início, todo
+   * grupo tem "Painel" embaixo, para as telas terem o mesmo desenho (decisão de 11/11/2026).
+   */
+  segundaLinhaSempre?: boolean;
   /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Ajustes → Gestão · Emendas · Acesso). */
   group?: string;
   /** Número ao lado da aba (ex.: Atas › A montar mostra quantas atas faltam montar). */
@@ -88,6 +93,7 @@ export const navigationConfig: NavItem[] = [
     label: 'Início',
     icon: LayoutDashboard,
     status: 'active',
+    segundaLinhaSempre: true,
     children: [
       {
         id: 'gestao-instrumentos',
@@ -127,8 +133,8 @@ export const navigationConfig: NavItem[] = [
         // O coordenador vê o mesmo resumo das emendas numa aba do Início dele (decisão de 23/10/2026); a consulta
         // também, só leitura, porque já lê Pedidos e Itens (decisão de 25/10/2026).
         id: 'emendas-inicio-coordenador',
-        label: 'Emendas',
-        icon: ScrollText,
+        label: 'Painel',
+        icon: LayoutDashboard,
         route: '/emendas/inicio',
         status: 'active',
         matchPrefixes: ['/emendas/inicio'],
@@ -149,7 +155,7 @@ export const navigationConfig: NavItem[] = [
       {
         id: 'fiscalizacao-inicio-coordenador',
         label: 'Painel',
-        icon: ClipboardCheck,
+        icon: LayoutDashboard,
         route: '/fiscalizacao/inicio',
         status: 'active',
         matchPrefixes: ['/fiscalizacao/inicio'],
@@ -550,7 +556,7 @@ const staticRouteLabels: Record<string, string> = {
   '/atas': 'Carteira de Atas',
   '/atas/montar': 'Atas a montar',
   '/itens': 'Carteira de Itens',
-  '/atas/distribuicao': 'Central de Distribuição',
+  '/atas/distribuicao': 'Distribuição',
   '/contratos': 'Carteira de Contratos',
   '/configuracoes/modelos': 'Modelos de Gestão',
   '/pagamentos': 'Pagamentos',
@@ -573,7 +579,7 @@ export function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
   if (pathname === '/atas/distribuicao') {
     return [
       { label: 'Início', route: '/instrumentos' },
-      { label: 'Central de Distribuição', route: '/atas/distribuicao' }
+      { label: 'Distribuição', route: '/atas/distribuicao' }
     ];
   }
 

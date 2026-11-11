@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { Users } from 'lucide-react';
+import { UsersRound } from 'lucide-react';
 import { ContractsPartialNotice } from '../../carteira/ContractsPartialNotice';
 import { CarteiraSegmentTabs } from '../../carteira/CarteiraSegmentTabs';
 import { PageContainer } from '../../../design-system/components/PageContainer';
@@ -97,7 +97,7 @@ export const DistribuicaoEquipePage: React.FC = () => {
     return (
       <PageContainer style={{ padding: '2rem 0' }}>
         <ErrorState
-          title="Erro ao carregar a central de distribuição"
+          title="Erro ao carregar a distribuição"
           message={contratos.error.message || 'Não foi possível carregar atas e contratos.'}
           onRetry={refresh}
         />
@@ -167,9 +167,10 @@ export const DistribuicaoEquipePage: React.FC = () => {
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
-        title="Central de Distribuição"
-        subtitle="Quem cuida de cada ata e contrato vigente. Contratos vinculados a uma ata seguem o gestor da ata."
-        icon={<Users size={26} color="var(--primary)" aria-hidden="true" />}
+        title="Distribuição"
+        subtitle="O coordenador decide quem cuida de cada ata e contrato vigente."
+        hint="Contratos vinculados a uma ata seguem o gestor da ata. A Equipe mostra a carga de cada gestor ajustada ao nível dele; as outras abas são as filas do que ainda não tem gestor."
+        icon={<UsersRound size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <HeaderRefreshAction
             onRefresh={contratos.podeForcarAtualizacao ? refresh : undefined}
