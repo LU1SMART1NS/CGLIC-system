@@ -33,7 +33,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/instrumentos/GestaoInstrumentosCategoryTabs.tsx': 1, // abas
   'src/components/instrumentos/GavetaDistribuicao.tsx': 3, // cartão clicável de cada gestor e os dois lados (Atas, Contratos) do "Sem gestor"
   'src/components/instrumentos/GavetaSituacao.tsx': 1, // trecho clicável da barra de faixas
-  'src/components/instrumentos/GestaoInstrumentosDockStrip.tsx': 3, // nome que volta ao topo, números-filtro e botões das áreas (faixa encolhida)
+  'src/components/instrumentos/PainelFaixa.tsx': 3, // faixa azul comum dos Painéis: nome que volta ao topo, números-filtro e botões das áreas
   'src/components/instrumentos/PainelCartao.tsx': 1, // cartão de resumo do Início (filtra a lista ou abre a tela certa)
   'src/components/instrumentos/PainelGavetas.tsx': 1, // botão de área que abre a gaveta (chip com resumo)
   'src/components/gti/InteresseGti.tsx': 1, // botão de gaveta "Interesse por GTI" (mesmo padrão do Início)

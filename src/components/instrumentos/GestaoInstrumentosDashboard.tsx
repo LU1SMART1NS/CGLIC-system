@@ -24,8 +24,7 @@ import { getLookupKey, getInstrumentoInfo, motivoDoEndereco, motivoNoFiltro, typ
 import type { CarteiraFilterOption } from '../carteira/CarteiraFilterButton';
 import { UASGS_CGLIC } from '../../config/unidadesGestoras';
 import { AvisosResolvidosLista, useResolverAviso } from '../avisos/ResolverAviso';
-import { Instrument360DockProvider } from '../instrument360/Instrument360DockProvider';
-import { Instrument360Head } from '../instrument360/Instrument360Head';
+import { PainelComFaixa } from './PainelFaixa';
 import { scrollToDock } from '../instrument360/instrument360Dock';
 import { GestaoInstrumentosDockStrip } from './GestaoInstrumentosDockStrip';
 import { useAllAtaManagers } from '../../hooks/useAtaManagers';
@@ -649,98 +648,83 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           testId="instrumentos-sem-carteira"
         />
       ) : (
-      // Cartões + trilho grudam no alto e encolhem em faixa azul ao rolar (mesmo bloco das telas 360).
-      // A lista tem de ser o irmão seguinte do bloco; o espaço perdido ao encolher volta no fim (--i360-lost).
-      <Instrument360DockProvider>
-        <div style={{ paddingBottom: 'var(--i360-lost, 0px)' }}>
-          <Instrument360Head>
-            <GestaoInstrumentosDockStrip
+      // Cartões + trilho grudam no alto e encolhem em faixa azul ao rolar: moldura comum dos Painéis (PainelComFaixa).
+      <PainelComFaixa
+        dockRef={dockRef}
+        faixa={
+          <GestaoInstrumentosDockStrip
+            counts={summaryCounts}
+            activeCard={activeCard}
+            onSelectCard={selectCardAndDock}
+            saldosOnly={saldosOnly}
+            gestorNome={gestorNome || undefined}
+            gavetas={gavetasDisponiveis}
+            gavetaAberta={gavetaAberta}
+            onToggleGaveta={alternarGaveta}
+          />
+        }
+        topo={
+          <>
+            <GestaoInstrumentosSummaryCards
               counts={summaryCounts}
               activeCard={activeCard}
               onSelectCard={selectCardAndDock}
               saldosOnly={saldosOnly}
-              gestorNome={gestorNome || undefined}
-              gavetas={gavetasDisponiveis}
-              gavetaAberta={gavetaAberta}
-              onToggleGaveta={alternarGaveta}
+              semSaldoDosItens={semAvisosDeSaldo}
             />
-            <div className="i360-fold" ref={dockRef}>
-              <div className="i360-fold-in">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '0.75rem' }}>
-                  <GestaoInstrumentosSummaryCards
-                    counts={summaryCounts}
-                    activeCard={activeCard}
-                    onSelectCard={selectCardAndDock}
-                    saldosOnly={saldosOnly}
-                    semSaldoDosItens={semAvisosDeSaldo}
-                  />
-                  <PainelBotoesGavetas botoes={botoesGavetas} aberta={gavetaAberta} onToggle={alternarGaveta} />
-                  {comVoceVisivel && (
-                    <ComVoce itens={comVoce} testId="instrumentos-com-voce" carregando={extras.atasSemGestor === null || extras.gestorDiferente === null || extras.contratosAta === null} />
-                  )}
-                  <SectionHeader
-                    title="Pendências da carteira"
-                    subtitle="Saldos, reajustes, pagamentos, tarefas e lembretes que exigem sua ação."
-                    className="section-header--flush"
-                    testId="instrumentos-pendencias-header"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {!saldosOnly && (
-              <div className="vg-rail">
-                <GestaoInstrumentosCategoryTabs
-                  counts={tabCounts}
-                  active={activeTab}
-                  onSelect={selectTabAndDock}
-                />
-              </div>
+            <PainelBotoesGavetas botoes={botoesGavetas} aberta={gavetaAberta} onToggle={alternarGaveta} />
+            {comVoceVisivel && (
+              <ComVoce itens={comVoce} testId="instrumentos-com-voce" carregando={extras.atasSemGestor === null || extras.gestorDiferente === null || extras.contratosAta === null} />
             )}
-          </Instrument360Head>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {gaveta}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '0.75rem'
-            }}>
-              <div style={{ flex: '1 1 360px', minWidth: 0 }}>
-                <GestaoInstrumentosCompactFilters
-                  filters={{ severidade, motivo, busca }}
-                  onChangeFilter={handleChangeFilter}
-                  onResetFilters={handleResetFilters}
-                  motivoOptions={motivoOptions}
-                  totalFiltered={filteredItems.length}
-                  totalItems={allItems.length}
-                />
-              </div>
-            </div>
-
-            {isLoading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <SkeletonLoader variant="card" height="96px" />
-                <SkeletonLoader variant="card" height="96px" />
-                <SkeletonLoader variant="card" height="96px" />
-                <SkeletonLoader variant="card" height="96px" />
-              </div>
-            ) : (
-              <GestaoInstrumentosTable
-                items={filteredItems}
-                totalItems={allItems.length}
-                fornecedorByKey={fornecedorByKey}
-                responsavelByContractKey={responsavelByContractKey}
-                onResetFilters={handleResetFilters}
-                onResolver={resolucao.abrir}
-                podeResolverAlvo={resolucao.podeResolverAlvo}
-              />
-            )}
+            <SectionHeader
+              title="Pendências da carteira"
+              subtitle="Saldos, reajustes, pagamentos, tarefas e lembretes que exigem sua ação."
+              className="section-header--flush"
+              testId="instrumentos-pendencias-header"
+            />
+          </>
+        }
+        trilho={saldosOnly ? undefined : <GestaoInstrumentosCategoryTabs counts={tabCounts} active={activeTab} onSelect={selectTabAndDock} />}
+      >
+        {gaveta}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          <div style={{ flex: '1 1 360px', minWidth: 0 }}>
+            <GestaoInstrumentosCompactFilters
+              filters={{ severidade, motivo, busca }}
+              onChangeFilter={handleChangeFilter}
+              onResetFilters={handleResetFilters}
+              motivoOptions={motivoOptions}
+              totalFiltered={filteredItems.length}
+              totalItems={allItems.length}
+            />
           </div>
         </div>
-      </Instrument360DockProvider>
+
+        {isLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <SkeletonLoader variant="card" height="96px" />
+            <SkeletonLoader variant="card" height="96px" />
+            <SkeletonLoader variant="card" height="96px" />
+            <SkeletonLoader variant="card" height="96px" />
+          </div>
+        ) : (
+          <GestaoInstrumentosTable
+            items={filteredItems}
+            totalItems={allItems.length}
+            fornecedorByKey={fornecedorByKey}
+            responsavelByContractKey={responsavelByContractKey}
+            onResetFilters={handleResetFilters}
+            onResolver={resolucao.abrir}
+            podeResolverAlvo={resolucao.podeResolverAlvo}
+          />
+        )}
+      </PainelComFaixa>
       )}
 
       <AvisosResolvidosLista
