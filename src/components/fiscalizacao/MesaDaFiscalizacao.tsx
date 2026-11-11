@@ -100,7 +100,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
         <Campo rotulo="Fiscalização"><StatusBadge label={c.situacao === 'MISTA' ? 'Mista' : NOME_SFC} variant={c.situacao === 'MISTA' ? 'purple' : 'info'} size="sm" dot={false} /></Campo>
         <Campo rotulo="Fiscal">{c.fiscalNome ?? '—'}{c.substitutoNome && <span style={carteiraDetalhe}> · substituto {c.substitutoNome}</span>}</Campo>
         <Campo rotulo="Portaria">{c.portariaSei ? <NumeroSeiEtiqueta numero={c.portariaSei} testId="fisc-mesa-portaria" /> : <span style={carteiraDetalhe}>não registrada</span>}</Campo>
-        <Campo rotulo="Processo">{c.processoSei ? <NumeroSeiEtiqueta numero={c.processoSei} testId="fisc-mesa-processo" /> : <span style={{ color: 'var(--color-warning-text)' }}>a autuar</span>}</Campo>
+        <Campo rotulo="SEI do contrato">{c.processoSei ? <NumeroSeiEtiqueta numero={c.processoSei} testId="fisc-mesa-processo" /> : <span style={{ color: 'var(--color-warning-text)' }}>a autuar</span>}</Campo>
         <Campo rotulo="Origem">{c.emendas.length ? `${c.emendas.length === 1 ? 'Emenda' : 'Emendas'} ${c.emendas.slice(0, 3).join(', ')}${c.emendas.length > 3 ? ` +${c.emendas.length - 3}` : ''}` : 'Sem emenda'}</Campo>
         <span style={{ flex: 1 }} />
         {podeAgir && (
@@ -109,7 +109,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
             testId="fisc-mesa-mais"
             actions={[
               ...(coordenador ? [{ label: 'Alterar quem fiscaliza', onClick: () => setJanela({ tipo: 'quem' }) }] : []),
-              ...(c.processoSei ? [{ label: 'Corrigir o processo', onClick: () => setJanela({ tipo: 'processo' }) }] : [])
+              ...(c.processoSei ? [{ label: 'Corrigir o SEI do contrato', onClick: () => setJanela({ tipo: 'processo' }) }] : [])
             ]}
           />
         )}

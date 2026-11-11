@@ -171,7 +171,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
       <PageHeader
         title="Início"
         subtitle={fiscal ? 'Os contratos que você fiscaliza e o que falta em cada um.' : `Resumo da fiscalização dos contratos pela ${NOME_SFC} e o que exige sua atenção.`}
-        hint={`Contrato de emenda chega "A definir", com sugestão ${NOME_SFC}; o coordenador decide na Distribuição. Depois da decisão, o fiscal autua o processo de fiscalização e registra a portaria. As pendências são do fiscal titular; o substituto só as recebe quando assume numa transferência temporária.`}
+        hint={`Contrato de emenda chega "A definir", com sugestão ${NOME_SFC}; o coordenador decide na Distribuição. Depois da decisão, o fiscal autua (registra o número SEI do contrato) e registra a portaria. As pendências são do fiscal titular; o substituto só as recebe quando assume numa transferência temporária.`}
         icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="fisc-inicio-atualizar" tooltipTitle="Recarregar a fiscalização" />}
       />
@@ -200,7 +200,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               unidade={daSfc.length === 1 ? 'contrato' : 'contratos'}
               linhas={[
                 escopo ? { rotulo: 'Como substituto', valor: String(comoSubstituto) } : { rotulo: 'Fiscalização mista', valor: String(mistas) },
-                { rotulo: 'Processo a autuar', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined },
+                { rotulo: 'A autuar (SEI do contrato)', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined },
                 { rotulo: 'Sem portaria registrada', valor: String(semPortaria.length), tom: semPortaria.length ? 'warning' : undefined }
               ]}
               onClick={() => irPara(aAutuar.length ? 'AUTUAR' : semPortaria.length ? 'PORTARIA' : 'TODAS')}

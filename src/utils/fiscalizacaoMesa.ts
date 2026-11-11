@@ -25,7 +25,7 @@ export function linhasDoContrato(es: EntregaFiscalizacao[], semProcesso: boolean
   const mudar = (rotulo: string, x: EntregaFiscalizacao[]) => ({ rotulo, principal: true, faz: () => abrir('etapa', x) });
   const comVoce: Linha[] = [];
   const comOutros: Linha[] = [];
-  if (semProcesso) comVoce.push({ chave: 'processo', tom: 'eu', titulo: 'Registrar o processo de fiscalização', detalhe: 'Número SEI do processo e data da autuação.', acoes: [{ rotulo: 'Registrar processo', principal: true, faz: processo }] });
+  if (semProcesso) comVoce.push({ chave: 'processo', tom: 'eu', titulo: 'Registrar o SEI do contrato', detalhe: 'Número SEI do contrato e data do contrato: vale para a autuação.', acoes: [{ rotulo: 'Registrar SEI', principal: true, faz: processo }] });
   const vencidos = de((e) => EM_EXECUCAO.has(e.etapa) && prazoDaEntrega(e).tom === 'danger');
   if (vencidos.length) comVoce.push({ chave: 'cobrar', tom: 'vencido', titulo: `Cobrar o fornecedor · ${itens(vencidos.length)} atrasado${vencidos.length === 1 ? "" : "s"}`, detalhe: quem(vencidos), prazo: dataBR(menorData(vencidos)), vencido: true, limite: menorData(vencidos), acoes: [{ rotulo: 'Nova data prevista', faz: () => abrir('prevista', vencidos) }, mudar('Mudar etapa', vencidos)] });
   const ordem = de((e) => e.etapa === 'INFO_ENVIADA');
