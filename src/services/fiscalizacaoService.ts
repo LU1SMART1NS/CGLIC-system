@@ -19,6 +19,8 @@ export interface ContratoFiscalizacao {
   assinatura: string | null;
   vigenciaFim: string | null;
   emendas: string[];
+  /** Atas dos itens do contrato (vínculo contrato → itens da ata). */
+  atas?: string[];
   situacao: SituacaoFiscalizacao;
   motivo: string | null;
   fiscalUserId: string | null;
@@ -138,6 +140,8 @@ export interface EntregaFiscalizacao {
   quantidade: number;
   origem: 'EMENDA' | 'CARGA' | 'MANUAL';
   emenda: string | null;
+  /** Parlamentar que destinou a emenda (do pedido de emenda). */
+  parlamentarNome?: string | null;
   pedidoId: string | null;
   responsavel: ResponsavelEntrega;
   etapa: EtapaEntrega;

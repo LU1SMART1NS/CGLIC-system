@@ -37,7 +37,7 @@ export const MudarEtapaModal: React.FC<{ entregas: EntregaFiscalizacao[]; onClos
     <Modal
       isOpen
       onClose={() => onClose(false)}
-      title={`Mudar a etapa de ${plural(entregas.length, 'entrega', 'entregas')}`}
+      title={`Mudar a etapa de ${plural(entregas.length, 'item', 'itens')}`}
       subtitle={quem(entregas)}
       size="md"
       dismissible={!mudar.isPending}
@@ -55,7 +55,7 @@ export const MudarEtapaModal: React.FC<{ entregas: EntregaFiscalizacao[]; onClos
                 { ids: entregas.map((e) => e.id), etapa, data, documentoSei: def.sei ? sei : null, observacao },
                 {
                   onSuccess: () => {
-                    toast.success(`${plural(entregas.length, 'entrega', 'entregas')} em "${def.nome}"`);
+                    toast.success(`${plural(entregas.length, 'item', 'itens')} em "${def.nome}"`);
                     onClose(true);
                   },
                   onError: (err) => toast.error(`Não foi possível mudar a etapa: ${erroDe(err)}`)
@@ -106,7 +106,7 @@ export const DividirEntregaModal: React.FC<{ entrega: EntregaFiscalizacao; onClo
     <Modal
       isOpen
       onClose={() => onClose(false)}
-      title="Dividir a entrega"
+      title="Entrega parcial"
       subtitle={`${nomeDoItem(entrega)} · ${rotuloDoBeneficiario(entrega).principal} · ${entrega.quantidade.toLocaleString('pt-BR')} unidades`}
       size="sm"
       dismissible={!dividir.isPending}
@@ -122,18 +122,18 @@ export const DividirEntregaModal: React.FC<{ entrega: EntregaFiscalizacao; onClo
             onClick={() =>
               dividir.mutate(
                 { id: entrega.id, quantidade },
-                { onSuccess: () => { toast.success(`Entrega dividida em ${quantidade} e ${entrega.quantidade - quantidade}`); onClose(true); }, onError: (err) => toast.error(`Não foi possível dividir: ${erroDe(err)}`) }
+                { onSuccess: () => { toast.success(`Entrega parcial: ${quantidade} unidades separadas; ${entrega.quantidade - quantidade} seguem a entregar`); onClose(true); }, onError: (err) => toast.error(`Não foi possível dividir: ${erroDe(err)}`) }
               )
             }
           >
-            Dividir
+            Separar
           </AppButton>
         </>
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <AppInput
-          label="Quantidade da nova parte"
+          label="Quantas unidades foram entregues?"
           type="number"
           min={1}
           max={entrega.quantidade - 1}
@@ -143,7 +143,7 @@ export const DividirEntregaModal: React.FC<{ entrega: EntregaFiscalizacao; onClo
           data-testid="fisc-dividir-quantidade"
         />
         <span style={{ ...carteiraDetalhe, marginTop: 0 }}>
-          Ficam {Math.max(0, entrega.quantidade - quantidade).toLocaleString('pt-BR')} na entrega de hoje. A parte nova começa na mesma etapa; depois mude a etapa de cada uma.
+          As {quantidade.toLocaleString('pt-BR')} entregues viram um item à parte, para você mudar a etapa para Entregue. As {Math.max(0, entrega.quantidade - quantidade).toLocaleString('pt-BR')} restantes seguem na etapa de hoje.
         </span>
       </div>
     </Modal>
@@ -159,7 +159,7 @@ export const PrevistaModal: React.FC<{ entregas: EntregaFiscalizacao[]; onClose:
     <Modal
       isOpen
       onClose={() => onClose(false)}
-      title={`Data prevista de ${plural(entregas.length, 'entrega', 'entregas')}`}
+      title={`Data prevista de ${plural(entregas.length, 'item', 'itens')}`}
       subtitle={quem(entregas)}
       size="sm"
       dismissible={!salvar.isPending}
@@ -179,7 +179,7 @@ export const PrevistaModal: React.FC<{ entregas: EntregaFiscalizacao[]; onClose:
         </>
       }
     >
-      <AppDateInput label="Prevista para" value={data} onValueChange={setData} hint="O prazo da entrega conta por esta data; sem ela, a entrega fica sem prazo." />
+      <AppDateInput label="Prevista para" value={data} onValueChange={setData} hint="O prazo do item conta por esta data; sem ela, o item fica sem prazo." />
     </Modal>
   );
 };
@@ -195,7 +195,7 @@ export const ResponsavelModal: React.FC<{ entregas: EntregaFiscalizacao[]; onClo
     <Modal
       isOpen
       onClose={() => onClose(false)}
-      title={`Quem fiscaliza ${entregas.length === 1 ? 'esta entrega' : `estas ${entregas.length} entregas`}`}
+      title={`Quem fiscaliza ${entregas.length === 1 ? 'este item' : `estes ${entregas.length} itens`}`}
       subtitle={quem(entregas)}
       size="md"
       dismissible={!salvar.isPending}
@@ -211,7 +211,7 @@ export const ResponsavelModal: React.FC<{ entregas: EntregaFiscalizacao[]; onClo
             onClick={() =>
               salvar.mutate(
                 { ids: entregas.map((e) => e.id), responsavel, motivo },
-                { onSuccess: () => { toast.success(`${plural(entregas.length, 'entrega', 'entregas')} com ${responsavel === 'SFC' ? `a ${NOME_SFC}` : 'a área requisitante'}`); onClose(true); }, onError: (err) => toast.error(`Não foi possível salvar: ${erroDe(err)}`) }
+                { onSuccess: () => { toast.success(`${plural(entregas.length, 'item', 'itens')} com ${responsavel === 'SFC' ? `a ${NOME_SFC}` : 'a área requisitante'}`); onClose(true); }, onError: (err) => toast.error(`Não foi possível salvar: ${erroDe(err)}`) }
               )
             }
           />
@@ -223,8 +223,8 @@ export const ResponsavelModal: React.FC<{ entregas: EntregaFiscalizacao[]; onClo
           <option value="SFC">{NOME_SFC}</option>
           <option value="AREA">Área requisitante</option>
         </AppSelect>
-        <AppTextarea label="Motivo" value={motivo} onChange={(ev) => setMotivo(ev.target.value)} rows={2} placeholder="ex.: a Força Nacional recebe e fiscaliza as próprias viaturas" hint="Fica no histórico de cada entrega." data-testid="fisc-responsavel-motivo" />
-        <span style={{ ...carteiraDetalhe, marginTop: 0 }}>Para passar só parte de uma entrega, divida a entrega antes.</span>
+        <AppTextarea label="Motivo" value={motivo} onChange={(ev) => setMotivo(ev.target.value)} rows={2} placeholder="ex.: a Força Nacional recebe e fiscaliza as próprias viaturas" hint="Fica no histórico de cada item." data-testid="fisc-responsavel-motivo" />
+        <span style={{ ...carteiraDetalhe, marginTop: 0 }}>Para passar só parte de um item, use Entrega parcial antes.</span>
       </div>
     </Modal>
   );

@@ -369,14 +369,34 @@ export const navigationConfig: NavItem[] = [
     label: 'Fiscalização',
     icon: ClipboardCheck,
     status: 'active',
+    // Abas na ordem decidida em 11/11/2026 (Programas entra quando o cadastro de programas existir); abre em Contratos.
+    entradaId: 'fiscalizacao-contratos',
     children: [
       {
-        id: 'fiscalizacao-entregas',
-        label: 'Entregas',
-        icon: Boxes,
-        route: '/fiscalizacao/entregas',
+        id: 'fiscalizacao-contratos',
+        label: 'Contratos',
+        icon: FileText,
+        route: '/fiscalizacao/contratos',
         status: 'active',
-        matchPrefixes: ['/fiscalizacao/entregas'],
+        matchPrefixes: ['/fiscalizacao/contratos'],
+        allowedRoles: ['admin', 'gestor_fiscalizacao', 'leitor']
+      },
+      {
+        id: 'fiscalizacao-beneficiarios',
+        label: 'Beneficiários',
+        icon: Building2,
+        route: '/fiscalizacao/beneficiarios',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/beneficiarios'],
+        allowedRoles: ['admin', 'gestor_fiscalizacao', 'leitor']
+      },
+      {
+        id: 'fiscalizacao-itens',
+        label: 'Itens',
+        icon: Boxes,
+        route: '/fiscalizacao/itens',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/itens', '/fiscalizacao/entregas'],
         allowedRoles: ['admin', 'gestor_fiscalizacao', 'leitor']
       }
     ]

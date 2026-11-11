@@ -2002,6 +2002,9 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .regua-item-lado { text-align: right; }
 .regua-item { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 0.35rem; }
 .regua-item__passo { white-space: nowrap; }
+@media (max-width: 900px) {
+  .fisc-mesa-item { grid-template-columns: minmax(0, 1fr) !important; }
+}
 @media (max-width: 640px) {
   .regua-item-lado { text-align: left; }
   .regua-item { justify-content: flex-start; }

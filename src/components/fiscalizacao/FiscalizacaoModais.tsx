@@ -87,7 +87,7 @@ export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao
             <AppInput label="Portaria de designação (SEI)" value={portaria} onChange={(ev) => setPortaria(ev.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="ex.: 34152364" hint="Opcional agora; o fiscal vê o que falta no Início dele." error={portariaRuim ? 'Só números, 7 a 10 dígitos.' : undefined} />
           </>
         )}
-        {decisao === 'MISTA' && <NoticeBar tone="info">As entregas do contrato chegam com a {NOME_SFC}. Na próxima etapa do módulo, o fiscal marca as que ficam com a área requisitante.</NoticeBar>}
+        {decisao === 'MISTA' && <NoticeBar tone="info">Os itens do contrato chegam com a {NOME_SFC}. Na próxima etapa do módulo, o fiscal marca as que ficam com a área requisitante.</NoticeBar>}
         {(pedeMotivo || motivo) && (
           <AppTextarea
             label={pedeMotivo ? 'Motivo' : 'Motivo (opcional)'}

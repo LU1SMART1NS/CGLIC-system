@@ -4,11 +4,14 @@ import { StatusBadge, type StatusBadgeVariant } from '../../design-system/compon
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
-import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
+import { carteiraIdentificacao, carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { useMovimentosDaEntrega } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, dataBR } from '../../utils/fiscalizacao';
-import { etapaDef, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
+import { ataEItemDaChave, etapaDef, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
+import { IdentificacaoDoContrato } from './ContratosFiscalizacaoTabela';
+import { NomeComSigla } from '../emendas/emendasPartes';
+import { chaveDeOrdem, ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
 
 const VARIANTE_DA_FASE: Record<FaseEntrega, StatusBadgeVariant> = { PREPARACAO: 'neutral', EXECUCAO: 'info', RECEBIMENTO: 'warning', PAGAMENTO: 'success', FINALIZADO: 'success' };
 const COR_DO_PRAZO = { danger: 'var(--color-danger-text)', warning: 'var(--color-warning-text)', success: 'var(--color-success-text)', neutral: '#64748b' } as const;
@@ -43,13 +46,91 @@ export const CelulaPrazo: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
   );
 };
 
-export const CelulaBeneficiario: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
-  const r = rotuloDoBeneficiario(e);
+/**
+ * Situação do item numa coluna só (etapa + o que importa do prazo), para não haver duas datas que parecem se
+ * contradizer: entregue mostra a data da entrega (e o atraso); a entregar mostra o prazo e a data prevista; sem data
+ * prevista, há quanto tempo está na etapa.
+ */
+/** Etapa numa linha só, para listas apertadas (Item 360 › Emendas): a etiqueta da etapa e, se houver, o atraso. */
+export const EtapaEmLinha: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
+  if (e.responsavel === 'AREA') return <StatusBadge label="Área requisitante" variant="neutral" size="sm" dot={false} />;
+  const d = etapaDef(e.etapa);
+  const p = prazoDaEntrega(e);
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+      <StatusBadge label={d.nome} variant={e.etapa === 'CONTROLADO' ? 'danger' : VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
+      {!e.entregueEm && p.tom === 'danger' && <span style={{ color: COR_DO_PRAZO.danger, fontWeight: 700, fontSize: '0.78rem' }}>{p.texto.toLowerCase()}</span>}
+    </span>
+  );
+};
+
+export const CelulaSituacaoDoItem: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
+  if (e.responsavel === 'AREA') return <CelulaEtapa e={e} />;
+  const d = etapaDef(e.etapa);
+  const p = prazoDaEntrega(e);
+  const dias = (a: string, b: string) => Math.round((Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`)) / 864e5);
+  const atraso = e.entregueEm && e.prevista && e.entregueEm > e.prevista ? dias(e.entregueEm, e.prevista) : 0;
   return (
     <>
-      <span style={carteiraValor}>{r.principal}</span>
-      <div style={carteiraDetalhe}>{[r.detalhe, e.municipio && e.uf ? `${e.municipio}/${e.uf}` : e.uf].filter(Boolean).join(' · ')}</div>
+      <StatusBadge label={d.nome} variant={e.etapa === 'CONTROLADO' ? 'danger' : VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
+      <div style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>
+        {e.entregueEm ? (
+          <>
+            entregue em {dataBR(e.entregueEm)}
+            {atraso > 0 && <span style={{ color: COR_DO_PRAZO.warning }}> · {atraso} {atraso === 1 ? 'dia' : 'dias'} de atraso</span>}
+            {e.pagoEm && <> · pago em {dataBR(e.pagoEm)}</>}
+          </>
+        ) : e.prevista ? (
+          <>
+            <span style={{ color: COR_DO_PRAZO[p.tom], fontWeight: p.tom === 'danger' || p.tom === 'warning' ? 700 : 400 }}>{p.texto}</span> · prevista {dataBR(e.prevista)}
+          </>
+        ) : (
+          <>sem data prevista{e.etapaEm ? ` · nesta etapa desde ${dataBR(e.etapaEm)}` : ''}</>
+        )}
+      </div>
     </>
+  );
+};
+
+/**
+ * Beneficiário como no Pedido 360 (NomeComSigla): nome por extenso com "· SIGLA" ao lado, até duas linhas, e CNPJ e
+ * razão social ao passar o mouse; embaixo, a cidade/UF de entrega. Sem cadastro: o nome da planilha e a etiqueta.
+ */
+export const CelulaBeneficiario: React.FC<{ e: EntregaFiscalizacao; destaque?: boolean }> = ({ e, destaque }) =>
+  e.beneficiarioNome ? (
+    <>
+      <NomeComSigla b={{ nome: e.beneficiarioNome, sigla: e.beneficiarioSigla, razaoSocial: e.beneficiarioRazao } as never} destaque={destaque} />
+      {(e.municipio || e.uf) && <div style={carteiraDetalhe}>{e.municipio && e.uf ? `${e.municipio}/${e.uf}` : e.uf}</div>}
+    </>
+  ) : (
+    <>
+      <span style={destaque ? carteiraIdentificacao : carteiraValor}>{e.beneficiarioTexto ?? 'Beneficiário a informar'}</span>
+      <div style={{ marginTop: '0.2rem' }}><StatusBadge label="Sem cadastro" variant="warning" size="sm" dot={false} /></div>
+    </>
+  );
+
+/**
+ * Item como nos "Itens por ata" do Pedido 360: o número do item em azul com a ata ao lado, e embaixo o nome (nome curto
+ * da CAEP; sem ele, a descrição da ata), com a descrição inteira ao passar o mouse. Item da planilha ainda sem ligação
+ * com a ata mostra o nome escrito na planilha.
+ */
+export const CelulaItem: React.FC<{ e: EntregaFiscalizacao; comOrigem?: boolean }> = ({ e, comOrigem }) => {
+  const k = ataEItemDaChave(e.itemKey);
+  return (
+    <div style={{ minWidth: 0 }} title={e.itemDescricao ?? undefined}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'wrap' }}>
+        {k ? (
+          <>
+            <span style={carteiraIdentificacao}>{k.item}</span>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>· Ata {k.ata}</span>
+          </>
+        ) : (
+          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>da planilha · sem item da ata</span>
+        )}
+      </div>
+      <div style={{ ...carteiraValor, color: '#0f172a' }}>{nomeDoItem(e)}</div>
+      {comOrigem && (e.emenda || e.programaTexto) && <div style={carteiraDetalhe}>{e.emenda ? `Emenda ${e.emenda}` : e.programaTexto}</div>}
+    </div>
   );
 };
 
@@ -87,11 +168,13 @@ export const EntregasTabela: React.FC<{
   entregas: EntregaFiscalizacao[];
   testId: string;
   comContrato?: boolean;
+  /** Na tela do beneficiário, a coluna Beneficiário repetiria o título. */
+  semBeneficiario?: boolean;
   selecao?: { marcadas: ReadonlySet<string>; alternar: (id: string) => void };
   abrir?: (e: EntregaFiscalizacao) => void;
   abertas?: ReadonlySet<string>;
   alternarAberta?: (id: string) => void;
-}> = ({ entregas, testId, comContrato = false, selecao, abrir, abertas, alternarAberta }) => {
+}> = ({ entregas, testId, comContrato = false, semBeneficiario = false, selecao, abrir, abertas, alternarAberta }) => {
   const colunas: Column<EntregaFiscalizacao>[] = [
     ...(selecao
       ? [
@@ -112,28 +195,25 @@ export const EntregasTabela: React.FC<{
           }
         ]
       : []),
+    { key: 'item', header: 'Item', minWidth: '230px', sortValue: (e) => nomeDoItem(e), priority: 'primary', render: (e) => <CelulaItem e={e} comOrigem /> },
+    ...(semBeneficiario ? [] : [{ key: 'beneficiario', header: 'Beneficiário', minWidth: '170px', sortValue: (e: EntregaFiscalizacao) => e.beneficiarioNome ?? e.beneficiarioTexto, render: (e: EntregaFiscalizacao) => <CelulaBeneficiario e={e} /> }]),
     ...(comContrato
       ? [
           {
             key: 'contrato',
             header: 'Contrato',
-            minWidth: '170px',
-            render: (e: EntregaFiscalizacao) => (
-              <>
-                <span style={carteiraIdentificacao}>{e.contratoNumero}</span>
-                <div style={carteiraSubtitle}>{e.fornecedor ?? '—'}</div>
-                {e.fiscalNome && <div style={carteiraDetalhe}>{e.fiscalNome}</div>}
-              </>
-            )
+            minWidth: '200px',
+            sortValue: (e: EntregaFiscalizacao) => chaveDeOrdem(e.contratoNumero),
+            render: (e: EntregaFiscalizacao) => <IdentificacaoDoContrato numero={e.contratoNumero} fornecedor={e.fornecedor} />
           }
         ]
       : []),
-    { key: 'item', header: 'Item', minWidth: '200px', render: (e) => <span style={carteiraValor}>{nomeDoItem(e)}</span> },
-    { key: 'beneficiario', header: 'Beneficiário', minWidth: '170px', render: (e) => <CelulaBeneficiario e={e} /> },
     {
       key: 'quantidade',
       header: 'Qtd.',
       align: 'right',
+      sortValue: (e) => e.quantidade,
+      sortFirstDir: 'desc',
       render: (e) => (
         <>
           <span style={{ ...carteiraValor, ...carteiraNumero }}>{e.quantidade.toLocaleString('pt-BR')}</span>
@@ -141,19 +221,7 @@ export const EntregasTabela: React.FC<{
         </>
       )
     },
-    {
-      key: 'origem',
-      header: 'Origem',
-      render: (e) => (
-        <>
-          {e.emenda ? <span style={carteiraValor}>Emenda {e.emenda}</span> : e.programaTexto ? <span style={carteiraValor}>{e.programaTexto}</span> : <span style={carteiraDetalhe}>Sem emenda</span>}
-          {e.emenda && e.programaTexto && <div style={carteiraDetalhe}>{e.programaTexto}</div>}
-          {e.origem === 'CARGA' && <div style={carteiraDetalhe}>da planilha da {NOME_SFC}</div>}
-        </>
-      )
-    },
-    { key: 'etapa', header: 'Etapa', minWidth: '170px', render: (e) => <CelulaEtapa e={e} /> },
-    { key: 'prazo', header: 'Prazo', render: (e) => <CelulaPrazo e={e} /> }
+    { key: 'etapa', header: 'Etapa', minWidth: '210px', sortValue: (e) => ordemDaSituacao(e), render: (e) => <CelulaSituacaoDoItem e={e} /> }
   ];
   return (
     <DataTable<EntregaFiscalizacao>
@@ -168,7 +236,7 @@ export const EntregasTabela: React.FC<{
       expandedKeys={abertas}
       onToggleExpand={alternarAberta}
       expandLabel={() => 'Histórico'}
-      emptyMessage="Nenhuma entrega."
+      emptyMessage="Nenhum item."
     />
   );
 };

@@ -47,6 +47,9 @@ const AlertRulesRoute = lazyComRecarga(() => import('./routes/AlertRulesRoute').
 const HolidaysRoute = lazyComRecarga(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
 const FiscalizacaoInicioPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoInicioPage').then((m) => ({ default: m.FiscalizacaoInicioPage })));
 const FiscalizacaoEntregasPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoEntregasPage').then((m) => ({ default: m.FiscalizacaoEntregasPage })));
+const FiscalizacaoContratosPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoContratosPage').then((m) => ({ default: m.FiscalizacaoContratosPage })));
+const FiscalizacaoBeneficiariosPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoBeneficiariosPage').then((m) => ({ default: m.FiscalizacaoBeneficiariosPage })));
+const FiscalizacaoBeneficiario360Page = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoBeneficiario360Page').then((m) => ({ default: m.FiscalizacaoBeneficiario360Page })));
 const FiscalizacaoDistribuicaoPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoDistribuicaoPage').then((m) => ({ default: m.FiscalizacaoDistribuicaoPage })));
 const EmendasInicioPage = lazyComRecarga(() => import('./components/emendas/EmendasInicioPage').then((m) => ({ default: m.EmendasInicioPage })));
 const EmendasPedidosPage = lazyComRecarga(() => import('./components/emendas/EmendasPedidosPage').then((m) => ({ default: m.EmendasPedidosPage })));
@@ -60,6 +63,12 @@ const Parlamentar360Page = lazyComRecarga(() => import('./components/emendas/par
 const EmendasListaPage = lazyComRecarga(() => import('./components/emendas/emendas360/EmendasListaPage').then((m) => ({ default: m.EmendasListaPage })));
 const Emenda360Page = lazyComRecarga(() => import('./components/emendas/emendas360/Emenda360Page').then((m) => ({ default: m.Emenda360Page })));
 const GruposUasgsRoute = lazyComRecarga(() => import('./routes/GruposUasgsRoute').then((m) => ({ default: m.GruposUasgsRoute })));
+
+/** Redireciona um endereço antigo para o novo mantendo a busca (?prazo=…, ?fase=…). */
+const RedirecionaComBusca: React.FC<{ para: string }> = ({ para }) => {
+  const { search } = useLocation();
+  return <Navigate to={`${para}${search}`} replace />;
+};
 
 const AuthRedirectHandler: React.FC = () => {
   const navigate = useNavigate();
@@ -538,13 +547,39 @@ const AppContent: React.FC = () => {
               }
             />
             <Route
-              path="/fiscalizacao/entregas"
+              path="/fiscalizacao/contratos"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoContratosPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/beneficiarios"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoBeneficiariosPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/beneficiarios/:chave"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoBeneficiario360Page />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/itens"
               element={
                 <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
                   <FiscalizacaoEntregasPage />
                 </RequireRole>
               }
             />
+            {/* A antiga aba Entregas virou a aba Itens (11/11/2026): o endereço antigo leva para a nova, com os filtros. */}
+            <Route path="/fiscalizacao/entregas" element={<RedirecionaComBusca para="/fiscalizacao/itens" />} />
             <Route
               path="/fiscalizacao/distribuicao"
               element={

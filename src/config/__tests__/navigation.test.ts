@@ -383,7 +383,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const menu = filterNavigationByRole(navigationConfig, 'gestor_fiscalizacao');
       expect(menu.find((i) => i.id === 'visao-geral')?.children?.map((c) => [c.label, c.route, c.group])).toEqual([['Painel', '/fiscalizacao/inicio', undefined]]);
       expect(menu.find((i) => i.id === 'carteira')?.children?.map((c) => c.route)).toEqual(['/contratos']);
-      expect(menu.find((i) => i.id === 'fiscalizacao')?.children?.map((c) => c.route)).toEqual(['/fiscalizacao/entregas']);
+      expect(menu.find((i) => i.id === 'fiscalizacao')?.children?.map((c) => c.route)).toEqual(['/fiscalizacao/contratos', '/fiscalizacao/beneficiarios', '/fiscalizacao/itens']);
       expect(filterNavigationByRole(navigationConfig, 'gestor').map((i) => i.id)).not.toContain('fiscalizacao');
       expect(menu.map((i) => i.id)).not.toContain('emendas');
       for (const role of ['gestor', 'gestor_saldos', 'gestor_emendas', 'leitor'] as const) {
