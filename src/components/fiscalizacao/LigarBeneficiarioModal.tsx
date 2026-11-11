@@ -35,7 +35,7 @@ const OpcaoDoCadastro: React.FC<{ b: BeneficiarioEmenda; marcado: boolean; selo?
 );
 
 /**
- * Ligar o beneficiário escrito na planilha a um cadastro (migration 271). Um nome por vez (o mesmo nome e a mesma UF
+ * Ligar o beneficiário escrito na planilha a um cadastro (migration 272). Um nome por vez (o mesmo nome e a mesma UF
  * em todos os contratos); "Pular" passa para o próximo. O nome escrito vira outra grafia do cadastro.
  * `contractKey`: só os nomes com itens neste contrato. `foco`: só o nome deste item (janela do item, Beneficiário 360).
  * `onLigado`: depois de ligar, com o cadastro escolhido.

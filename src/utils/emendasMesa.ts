@@ -33,7 +33,7 @@ export type FazDaMesa =
   | { tipo: 'proxima' }
   | {
       tipo: 'janela';
-      acao: 'OFICIO' | 'DIVERGENCIA' | 'ORDEM_FORNECIMENTO' | 'MAIS_CGOFI' | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA';
+      acao: 'OFICIO' | 'DIVERGENCIA' | 'MAIS_CGOFI' | 'MAIS_EMPENHADO' | 'MAIS_CONTRATACAO' | 'SOLICITACAO_ATA';
       numero?: string;
     }
   | { tipo: 'pendencia'; tarefa: TarefaDoPedido }
@@ -484,7 +484,7 @@ export function mesaDoPedido(
         // Despacho com envio por ata: uma linha "Enviar à CCGA" com as atas (D3, D10).
         if (t.chave === 'despacho' && porAta) continue;
         // Informação e Ordem por contrato: linhas próprias abaixo (migration 250).
-        if (t.chave === 'ordem' && !p.ordemFornecimentoEm) continue;
+        if (t.chave === 'ordem') continue;
         const acoes: AcaoDaMesa[] = [];
         if (t.chave === 'minuta' && p.etapa === 'RESERVADO' && p.autorId)
           acoes.push(
@@ -511,15 +511,6 @@ export function mesaDoPedido(
             faz: { tipo: 'proxima' },
             testId: `emendas-pedido-proximo-${p.id}`
           });
-        if (t.chave === 'ordem')
-          acoes.push(
-            ...se(true, {
-              rotulo: 'Registrar as informações',
-              jeito: 'botao',
-              faz: { tipo: 'janela', acao: 'ORDEM_FORNECIMENTO' },
-              testId: 'emendas-pedido-ordem-fornecimento'
-            })
-          );
         const pendentes = t.pendencias.filter((x) => x.botao);
         // A tarefa só com pendências (assinatura de uma ata, beneficiário): cada pendência é a linha.
         if (acoes.length || !pendentes.length) {
@@ -607,43 +598,41 @@ export function mesaDoPedido(
     }
 
     // Informação e Ordem de Fornecimento por contrato (migration 250): a Informação é com a ComprasSUSP; a Ordem, com a SFC.
-    if (!p.ordemFornecimentoEm) {
-      const ordens = ordensDoPedido(p, notas);
-      const aInformar = ordens.filter((o) => o.estado === 'A_INFORMAR');
-      if (aInformar.length)
-        comVoce.push({
-          chave: 'ordem-informacao',
-          tom: 'eu',
-          titulo: `Fazer a Informação para a Ordem de Fornecimento · ${aInformar.length === 1 ? `Contrato ${aInformar[0].numero}` : `${aInformar.length} contratos (${aInformar.map((o) => o.numero).join(', ')})`}`,
-          detalhe: 'No processo do contrato: item, emenda, beneficiário, CNPJ e local de entrega. Depois o Setor de Fiscalização de Contratos emite a Ordem.',
-          prazo: null,
-          vencido: false,
-          regra: null,
-          acoes: se(true, {
-            rotulo: 'Registrar a Informação',
-            jeito: 'botao',
-            faz: { tipo: 'ordem', modo: 'INFORMACAO', contratos: aInformar.map((o) => o.contractKey) },
-            testId: `emendas-pedido-ordem-informacao-${p.id}`
-          })
-        });
-      for (const o of ordens.filter((x) => x.estado === 'NA_SFC'))
-        comOutros.push({
-          chave: `ordem-sfc-${o.contractKey}`,
-          tom: 'espera',
-          quem: 'SFC',
-          titulo: `Emitir a Ordem de Fornecimento · Contrato ${o.numero}`,
-          detalhe: `Informação de ${dataBR(o.registro!.informacaoEm)}.`,
-          prazo: null,
-          vencido: false,
-          regra: null,
-          acoes: se(true, {
-            rotulo: 'Registrar a Ordem',
-            jeito: 'link',
-            faz: { tipo: 'ordem', modo: 'ORDEM', contratos: [o.contractKey] },
-            testId: `emendas-pedido-ordem-emitida-${o.contractKey}`
-          })
-        });
-    }
+    const ordens = ordensDoPedido(p, notas);
+    const aInformar = ordens.filter((o) => o.estado === 'A_INFORMAR');
+    if (aInformar.length)
+      comVoce.push({
+        chave: 'ordem-informacao',
+        tom: 'eu',
+        titulo: `Fazer a Informação para a Ordem de Fornecimento · ${aInformar.length === 1 ? `Contrato ${aInformar[0].numero}` : `${aInformar.length} contratos (${aInformar.map((o) => o.numero).join(', ')})`}`,
+        detalhe: 'No processo do contrato: item, emenda, beneficiário, CNPJ e local de entrega. Depois o Setor de Fiscalização de Contratos emite a Ordem.',
+        prazo: null,
+        vencido: false,
+        regra: null,
+        acoes: se(true, {
+          rotulo: 'Registrar a Informação',
+          jeito: 'botao',
+          faz: { tipo: 'ordem', modo: 'INFORMACAO', contratos: aInformar.map((o) => o.contractKey) },
+          testId: `emendas-pedido-ordem-informacao-${p.id}`
+        })
+      });
+    for (const o of ordens.filter((x) => x.estado === 'NA_SFC'))
+      comOutros.push({
+        chave: `ordem-sfc-${o.contractKey}`,
+        tom: 'espera',
+        quem: 'SFC',
+        titulo: `Emitir a Ordem de Fornecimento · Contrato ${o.numero}`,
+        detalhe: `Informação de ${dataBR(o.registro!.informacaoEm)}.`,
+        prazo: null,
+        vencido: false,
+        regra: null,
+        acoes: se(true, {
+          rotulo: 'Registrar a Ordem',
+          jeito: 'link',
+          faz: { tipo: 'ordem', modo: 'ORDEM', contratos: [o.contractKey] },
+          testId: `emendas-pedido-ordem-emitida-${o.contractKey}`
+        })
+      });
 
     // Solicitação sem ata: ligar a uma ata.
     const soltas = solicitacoesSemAta(p);
@@ -831,7 +820,7 @@ export function mesaDoPedido(
     const todasFeitas = contaveis.length > 0 && contaveis.every((t) => t.estado === 'FEITA');
     let estado: FaseDaMesa['estado'];
     if (cancelado || !daEtapa) estado = f.tarefas.some((t) => t.estado === 'FEITA') ? 'feita' : 'vem';
-    else if (f.id === 'EXECUCAO') estado = todasFeitas ? 'feita' : comContrato || p.ordemFornecimentoEm ? 'atual' : 'vem';
+    else if (f.id === 'EXECUCAO') estado = todasFeitas ? 'feita' : comContrato ? 'atual' : 'vem';
     else if (f.id === 'CONTRATACAO' && daEtapa === 'CONTRATACAO') estado = todasFeitas ? 'feita' : 'atual';
     else {
       const d = ORDEM_FASE.indexOf(f.id) - ORDEM_FASE.indexOf(daEtapa);
@@ -853,10 +842,10 @@ export function mesaDoPedido(
   const registro = (t: TarefaDoAndamento): RegistroDaMesa | null => {
     if (t.estado !== 'FEITA') return null;
     // Informação e Ordem por contrato: registros próprios na Execução (migration 250).
-    if (t.chave === 'ordem' && !p.ordemFornecimentoEm) return null;
+    if (t.chave === 'ordem') return null;
     const e = t.etapa;
-    const sei = e ? docs(e).map((d) => d.numero) : t.chave === 'ordem' && p.ordemFornecimentoDocumentoSei ? [p.ordemFornecimentoDocumentoSei] : [];
-    const temDocumento = e === 'SOLICITADO' || e === 'CGOFI' || e === 'EMPENHADO' || (e === 'CONTRATACAO' && !porAta) || t.chave === 'ordem';
+    const sei = e ? docs(e).map((d) => d.numero) : [];
+    const temDocumento = e === 'SOLICITADO' || e === 'CGOFI' || e === 'EMPENHADO' || (e === 'CONTRATACAO' && !porAta);
     return {
       chave: t.chave,
       texto: t.nome,

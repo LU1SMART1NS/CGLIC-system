@@ -11,7 +11,9 @@ import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, ehDoFiscal } from '../../utils/fiscalizacao';
 import { nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario } from '../../utils/fiscalizacaoEntregas';
 import { MudarEtapaModal, PrevistaModal } from './EntregasModais';
-import { COR, comQuemEstaOItem, itens, linhaDeCadastro, linhaDeLigacao, linhasDoContrato, type Linha, type Tom } from '../../utils/fiscalizacaoMesa';
+import { comQuemEstaOItem, itens, linhaDeCadastro, linhaDeLigacao, linhasDoContrato, type Linha } from '../../utils/fiscalizacaoMesa';
+import { FiltroPendencia, MaisSemPendencia, SecaoDaMesa, type LinhaDeTrabalho } from '../mesa/MesaDeTrabalho';
+import { blocoDaMesa as bloco } from '../mesa/mesaEstilos';
 import { LigarItemDaAtaModal } from './LigarItemDaAtaModal';
 import { LigarBeneficiarioModal } from './LigarBeneficiarioModal';
 import { DefinirFiscalizacaoModal, RegistrarProcessoModal } from './FiscalizacaoModais';
@@ -23,38 +25,15 @@ import { ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
 
 type Janela = { tipo: 'etapa' | 'prevista'; itens: EntregaFiscalizacao[] } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'quem' } | { tipo: 'ligar' } | { tipo: 'cadastro' } | null;
 
-const lista: React.CSSProperties = { border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' };
-const bloco: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.4rem' };
-const marca = (tom: Tom): React.CSSProperties => ({ width: 10, height: 10, borderRadius: '50%', marginTop: '0.3rem', boxSizing: 'border-box', ...(tom === 'espera' ? { border: `2px solid ${COR[tom]}` } : { background: COR[tom] }) });
 const chaveDoGrupo = (g: EntregaFiscalizacao[]) => g[0].beneficiarioId ?? `planilha:${g[0].beneficiarioTexto}`;
 /** Acima disto, a lista abre só nos beneficiários com pendência (como o Andamento do Pedido 360). */
 const GRUPOS_SEM_FILTRO = 5;
-const LinhaDaMesa: React.FC<{ l: Linha; podeAgir: boolean }> = ({ l, podeAgir }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: '12px minmax(0, 1fr)', gap: '0.2rem 0.7rem', padding: '0.65rem 0.75rem', borderTop: '1px solid var(--border)', alignItems: 'start' }} data-testid={`fisc-mesa-${l.chave}`}>
-    <span style={marca(l.tom)} aria-hidden="true" />
-    <div style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '0.4rem 0.8rem' }}>
-      <div style={{ minWidth: 0, flex: '1 1 260px' }}>
-        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-          {l.quem && <span style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 800, border: '1px solid var(--border)', borderRadius: 4, padding: '0 0.35rem', marginRight: '0.4rem', color: '#64748b', verticalAlign: '1px' }}>{l.quem}</span>}
-          {l.titulo}
-        </div>
-        {l.detalhe && <div style={{ ...carteiraDetalhe, fontSize: '0.8rem' }}>{l.detalhe}</div>}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem', marginLeft: 'auto' }}>
-        {l.prazo && l.prazo !== '—' && <span style={{ fontSize: '0.8rem', fontWeight: 700, whiteSpace: 'nowrap', color: l.vencido ? 'var(--color-danger-text)' : '#64748b' }}>{l.vencido ? `venceu em ${l.prazo}` : `até ${l.prazo}`}</span>}
-        {podeAgir && l.acoes.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
-            {l.acoes.map((a) => (
-              <AppButton key={a.rotulo} size={a.principal ? 'sm' : 'xs'} variant={a.principal ? 'primary' : 'link'} onClick={a.faz} data-testid={`fisc-mesa-${l.chave}-${a.rotulo}`}>
-                {a.rotulo}
-              </AppButton>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-);
+const paraTela = (l: Linha): LinhaDeTrabalho => ({
+  ...l,
+  prazo: l.prazo && l.prazo !== '—' ? l.prazo : null,
+  botoes: l.acoes.map((a) => ({ rotulo: a.rotulo, jeito: a.principal ? 'botao' : 'link', onClick: a.faz, testId: `fisc-mesa-${l.chave}-${a.rotulo}` }))
+});
+const linhaTestId = (l: LinhaDeTrabalho) => `fisc-mesa-${l.chave}`;
 
 const Campo: React.FC<{ rotulo: string; children: React.ReactNode }> = ({ rotulo, children }) => (
   <div style={{ minWidth: 0 }}>
@@ -81,7 +60,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
     // Itens da planilha sem item da ata (migration 268): com o fiscal quando o contrato já tem itens de ata; senão, espera a Vinculação.
     const linha = linhaDeLigacao(es, Boolean(c?.atas?.length), () => setJanela({ tipo: 'ligar' }));
     if (linha) (linha.tom === 'espera' ? r.comOutros : r.comVoce).unshift(linha);
-    // Beneficiário escrito à mão na planilha (migration 271): ligar ao cadastro.
+    // Beneficiário escrito à mão na planilha (migration 272): ligar ao cadastro.
     const cadastro = linhaDeCadastro(es, () => setJanela({ tipo: 'cadastro' }));
     if (cadastro) r.comVoce.unshift(cadastro);
     return r;
@@ -126,31 +105,16 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
         )}
       </div>
 
-      <section style={bloco} data-testid="fisc-mesa-com-voce">
-        <CarteiraDetailLabel>Com {podeAgir ? 'você' : 'o fiscal'}{comVoce.length ? ` · ${comVoce.length}` : ''}</CarteiraDetailLabel>
-        <div style={{ ...lista, borderLeft: '4px solid var(--primary)' }}>
-          <div style={{ marginTop: '-1px' }}>
-            {comVoce.length === 0 ? <div style={{ padding: '0.65rem 0.75rem', borderTop: '1px solid var(--border)', fontWeight: 600 }}>Nada com {podeAgir ? 'você' : 'o fiscal'} agora.</div> : comVoce.map((l) => <LinhaDaMesa key={l.chave} l={l} podeAgir={podeAgir} />)}
-          </div>
-        </div>
-      </section>
+      <SecaoDaMesa titulo={`Com ${podeAgir ? 'você' : 'o fiscal'}`} linhas={comVoce.map(paraTela)} testId="fisc-mesa-com-voce" linhaTestId={linhaTestId} destaque vazio={`Nada com ${podeAgir ? 'você' : 'o fiscal'} agora.`} semBotoes={!podeAgir} />
 
-      {comOutros.length > 0 && (
-        <section style={bloco} data-testid="fisc-mesa-com-outros">
-          <CarteiraDetailLabel>Com outros · {comOutros.length}</CarteiraDetailLabel>
-          <div style={lista}><div style={{ marginTop: '-1px' }}>{comOutros.map((l) => <LinhaDaMesa key={l.chave} l={l} podeAgir={false} />)}</div></div>
-        </section>
-      )}
+      <SecaoDaMesa titulo="Com outros" linhas={comOutros.map(paraTela)} testId="fisc-mesa-com-outros" linhaTestId={linhaTestId} semBotoes />
 
       <section style={bloco} data-testid="fisc-mesa-itens">
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem 1rem' }}>
           <CarteiraDetailLabel>Onde está cada item · {es.length}</CarteiraDetailLabel>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
             {grupos.length > GRUPOS_SEM_FILTRO && pendentes.length > 0 && (
-              <span role="group" aria-label="Quais beneficiários mostrar" style={{ display: 'inline-flex', gap: '0.5rem' }}>
-                <AppButton size="xs" variant={soPendentes ? 'secondary' : 'ghost'} aria-pressed={soPendentes} onClick={() => setSoPendentes(true)}>Com pendência · {pendentes.length}</AppButton>
-                <AppButton size="xs" variant={soPendentes ? 'ghost' : 'secondary'} aria-pressed={!soPendentes} onClick={() => setSoPendentes(false)}>Todos · {grupos.length}</AppButton>
-              </span>
+              <FiltroPendencia soPendentes={soPendentes} pendentes={pendentes.length} todos={grupos.length} onChange={setSoPendentes} />
             )}
             {mostrados.length > 1 && (
               <span style={{ ...carteiraDetalhe, marginTop: 0, display: 'inline-flex', gap: '0.4rem' }}>
@@ -208,12 +172,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
               </section>
             );
           })}
-          {resto > 0 && (
-            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-              E mais {resto === 1 ? '1 beneficiário' : `${resto} beneficiários`} sem pendência.{' '}
-              <AppButton size="xs" variant="link" onClick={() => setSoPendentes(false)}>Ver todos</AppButton>
-            </div>
-          )}
+          <MaisSemPendencia resto={resto} onVerTodos={() => setSoPendentes(false)} />
         </div>
       </section>
 

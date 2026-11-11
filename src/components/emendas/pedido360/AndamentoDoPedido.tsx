@@ -6,6 +6,8 @@ import { InfoHint } from '../../../design-system/components/InfoHint';
 import { NoticeBar } from '../../../design-system/components/NoticeBar';
 import { NumeroSeiEtiqueta } from '../../../design-system/components/NumeroSeiEtiqueta';
 import { CarteiraDetailLabel } from '../../carteira/CarteiraDetailLabel';
+import { FiltroPendencia, MaisSemPendencia, SecaoDaMesa, type LinhaDeTrabalho } from '../../mesa/MesaDeTrabalho';
+import { blocoDaMesa, listaDaMesa } from '../../mesa/mesaEstilos';
 import { carteiraDetalhe } from '../../carteira/carteiraStyles';
 import { dataBR } from '../../../utils/emendasKits';
 import type { AvisoPedido } from '../../../utils/emendasPedidos';
@@ -33,47 +35,8 @@ interface Props {
   onOrdem?: (modo: 'INFORMACAO' | 'ORDEM', contratos: string[]) => void;
 }
 
-const COR_DO_TOM: Record<LinhaDaMesa['tom'], string> = {
-  vencido: 'var(--color-danger)',
-  eu: 'var(--primary)',
-  espera: 'var(--color-warning)'
-};
-
-const lista: React.CSSProperties = {
-  border: '1px solid var(--border)',
-  borderRadius: '8px',
-  overflow: 'hidden'
-};
-const linhaDaLista: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '12px minmax(0, 1fr)',
-  gap: '0.2rem 0.7rem',
-  padding: '0.65rem 0.75rem',
-  borderTop: '1px solid var(--border)',
-  alignItems: 'start'
-};
-const bloco: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.4rem'
-};
-const marca = (tom: LinhaDaMesa['tom']): React.CSSProperties =>
-  tom === 'espera'
-    ? {
-        width: 10,
-        height: 10,
-        borderRadius: '50%',
-        border: `2px solid ${COR_DO_TOM[tom]}`,
-        marginTop: '0.3rem',
-        boxSizing: 'border-box'
-      }
-    : {
-        width: 10,
-        height: 10,
-        borderRadius: '50%',
-        background: COR_DO_TOM[tom],
-        marginTop: '0.3rem'
-      };
+const lista = listaDaMesa;
+const bloco = blocoDaMesa;
 
 /**
  * Régua de 6 passos do item com o nome de cada um (D5, ajuste de 30/10/2026: os tracinhos sem nome não diziam nada):
@@ -220,16 +183,7 @@ const OndeEstaCadaItem: React.FC<{ it: ItensDaMesa }> = ({ it }) => {
         }}
       >
         {titulo}
-        {it.grande && pendentes.length > 0 && (
-          <div style={{ display: 'flex', gap: '0.5rem' }} role="group" aria-label="Quais beneficiários mostrar">
-            <AppButton size="xs" variant={soPendentes ? 'secondary' : 'ghost'} aria-pressed={soPendentes} onClick={() => setSoPendentes(true)} data-testid="pedido360-itens-pendentes">
-              Com pendência · {pendentes.length}
-            </AppButton>
-            <AppButton size="xs" variant={soPendentes ? 'ghost' : 'secondary'} aria-pressed={!soPendentes} onClick={() => setSoPendentes(false)} data-testid="pedido360-itens-todos">
-              Todos · {it.grupos.length}
-            </AppButton>
-          </div>
-        )}
+        {it.grande && pendentes.length > 0 && <FiltroPendencia soPendentes={soPendentes} pendentes={pendentes.length} todos={it.grupos.length} onChange={setSoPendentes} testId="pedido360-itens" />}
       </div>
       <div style={{ ...lista }}>
         {mostra.map((g, i) => (
@@ -237,21 +191,7 @@ const OndeEstaCadaItem: React.FC<{ it: ItensDaMesa }> = ({ it }) => {
             <Grupo g={g} aberto={!it.grande || g.pendente} contagem={it.grande} />
           </div>
         ))}
-        {resto > 0 && (
-          <div
-            style={{
-              padding: '0.5rem 0.75rem',
-              borderTop: '1px solid var(--border)',
-              fontSize: '0.8rem',
-              color: '#64748b'
-            }}
-          >
-            E mais {resto === 1 ? '1 beneficiário' : `${resto} beneficiários`} sem pendência.{' '}
-            <AppButton size="xs" variant="link" onClick={() => setSoPendentes(false)}>
-              Ver todos
-            </AppButton>
-          </div>
-        )}
+        <MaisSemPendencia resto={resto} onVerTodos={() => setSoPendentes(false)} style={{ padding: '0.5rem 0.75rem', borderTop: '1px solid var(--border)' }} />
       </div>
     </section>
   );
@@ -442,7 +382,6 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, beneficiar
   // Entregas da Fiscalização por linha (migration 263): a régua do item mostra os passos da SFC/CGLIC.
   const { porLinha: entregas } = useEntregasDoPedido(p.id);
   const m = useMemo(() => mesaDoPedido(p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos, entregas), [p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos, entregas]);
-  const [todasComVoce, setTodasComVoce] = useState(false);
   const cancelado = p.etapa === 'CANCELADO';
 
   const agir = (a: AcaoDaMesa) => {
@@ -476,96 +415,19 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, beneficiar
     }
   };
 
-  const linha = (l: LinhaDaMesa) => (
-    <div key={l.chave} style={linhaDaLista} data-testid={`pedido360-linha-${l.chave}`} data-tom={l.tom}>
-      <span style={marca(l.tom)} aria-hidden="true" />
-      {/* Texto e ações lado a lado; sem espaço (celular), as ações descem para baixo do texto. */}
-      <div
-        style={{
-          minWidth: 0,
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'flex-start',
-          gap: '0.4rem 0.8rem'
-        }}
-      >
-        <div style={{ minWidth: 0, flex: '1 1 260px' }}>
-          <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-            {l.quem && (
-              <span
-                style={{
-                  display: 'inline-block',
-                  fontSize: '0.75rem',
-                  fontWeight: 800,
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  padding: '0 0.35rem',
-                  marginRight: '0.4rem',
-                  color: '#64748b',
-                  verticalAlign: '1px'
-                }}
-              >
-                {l.quem}
-              </span>
-            )}
-            {l.titulo}
-          </div>
-          {l.detalhe && <div style={{ ...carteiraDetalhe, fontSize: '0.8rem' }}>{l.detalhe}</div>}
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-end',
-            gap: '0.3rem',
-            marginLeft: 'auto'
-          }}
-        >
-          {l.prazo && (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.2rem',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
-                color: l.vencido ? 'var(--color-danger-text)' : '#64748b'
-              }}
-            >
-              {l.vencido ? `venceu em ${l.prazo}` : `até ${l.prazo}`}
-              {l.regra && <InfoHint label="Regra do prazo" content={l.regra} testId={`pedido360-regra-${l.chave}`} />}
-            </span>
-          )}
-          {l.acoes.length > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              {l.acoes.map((a) => (
-                <AppButton
-                  key={a.testId}
-                  size={a.jeito === 'botao' ? 'sm' : 'xs'}
-                  variant={a.jeito === 'botao' ? 'primary' : a.jeito === 'perigo' ? 'ghostDanger' : 'link'}
-                  onClick={() => agir(a)}
-                  data-testid={a.testId}
-                >
-                  {a.rotulo}
-                </AppButton>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  const paraTela = (l: LinhaDaMesa): LinhaDeTrabalho => ({
+    chave: l.chave,
+    tom: l.tom,
+    quem: l.quem,
+    titulo: l.titulo,
+    detalhe: l.detalhe,
+    prazo: l.prazo,
+    vencido: l.vencido,
+    regra: l.regra,
+    botoes: l.acoes.map((a) => ({ rotulo: a.rotulo, jeito: a.jeito, testId: a.testId, onClick: () => agir(a) }))
+  });
+  const linhaTestId = (l: LinhaDeTrabalho) => `pedido360-linha-${l.chave}`;
 
-  const comVoce = todasComVoce ? m.comVoce : m.comVoce.slice(0, LIMITE_COM_VOCE);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }} data-testid={`pedido360-andamento-${p.id}`}>
       {cancelado && (
@@ -583,43 +445,9 @@ export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, beneficiar
         </NoticeBar>
       )}
 
-      {!cancelado && (
-        <section style={bloco} data-testid="pedido360-com-voce">
-          <CarteiraDetailLabel>Com você{m.comVoce.length ? ` · ${m.comVoce.length}` : ''}</CarteiraDetailLabel>
-          <div style={{ ...lista, borderLeft: '4px solid var(--primary)' }}>
-            <div style={{ marginTop: '-1px' }}>
-              {m.comVoce.length === 0 ? (
-                <div style={{ ...linhaDaLista, gridTemplateColumns: '1fr' }}>
-                  <span style={{ fontWeight: 600 }}>Nada com você agora.</span>
-                </div>
-              ) : (
-                comVoce.map(linha)
-              )}
-              {!todasComVoce && m.comVoce.length > LIMITE_COM_VOCE && (
-                <div
-                  style={{
-                    padding: '0.5rem 0.75rem',
-                    borderTop: '1px solid var(--border)'
-                  }}
-                >
-                  <AppButton size="xs" variant="link" onClick={() => setTodasComVoce(true)}>
-                    e mais {m.comVoce.length - LIMITE_COM_VOCE}
-                  </AppButton>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
+      {!cancelado && <SecaoDaMesa titulo="Com você" linhas={m.comVoce.map(paraTela)} testId="pedido360-com-voce" linhaTestId={linhaTestId} destaque vazio="Nada com você agora." limite={LIMITE_COM_VOCE} />}
 
-      {m.comOutros.length > 0 && (
-        <section style={bloco} data-testid="pedido360-com-outros">
-          <CarteiraDetailLabel>Com outros · {m.comOutros.length}</CarteiraDetailLabel>
-          <div style={lista}>
-            <div style={{ marginTop: '-1px' }}>{m.comOutros.map(linha)}</div>
-          </div>
-        </section>
-      )}
+      <SecaoDaMesa titulo="Com outros" linhas={m.comOutros.map(paraTela)} testId="pedido360-com-outros" linhaTestId={linhaTestId} />
 
       {m.itens && <OndeEstaCadaItem it={m.itens} />}
 

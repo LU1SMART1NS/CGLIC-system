@@ -81,7 +81,7 @@ export function linhaDeLigacao(es: EntregaFiscalizacao[], temItensDaAta: boolean
   return { chave: 'ligar', tom: 'eu', titulo: `Ligar ao item da ata · ${itens(n)} da planilha`, detalhe: `${nomes} · uma escolha por nome`, acoes: [{ rotulo: 'Ligar ao item da ata', principal: true, faz: ligar }] };
 }
 
-/** Itens da planilha com o beneficiário escrito à mão (migration 271): um passo só, com quantos itens e quantos nomes. */
+/** Itens da planilha com o beneficiário escrito à mão (migration 272): um passo só, com quantos itens e quantos nomes. */
 export function linhaDeCadastro(es: EntregaFiscalizacao[], ligar: () => void): Linha | null {
   const gs = gruposSemCadastro(es);
   if (!gs.length) return null;

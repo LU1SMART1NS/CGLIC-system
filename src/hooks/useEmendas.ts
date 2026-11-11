@@ -37,7 +37,6 @@ import {
   fetchDadosDaAtaParaAutorizacao,
   informarSolicitacaoDaAta,
   registrarEnvioCgofi,
-  registrarOrdemFornecimento,
   registrarInformacaoOrdem,
   registrarOrdemDoContrato,
   enviarPedidoCcga,
@@ -341,11 +340,6 @@ export function useEmendasAContratar({ enabled = true }: LeituraOpcional = {}) {
     enabled: enabled && (role === 'admin' || role === 'gestor'),
     staleTime: 5 * 60_000
   });
-}
-
-export function useRegistrarOrdemFornecimento() {
-  const invalidar = useInvalidarPedidos();
-  return useMutation({ mutationFn: registrarOrdemFornecimento, retry: 0, onSettled: invalidar });
 }
 
 /** Informação da ComprasSUSP e Ordem de Fornecimento por contrato (migration 250). */

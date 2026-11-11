@@ -132,18 +132,3 @@ describe('janela das etapas: completar o SEI de um passo registrado pela fonte (
     expect(semData).toContain('Enviado em');
   });
 });
-
-describe('janela das etapas: informações para a Ordem de Fornecimento (migration 245)', () => {
-  it('pede o documento SEI e a data; registrada, abre com o que foi gravado para corrigir', () => {
-    const nova = renderToStaticMarkup(<EtapaPedidoModal pedido={pedido('CONTRATACAO')} acao="ORDEM_FORNECIMENTO" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />);
-    expect(nova).toContain('Informações para a Ordem de Fornecimento');
-    expect(nova).toContain('Documento SEI com as informações *');
-    expect(nova).toContain('Concluídas em');
-    expect(nova).toContain('Registrar');
-    const gravada = renderToStaticMarkup(
-      <EtapaPedidoModal pedido={{ ...pedido('CONTRATACAO'), ordemFornecimentoEm: '2026-10-28', ordemFornecimentoDocumentoSei: '41234567' }} acao="ORDEM_FORNECIMENTO" itens={itens} nomeDoAutor="Deputado" onClose={() => {}} />
-    );
-    expect(gravada).toContain('value="41234567"');
-    expect(gravada).toContain('Salvar');
-  });
-});
