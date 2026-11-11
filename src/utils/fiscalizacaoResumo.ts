@@ -1,6 +1,6 @@
 // Contas das listas e telas 360 da Fiscalização (Contratos, Beneficiários, Programas), a partir dos itens.
 import type { EntregaFiscalizacao, OrigemDoRecurso } from '../services/fiscalizacaoService';
-import { etapaDef, foiEntregue, ordemDaEtapa, prazoDaEntrega, rotuloDoBeneficiario, type FaseEntrega, type TomPrazo, nomeDoItem } from './fiscalizacaoEntregas';
+import { etapaDef, foiEntregue, itemConcluido, ordemDaEtapa, prazoDaEntrega, rotuloDoBeneficiario, type FaseEntrega, type TomPrazo, nomeDoItem } from './fiscalizacaoEntregas';
 
 const ORDEM_DA_FASE: FaseEntrega[] = ['PREPARACAO', 'EXECUCAO', 'RECEBIMENTO', 'PAGAMENTO', 'FINALIZADO'];
 const somar = (es: EntregaFiscalizacao[]) => es.reduce((t, e) => t + e.quantidade, 0);
@@ -16,7 +16,7 @@ export interface Resumo {
   area: number;
   vencidas: number;
   proxima: { texto: string; tom: TomPrazo; dias: number | null } | null;
-  /** Fase que segura o conjunto: a menos adiantada entre as entregas da SFC/CGLIC que não acabaram. */
+  /** Fase que segura o conjunto: a menos adiantada entre as entregas da SFC/CGLIC que não acabaram (Ofício à SAL ou Finalizado). */
   fase: FaseEntrega | null;
   etapas: number;
   noExercito: number;
@@ -28,7 +28,7 @@ export function resumir(es: EntregaFiscalizacao[]): Resumo {
   const semInicio = sfc.filter((e) => ordemDaEtapa(e.etapa) < ordemDaEtapa('ORDEM'));
   const abertas = sfc.filter((e) => !foiEntregue(e));
   const prazos = abertas.map((e) => prazoDaEntrega(e)).filter((p) => p.dias != null).sort((a, b) => (a.dias ?? 0) - (b.dias ?? 0));
-  const fases = sfc.filter((e) => e.etapa !== 'FINALIZADO').map((e) => etapaDef(e.etapa).fase);
+  const fases = sfc.filter((e) => !itemConcluido(e)).map((e) => etapaDef(e.etapa).fase);
   const fase = sfc.length === 0 ? null : fases.length === 0 ? 'FINALIZADO' : ORDEM_DA_FASE.find((f) => fases.includes(f)) ?? null;
   return {
     entregas: es.length,
@@ -44,6 +44,18 @@ export function resumir(es: EntregaFiscalizacao[]): Resumo {
     etapas: new Set(sfc.map((e) => e.etapa)).size,
     noExercito: abertas.filter((e) => e.etapa === 'CONTROLADO').length
   };
+}
+
+/**
+ * Contratos com a fiscalização encerrada: têm itens da SFC/CGLIC e todos chegaram ao fim (Ofício à SAL ou Finalizado),
+ * a mesma regra do trilho Finalizados das abas Contratos e Itens. Saem das contas e pendências do Painel.
+ */
+export function contratosFinalizados(es: EntregaFiscalizacao[]): Set<string> {
+  const fim = new Set<string>();
+  for (const [chave, doContrato] of agrupar(es.filter((e) => e.responsavel === 'SFC'), (e) => e.contractKey)) {
+    if (doContrato.every(itemConcluido)) fim.add(chave);
+  }
+  return fim;
 }
 
 export function agrupar<K>(es: EntregaFiscalizacao[], chave: (e: EntregaFiscalizacao) => K): Map<K, EntregaFiscalizacao[]> {

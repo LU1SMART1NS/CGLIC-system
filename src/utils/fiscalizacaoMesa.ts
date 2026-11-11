@@ -1,6 +1,6 @@
 import type { EntregaFiscalizacao } from '../services/fiscalizacaoService';
 import { NOME_SFC, dataBR } from './fiscalizacao';
-import { prazoDaEntrega, rotuloDoBeneficiario } from './fiscalizacaoEntregas';
+import { itemConcluido, prazoDaEntrega, rotuloDoBeneficiario } from './fiscalizacaoEntregas';
 import { gruposALigar } from './fiscalizacaoLigacao';
 
 /* Regras da mesa do Contrato 360 › Fiscalização (Com você · Com outros) e de "com quem está o item", usadas também nas abas Contratos e Itens. */
@@ -60,7 +60,7 @@ export function linhasDoContrato(es: EntregaFiscalizacao[], semProcesso: boolean
 /** Com quem está o item (a mesma regra da mesa do contrato): o passo é do fiscal, de outros, ou acabou. */
 export function comQuemEstaOItem(e: EntregaFiscalizacao): 'VOCE' | 'OUTROS' | 'FIM' {
   if (e.responsavel === 'AREA') return 'OUTROS';
-  if (e.etapa === 'SAL' || e.etapa === 'FINALIZADO') return 'FIM';
+  if (itemConcluido(e)) return 'FIM';
   if (e.etapa === 'INFO_PEDIDA' || e.etapa === 'CONTROLADO') return 'OUTROS';
   if (EM_EXECUCAO.has(e.etapa)) return !e.prevista || prazoDaEntrega(e).tom === 'danger' ? 'VOCE' : 'OUTROS';
   if (e.etapa === 'PAGAMENTO') return e.pagoEm ? 'VOCE' : 'OUTROS';

@@ -26,6 +26,7 @@ import { prazoDaEntrega } from '../../utils/fiscalizacaoEntregas';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, cargaPorFiscal, comSfc, dataBR, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato } from '../../utils/fiscalizacao';
 import { useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
+import { contratosFinalizados } from '../../utils/fiscalizacaoResumo';
 
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
 import { GavetaDistribuicaoFiscais } from './GavetaDistribuicaoFiscais';
@@ -55,7 +56,10 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   const transferencias = useTransferenciasFiscalizacao();
   const coordenador = role === 'admin';
   const fiscal = role === 'gestor_fiscalizacao';
-  const contratos = useMemo(() => data ?? [], [data]);
+  // Contratos com a fiscalização encerrada (todos os itens no Ofício à SAL ou Finalizados) saem do Painel:
+  // ficam no trilho Finalizados da aba Contratos.
+  const finalizados = useMemo(() => contratosFinalizados(entregasConsulta.data ?? []), [entregasConsulta.data]);
+  const contratos = useMemo(() => (data ?? []).filter((c) => !finalizados.has(c.contractKey)), [data, finalizados]);
 
   // Escopo: o fiscal vê os dele; o coordenador e a consulta escolhem um fiscal no filtro do topo (?fiscal=).
   const fiscalEscolhido = fiscal ? '' : params.get('fiscal') ?? TODOS_OS_GESTORES;

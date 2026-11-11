@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { linhaParaEntrega } from '../../services/fiscalizacaoService';
-import { agrupar, chaveDoBeneficiario, enderecoDeEntrega, mudancasDoPrograma, passaPrazo, resumir } from '../fiscalizacaoResumo';
+import { agrupar, chaveDoBeneficiario, contratosFinalizados, enderecoDeEntrega, mudancasDoPrograma, passaPrazo, resumir } from '../fiscalizacaoResumo';
 import { ataEItemDaChave, passoDoItem, passosDoItem } from '../fiscalizacaoEntregas';
 import { comQuemEstaOItem, linhasDoContrato } from '../fiscalizacaoMesa';
 
@@ -28,6 +28,23 @@ describe('resumo de um conjunto de itens', () => {
     expect(resumir([e({ etapa: 'PAGAMENTO' }), e({ etapa: 'CONTROLADO' })]).fase).toBe('EXECUCAO');
     expect(resumir([e({ etapa: 'FINALIZADO' })]).fase).toBe('FINALIZADO');
     expect(resumir([e({ responsavel: 'AREA' })]).fase).toBeNull();
+  });
+
+  it('Ofício à SAL encerra o item de emenda: o conjunto fica Finalizado, como na aba Itens', () => {
+    expect(resumir([e({ etapa: 'SAL' }), e({ etapa: 'FINALIZADO', origem: 'CARGA' })]).fase).toBe('FINALIZADO');
+    expect(resumir([e({ etapa: 'SAL' }), e({ etapa: 'PAGAMENTO' })]).fase).toBe('PAGAMENTO');
+  });
+
+  it('contrato finalizado: todos os itens da SFC/CGLIC no fim; a área requisitante não conta', () => {
+    const fim = contratosFinalizados([
+      e({ contractKey: 'A', etapa: 'SAL' }),
+      e({ contractKey: 'A', etapa: 'FINALIZADO' }),
+      e({ contractKey: 'A', responsavel: 'AREA' }),
+      e({ contractKey: 'B', etapa: 'SAL' }),
+      e({ contractKey: 'B', etapa: 'TRD' }),
+      e({ contractKey: 'C', responsavel: 'AREA' })
+    ]);
+    expect([...fim]).toEqual(['A']);
   });
 
   it('filtro de prazo: com vencido, vencendo e em dia', () => {
