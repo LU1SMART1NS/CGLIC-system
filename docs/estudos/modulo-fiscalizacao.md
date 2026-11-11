@@ -198,3 +198,84 @@ Protótipo aprovado em 10/11/2026 (versão 6). Entrega 1 (perfil, fiscalização
 - Fiscalização › Programas: um programa por vez no trilho e o alternador Por item · Por contrato · Por UF, com no programa × entregue. Conta todas as entregas do programa: as da SFC/CGLIC pela etapa e as da área requisitante como **sem acompanhamento** (P5).
 
 **P5 decidida (10/11/2026): sem acompanhamento.** A área requisitante não informa nada no sistema. Nos programas, as unidades dela aparecem como "Com a área requisitante · sem acompanhamento": contam no total do programa, mas não em Entregue, Em andamento nem Sem início, e o percentual de entregue é sobre o que a SFC/CGLIC acompanha.
+
+## 9. Telas em abas, vocabulário e item da ata (decisões de 11/11/2026)
+
+Protótipo: https://claude.ai/artifact/HEJqKuqmZckYKnHowS6tzX (versão 4; feito com as peças do sistema e dados de exemplo). Aprovação em andamento, tela por tela.
+
+**Vocabulário.** A linha contrato × item × beneficiário se chama **item** nas telas ("3 itens com prazo vencido", "Nenhum item ainda"). **Entrega** e **Entregue** são só o status do item. "Destinação" foi tentada e recusada: confunde com beneficiário. Os nomes no banco (`fisc_entregas`) não mudam.
+
+**Menu Fiscalização.** Programas · Contratos · Beneficiários · Itens, nessa ordem; o menu abre em **Contratos** (o trabalho do fiscal). A antiga aba Entregas virou a aba Itens, sem alternador.
+- **Contratos:** trilho por fase (a do item mais atrasado), fiscal, entregue × total, próximo prazo, processo. O fiscal abre filtrado nos contratos dele.
+- **Beneficiários:** um órgão por linha com tudo somado; trilho A entregar · Tudo entregue · Todos; o beneficiário da planilha aparece com a etiqueta "Sem cadastro".
+- **Itens:** a lista de sempre, um item de um contrato para um beneficiário por linha.
+- **Programas:** um programa por linha.
+
+**Telas 360 (Beneficiário 360 aprovado; Programa 360 no mesmo desenho).** Sem abas: uma lista só, **Itens por contrato**, no padrão dos "Itens por ata" do Pedido 360 (bloco por contrato que abre e fecha: Contrato nº com link · fornecedor · fiscal | N itens · un · entregues | etiquetas "N com prazo vencido" e "aguardando o Exército"; tabela Item · Beneficiário (só no Programa) · Qtd. · Situação). Trilho A entregar · Entregues · Todos. No Programa, Beneficiário e UF são filtros; no Beneficiário não há filtro de UF (um órgão, uma UF). Indicadores: Entregue % · A entregar · Prazo vencido · Contratos. O Beneficiário 360 mostra o endereço de entrega do cadastro e as emendas e programas que destinaram itens.
+
+**Situação numa coluna só.** A etapa e uma linha: entregue em X (com os dias de atraso e o pagamento); a entregar, o prazo e a data prevista; sem data prevista, desde quando está na etapa. Antes, "Entregue desde 20/10" (data do registro) e "entregue em 02/10" (data do fato) apareciam juntas e pareciam contradizer-se. Na etapa Entregue, a data da etapa é a data da entrega informada.
+
+**Programas: cadastro e itens.** O cadastro fica em **Ajustes › Gestão › Programas**, a primeira aba de Gestão, antes de Modelos de Gestão (Novo programa: nome, setor responsável, observação; Editar; programa com itens só se desativa). Os itens entram pela tela do programa, no botão **Incluir itens no programa**: escolhe o contrato, diz quantas unidades de cada item são do programa (até o contratado menos o que está em outro programa) e vê o que já está no programa, com Retirar. Grava em `fisc_item_programas`. A marcação sai do Contrato 360, onde o programa só aparece como informação.
+
+**Contrato 360 › Fiscalização como mesa de trabalho** (o desenho da aba Andamento do Pedido 360):
+- faixa com Fiscalização · Fiscal · Portaria · Processo · Origem e o menu ⋯ (Alterar quem fiscaliza, Corrigir o processo);
+- **Com você:** o próximo passo juntando os itens que estão no mesmo ponto, com um botão que age em todos (Registrar o processo, Cobrar o fornecedor, Emitir a Ordem, Informar a data prevista, Receber provisoriamente, Receber em definitivo, Enviar para pagamento e doação, Enviar o Ofício à SAL, Finalizar);
+- **Com outros:** CAEP (informações), Exército/DFPC (controlados), Fornecedor (entregar, com a data), Financeiro (pagar), Área requisitante;
+- **Onde está cada item:** por beneficiário, com a régua Informações › Ordem › Produção › Entregue › Recebido › Pagamento › Ofício à SAL;
+- saem as caixinhas de marcar; o histórico do contrato fica na aba Histórico. "Dividir entrega" vira **Entrega parcial** ("Quantas unidades foram entregues?").
+
+**Janela do item.** O item não ganha tela 360 (Item 360 já é o item da ata, e a linha do contrato não tem abas próprias). Em qualquer lista (Programa 360, Beneficiário 360, aba Itens, Contrato 360 e Item 360) o clique abre a mesma janela: régua e prazo, contrato ("Abrir o contrato"), item da ata ("Abrir o item da ata", quando ligado), origem, fiscal, endereço de entrega, histórico com SEI e as ações (Entrega parcial, Data prevista, Quem fiscaliza, Mudar etapa).
+
+**Item 360 › Emendas.** Sem aba nova: na aba Emendas, cada beneficiário de cada pedido mostra o passo da fiscalização ("70× GCM Taboão · Aguardando o Exército · passo 3 de 7 · contrato 00055/2026"); o clique abre a janela do item.
+
+**Ligar os itens da planilha ao item da ata** (incluído no plano em 11/11/2026). Os 2.046 itens de emenda já têm `item_key`. Os 1.959 da carga têm o contrato, mas não o item. Medição no banco (11/11/2026), pelos itens da ata ligados a cada contrato (`arp_item_contract_links`):
+
+| Itens da carga | Quantos | Como ligar |
+|---|---|---|
+| Contrato com um só item ligado à ata | 662 itens · 153 contratos | automático |
+| Contrato com vários itens | 1.184 itens · 53 contratos (214 nomes contrato × texto) | pelo nome; o que não casar vai para a lista "a conferir" |
+| Contrato sem item ligado à ata | 113 itens · 19 contratos | não liga até o contrato ser ligado à ata |
+
+Migration (número livre na hora): grava `fisc_entregas.item_key` nos itens da carga casados, com movimento no histórico; nada é adivinhado (sem casamento único, fica a conferir). Fila "Itens a conferir" para o coordenador ou o fiscal escolherem o item do contrato. Depois disso, o Item 360 mostra também esses itens e a aba Itens deixa de separar o mesmo produto em várias grafias.
+
+**Ordem das próximas entregas de tela:** (a) vocabulário "item" e abas do menu; (b) Contrato 360 › Fiscalização como mesa e janela do item; (c) Programa 360 e Beneficiário 360; (d) Item 360 › Emendas; (e) ligação dos itens da carga ao item da ata (migration + fila a conferir). Programas dependem do cadastro `fisc_programas`/`fisc_item_programas` (seção 8).
+
+**Aba Contratos (11/11/2026, com especialista em telas e em fiscalização de contratos).** "Próximo passo" e "Próximo prazo" em colunas separadas confundiam: os dois respondem "o que falta e com que urgência". Viram uma coluna, **Situação**: o próximo passo do contrato (o mesmo do "Com você" da mesa; sem nada com o fiscal, "Com outros" com bolinha vazada), com o prazo desse passo numa etiqueta (vencido há N dias / vence em N dias) e "+N passos". Colunas: Contrato (com "vigência acaba em N dias · item a entregar" só quando faltam até 90 dias) · Situação · Entrega (em itens: "6 de 9 itens", com a barra e as unidades embaixo; o título da coluna já diz que é entrega) · Fiscal (texto simples, sempre visível, como a coluna Gestor da Carteira). Trilho por quem está com o contrato: **Com você** (o fiscal abre aqui) · Com outros · Todos (o coordenador abre aqui) · Finalizados; a fase vira filtro. Filtros: Fiscal · Prazo (Vencido / Vence em 15 dias / Em dia) · Fase · Programa. Ordem: vencidos mais antigos primeiro. A lista não tem botões (ficam no Contrato 360) nem detalhe por item ou beneficiário.
+
+**O que falta registrar para fiscalizar bem (proposta do especialista, por prioridade; a decidir).**
+1. Data em que o fornecedor recebeu a Ordem de Fornecimento e o prazo de entrega em dias: é a base do atraso e de eventual multa.
+2. Ocorrências (cobrança, notificação, pedido de prorrogação, defeito, recusa), com data, SEI e texto curto, gravadas pelo próprio botão do passo ("Cobrar o fornecedor" grava a ocorrência).
+3. Prorrogação do prazo de entrega: pedido, decisão, nova data e SEI, sem apagar a data antiga.
+4. Prazos de recebimento provisório e definitivo do contrato (dias), para os alertas "entregue sem TRP" e "TRP sem TRD".
+5. Nota fiscal: número, chegada e envio para pagamento (faturado e pago continuam vindo do Tesouro).
+6. Garantia contratual e garantia do produto; 7. Sanções e aditivos (só número, SEI e data).
+Alertas sugeridos: item atrasado sem cobrança registrada; vigência acabando com item a entregar; entregue sem TRP no prazo; TRP sem TRD; TRD sem envio para pagamento; pago sem Ofício à SAL; parado no Exército ou à espera da CAEP há mais de N dias; substituto sem portaria. Os "N dias" ficam para a CGLIC definir conforme os contratos e o TR; as normas citadas (Lei 14.133, arts. 111, 140 e 141) devem ser conferidas no texto.
+
+**Aba Itens (11/11/2026), alinhada à aba Contratos.** Trilho por quem está com o item: Com você (o fiscal abre aqui) · Com outros · Todos (o coordenador abre aqui) · Finalizados, pela mesma regra da mesa do contrato (comQuemEstaOItem). A fase vira filtro. Filtros: Fiscal · Prazo (Vencido / Vence em 15 dias / Em dia ou sem prazo / Entregue) · Fase · Programa · UF · Quem fiscaliza. Colunas (correção de 11/11/2026: a primeira coluna é o que a linha representa): Item (nº · Ata, nome e, embaixo, a emenda ou o programa) · Contrato · Beneficiário · Qtd. · Situação (etapa e prazo). A coluna Origem saiu: foi para baixo do nome do item, como nos Itens por contrato. A linha abre a janela do item.
+
+**Coluna Item igual aos "Itens por ata" do Pedido 360 (11/11/2026).** Em cima, o número do item em azul e "· Ata 00031/2025"; embaixo, o nome (nome curto da CAEP; sem ele, a descrição da ata), com a descrição inteira ao passar o mouse. A ata e o número saem da chave do item da ata (`ata-UASG-item`), sem dado novo. Item da planilha ainda sem ligação mostra "da planilha · sem item da ata" e o nome escrito na planilha. Na aba Itens a ata sai da célula do contrato para não aparecer duas vezes na linha.
+
+**Beneficiário em todas as telas da Fiscalização (11/11/2026).** Como no Pedido 360 (NomeComSigla): nome por extenso em negrito com "· SIGLA" em cinza, até duas linhas, CNPJ e razão social ao passar o mouse; embaixo, a cidade/UF de entrega. Sem cadastro: o nome da planilha e a etiqueta "Sem cadastro". Vale nas abas Beneficiários e Itens, nos Itens por contrato, na mesa do contrato e na janela do item.
+
+**Aba Beneficiários alinhada à aba Contratos.** Colunas: Beneficiário · Itens · Contratos · Entrega ("0 de 3 itens", barra, unidades) · Situação (etiqueta: "3 itens com prazo vencido" com "2 no Exército", "vence em 9 dias", "Tudo entregue"; sem etiqueta, "no prazo" ou "sem data prevista"). Trilho A entregar · Tudo entregue · Todos; filtros UF · Prazo · Programa · Cadastro.
+
+**Aba Programas alinhada (11/11/2026).** Colunas Programa · Itens · Entrega (em itens) · Situação (etiqueta), como Beneficiários e Contratos.
+
+**Mesa do Contrato 360, ajustes (11/11/2026).** Em "Onde está cada item": beneficiários com pendência primeiro (os com prazo vencido no topo) e os concluídos por último e fechados; acima de 5 beneficiários, "Com pendência · Todos" e "E mais N beneficiários sem pendência", como no Andamento do Pedido 360; quando todos os itens do beneficiário são da mesma emenda, a emenda vai para o título do grupo e sai das linhas.
+
+**"Onde está cada item" no padrão dos "Itens por ata" (11/11/2026, pedido do usuário).** Na mesa do Contrato 360, um bloco por beneficiário que abre e fecha (nome · SIGLA · cidade/UF · emenda | N itens · un · entregues | etiquetas "N com prazo vencido", "aguardando o Exército", "concluído"), com a tabela Item (nº · Ata, nome) · Qtd. · Situação; Abrir todos · Recolher todos. A régua longa fica só na janela do item. Assim Programa 360, Beneficiário 360 e Contrato 360 usam a mesma peça, mudando só o agrupamento (por contrato ou por beneficiário).
+
+**Janela do item (11/11/2026).** Título "70× nome do item" e "para nome · SIGLA · cidade/UF"; quadro com a régua, desde quando está na etapa e o prazo; campos Contrato (como na Carteira: número em azul que abre o contrato, fornecedor em maiúsculas) · Item da ata (número em azul que abre o Item 360 › Emendas, "· Ata X", descrição da ata) · Origem · Fiscal; Endereço de entrega numa linha (logradouro, bairro, cidade/UF, CEP do cadastro); Histórico com SEI; botões Entrega parcial · Data prevista · Quem fiscaliza (só na mista) · Mudar etapa. Saíram os links soltos "Abrir o contrato" e "Abrir o item da ata".
+
+**Colunas por pergunta (11/11/2026, a pedido do usuário: "parece que estamos sempre olhando a mesma coisa").** Cada aba responde uma pergunta e tem a coluna que só ela tem; "Situação" deixa de ser nome genérico.
+| Aba | Pergunta | Colunas |
+|---|---|---|
+| Programas | Quanto do programa já chegou, e onde? | Programa · Contratado (os itens maiores e "N itens · un. em N contratos") · Entrega · Beneficiários ("6 beneficiários" e as UFs embaixo) |
+| Contratos | O que o fiscal precisa fazer hoje? | Contrato · Próximo passo (com o prazo do passo) · Entrega · Fiscal |
+| Beneficiários | O que o órgão recebe, e quem mandou? | Beneficiário · O que recebe · Quem destinou (parlamentar e emenda, programa ou planilha) · Entrega |
+| Itens | Em que etapa está cada item? | Item · Beneficiário · Contrato · Qtd. · Etapa |
+Entrega é o único indicador repetido, de propósito, sempre igual: "2 de 8 itens", %, barra e o alerta embaixo ("2 itens com prazo vencido", "tudo entregue"). Nas tabelas dos 360 e na mesa, a coluna do item também se chama Etapa. O parlamentar vem do pedido de emenda (campo novo parlamentarNome na lista da Fiscalização).
+
+**Cadastro do programa (11/11/2026, decisão do usuário).** Campos: Nome · Área responsável (lista das Unidades Internas, não texto livre) · Origem do recurso (Emenda parlamentar · Fundo Nacional de Segurança Pública (FNSP) · BNDES ou outro fundo · Outro) · Situação (Ativo/Inativo, só na edição). Sem processo SEI, período ou observação. Lista em Ajustes › Gestão › Programas: Programa · Área responsável · Origem do recurso · Itens no programa · Situação; menu ⋯ com Editar, Inativar/Ativar e Excluir (só para programa sem item ligado; com itens, só inativar, como em Usuários e Unidades Internas). Programa inativo sai das listas da Fiscalização; itens e histórico ficam. Tabela `fisc_programas`: nome único, unidade_interna_id, origem_recurso, ativo.
+
+**Item 360 › Emendas (11/11/2026).** Na coluna "Beneficiários e entrega", cada beneficiário (pela sigla, como nas listas de pedidos) com a etiqueta da etapa, a mesma das tabelas da Fiscalização, e o atraso em vermelho quando vencido ("70× GCM · Aguardando o Exército · vencida há 256 dias · contrato 00055/2026"); o clique abre a janela do item. Saiu o texto "passo N de 7".
