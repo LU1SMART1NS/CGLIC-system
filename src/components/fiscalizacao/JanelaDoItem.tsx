@@ -16,11 +16,14 @@ import { IdentificacaoDoContrato } from './ContratosFiscalizacaoTabela';
 import { CarteiraIdLink } from '../carteira/CarteiraRowLink';
 import { buildAtaItemPath } from '../../hooks/useAta';
 import { CelulaPrazo, HistoricoDaEntrega } from './EntregasTabela';
-import { DividirEntregaModal, MudarEtapaModal, PrevistaModal, ResponsavelModal } from './EntregasModais';
+import { CorrigirEtapaModal, DividirEntregaModal, PrevistaModal, ResponsavelModal } from './EntregasModais';
+import { AvancarEtapaModal, VoltarEtapaItemModal } from './EtapaModais';
+import { RowActionsMenu } from '../../design-system/components/RowActionsMenu';
+import { proximasEtapas, rotuloDoAvanco } from '../../utils/fiscalizacaoPassos';
 import { ReguaDoItem } from './ReguaDoItem';
 import { LigarItemDaAtaModal } from './LigarItemDaAtaModal';
 
-type Acao = 'etapa' | 'parcial' | 'prevista' | 'responsavel';
+type Acao = 'avancar' | 'voltar' | 'corrigir' | 'parcial' | 'prevista' | 'responsavel';
 
 const Campo: React.FC<{ rotulo: string; largo?: boolean; children: React.ReactNode }> = ({ rotulo, largo, children }) => (
   <div style={{ minWidth: 0, gridColumn: largo ? '1 / -1' : undefined }}>
@@ -43,13 +46,16 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
   const b = rotuloDoBeneficiario(e);
   const endereco = enderecoDeEntrega(e);
   const area = e.responsavel === 'AREA';
+  const avanco = rotuloDoAvanco(proximasEtapas(e));
   const k = ataEItemDaChave(e.itemKey);
   // O link só aparece quando o contrato já tem item da ata para escolher (sem ata, a mesa aponta para a Vinculação).
   const itensDaAta = useItensDaAtaDoContrato(podeAgir && !e.itemKey ? e.contractKey : null);
   const podeLigar = podeAgir && !e.itemKey && (itensDaAta.data?.length ?? 0) > 0;
   const fechar = () => { setAcao(null); onClose(); };
   if (ligando) return <LigarItemDaAtaModal contractKey={e.contractKey} contratoNumero={e.contratoNumero} foco={e.id} onClose={fechar} />;
-  if (acao === 'etapa') return <MudarEtapaModal entregas={[e]} onClose={fechar} />;
+  if (acao === 'avancar') return <AvancarEtapaModal entregas={[e]} onClose={fechar} />;
+  if (acao === 'voltar') return <VoltarEtapaItemModal entrega={e} onClose={fechar} />;
+  if (acao === 'corrigir') return <CorrigirEtapaModal entregas={[e]} onClose={fechar} />;
   if (acao === 'parcial') return <DividirEntregaModal entrega={e} onClose={fechar} />;
   if (acao === 'prevista') return <PrevistaModal entregas={[e]} onClose={fechar} />;
   if (acao === 'responsavel') return <ResponsavelModal entregas={[e]} onClose={fechar} />;
@@ -64,10 +70,21 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
       footer={
         podeAgir ? (
           <>
+            {!area && (
+              <RowActionsMenu
+                label="Mais ações do item"
+                testId="fisc-janela-mais"
+                actions={[
+                  { label: 'Voltar etapa', onClick: () => setAcao('voltar') },
+                  ...(role === 'admin' ? [{ label: 'Corrigir a etapa', onClick: () => setAcao('corrigir') }] : [])
+                ]}
+              />
+            )}
+            <span style={{ flex: 1 }} />
             {!area && <AppButton variant="outline" size="sm" disabled={e.quantidade < 2} onClick={() => setAcao('parcial')} data-testid="fisc-janela-parcial">Entrega parcial</AppButton>}
             {!area && <AppButton variant="outline" size="sm" onClick={() => setAcao('prevista')} data-testid="fisc-janela-prevista">Data prevista</AppButton>}
             {e.fiscalizacao === 'MISTA' && <AppButton variant="outline" size="sm" onClick={() => setAcao('responsavel')} data-testid="fisc-janela-responsavel">Quem fiscaliza</AppButton>}
-            {!area && <AppButton variant="primary" size="sm" onClick={() => setAcao('etapa')} data-testid="fisc-janela-etapa">Mudar etapa</AppButton>}
+            {!area && avanco && <AppButton variant="primary" size="sm" onClick={() => setAcao('avancar')} data-testid="fisc-janela-avancar">{avanco}</AppButton>}
           </>
         ) : (
           <ActionButton action="fechar" size="sm" onClick={onClose} />

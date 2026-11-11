@@ -11,6 +11,8 @@ import {
   fetchEntregasFiscalizacao,
   fetchMovimentosDaEntrega,
   mudarEtapaEntregas,
+  corrigirEtapaEntregas,
+  voltarEtapaEntrega,
   type EntregaDaLinha,
   type EntregaFiscalizacao,
   type MovimentoEntrega,
@@ -119,6 +121,8 @@ function useMutacaoDeEntregas<I>(fn: (input: I) => Promise<void>) {
 }
 
 export const useMudarEtapaEntregas = () => useMutacaoDeEntregas(mudarEtapaEntregas);
+export const useCorrigirEtapaEntregas = () => useMutacaoDeEntregas(corrigirEtapaEntregas);
+export const useVoltarEtapaEntrega = () => useMutacaoDeEntregas(voltarEtapaEntrega);
 export const useDividirEntrega = () => useMutacaoDeEntregas(dividirEntrega);
 export const useDefinirPrevistaEntregas = () => useMutacaoDeEntregas(definirPrevistaEntregas);
 export const useDefinirResponsavelEntregas = () => useMutacaoDeEntregas(definirResponsavelEntregas);
