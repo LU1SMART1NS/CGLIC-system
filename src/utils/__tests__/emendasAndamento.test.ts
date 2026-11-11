@@ -107,8 +107,9 @@ describe('Andamento do pedido: as etapas como tarefas', () => {
     const contratado = new Map([['l1', nota('l1', { contractKey: '200331-00163-2026' })]]);
     expect(estado(p, 'ordem', contratado)).toMatchObject({ estado: 'COMIGO', acao: 'FAZER', comQuem: 'CAEP', fase: 'EXECUCAO' });
     expect(andamentoDoPedido(p, itens, contratado, HOJE, true).contagem.COMIGO).toBe(1);
-    // Registrada pela CAEP: a data.
-    expect(estado({ ...p, ordemFornecimentoEm: '2026-10-28', ordemFornecimentoDocumentoSei: '41234567' }, 'ordem', contratado)).toMatchObject({ estado: 'FEITA', feito: '28/10/2026' });
+    // Ordem emitida pela SFC no contrato (migration 250): a data.
+    const comOrdem = { ...p, ordens: [{ id: 'o1', contractKey: '200331-00163-2026', informacaoEm: '2026-10-20', informacaoDocumentoSei: '41234560', ordemEm: '2026-10-28', ordemDocumentoSei: '41234567' }] };
+    expect(estado(comOrdem, 'ordem', contratado)).toMatchObject({ estado: 'FEITA', feito: '28/10/2026' });
     // Já com fatura e sem registro: comprovada pela entrega.
     const faturado = new Map([['l1', nota('l1', { contractKey: '200331-00163-2026', faturas: 1, faturadoEm: '2026-07-20' })]]);
     expect(estado(p, 'ordem', faturado)).toMatchObject({ estado: 'FEITA', feito: 'comprovado pela entrega' });
