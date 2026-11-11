@@ -8,8 +8,6 @@ import { SectionHeader } from '../../design-system/components/SectionHeader';
 import { AppButton } from '../../design-system/components/AppButton';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBar';
-import { DataTable, type Column } from '../../design-system/components/DataTable';
-import { carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { AdminListShell } from '../admin/shared/AdminListShell';
@@ -26,10 +24,11 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useContratosFiscalizacao, useEntregasFiscalizacao } from '../../hooks/useFiscalizacao';
 import { prazoDaEntrega } from '../../utils/fiscalizacaoEntregas';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, cargaPorFiscal, comSfc, dataBR, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, type CargaDoFiscal } from '../../utils/fiscalizacao';
+import { NOME_SFC, cargaPorFiscal, comSfc, dataBR, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato } from '../../utils/fiscalizacao';
 import { useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
 
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
+import { GavetaDistribuicaoFiscais } from './GavetaDistribuicaoFiscais';
 import { RegistrarProcessoModal } from './FiscalizacaoModais';
 
 const POR_PAGINA = 25;
@@ -150,13 +149,6 @@ export const FiscalizacaoInicioPage: React.FC = () => {
     resumo: `${carga.length} ${carga.length === 1 ? 'fiscal' : 'fiscais'}${ausentes.length ? ` · ${ausentes.length} ${ausentes.length === 1 ? 'ausente' : 'ausentes'}` : ''}`,
     atencao: ausentes.length > 0
   }));
-  const colunasCarga: Column<CargaDoFiscal>[] = [
-    { key: 'nome', header: 'Fiscal', render: (f) => <span style={{ ...carteiraValor, fontWeight: 700 }}>{f.nome}</span> },
-    { key: 'contratos', header: 'Contratos', align: 'right', render: (f) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{f.contratos}</span> },
-    { key: 'substituto', header: 'Como substituto', align: 'right', render: (f) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{f.comoSubstituto}</span> },
-    { key: 'autuar', header: 'A autuar', align: 'right', render: (f) => <span style={{ ...carteiraValor, ...carteiraNumero, color: f.aAutuar ? 'var(--color-warning-text)' : undefined }}>{f.aAutuar}</span> },
-    { key: 'portaria', header: 'Sem portaria', align: 'right', render: (f) => <span style={{ ...carteiraValor, ...carteiraNumero, color: f.semPortaria ? 'var(--color-warning-text)' : undefined }}>{f.semPortaria}</span> }
-  ];
 
   const qtd = (n: number) => String(n);
   const chipsDaFaixa: PainelFaixaChip[] = [
@@ -270,16 +262,13 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               id="distribuicao"
               onFechar={() => alternarGaveta('distribuicao')}
               subtitulo="Clique num fiscal para ver o painel dele."
-              hint="Contratos com a SFC/CGLIC de cada fiscal (titular e substituto) e o que falta autuar ou registrar. Transferir e ausências ficam em Distribuição › Equipe."
+              hint="Contratos com a SFC/CGLIC de cada fiscal (titular e substituto) e o que falta autuar ou registrar; “A definir” leva à Distribuição. Transferir e ausências ficam em Distribuição › Equipe."
             >
-              <DataTable<CargaDoFiscal>
-                testId="fisc-inicio-carga"
-                className="data-table-container--flush"
-                data={carga}
-                keyExtractor={(f) => f.userId}
-                columns={colunasCarga}
-                rowOpen={(f) => () => mudarEndereco({ fiscal: f.userId, gaveta: null })}
-                emptyMessage="Nenhum servidor com o perfil Gestor de Fiscalização."
+              <GavetaDistribuicaoFiscais
+                carga={carga}
+                aDefinir={aDefinir.length}
+                onEscolherFiscal={(userId) => mudarEndereco({ fiscal: userId, gaveta: null })}
+                onDistribuir={() => navigate('/fiscalizacao/distribuicao')}
               />
             </PainelGaveta>
           )}
