@@ -54,6 +54,12 @@ describe('nomes', () => {
     expect(rotuloDoBeneficiario(e({ beneficiarioSigla: 'PMERJ', beneficiarioNome: 'Polícia Militar do Estado do Rio de Janeiro' }))).toEqual({ principal: 'PMERJ', detalhe: 'Polícia Militar do Estado do Rio de Janeiro' });
     expect(rotuloDoBeneficiario(e({})).principal).toBe('Beneficiário a informar');
   });
+  it('entrega da planilha: item e destinatário em texto', () => {
+    expect(nomeDoItem(e({ itemTexto: 'Drone tipo II' }))).toBe('Drone tipo II');
+    expect(rotuloDoBeneficiario(e({ beneficiarioTexto: 'Unidade Aérea Pública - DF' })).principal).toBe('Unidade Aérea Pública - DF');
+    expect(linhaParaEntrega({ id: 'x', quantidade: 1, origem: 'CARGA', programa_texto: 'Projeto Pegasus', carga_linha: 1483 })).toMatchObject({ programaTexto: 'Projeto Pegasus', cargaLinha: 1483 });
+  });
+
   it('item pelo nome curto, depois a descrição', () => {
     expect(nomeDoItem(e({ itemDescricao: 'Carabina 5,56' }))).toBe('Carabina 5,56');
     expect(nomeDoItem(e({ itemNome: 'Carabina', itemDescricao: 'Carabina 5,56' }))).toBe('Carabina');
