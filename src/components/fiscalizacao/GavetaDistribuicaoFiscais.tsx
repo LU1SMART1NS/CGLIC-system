@@ -7,9 +7,9 @@ const plural = (n: number, um: string, varios: string) => `${formatNumber(n)} ${
 /**
  * Gaveta Distribuição do Painel da fiscalização, nos mesmos cartões da gaveta de Atas e Contratos (GavetaDistribuicao):
  * primeiro o "A definir" (contratos de emenda sem decisão, que levam à Distribuição), depois um cartão por fiscal com os
- * contratos de que é titular (e o que falta autuar ou registrar), os em que é substituto e a barra da carga em relação à
- * maior carteira. Ordem: mais pendências, depois a maior carteira. Fiscal sem contrato vai para uma linha no rodapé. O
- * cartão do fiscal filtra o Painel pela carteira dele.
+ * contratos (e o que falta autuar ou registrar) e a barra da carga em relação à maior carteira. Ordem: mais pendências,
+ * depois a maior carteira. Fiscal sem contrato vai para uma linha no rodapé. O cartão do fiscal filtra o Painel pela
+ * carteira dele.
  */
 export const GavetaDistribuicaoFiscais: React.FC<{
   carga: CargaDoFiscal[];
@@ -17,8 +17,8 @@ export const GavetaDistribuicaoFiscais: React.FC<{
   onEscolherFiscal: (userId: string) => void;
   onDistribuir: () => void;
 }> = ({ carga, aDefinir, onEscolherFiscal, onDistribuir }) => {
-  const comCarteira = carga.filter((f) => f.contratos + f.comoSubstituto > 0);
-  const semCarteira = carga.filter((f) => f.contratos + f.comoSubstituto === 0).map((f) => f.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const comCarteira = carga.filter((f) => f.contratos > 0);
+  const semCarteira = carga.filter((f) => f.contratos === 0).map((f) => f.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const maior = Math.max(0, ...comCarteira.map((f) => f.contratos));
   const pendencias = (f: CargaDoFiscal) => f.aAutuar + f.semPortaria;
   const fiscais = [...comCarteira].sort((a, b) => pendencias(b) - pendencias(a) || b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -69,10 +69,6 @@ export const GavetaDistribuicaoFiscais: React.FC<{
                     {f.aAutuar > 0 && <span className="pn-gc-tag pn-gc-tag--atencao">{formatNumber(f.aAutuar)} a autuar</span>}
                     {f.semPortaria > 0 && <span className="pn-gc-tag pn-gc-tag--atencao">{formatNumber(f.semPortaria)} sem portaria</span>}
                   </span>
-                </span>
-                <span className="pn-gc-lado">
-                  <span className="pn-gc-rotulo">Substituto</span>
-                  <span className="pn-gc-num">{formatNumber(f.comoSubstituto)}</span>
                 </span>
               </span>
               <span className="pn-gc-carga">

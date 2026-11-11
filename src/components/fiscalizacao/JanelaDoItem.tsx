@@ -36,7 +36,7 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
   const { user, role } = useAuth();
   const navigate = useNavigateWithOrigin();
   const [acao, setAcao] = useState<Acao | null>(null);
-  const podeAgir = role === 'admin' || (role === 'gestor_fiscalizacao' && (e.fiscalUserId === user?.id || e.substitutoUserId === user?.id));
+  const podeAgir = role === 'admin' || (role === 'gestor_fiscalizacao' && e.fiscalUserId === user?.id);
   const b = rotuloDoBeneficiario(e);
   const endereco = enderecoDeEntrega(e);
   const area = e.responsavel === 'AREA';

@@ -40,25 +40,9 @@ export function decisaoSugerida(c: Pick<ContratoFiscalizacao, 'situacao' | 'emen
 
 export const MOTIVO_MINIMO = 10;
 
-/** O usuário fiscaliza o contrato (titular ou substituto)? */
-export function ehDoFiscal(c: Pick<ContratoFiscalizacao, 'fiscalUserId' | 'substitutoUserId'>, userId: string | null | undefined): boolean {
-  return Boolean(userId) && (c.fiscalUserId === userId || c.substitutoUserId === userId);
-}
-
-/**
- * Substitutos designados nos contratos em que o servidor é o fiscal titular, do que substitui mais contratos ao que
- * substitui menos. Na transferência temporária, quem assume deve ser, de preferência, o substituto da portaria.
- */
-export function substitutosDoTitular(contratos: ContratoFiscalizacao[], titularUserId: string): Array<{ userId: string; nome: string; contratos: number }> {
-  const porId = new Map<string, { userId: string; nome: string; contratos: number }>();
-  contratos
-    .filter((c) => comSfc(c) && c.fiscalUserId === titularUserId && c.substitutoUserId)
-    .forEach((c) => {
-      const s = porId.get(c.substitutoUserId!) ?? { userId: c.substitutoUserId!, nome: c.substitutoNome ?? '', contratos: 0 };
-      s.contratos += 1;
-      porId.set(s.userId, s);
-    });
-  return [...porId.values()].sort((a, b) => b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));
+/** O usuário é o fiscal do contrato? */
+export function ehDoFiscal(c: Pick<ContratoFiscalizacao, 'fiscalUserId'>, userId: string | null | undefined): boolean {
+  return Boolean(userId) && c.fiscalUserId === userId;
 }
 
 /** O que falta no contrato com a SFC/CGLIC nesta entrega: portaria e autuação do processo. */
@@ -80,13 +64,12 @@ export interface CargaDoFiscal {
   userId: string;
   nome: string;
   contratos: number;
-  comoSubstituto: number;
   aAutuar: number;
-  /** Contratos do fiscal (titular) sem portaria registrada. */
+  /** Contratos do fiscal sem portaria registrada. */
   semPortaria: number;
 }
 
-/** Contratos por fiscal (titular), com os que ele substitui, os que faltam autuar e os sem portaria. */
+/** Contratos por fiscal, com os que faltam autuar e os sem portaria. */
 export function cargaPorFiscal(contratos: ContratoFiscalizacao[], fiscais: Array<{ id: string; nome: string }>): CargaDoFiscal[] {
   return fiscais
     .map((f) => {
@@ -95,7 +78,6 @@ export function cargaPorFiscal(contratos: ContratoFiscalizacao[], fiscais: Array
         userId: f.id,
         nome: f.nome,
         contratos: titular.length,
-        comoSubstituto: contratos.filter((c) => comSfc(c) && c.substitutoUserId === f.id).length,
         aAutuar: titular.filter((c) => !c.processoSei).length,
         semPortaria: titular.filter((c) => !c.portariaSei).length
       };

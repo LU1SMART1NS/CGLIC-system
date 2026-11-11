@@ -14,11 +14,10 @@ import { useSelecaoFila } from '../atas/distribuicao/DistribuicaoSelecao';
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
-/** Carteira do fiscal: contratos em que é titular, os que substitui e a ausência (saiu ou recebeu de colega). */
+/** Carteira do fiscal: contratos e a ausência (saiu ou recebeu de colega). */
 const CarteiraCell: React.FC<{ f: CargaDoFiscal; ausencia: TransferenciaFiscal | null; recebidas: TransferenciaFiscal[] }> = ({ f, ausencia, recebidas }) => (
   <div>
     <span style={{ fontWeight: 700 }}>{plural(f.contratos, 'contrato', 'contratos')}</span>
-    {f.comoSubstituto > 0 && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{plural(f.comoSubstituto, 'como substituto', 'como substituto')}</div>}
     {ausencia && (
       <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-warning-text)' }} data-testid={`fisc-equipe-ausente-${f.userId}`}>
         {ausencia.retornoPrevisto <= hojeEmBrasilia() ? `retorno em ${dataBR(ausencia.retornoPrevisto)}: devolver os contratos` : `ausente até ${dataBR(ausencia.retornoPrevisto)}`} · com {ausencia.destinoNome}
@@ -117,7 +116,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
     const q = busca.trim().toLowerCase();
     return q ? carga.filter((f) => f.nome.toLowerCase().includes(q)) : carga;
   }, [carga, busca]);
-  const doFiscal = (userId: string) => contratos.filter((c) => comSfc(c) && (c.fiscalUserId === userId || c.substitutoUserId === userId));
+  const doFiscal = (userId: string) => contratos.filter((c) => comSfc(c) && c.fiscalUserId === userId);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} data-testid="fisc-equipe">
@@ -152,7 +151,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
               <tbody>
                 {filtradas.map((f) => {
                   const expandido = aberto === f.userId;
-                  const temContratos = f.contratos + f.comoSubstituto > 0;
+                  const temContratos = f.contratos > 0;
                   const ausencia = ausenciaDe(f.userId);
                   return (
                     <React.Fragment key={f.userId}>
@@ -254,7 +253,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
           }}
         />
       )}
-      {janela?.tipo === 'TEMPORARIA' && <TransferirFiscalTemporariamenteModal carga={janela.carga} contratos={contratos} ausentes={transferencias} onClose={() => setJanela(null)} />}
+      {janela?.tipo === 'TEMPORARIA' && <TransferirFiscalTemporariamenteModal carga={janela.carga} ausentes={transferencias} onClose={() => setJanela(null)} />}
       {janela?.tipo === 'DESFAZER' && <DesfazerTransferenciaFiscalModal transferencia={janela.transferencia} onClose={() => setJanela(null)} />}
     </div>
   );

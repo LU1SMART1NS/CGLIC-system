@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { linhaParaContrato } from '../../services/fiscalizacaoService';
-import { cargaPorFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato, substitutosDoTitular } from '../fiscalizacao';
+import { cargaPorFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato } from '../fiscalizacao';
 
 const base: ContratoFiscalizacao = {
   contractKey: '200331-00055-2026', uasg: '200331', numero: '00055/2026', fornecedor: 'CONDOR', objeto: null, assinatura: '2026-01-29', vigenciaFim: '2027-01-29',
-  emendas: ['27960009'], situacao: 'A_DEFINIR', motivo: null, fiscalUserId: null, fiscalNome: null, substitutoUserId: null, substitutoNome: null,
+  emendas: ['27960009'], situacao: 'A_DEFINIR', motivo: null, fiscalUserId: null, fiscalNome: null,
   portariaSei: null, processoSei: null, autuadoEm: null, definidoPorNome: null, definidoEm: null
 };
 const c = (p: Partial<ContratoFiscalizacao>): ContratoFiscalizacao => ({ ...base, ...p });
@@ -36,23 +36,23 @@ describe('fiscalização do contrato', () => {
     expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1', processoSei: '34472015', autuadoEm: '2026-02-05', portariaSei: '34152364' }))).toEqual([]);
   });
 
-  it('fiscal ou substituto', () => {
-    const x = c({ situacao: 'SFC', fiscalUserId: 'u1', substitutoUserId: 'u2' });
+  it('é do fiscal', () => {
+    const x = c({ situacao: 'SFC', fiscalUserId: 'u1' });
     expect(ehDoFiscal(x, 'u1')).toBe(true);
-    expect(ehDoFiscal(x, 'u2')).toBe(true);
+    expect(ehDoFiscal(x, 'u2')).toBe(false);
     expect(ehDoFiscal(x, 'u3')).toBe(false);
     expect(ehDoFiscal(x, undefined)).toBe(false);
   });
 
-  it('carga por fiscal conta titular, substituto, a autuar e sem portaria', () => {
+  it('carga por fiscal conta contratos, a autuar e sem portaria', () => {
     const lista = [
-      c({ contractKey: 'a', situacao: 'SFC', fiscalUserId: 'u1', substitutoUserId: 'u2' }),
+      c({ contractKey: 'a', situacao: 'SFC', fiscalUserId: 'u1' }),
       c({ contractKey: 'b', situacao: 'MISTA', fiscalUserId: 'u1', processoSei: '1234567', autuadoEm: '2026-01-01' }),
       c({ contractKey: 'c', situacao: 'AREA', fiscalUserId: null })
     ];
     const carga = cargaPorFiscal(lista, [{ id: 'u2', nome: 'Bia' }, { id: 'u1', nome: 'Ana' }]);
-    expect(carga[0]).toEqual({ userId: 'u1', nome: 'Ana', contratos: 2, comoSubstituto: 0, aAutuar: 1, semPortaria: 2 });
-    expect(carga[1]).toEqual({ userId: 'u2', nome: 'Bia', contratos: 0, comoSubstituto: 1, aAutuar: 0, semPortaria: 0 });
+    expect(carga[0]).toEqual({ userId: 'u1', nome: 'Ana', contratos: 2, aAutuar: 1, semPortaria: 2 });
+    expect(carga[1]).toEqual({ userId: 'u2', nome: 'Bia', contratos: 0, aAutuar: 0, semPortaria: 0 });
   });
 
   it('número do contrato pela chave quando a fonte não traz', () => {
@@ -68,23 +68,5 @@ describe('fiscalização do contrato', () => {
     expect(x.emendas).toEqual(['1']);
     expect(x.fiscalNome).toBe('Ana');
     expect(x.processoSei).toBeNull();
-  });
-});
-
-describe('substitutosDoTitular', () => {
-  it('lista os substitutos dos contratos do titular, do mais frequente ao menos, só com a SFC/CGLIC', () => {
-    const lista = [
-      c({ contractKey: 'a', situacao: 'SFC', fiscalUserId: 'u1', substitutoUserId: 's1', substitutoNome: 'Bia' }),
-      c({ contractKey: 'b', situacao: 'SFC', fiscalUserId: 'u1', substitutoUserId: 's2', substitutoNome: 'Ana' }),
-      c({ contractKey: 'c', situacao: 'MISTA', fiscalUserId: 'u1', substitutoUserId: 's2', substitutoNome: 'Ana' }),
-      c({ contractKey: 'd', situacao: 'SFC', fiscalUserId: 'u1', substitutoUserId: null }),
-      c({ contractKey: 'e', situacao: 'SFC', fiscalUserId: 'u9', substitutoUserId: 's1', substitutoNome: 'Bia' }),
-      c({ contractKey: 'f', situacao: 'AREA', fiscalUserId: null, substitutoUserId: null })
-    ];
-    expect(substitutosDoTitular(lista, 'u1')).toEqual([
-      { userId: 's2', nome: 'Ana', contratos: 2 },
-      { userId: 's1', nome: 'Bia', contratos: 1 }
-    ]);
-    expect(substitutosDoTitular(lista, 'u3')).toEqual([]);
   });
 });

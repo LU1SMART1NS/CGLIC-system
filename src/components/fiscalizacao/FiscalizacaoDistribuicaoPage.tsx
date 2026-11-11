@@ -53,7 +53,7 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
       .filter(
         (c) =>
           (!q || `${numeroDoContrato(c)} ${c.fornecedor ?? ''} ${c.emendas.join(' ')} ${c.fiscalNome ?? ''}`.toLowerCase().includes(q)) &&
-          (!fiscal || c.fiscalUserId === fiscal || c.substitutoUserId === fiscal) &&
+          (!fiscal || c.fiscalUserId === fiscal) &&
           (!origem || (origem === 'EMENDA' ? deEmenda(c) : !deEmenda(c)))
       )
       .sort((a, b) => (b.assinatura ?? '').localeCompare(a.assinatura ?? ''));
@@ -101,7 +101,7 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
         testIdPrefix="fisc-dist"
       >
         <CarteiraFilterButton label="Origem" value={origem} emptyValue="" options={[{ value: 'EMENDA', label: 'Com emenda', count: doSeg.filter(deEmenda).length }, { value: 'SEM', label: 'Sem emenda', count: doSeg.filter((c) => !deEmenda(c)).length }]} onChange={setOrigem} testId="fisc-dist-filtro-origem" />
-        <CarteiraFilterButton label="Fiscal" value={fiscal} emptyValue="" options={fiscais.map((f) => ({ value: f.id, label: f.nome, count: doSeg.filter((c) => c.fiscalUserId === f.id || c.substitutoUserId === f.id).length }))} onChange={setFiscal} testId="fisc-dist-filtro-fiscal" />
+        <CarteiraFilterButton label="Fiscal" value={fiscal} emptyValue="" options={fiscais.map((f) => ({ value: f.id, label: f.nome, count: doSeg.filter((c) => c.fiscalUserId === f.id).length }))} onChange={setFiscal} testId="fisc-dist-filtro-fiscal" />
       </CarteiraFilterBar>
       <AdminListShell
         testId="fisc-dist-lista"
