@@ -60,7 +60,8 @@ export function linhaParaContrato(r: any): ContratoFiscalizacao {
     processoSei: r.processo_sei || null,
     autuadoEm: r.autuado_em || null,
     definidoPorNome: r.definido_por_nome || null,
-    definidoEm: r.definido_em || null
+    definidoEm: r.definido_em || null,
+    atas: Array.isArray(r.atas) ? r.atas.filter(Boolean) : []
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -157,6 +158,15 @@ export interface EntregaFiscalizacao {
   pagoEm: string | null;
   atualizadoPorNome: string | null;
   atualizadoEm: string | null;
+  /** Programa do cadastro (migration 265); programaTexto traz o nome dele (ou o texto da planilha). */
+  programaId?: string | null;
+  programaAtivo?: boolean | null;
+  /** Endereço de entrega do cadastro do beneficiário (migration 265). */
+  entregaLogradouro?: string | null;
+  entregaNumero?: string | null;
+  entregaComplemento?: string | null;
+  entregaBairro?: string | null;
+  entregaCep?: string | null;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -196,7 +206,15 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
     faturadoEm: r.faturado_em || null,
     pagoEm: r.pago_em || null,
     atualizadoPorNome: r.atualizado_por_nome || null,
-    atualizadoEm: r.atualizado_em || null
+    atualizadoEm: r.atualizado_em || null,
+    programaId: r.programa_id || null,
+    programaAtivo: r.programa_ativo ?? null,
+    parlamentarNome: r.parlamentar_nome || null,
+    entregaLogradouro: r.entrega_logradouro || null,
+    entregaNumero: r.entrega_numero || null,
+    entregaComplemento: r.entrega_complemento || null,
+    entregaBairro: r.entrega_bairro || null,
+    entregaCep: r.entrega_cep || null
   };
 }
 
@@ -385,4 +403,59 @@ export async function fetchEntregasDoPedido(pedidoId: string): Promise<EntregaDa
     divididaDe: r.dividida_de || null,
     fiscalNome: r.fiscal_nome || null
   }));
+}
+
+// ── Programas (migration 265) ─────────────────────────────────────────────────────────────────────
+
+export type OrigemDoRecurso = 'EMENDA' | 'FNSP' | 'FUNDO' | 'OUTRO';
+export interface ProgramaFiscalizacao {
+  id: string;
+  nome: string;
+  unidadeId: string | null;
+  unidadeSigla: string | null;
+  origemRecurso: OrigemDoRecurso | null;
+  ativo: boolean;
+  itens: number;
+  atualizadoPorNome: string | null;
+  atualizadoEm: string | null;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export function linhaParaPrograma(r: any): ProgramaFiscalizacao {
+  return {
+    id: r.id,
+    nome: r.nome,
+    unidadeId: r.unidade_id || null,
+    unidadeSigla: r.unidade_sigla || null,
+    origemRecurso: r.origem_recurso || null,
+    ativo: r.ativo !== false,
+    itens: Number(r.itens) || 0,
+    atualizadoPorNome: r.atualizado_por_nome || null,
+    atualizadoEm: r.atualizado_em || null
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+export async function fetchProgramasFiscalizacao(): Promise<ProgramaFiscalizacao[]> {
+  const { data, error } = await cliente().rpc('fisc_programas_lista');
+  if (error) throw mapPostgresErrorToAppError(error);
+  return (data || []).map(linhaParaPrograma);
+}
+
+export async function salvarProgramaFiscalizacao(input: { id: string | null; nome: string; unidadeId: string; origem: OrigemDoRecurso; ativo: boolean }): Promise<string> {
+  const { data, error } = await cliente().rpc('salvar_fisc_programa', { p_id: input.id, p_nome: input.nome.trim(), p_unidade: input.unidadeId, p_origem: input.origem, p_ativo: input.ativo });
+  if (error) throw mapPostgresErrorToAppError(error);
+  return data as string;
+}
+
+export async function excluirProgramaFiscalizacao(id: string): Promise<void> {
+  const { error } = await cliente().rpc('excluir_fisc_programa', { p_id: id });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Inclui e retira itens (contrato × item × beneficiário) do programa. */
+export async function definirProgramaDasEntregas(input: { programaId: string; incluir: string[]; retirar: string[] }): Promise<{ incluidos: number; retirados: number }> {
+  const { data, error } = await cliente().rpc('definir_programa_das_entregas', { p_programa: input.programaId, p_incluir: input.incluir, p_retirar: input.retirar });
+  if (error) throw mapPostgresErrorToAppError(error);
+  return { incluidos: Number(data?.incluidos) || 0, retirados: Number(data?.retirados) || 0 };
 }

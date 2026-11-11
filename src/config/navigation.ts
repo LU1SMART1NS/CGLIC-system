@@ -364,14 +364,24 @@ export const navigationConfig: NavItem[] = [
   },
   {
     // Fiscalização de contratos pela SFC/CGLIC (migration 260): a área de trabalho, como Emendas; o Painel e a
-    // Distribuição ficam no Início. Programas entra numa próxima entrega.
+    // Distribuição ficam no Início.
     id: 'fiscalizacao',
     label: 'Fiscalização',
     icon: ClipboardCheck,
     status: 'active',
-    // Abas na ordem decidida em 11/11/2026 (Programas entra quando o cadastro de programas existir); abre em Contratos.
+    // Abas na ordem decidida em 11/11/2026: Programas (cadastro da migration 265) · Contratos · Beneficiários · Itens;
+    // abre em Contratos, a fila de trabalho do fiscal.
     entradaId: 'fiscalizacao-contratos',
     children: [
+      {
+        id: 'fiscalizacao-programas',
+        label: 'Programas',
+        icon: Network,
+        route: '/fiscalizacao/programas',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/programas'],
+        allowedRoles: ['admin', 'gestor_fiscalizacao', 'leitor']
+      },
       {
         id: 'fiscalizacao-contratos',
         label: 'Contratos',
@@ -408,6 +418,17 @@ export const navigationConfig: NavItem[] = [
     status: 'active',
     placement: 'bottom',
     children: [
+      {
+        // Cadastro dos programas da Fiscalização (migration 265), antes dos Modelos de Gestão (decisão de 11/11/2026).
+        id: 'config-programas',
+        label: 'Programas',
+        icon: Network,
+        route: '/configuracoes/programas',
+        status: 'active',
+        group: 'Gestão',
+        matchPrefixes: ['/configuracoes/programas'],
+        allowedRoles: ['admin', 'gestor_fiscalizacao']
+      },
       {
         id: 'config-modelos',
         label: 'Modelos de Gestão',
@@ -579,6 +600,7 @@ const staticRouteLabels: Record<string, string> = {
   '/atas/distribuicao': 'Distribuição',
   '/contratos': 'Carteira de Contratos',
   '/configuracoes/modelos': 'Modelos de Gestão',
+  '/configuracoes/programas': 'Programas',
   '/pagamentos': 'Pagamentos',
   '/empenhos': 'Empenhos',
   '/vinculacao/contratos': 'Contratos à ata',

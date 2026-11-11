@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin } from 'lucide-react';
+import { enderecoDeEntrega } from '../../utils/fiscalizacaoResumo';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
@@ -37,6 +38,7 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
   const [acao, setAcao] = useState<Acao | null>(null);
   const podeAgir = role === 'admin' || (role === 'gestor_fiscalizacao' && (e.fiscalUserId === user?.id || e.substitutoUserId === user?.id));
   const b = rotuloDoBeneficiario(e);
+  const endereco = enderecoDeEntrega(e);
   const area = e.responsavel === 'AREA';
   const k = ataEItemDaChave(e.itemKey);
   const fechar = () => { setAcao(null); onClose(); };
@@ -114,9 +116,12 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
           </Campo>
           <Campo rotulo="Endereço de entrega" largo>
             {e.beneficiarioId ? (
-              <span style={{ display: 'inline-flex', gap: '0.3rem', alignItems: 'center', fontSize: '0.85rem' }}>
-                <MapPin size={13} aria-hidden="true" /> {e.municipio ? `${e.municipio}/${e.uf}` : e.uf ?? '—'} <span style={{ ...carteiraDetalhe, marginTop: 0 }}>· do cadastro do beneficiário</span>
-              </span>
+              <div data-testid="fisc-janela-endereco">
+                <span style={{ display: 'inline-flex', gap: '0.3rem', alignItems: 'center', fontSize: '0.85rem', fontWeight: 600 }}>
+                  <MapPin size={13} aria-hidden="true" /> {endereco.rua ?? endereco.detalhe}
+                </span>
+                <div style={carteiraDetalhe}>{endereco.rua ? `${endereco.detalhe} · ` : ''}do cadastro do beneficiário</div>
+              </div>
             ) : (
               <span style={carteiraDetalhe}>beneficiário sem cadastro: ligue ao cadastro para ver o endereço</span>
             )}

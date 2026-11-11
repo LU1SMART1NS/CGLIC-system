@@ -80,6 +80,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
     it('Ajustes tem os Modelos de Gestão, o cadastro de beneficiários das emendas e a administração do sistema', () => {
       const area = navigationConfig.find((i) => i.id === 'configuracoes')!;
       expect(area.children!.map((c) => [c.label, c.route])).toEqual([
+        ['Programas', '/configuracoes/programas'],
         ['Modelos de Gestão', '/configuracoes/modelos'],
         ['Regras de Alertas', '/admin/regras-alertas'],
         ['Feriados', '/admin/feriados'],
@@ -91,7 +92,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         ['Usuários e Servidores', '/admin/usuarios'],
         ['Perfis e Permissões', '/admin/perfis']
       ]);
-      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Emendas', 'Emendas', 'Emendas', 'Acesso', 'Acesso']);
+      expect(area.children!.map((c) => c.group)).toEqual(['Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Gestão', 'Emendas', 'Emendas', 'Emendas', 'Acesso', 'Acesso']);
     });
 
     it('não deve conter itens legados isolados no menu (SEI, Exportar Excel, Prorrogações soltas)', () => {
@@ -383,7 +384,10 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const menu = filterNavigationByRole(navigationConfig, 'gestor_fiscalizacao');
       expect(menu.find((i) => i.id === 'visao-geral')?.children?.map((c) => [c.label, c.route, c.group])).toEqual([['Painel', '/fiscalizacao/inicio', undefined]]);
       expect(menu.find((i) => i.id === 'carteira')?.children?.map((c) => c.route)).toEqual(['/contratos']);
-      expect(menu.find((i) => i.id === 'fiscalizacao')?.children?.map((c) => c.route)).toEqual(['/fiscalizacao/contratos', '/fiscalizacao/beneficiarios', '/fiscalizacao/itens']);
+      expect(menu.find((i) => i.id === 'fiscalizacao')?.children?.map((c) => c.route)).toEqual(['/fiscalizacao/programas', '/fiscalizacao/contratos', '/fiscalizacao/beneficiarios', '/fiscalizacao/itens']);
+      // O cadastro dos programas fica em Ajustes › Gestão, para o gestor de fiscalização e o admin.
+      expect(menu.find((i) => i.id === 'configuracoes')?.children?.map((c) => c.route)).toContain('/configuracoes/programas');
+      expect(filterNavigationByRole(navigationConfig, 'gestor').find((i) => i.id === 'configuracoes')?.children?.map((c) => c.route)).not.toContain('/configuracoes/programas');
       expect(filterNavigationByRole(navigationConfig, 'gestor').map((i) => i.id)).not.toContain('fiscalizacao');
       expect(menu.map((i) => i.id)).not.toContain('emendas');
       for (const role of ['gestor', 'gestor_saldos', 'gestor_emendas', 'leitor'] as const) {
