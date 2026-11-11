@@ -36,8 +36,9 @@ const POR_PAGINA = 25;
 type Segmento = 'AUTUAR' | 'PORTARIA' | 'TODAS';
 
 /**
- * Início › Painel da fiscalização (migration 259). O gestor de fiscalização vê os contratos em que é fiscal ou substituto
- * e o que falta em cada um; o coordenador e a consulta veem todos os contratos com a SFC/CGLIC e podem escolher um fiscal
+ * Início › Painel da fiscalização (migration 259). O gestor de fiscalização vê os contratos em que é o fiscal titular
+ * e o que falta em cada um; onde é só substituto, o contrato não entra nas pendências (decisão de 11/11/2026: o
+ * substituto é o da portaria e assume pela transferência temporária) e aparece só no número "Como substituto"; o coordenador e a consulta veem todos os contratos com a SFC/CGLIC e podem escolher um fiscal
  * (o Painel passa a ser o dele, como o filtro Gestor em Atas e Contratos). Mesma moldura dos outros Painéis
  * (PainelComFaixa, 11/11/2026): cartões e "Ver mais" encolhem numa faixa azul fixa, "Com você" só do coordenador, e as
  * abas das Pendências (A autuar · Sem portaria · Todos) grudam embaixo da faixa.
@@ -74,15 +75,16 @@ export const FiscalizacaoInicioPage: React.FC = () => {
       ),
     [setParams]
   );
-  const daSfc = useMemo(() => contratos.filter((c) => comSfc(c) && (!escopo || ehDoFiscal(c, escopo))), [contratos, escopo]);
-  const titular = daSfc.filter((c) => !escopo || c.fiscalUserId === escopo);
+  // Escolhido um fiscal, só os contratos em que ele é o titular: o substituto não recebe pendências.
+  const daSfc = useMemo(() => contratos.filter((c) => comSfc(c) && (!escopo || c.fiscalUserId === escopo)), [contratos, escopo]);
+  const comoSubstituto = escopo ? contratos.filter((c) => comSfc(c) && c.substitutoUserId === escopo).length : 0;
   const aDefinir = contratos.filter((c) => c.situacao === 'A_DEFINIR');
   const pendencias = useMemo(() => daSfc.flatMap(pendenciasDoContrato), [daSfc]);
   const aAutuar = pendencias.filter((p) => p.tipo === 'AUTUAR');
   const semPortaria = pendencias.filter((p) => p.tipo === 'PORTARIA');
   const mistas = daSfc.filter((c) => c.situacao === 'MISTA').length;
   const minhasEntregas = useMemo(
-    () => (entregasConsulta.data ?? []).filter((e) => e.responsavel === 'SFC' && (!escopo || e.fiscalUserId === escopo || e.substitutoUserId === escopo)),
+    () => (entregasConsulta.data ?? []).filter((e) => e.responsavel === 'SFC' && (!escopo || e.fiscalUserId === escopo)),
     [entregasConsulta.data, escopo]
   );
   const vencidas = minhasEntregas.filter((e) => prazoDaEntrega(e).tom === 'danger');
@@ -158,7 +160,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
 
   const qtd = (n: number) => String(n);
   const chipsDaFaixa: PainelFaixaChip[] = [
-    { id: 'contratos', rotulo: escopo ? 'Contratos' : `Com a ${NOME_SFC}`, valor: qtd(escopo ? titular.length : daSfc.length), ativo: segmento === 'TODAS', onClick: () => irPara('TODAS') },
+    { id: 'contratos', rotulo: escopo ? 'Contratos' : `Com a ${NOME_SFC}`, valor: qtd(daSfc.length), ativo: segmento === 'TODAS', onClick: () => irPara('TODAS') },
     { id: 'autuar', rotulo: 'A autuar', valor: qtd(aAutuar.length), ativo: segmento === 'AUTUAR', onClick: () => irPara('AUTUAR') },
     { id: 'vencidas', rotulo: 'Entregas vencidas', valor: entregasCarregando ? '…' : qtd(vencidas.length), perigo: vencidas.length > 0, onClick: () => navigate('/fiscalizacao/entregas?prazo=danger') },
     ...(!fiscal && !escopo ? [{ id: 'definir', rotulo: 'A definir', valor: qtd(aDefinir.length), perigo: aDefinir.length > 0, onClick: () => navigate(coordenador ? '/fiscalizacao/distribuicao' : '/fiscalizacao/inicio') }] : [])
@@ -169,7 +171,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
       <PageHeader
         title="Início"
         subtitle={fiscal ? 'Os contratos que você fiscaliza e o que falta em cada um.' : `Resumo da fiscalização dos contratos pela ${NOME_SFC} e o que exige sua atenção.`}
-        hint={`Contrato de emenda chega "A definir", com sugestão ${NOME_SFC}; o coordenador decide na Distribuição. Depois da decisão, o fiscal autua o processo de fiscalização e registra a portaria.`}
+        hint={`Contrato de emenda chega "A definir", com sugestão ${NOME_SFC}; o coordenador decide na Distribuição. Depois da decisão, o fiscal autua o processo de fiscalização e registra a portaria. As pendências são do fiscal titular; o substituto só as recebe quando assume numa transferência temporária.`}
         icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="fisc-inicio-atualizar" tooltipTitle="Recarregar a fiscalização" />}
       />
@@ -194,10 +196,10 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               rotulo={fiscal ? 'Meus contratos' : escopo ? `Contratos de ${nomeEscolhido}` : `Com a ${NOME_SFC}`}
               icone={<FolderOpen size={16} />}
               tom="primary"
-              valor={String(escopo ? titular.length : daSfc.length)}
-              unidade={(escopo ? titular.length : daSfc.length) === 1 ? 'contrato' : 'contratos'}
+              valor={String(daSfc.length)}
+              unidade={daSfc.length === 1 ? 'contrato' : 'contratos'}
               linhas={[
-                escopo ? { rotulo: 'Como substituto', valor: String(daSfc.length - titular.length) } : { rotulo: 'Fiscalização mista', valor: String(mistas) },
+                escopo ? { rotulo: 'Como substituto', valor: String(comoSubstituto) } : { rotulo: 'Fiscalização mista', valor: String(mistas) },
                 { rotulo: 'Processo a autuar', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined },
                 { rotulo: 'Sem portaria registrada', valor: String(semPortaria.length), tom: semPortaria.length ? 'warning' : undefined }
               ]}

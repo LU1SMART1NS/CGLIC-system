@@ -184,7 +184,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
         </div>
       )}
       {janela?.tipo === 'TRANSFERIR' && <TransferirFiscalModal carga={janela.carga} ausentes={transferencias} onClose={() => setJanela(null)} />}
-      {janela?.tipo === 'TEMPORARIA' && <TransferirFiscalTemporariamenteModal carga={janela.carga} ausentes={transferencias} onClose={() => setJanela(null)} />}
+      {janela?.tipo === 'TEMPORARIA' && <TransferirFiscalTemporariamenteModal carga={janela.carga} contratos={contratos} ausentes={transferencias} onClose={() => setJanela(null)} />}
       {janela?.tipo === 'DESFAZER' && <DesfazerTransferenciaFiscalModal transferencia={janela.transferencia} onClose={() => setJanela(null)} />}
     </div>
   );

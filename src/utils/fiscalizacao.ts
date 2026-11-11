@@ -45,6 +45,22 @@ export function ehDoFiscal(c: Pick<ContratoFiscalizacao, 'fiscalUserId' | 'subst
   return Boolean(userId) && (c.fiscalUserId === userId || c.substitutoUserId === userId);
 }
 
+/**
+ * Substitutos designados nos contratos em que o servidor é o fiscal titular, do que substitui mais contratos ao que
+ * substitui menos. Na transferência temporária, quem assume deve ser, de preferência, o substituto da portaria.
+ */
+export function substitutosDoTitular(contratos: ContratoFiscalizacao[], titularUserId: string): Array<{ userId: string; nome: string; contratos: number }> {
+  const porId = new Map<string, { userId: string; nome: string; contratos: number }>();
+  contratos
+    .filter((c) => comSfc(c) && c.fiscalUserId === titularUserId && c.substitutoUserId)
+    .forEach((c) => {
+      const s = porId.get(c.substitutoUserId!) ?? { userId: c.substitutoUserId!, nome: c.substitutoNome ?? '', contratos: 0 };
+      s.contratos += 1;
+      porId.set(s.userId, s);
+    });
+  return [...porId.values()].sort((a, b) => b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
 /** O que falta no contrato com a SFC/CGLIC nesta entrega: portaria e autuação do processo. */
 export interface PendenciaFiscalizacao {
   chave: string;

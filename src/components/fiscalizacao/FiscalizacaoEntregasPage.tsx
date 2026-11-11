@@ -27,9 +27,11 @@ const PONTO: Record<string, string> = { PREPARACAO: colors.semantic.neutral.soli
 /** Fase da entrega no trilho; a da área requisitante não tem etapa e só aparece em Todas. */
 const faseDa = (e: EntregaFiscalizacao): FaseEntrega | null => (e.responsavel === 'AREA' ? null : etapaDef(e.etapa).fase);
 
+const COMO_SUBSTITUTO = 'substituto:';
+
 /**
  * Fiscalização › Entregas (migration 260): cada linha é um item de um contrato para um beneficiário. O gestor de
- * fiscalização abre filtrado pelos contratos dele; a linha abre o Contrato 360 na aba Fiscalização.
+ * fiscalização abre filtrado pelos contratos em que é o titular; a linha abre o Contrato 360 na aba Fiscalização.
  */
 export const FiscalizacaoEntregasPage: React.FC = () => {
   const { user, role } = useAuth();
@@ -45,7 +47,16 @@ export const FiscalizacaoEntregasPage: React.FC = () => {
   const [uf, setUf] = useState('');
   const entregas = useMemo(() => data ?? [], [data]);
 
-  const doFiscal = useMemo(() => entregas.filter((e) => !fiscal || e.fiscalUserId === fiscal || e.substitutoUserId === fiscal), [entregas, fiscal]);
+  // Fiscal = titular; o substituto vê as dele só se escolher "Você como substituto" (não são pendências dele).
+  const doFiscal = useMemo(
+    () => entregas.filter((e) => !fiscal || (fiscal.startsWith(COMO_SUBSTITUTO) ? e.substitutoUserId === fiscal.slice(COMO_SUBSTITUTO.length) : e.fiscalUserId === fiscal)),
+    [entregas, fiscal]
+  );
+  const minhasComoSubstituto = user?.id ? entregas.filter((e) => e.substitutoUserId === user.id).length : 0;
+  const opcoesFiscal = [
+    ...fiscais.map((f) => ({ value: f.id, label: f.id === user?.id ? `${f.nome} (você)` : f.nome, count: entregas.filter((e) => e.fiscalUserId === f.id).length })),
+    ...(minhasComoSubstituto ? [{ value: `${COMO_SUBSTITUTO}${user?.id ?? ''}`, label: 'Você como substituto', count: minhasComoSubstituto }] : [])
+  ];
   const conta = (s: Segmento) => doFiscal.filter((e) => s === 'TODAS' || faseDa(e) === s).length;
   const doSeg = useMemo(() => doFiscal.filter((e) => seg === 'TODAS' || faseDa(e) === seg), [doFiscal, seg]);
   const filtradas = useMemo(() => {
@@ -99,7 +110,7 @@ export const FiscalizacaoEntregasPage: React.FC = () => {
         counter={carteiraCounter(filtradas.length, doSeg.length, ativos, 'entrega', 'entregas')}
         testIdPrefix="fisc-entregas"
       >
-        <CarteiraFilterButton label="Fiscal" value={fiscal} emptyValue="" options={fiscais.map((f) => ({ value: f.id, label: f.id === user?.id ? `${f.nome} (você)` : f.nome, count: entregas.filter((e) => e.fiscalUserId === f.id || e.substitutoUserId === f.id).length }))} onChange={setFiscal} testId="fisc-entregas-filtro-fiscal" />
+        <CarteiraFilterButton label="Fiscal" value={fiscal} emptyValue="" options={opcoesFiscal} onChange={setFiscal} testId="fisc-entregas-filtro-fiscal" />
         <CarteiraFilterButton label="Prazo" value={prazo} emptyValue="" options={[{ value: 'danger', label: 'Vencidas', count: contaPrazo('danger') }, { value: 'warning', label: 'Vencem em 30 dias ou com atraso', count: contaPrazo('warning') }, { value: 'neutral', label: 'No prazo ou sem data', count: contaPrazo('neutral') }, { value: 'success', label: 'Entregues', count: contaPrazo('success') }]} onChange={setPrazo} testId="fisc-entregas-filtro-prazo" />
         <CarteiraFilterButton label="Fiscalização" value={quem} emptyValue="" options={[{ value: 'SFC', label: NOME_SFC, count: doSeg.filter((e) => e.responsavel === 'SFC').length }, { value: 'AREA', label: 'Área requisitante', count: doSeg.filter((e) => e.responsavel === 'AREA').length }]} onChange={setQuem} testId="fisc-entregas-filtro-quem" />
         <CarteiraFilterButton label="UF" value={uf} emptyValue="" options={ufs.map((u) => ({ value: u, label: u, count: doSeg.filter((e) => e.uf === u).length }))} onChange={setUf} testId="fisc-entregas-filtro-uf" />

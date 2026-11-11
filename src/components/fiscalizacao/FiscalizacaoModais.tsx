@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
@@ -9,7 +9,7 @@ import { carteiraDetalhe } from '../carteira/carteiraStyles';
 import { mascaraProcessoSei, processoSeiValido } from '../../utils/mascaras';
 import { useDefinirFiscalizacao, useDesfazerTransferenciaFiscal, useFiscaisAtivos, useRegistrarProcessoFiscalizacao, useTransferirContratosFiscal, useTransferirFiscalTemporaria } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao, DecisaoFiscalizacao, TransferenciaFiscal } from '../../services/fiscalizacaoService';
-import { MOTIVO_MINIMO, NOME_SFC, dataBR, decisaoPedeMotivo, decisaoSugerida, deEmenda, hojeEmBrasilia, numeroDoContrato, type CargaDoFiscal } from '../../utils/fiscalizacao';
+import { MOTIVO_MINIMO, NOME_SFC, dataBR, decisaoPedeMotivo, decisaoSugerida, deEmenda, hojeEmBrasilia, numeroDoContrato, substitutosDoTitular, type CargaDoFiscal } from '../../utils/fiscalizacao';
 
 const seiValido = (s: string) => /^\d{7,10}$/.test(s.replace(/\D/g, ''));
 const erroDe = (err: unknown) => (err as { message?: string } | null)?.message || 'erro desconhecido';
@@ -220,8 +220,10 @@ export const TransferirFiscalModal: React.FC<{ carga: CargaDoFiscal; ausentes: T
 /**
  * Coordenador: férias, licença… Os contratos em que o servidor é o fiscal vão para quem assume até o retorno e voltam
  * no Desfazer. O substituto de cada contrato fica; se quem assume era o substituto, quem sai fica de substituto.
+ * Quem assume vem sugerido: o substituto designado em mais contratos de quem sai (decisão de 11/11/2026). Se quem
+ * assume não é o substituto de algum contrato, a janela avisa que ele não está na portaria.
  */
-export const TransferirFiscalTemporariamenteModal: React.FC<{ carga: CargaDoFiscal; ausentes: TransferenciaFiscal[]; onClose: () => void }> = ({ carga, ausentes, onClose }) => {
+export const TransferirFiscalTemporariamenteModal: React.FC<{ carga: CargaDoFiscal; contratos: ContratoFiscalizacao[]; ausentes: TransferenciaFiscal[]; onClose: () => void }> = ({ carga, contratos, ausentes, onClose }) => {
   const toast = useToast();
   const transferir = useTransferirFiscalTemporaria();
   const { destinos } = useDestinos(carga.userId, ausentes);
@@ -230,8 +232,14 @@ export const TransferirFiscalTemporariamenteModal: React.FC<{ carga: CargaDoFisc
   const [inicio, setInicio] = useState(hoje);
   const [retorno, setRetorno] = useState('');
   const [sei, setSei] = useState('');
-  const [destino, setDestino] = useState('');
+  const substitutos = useMemo(() => substitutosDoTitular(contratos, carga.userId).filter((s) => destinos.some((d) => d.id === s.userId)), [contratos, carga.userId, destinos]);
+  const designadoEm = new Map(substitutos.map((s) => [s.userId, s.contratos]));
+  // Sem escolha do coordenador, vale a sugestão (o substituto de mais contratos); a lista de fiscais chega depois.
+  const [escolhido, setDestino] = useState<string | null>(null);
+  const destino = escolhido ?? substitutos[0]?.userId ?? '';
   const nomeDestino = destinos.find((f) => f.id === destino)?.nome ?? '';
+  const foraDaPortaria = destino ? carga.contratos - (designadoEm.get(destino) ?? 0) : 0;
+  const ordenados = [...destinos].sort((a, b) => (designadoEm.get(b.id) ?? 0) - (designadoEm.get(a.id) ?? 0));
   const retornoRuim = Boolean(retorno) && retorno < inicio;
   const ok = Boolean(destino && inicio && retorno) && !retornoRuim;
   const enviar = () =>
@@ -273,10 +281,21 @@ export const TransferirFiscalTemporariamenteModal: React.FC<{ carga: CargaDoFisc
         </div>
         <AppSelect label="Quem assume" value={destino} onChange={(ev) => setDestino(ev.target.value)} data-testid="fisc-temporaria-destino">
           <option value="">Escolher…</option>
-          {destinos.map((f) => (
-            <option key={f.id} value={f.id}>{f.nome}</option>
-          ))}
+          {ordenados.map((f) => {
+            const n = designadoEm.get(f.id) ?? 0;
+            return (
+              <option key={f.id} value={f.id}>{n ? `${f.nome} · substituto em ${n} de ${carga.contratos}` : f.nome}</option>
+            );
+          })}
         </AppSelect>
+        {destino && foraDaPortaria > 0 && (
+          <NoticeBar tone="warning" testId="fisc-temporaria-fora-portaria">
+            {foraDaPortaria === carga.contratos
+              ? `${nomeDestino} não é o substituto designado em nenhum contrato de ${carga.nome}.`
+              : `Em ${foraDaPortaria} de ${carga.contratos} contratos, ${nomeDestino} não é o substituto designado.`}{' '}
+            Informe abaixo o documento SEI da portaria de substituição.
+          </NoticeBar>
+        )}
         <AppInput label="Documento SEI (opcional)" value={sei} onChange={(ev) => setSei(ev.target.value)} placeholder="ex.: portaria de substituição" />
         <NoticeBar tone="info">
           No retorno, o Desfazer devolve os contratos que ainda estiverem com {nomeDestino || 'quem assumir'}. O substituto de cada contrato continua o mesmo.
