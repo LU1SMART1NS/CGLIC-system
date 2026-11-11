@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { linhaParaEntrega } from '../../services/fiscalizacaoService';
-import { agrupar, chaveDoBeneficiario, passaPrazo, resumir } from '../fiscalizacaoResumo';
+import { agrupar, chaveDoBeneficiario, enderecoDeEntrega, mudancasDoPrograma, passaPrazo, resumir } from '../fiscalizacaoResumo';
 import { ataEItemDaChave, passoDoItem, passosDoItem } from '../fiscalizacaoEntregas';
 import { comQuemEstaOItem, linhasDoContrato } from '../fiscalizacaoMesa';
 
@@ -91,5 +91,16 @@ describe('régua e chave do item da ata', () => {
   it('lê ata, UASG e número do item da chave', () => {
     expect(ataEItemDaChave('00031/2025-200331-00002')).toEqual({ ata: '00031/2025', uasg: '200331', item: '00002' });
     expect(ataEItemDaChave(null)).toBeNull();
+  });
+});
+
+describe('programas (migration 265)', () => {
+  it('marcas da janela viram incluir e retirar, sem repetir o que não mudou', () => {
+    expect(mudancasDoPrograma(new Set(['a', 'b']), new Set(['b', 'c']))).toEqual({ incluir: ['c'], retirar: ['a'] });
+    expect(mudancasDoPrograma(new Set(['a']), new Set(['a']))).toEqual({ incluir: [], retirar: [] });
+  });
+  it('endereço de entrega: rua com número e complemento; bairro, cidade e CEP embaixo', () => {
+    expect(enderecoDeEntrega(e({ entregaLogradouro: 'Rua A', entregaNumero: '10', entregaComplemento: 'Bloco B', entregaBairro: 'Centro', entregaCep: '70000000', municipio: 'Brasília', uf: 'DF' }))).toEqual({ rua: 'Rua A, 10, Bloco B', detalhe: 'Centro · Brasília/DF · CEP 70000-000' });
+    expect(enderecoDeEntrega(e({ entregaLogradouro: null, municipio: 'Natal', uf: 'RN' }))).toEqual({ rua: null, detalhe: 'Natal/RN' });
   });
 });

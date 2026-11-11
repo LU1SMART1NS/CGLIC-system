@@ -50,6 +50,9 @@ const FiscalizacaoEntregasPage = lazyComRecarga(() => import('./components/fisca
 const FiscalizacaoContratosPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoContratosPage').then((m) => ({ default: m.FiscalizacaoContratosPage })));
 const FiscalizacaoBeneficiariosPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoBeneficiariosPage').then((m) => ({ default: m.FiscalizacaoBeneficiariosPage })));
 const FiscalizacaoBeneficiario360Page = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoBeneficiario360Page').then((m) => ({ default: m.FiscalizacaoBeneficiario360Page })));
+const FiscalizacaoProgramasPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoProgramasPage').then((m) => ({ default: m.FiscalizacaoProgramasPage })));
+const FiscalizacaoPrograma360Page = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoPrograma360Page').then((m) => ({ default: m.FiscalizacaoPrograma360Page })));
+const AjustesProgramasPage = lazyComRecarga(() => import('./components/fiscalizacao/AjustesProgramasPage').then((m) => ({ default: m.AjustesProgramasPage })));
 const FiscalizacaoDistribuicaoPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoDistribuicaoPage').then((m) => ({ default: m.FiscalizacaoDistribuicaoPage })));
 const EmendasInicioPage = lazyComRecarga(() => import('./components/emendas/EmendasInicioPage').then((m) => ({ default: m.EmendasInicioPage })));
 const EmendasPedidosPage = lazyComRecarga(() => import('./components/emendas/EmendasPedidosPage').then((m) => ({ default: m.EmendasPedidosPage })));
@@ -299,6 +302,14 @@ const AppContent: React.FC = () => {
               }
             />
             <Route
+              path="/configuracoes/programas"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao']}>
+                  <AjustesProgramasPage />
+                </RequireRole>
+              }
+            />
+            <Route
               path="/configuracoes/modelos"
               element={
                 <RequireRole allowedRoles={['admin', 'gestor']}>
@@ -543,6 +554,22 @@ const AppContent: React.FC = () => {
               element={
                 <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
                   <FiscalizacaoInicioPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/programas"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoProgramasPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/programas/:id"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoPrograma360Page />
                 </RequireRole>
               }
             />

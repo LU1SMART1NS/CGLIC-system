@@ -22,12 +22,18 @@ import {
   fetchTransferenciasFiscal,
   transferirContratosFiscal,
   transferirContratosFiscalTemporaria,
-  type TransferenciaFiscal
+  type TransferenciaFiscal,
+  definirProgramaDasEntregas,
+  excluirProgramaFiscalizacao,
+  fetchProgramasFiscalizacao,
+  salvarProgramaFiscalizacao,
+  type ProgramaFiscalizacao
 } from '../services/fiscalizacaoService';
 
 export const FISCALIZACAO_CONTRATOS_KEY = ['fiscalizacao', 'contratos'] as const;
 export const FISCALIZACAO_ENTREGAS_KEY = ['fiscalizacao', 'entregas'] as const;
 export const FISCALIZACAO_TRANSFERENCIAS_KEY = ['fiscalizacao', 'transferencias'] as const;
+export const FISCALIZACAO_PROGRAMAS_KEY = ['fiscalizacao', 'programas'] as const;
 
 /** Quem lê a fiscalização (fiscalizacao.view, migration 259). */
 export function podeVerFiscalizacao(role: string | null | undefined): boolean {
@@ -163,3 +169,26 @@ export function useEntregasDoPedido(pedidoId: string | null | undefined) {
   }, [consulta.data]);
   return { consulta, porLinha };
 }
+
+/** Programas da Fiscalização (migration 265): cadastro em Ajustes › Gestão › Programas. */
+export function useProgramasFiscalizacao() {
+  const { role } = useAuth();
+  return useQuery<ProgramaFiscalizacao[], Error>({
+    queryKey: FISCALIZACAO_PROGRAMAS_KEY,
+    queryFn: fetchProgramasFiscalizacao,
+    enabled: podeVerFiscalizacao(role),
+    staleTime: 60 * 1000
+  });
+}
+
+function useMutacaoDePrograma<I, R>(fn: (input: I) => Promise<R>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: FISCALIZACAO_PROGRAMAS_KEY }), qc.invalidateQueries({ queryKey: FISCALIZACAO_ENTREGAS_KEY })])
+  });
+}
+
+export const useSalvarProgramaFiscalizacao = () => useMutacaoDePrograma(salvarProgramaFiscalizacao);
+export const useExcluirProgramaFiscalizacao = () => useMutacaoDePrograma(excluirProgramaFiscalizacao);
+export const useDefinirProgramaDasEntregas = () => useMutacaoDePrograma(definirProgramaDasEntregas);

@@ -16,7 +16,7 @@ import { useContratosFiscalizacao, useEntregasFiscalizacao } from '../../hooks/u
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC } from '../../utils/fiscalizacao';
 import { foiEntregue } from '../../utils/fiscalizacaoEntregas';
-import { agrupar, chaveDoBeneficiario, contratosDe, numero, pct, programasDe, qtdTexto, resumir, semCadastro } from '../../utils/fiscalizacaoResumo';
+import { agrupar, chaveDoBeneficiario, contratosDe, numero, pct, programasDe, qtdTexto, resumir, semCadastro, enderecoDeEntrega } from '../../utils/fiscalizacaoResumo';
 import { ItensPorContrato, type GrupoDeItens } from './FiscalizacaoCelulas';
 
 // ── Beneficiário 360: o que ele recebe, por contrato ─────────────────────────────────────────────
@@ -43,6 +43,7 @@ export const FiscalizacaoBeneficiario360Page: React.FC = () => {
   const noExercito = faltam.filter((e) => e.etapa === 'CONTROLADO').length;
   const e0 = todos[0];
   const sem = semCadastro(e0);
+  const endereco = enderecoDeEntrega(e0);
   const emendas = [...new Set(todos.map((e) => e.emenda).filter((x): x is string => Boolean(x)))];
   const progs = programasDe(todos);
   const grupos: GrupoDeItens[] = [...agrupar(es, (e) => e.contractKey).entries()].map(([k, l]) => ({ chave: k, contrato: contratos.find((x) => x.contractKey === k), es: l }));
@@ -71,9 +72,9 @@ export const FiscalizacaoBeneficiario360Page: React.FC = () => {
               <div data-testid="fisc-benef-360-endereco">
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Endereço de entrega</div>
                 <div style={{ fontWeight: 700, marginTop: '0.15rem', display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-                  <MapPin size={14} aria-hidden="true" /> {e0.municipio ? `${e0.municipio}/${e0.uf}` : e0.uf ?? '—'}
+                  <MapPin size={14} aria-hidden="true" /> {endereco.rua ?? endereco.detalhe}
                 </div>
-                <div style={carteiraDetalhe}>do cadastro do beneficiário</div>
+                <div style={carteiraDetalhe}>{endereco.rua ? `${endereco.detalhe} · ` : ''}do cadastro do beneficiário</div>
               </div>
             )
           }

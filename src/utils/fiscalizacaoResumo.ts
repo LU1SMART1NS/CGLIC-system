@@ -1,5 +1,5 @@
 // Contas das listas e telas 360 da Fiscalização (Contratos, Beneficiários, Programas), a partir dos itens.
-import type { EntregaFiscalizacao } from '../services/fiscalizacaoService';
+import type { EntregaFiscalizacao, OrigemDoRecurso } from '../services/fiscalizacaoService';
 import { etapaDef, foiEntregue, ordemDaEtapa, prazoDaEntrega, rotuloDoBeneficiario, type FaseEntrega, type TomPrazo, nomeDoItem } from './fiscalizacaoEntregas';
 
 const ORDEM_DA_FASE: FaseEntrega[] = ['PREPARACAO', 'EXECUCAO', 'RECEBIMENTO', 'PAGAMENTO', 'FINALIZADO'];
@@ -97,3 +97,27 @@ export const opcoesDePrazo = (contar: (t: TomPrazo) => number) => [
   { value: 'warning', label: 'Vence em 30 dias', count: contar('warning') },
   { value: 'neutral', label: 'No prazo ou sem data', count: contar('neutral') }
 ];
+
+/** Origem do recurso do programa (migration 265): rótulos do cadastro. */
+export const ROTULO_ORIGEM: Record<OrigemDoRecurso, string> = {
+  EMENDA: 'Emenda parlamentar',
+  FNSP: 'Fundo Nacional de Segurança Pública (FNSP)',
+  FUNDO: 'BNDES ou outro fundo',
+  OUTRO: 'Outro'
+};
+
+/**
+ * Inclui e retira do programa pelas marcas da janela: o que foi marcado e não estava entra; o que estava e foi desmarcado
+ * sai. Item de outro programa nunca entra na conta (a janela não deixa marcar).
+ */
+export function mudancasDoPrograma(antes: ReadonlySet<string>, depois: ReadonlySet<string>): { incluir: string[]; retirar: string[] } {
+  return { incluir: [...depois].filter((id) => !antes.has(id)), retirar: [...antes].filter((id) => !depois.has(id)) };
+}
+
+/** Endereço de entrega do cadastro do beneficiário (migration 265): rua, número e complemento; bairro e CEP embaixo. */
+export function enderecoDeEntrega(e: Pick<EntregaFiscalizacao, 'entregaLogradouro' | 'entregaNumero' | 'entregaComplemento' | 'entregaBairro' | 'entregaCep' | 'municipio' | 'uf'>): { rua: string | null; detalhe: string } {
+  const rua = e.entregaLogradouro ? [e.entregaLogradouro, e.entregaNumero, e.entregaComplemento].filter(Boolean).join(', ') : null;
+  const cidade = e.municipio ? `${e.municipio}/${e.uf ?? ''}`.replace(/\/$/, '') : e.uf ?? '';
+  const cep = e.entregaCep ? `CEP ${e.entregaCep.replace(/^(\d{5})(\d{3})$/, '$1-$2')}` : '';
+  return { rua, detalhe: [e.entregaBairro, cidade, cep].filter(Boolean).join(' · ') || '—' };
+}
