@@ -308,8 +308,13 @@ export async function fetchTransferenciasFiscal(): Promise<TransferenciaFiscal[]
   return ((data || []) as unknown[]).map(linhaParaTransferenciaFiscal);
 }
 
-export async function transferirContratosFiscal(input: { origemUserId: string; destinoUserId: string }): Promise<{ fiscal: number; substituto: number }> {
-  const { data, error } = await cliente().rpc('transferir_contratos_fiscal', { p_origem_user_id: input.origemUserId, p_destino_user_id: input.destinoUserId });
+/** Sem `contractKeys`, passa todos os contratos do fiscal; com a lista, só os marcados (migration 264). */
+export async function transferirContratosFiscal(input: { origemUserId: string; destinoUserId: string; contractKeys?: string[] }): Promise<{ fiscal: number; substituto: number }> {
+  const { data, error } = await cliente().rpc('transferir_contratos_fiscal', {
+    p_origem_user_id: input.origemUserId,
+    p_destino_user_id: input.destinoUserId,
+    ...(input.contractKeys ? { p_contract_keys: input.contractKeys } : {})
+  });
   if (error) throw mapPostgresErrorToAppError(error);
   const r = (data ?? {}) as { fiscal?: number; substituto?: number };
   return { fiscal: r.fiscal ?? 0, substituto: r.substituto ?? 0 };
