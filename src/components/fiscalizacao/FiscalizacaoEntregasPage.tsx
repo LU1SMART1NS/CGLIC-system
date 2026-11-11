@@ -33,11 +33,9 @@ const faixaDoPrazo = (e: EntregaFiscalizacao): string => {
 /** Fase da entrega no trilho; a da área requisitante não tem etapa e só aparece em Todas. */
 const faseDa = (e: EntregaFiscalizacao): FaseEntrega | null => (e.responsavel === 'AREA' ? null : etapaDef(e.etapa).fase);
 
-const COMO_SUBSTITUTO = 'substituto:';
-
 /**
  * Fiscalização › Entregas (migration 260): cada linha é um item de um contrato para um beneficiário. O gestor de
- * fiscalização abre filtrado pelos contratos em que é o titular; a linha abre o Contrato 360 na aba Fiscalização.
+ * fiscalização abre filtrado pelos contratos em que é o fiscal; a linha abre o Contrato 360 na aba Fiscalização.
  */
 export const FiscalizacaoEntregasPage: React.FC = () => {
   const { user, role } = useAuth();
@@ -56,16 +54,8 @@ export const FiscalizacaoEntregasPage: React.FC = () => {
   const [programa, setPrograma] = useState('');
   const entregas = useMemo(() => data ?? [], [data]);
 
-  // Fiscal = titular; o substituto vê as dele só se escolher "Você como substituto" (não são pendências dele).
-  const doFiscal = useMemo(
-    () => entregas.filter((e) => !fiscal || (fiscal.startsWith(COMO_SUBSTITUTO) ? e.substitutoUserId === fiscal.slice(COMO_SUBSTITUTO.length) : e.fiscalUserId === fiscal)),
-    [entregas, fiscal]
-  );
-  const minhasComoSubstituto = user?.id ? entregas.filter((e) => e.substitutoUserId === user.id).length : 0;
-  const opcoesFiscal = [
-    ...fiscais.map((f) => ({ value: f.id, label: f.id === user?.id ? `${f.nome} (você)` : f.nome, count: entregas.filter((e) => e.fiscalUserId === f.id).length })),
-    ...(minhasComoSubstituto ? [{ value: `${COMO_SUBSTITUTO}${user?.id ?? ''}`, label: 'Você como substituto', count: minhasComoSubstituto }] : [])
-  ];
+  const doFiscal = useMemo(() => entregas.filter((e) => !fiscal || e.fiscalUserId === fiscal), [entregas, fiscal]);
+  const opcoesFiscal = fiscais.map((f) => ({ value: f.id, label: f.id === user?.id ? `${f.nome} (você)` : f.nome, count: entregas.filter((e) => e.fiscalUserId === f.id).length }));
   const conta = (s: Segmento) => doFiscal.filter((e) => s === 'TODAS' || LADO[comQuemEstaOItem(e)] === s).length;
   const doSeg = useMemo(() => doFiscal.filter((e) => seg === 'TODAS' || LADO[comQuemEstaOItem(e)] === seg), [doFiscal, seg]);
   const filtradas = useMemo(() => {

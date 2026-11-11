@@ -69,10 +69,7 @@ export const CelulaSituacao: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) => 
 
 export const CelulaFiscal: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) =>
   c.fiscalNome ? (
-    <>
-      <span style={carteiraValor}>{c.fiscalNome}</span>
-      {c.substitutoNome && <div style={carteiraDetalhe}>substituto: {c.substitutoNome}</div>}
-    </>
+    <span style={carteiraValor}>{c.fiscalNome}</span>
   ) : (
     <span style={carteiraDetalhe}>—</span>
   );

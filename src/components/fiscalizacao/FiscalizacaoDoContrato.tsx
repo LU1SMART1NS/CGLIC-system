@@ -23,7 +23,7 @@ const Campo: React.FC<{ rotulo: string; children: React.ReactNode }> = ({ rotulo
   </div>
 );
 
-/** Contrato 360 › Fiscalização: quem fiscaliza, fiscal e substituto da SFC/CGLIC, portaria e processo (migration 259). */
+/** Contrato 360 › Fiscalização: quem fiscaliza, fiscal da SFC/CGLIC, portaria e processo (migration 259). */
 export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ contractKey }) => {
   const { user, role } = useAuth();
   const { consulta, contrato } = useFiscalizacaoDoContrato(contractKey);
@@ -87,7 +87,6 @@ export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ cont
             {comSfc(contrato) && (
               <Campo rotulo={`Fiscal ${NOME_SFC}`}>
                 <span style={carteiraValor}>{contrato.fiscalNome}</span>
-                <div style={carteiraDetalhe}>{contrato.substitutoNome ? `substituto: ${contrato.substitutoNome}` : 'sem substituto'}</div>
               </Campo>
             )}
             {comSfc(contrato) && (

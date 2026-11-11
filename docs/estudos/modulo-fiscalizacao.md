@@ -70,7 +70,7 @@ Ou seja: a Fiscalização preenche o buraco **entre "Contrato" e "Faturado"** (p
 ### 3.2 Dois níveis
 
 **Contrato** (`fisc_contratos`, uma linha por `contract_key`):
-- fiscal (e substituto), portaria de designação (SEI)
+- fiscal, portaria de designação (SEI)
 - processo de acompanhamento/fiscalização (SEI) e data da autuação
 - análise inicial feita (data)
 - termo de encerramento (data + SEI)
@@ -135,7 +135,7 @@ Correção do usuário (10/11/2026): o Início do fiscal fica no **Início** do 
 | Pedido 360 (Emendas) | régua por item com os passos da Fiscalização | — | idem |
 
 1. **Início › Fiscalização › Painel**: cartões (vencidas, a vencer, aguardando o Exército, para encerrar), Com você e Com outros. O do coordenador soma todos os fiscais e traz "Distribuir contratos sem fiscal".
-2. **Início › Fiscalização › Distribuição** (coordenador): contratos sem fiscal, fiscal e substituto, carga por fiscal, transferir e transferir temporariamente.
+2. **Início › Fiscalização › Distribuição** (coordenador): contratos sem fiscal, fiscal, carga por fiscal, transferir e transferir temporariamente.
 3. **Fiscalização › Entregas**: trilho de fases, filtros Fiscal · Origem · Prazo · UF, linha abre o Contrato 360 (rota `/contratos/...`).
 4. **Fiscalização › Programas**: um programa por vez no trilho, comprado × entregue por item.
 5. **Contrato 360 › Fiscalização**: entregas do contrato, mudar etapa em lote, dividir entrega, encerrar.
@@ -279,3 +279,7 @@ Entrega é o único indicador repetido, de propósito, sempre igual: "2 de 8 ite
 **Cadastro do programa (11/11/2026, decisão do usuário).** Campos: Nome · Área responsável (lista das Unidades Internas, não texto livre) · Origem do recurso (Emenda parlamentar · Fundo Nacional de Segurança Pública (FNSP) · BNDES ou outro fundo · Outro) · Situação (Ativo/Inativo, só na edição). Sem processo SEI, período ou observação. Lista em Ajustes › Gestão › Programas: Programa · Área responsável · Origem do recurso · Itens no programa · Situação; menu ⋯ com Editar, Inativar/Ativar e Excluir (só para programa sem item ligado; com itens, só inativar, como em Usuários e Unidades Internas). Programa inativo sai das listas da Fiscalização; itens e histórico ficam. Tabela `fisc_programas`: nome único, unidade_interna_id, origem_recurso, ativo.
 
 **Item 360 › Emendas (11/11/2026).** Na coluna "Beneficiários e entrega", cada beneficiário (pela sigla, como nas listas de pedidos) com a etiqueta da etapa, a mesma das tabelas da Fiscalização, e o atraso em vermelho quando vencido ("70× GCM · Aguardando o Exército · vencida há 256 dias · contrato 00055/2026"); o clique abre a janela do item. Saiu o texto "passo N de 7".
+
+## 10. Sem substituto (decisão de 11/11/2026)
+
+O módulo deixa de ter substituto. Quem age no contrato é o fiscal (e o coordenador); na ausência do fiscal, o coordenador passa os contratos a um colega pela transferência temporária e o Desfazer devolve. A migration 267 recria as funções sem o substituto e apaga as colunas (nenhum contrato tinha substituto preenchido).

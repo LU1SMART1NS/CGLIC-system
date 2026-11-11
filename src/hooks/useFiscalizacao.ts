@@ -58,7 +58,7 @@ export function useFiscalizacaoDoContrato(contractKey: string | null | undefined
   return { consulta, contrato };
 }
 
-/** Servidores ativos com o perfil Gestor de Fiscalização (os que podem ser fiscal ou substituto). */
+/** Servidores ativos com o perfil Gestor de Fiscalização (os que podem ser fiscal). */
 export function useFiscaisAtivos() {
   const usuarios = useUsers();
   const fiscais = useMemo(

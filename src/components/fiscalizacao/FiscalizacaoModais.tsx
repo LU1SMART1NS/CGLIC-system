@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
@@ -9,19 +9,18 @@ import { carteiraDetalhe } from '../carteira/carteiraStyles';
 import { documentoSeiValido, mascaraDocumentoSei } from '../../utils/mascaras';
 import { useDefinirFiscalizacao, useDesfazerTransferenciaFiscal, useFiscaisAtivos, useRegistrarProcessoFiscalizacao, useTransferirContratosFiscal, useTransferirFiscalTemporaria } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao, DecisaoFiscalizacao, TransferenciaFiscal } from '../../services/fiscalizacaoService';
-import { MOTIVO_MINIMO, NOME_SFC, dataBR, decisaoPedeMotivo, decisaoSugerida, deEmenda, hojeEmBrasilia, numeroDoContrato, substitutosDoTitular, type CargaDoFiscal } from '../../utils/fiscalizacao';
+import { MOTIVO_MINIMO, NOME_SFC, dataBR, decisaoPedeMotivo, decisaoSugerida, deEmenda, hojeEmBrasilia, numeroDoContrato, type CargaDoFiscal } from '../../utils/fiscalizacao';
 
 const seiValido = (s: string) => /^\d{7,10}$/.test(s.replace(/\D/g, ''));
 const erroDe = (err: unknown) => (err as { message?: string } | null)?.message || 'erro desconhecido';
 
-/** Coordenador: quem fiscaliza o contrato (toda SFC/CGLIC, mista ou toda área requisitante), fiscal, substituto e portaria. */
+/** Coordenador: quem fiscaliza o contrato (toda SFC/CGLIC, mista ou toda área requisitante), fiscal e portaria. */
 export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao; onClose: () => void }> = ({ contrato, onClose }) => {
   const toast = useToast();
   const { fiscais, consulta } = useFiscaisAtivos();
   const salvar = useDefinirFiscalizacao();
   const [decisao, setDecisao] = useState<DecisaoFiscalizacao>(() => decisaoSugerida(contrato));
   const [fiscal, setFiscal] = useState(contrato.fiscalUserId ?? '');
-  const [substituto, setSubstituto] = useState(contrato.substitutoUserId ?? '');
   const [portaria, setPortaria] = useState(contrato.portariaSei ?? '');
   const [motivo, setMotivo] = useState(contrato.motivo ?? '');
   const pedeMotivo = decisaoPedeMotivo(contrato, decisao);
@@ -29,11 +28,11 @@ export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao
   const faltaMotivo = pedeMotivo && motivo.trim().length < MOTIVO_MINIMO;
   const faltaFiscal = comFiscal && !fiscal;
   const portariaRuim = comFiscal && portaria.trim() !== '' && !seiValido(portaria);
-  const bloqueado = faltaMotivo || faltaFiscal || portariaRuim || (substituto === fiscal && substituto !== '');
+  const bloqueado = faltaMotivo || faltaFiscal || portariaRuim;
 
   const enviar = () =>
     salvar.mutate(
-      { contractKey: contrato.contractKey, fiscalizacao: decisao, fiscalUserId: fiscal || null, substitutoUserId: substituto || null, portariaSei: portaria || null, motivo: pedeMotivo || motivo ? motivo : null },
+      { contractKey: contrato.contractKey, fiscalizacao: decisao, fiscalUserId: fiscal || null, portariaSei: portaria || null, motivo: pedeMotivo || motivo ? motivo : null },
       {
         onSuccess: () => {
           toast.success(`Contrato ${numeroDoContrato(contrato)}: ${decisao === 'AREA' ? 'com a área requisitante' : `${decisao === 'MISTA' ? 'fiscalização mista' : NOME_SFC} · ${fiscais.find((f) => f.id === fiscal)?.nome ?? ''}`}`);
@@ -67,20 +66,12 @@ export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao
         </AppSelect>
         {comFiscal && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.75rem' }}>
-              <AppSelect label={`Fiscal ${NOME_SFC}`} value={fiscal} onChange={(ev) => setFiscal(ev.target.value)} data-testid="fisc-definir-fiscal">
-                <option value="">Escolher…</option>
-                {fiscais.map((f) => (
-                  <option key={f.id} value={f.id}>{f.nome}</option>
-                ))}
-              </AppSelect>
-              <AppSelect label="Substituto" value={substituto} onChange={(ev) => setSubstituto(ev.target.value)} data-testid="fisc-definir-substituto">
-                <option value="">Nenhum</option>
-                {fiscais.filter((f) => f.id !== fiscal).map((f) => (
-                  <option key={f.id} value={f.id}>{f.nome}</option>
-                ))}
-              </AppSelect>
-            </div>
+            <AppSelect label={`Fiscal ${NOME_SFC}`} value={fiscal} onChange={(ev) => setFiscal(ev.target.value)} data-testid="fisc-definir-fiscal">
+              <option value="">Escolher…</option>
+              {fiscais.map((f) => (
+                <option key={f.id} value={f.id}>{f.nome}</option>
+              ))}
+            </AppSelect>
             {!consulta.isLoading && fiscais.length === 0 && (
               <NoticeBar tone="warning">Nenhum servidor ativo com o perfil Gestor de Fiscalização. Dê o perfil em Ajustes › Usuários.</NoticeBar>
             )}
@@ -106,7 +97,7 @@ export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao
   );
 };
 
-/** Fiscal, substituto ou coordenador: autuação pelo número SEI do contrato (documento) e a data do contrato (migration 266). */
+/** Fiscal ou coordenador: autuação pelo número SEI do contrato (documento) e a data do contrato (migration 266). */
 export const RegistrarProcessoModal: React.FC<{ contrato: ContratoFiscalizacao; onClose: () => void }> = ({ contrato, onClose }) => {
   const toast = useToast();
   const registrar = useRegistrarProcessoFiscalizacao();
@@ -167,7 +158,7 @@ function useDestinos(origemUserId: string, ausentes: TransferenciaFiscal[]) {
 
 /**
  * Coordenador: passa de vez os contratos de um fiscal para outro, como o Transferir da Equipe de Atas e Contratos.
- * Onde era fiscal, o destino vira o fiscal; onde era substituto, o destino vira o substituto (migration 261).
+ * O destino passa a ser o fiscal dos contratos (migration 261).
  */
 export const TransferirFiscalModal: React.FC<{
   carga: CargaDoFiscal;
@@ -182,14 +173,13 @@ export const TransferirFiscalModal: React.FC<{
   const { destinos } = useDestinos(carga.userId, ausentes);
   const [destino, setDestino] = useState('');
   const nomeDestino = destinos.find((f) => f.id === destino)?.nome ?? '';
-  const comoFiscal = selecionados ? selecionados.filter((c) => c.fiscalUserId === carga.userId).length : carga.contratos;
-  const comoSubstituto = selecionados ? selecionados.length - comoFiscal : carga.comoSubstituto;
+  const qtd = selecionados ? selecionados.length : carga.contratos;
   const enviar = () =>
     transferir.mutate(
       { origemUserId: carga.userId, destinoUserId: destino, contractKeys: selecionados?.map((c) => c.contractKey) },
       {
         onSuccess: (r) => {
-          toast.success(`${r.fiscal + r.substituto} ${r.fiscal + r.substituto === 1 ? 'contrato passou' : 'contratos passaram'} de ${carga.nome} para ${nomeDestino}`);
+          toast.success(`${r.fiscal} ${r.fiscal === 1 ? 'contrato passou' : 'contratos passaram'} de ${carga.nome} para ${nomeDestino}`);
           onDone?.();
           onClose();
         },
@@ -200,8 +190,8 @@ export const TransferirFiscalModal: React.FC<{
     <Modal
       isOpen
       onClose={onClose}
-      title={selecionados ? `Transferir ${selecionados.length} ${selecionados.length === 1 ? 'contrato' : 'contratos'} de ${carga.nome}` : `Transferir os contratos de ${carga.nome}`}
-      subtitle={`${comoFiscal} como fiscal · ${comoSubstituto} como substituto`}
+      title={selecionados ? `Transferir ${qtd} ${qtd === 1 ? 'contrato' : 'contratos'} de ${carga.nome}` : `Transferir os contratos de ${carga.nome}`}
+      subtitle={`${qtd} ${qtd === 1 ? 'contrato' : 'contratos'} como fiscal`}
       size="sm"
       dismissible={!transferir.isPending}
       testId="fisc-transferir-modal"
@@ -220,7 +210,7 @@ export const TransferirFiscalModal: React.FC<{
           ))}
         </AppSelect>
         <NoticeBar tone="info">
-          Onde {carga.nome} é o fiscal, {nomeDestino || 'quem receber'} passa a ser o fiscal; onde é substituto, passa a ser o substituto. Portaria e processo ficam como estão: se precisar de portaria nova, registre no contrato.
+          {nomeDestino || 'Quem receber'} passa a ser o fiscal desses contratos. Portaria e processo ficam como estão: se precisar de portaria nova, registre no contrato.
         </NoticeBar>
       </div>
     </Modal>
@@ -229,11 +219,9 @@ export const TransferirFiscalModal: React.FC<{
 
 /**
  * Coordenador: férias, licença… Os contratos em que o servidor é o fiscal vão para quem assume até o retorno e voltam
- * no Desfazer. O substituto de cada contrato fica; se quem assume era o substituto, quem sai fica de substituto.
- * Quem assume vem sugerido: o substituto designado em mais contratos de quem sai (decisão de 11/11/2026). Se quem
- * assume não é o substituto de algum contrato, a janela avisa que ele não está na portaria.
+ * no Desfazer.
  */
-export const TransferirFiscalTemporariamenteModal: React.FC<{ carga: CargaDoFiscal; contratos: ContratoFiscalizacao[]; ausentes: TransferenciaFiscal[]; onClose: () => void }> = ({ carga, contratos, ausentes, onClose }) => {
+export const TransferirFiscalTemporariamenteModal: React.FC<{ carga: CargaDoFiscal; ausentes: TransferenciaFiscal[]; onClose: () => void }> = ({ carga, ausentes, onClose }) => {
   const toast = useToast();
   const transferir = useTransferirFiscalTemporaria();
   const { destinos } = useDestinos(carga.userId, ausentes);
@@ -242,14 +230,8 @@ export const TransferirFiscalTemporariamenteModal: React.FC<{ carga: CargaDoFisc
   const [inicio, setInicio] = useState(hoje);
   const [retorno, setRetorno] = useState('');
   const [sei, setSei] = useState('');
-  const substitutos = useMemo(() => substitutosDoTitular(contratos, carga.userId).filter((s) => destinos.some((d) => d.id === s.userId)), [contratos, carga.userId, destinos]);
-  const designadoEm = new Map(substitutos.map((s) => [s.userId, s.contratos]));
-  // Sem escolha do coordenador, vale a sugestão (o substituto de mais contratos); a lista de fiscais chega depois.
-  const [escolhido, setDestino] = useState<string | null>(null);
-  const destino = escolhido ?? substitutos[0]?.userId ?? '';
+  const [destino, setDestino] = useState('');
   const nomeDestino = destinos.find((f) => f.id === destino)?.nome ?? '';
-  const foraDaPortaria = destino ? carga.contratos - (designadoEm.get(destino) ?? 0) : 0;
-  const ordenados = [...destinos].sort((a, b) => (designadoEm.get(b.id) ?? 0) - (designadoEm.get(a.id) ?? 0));
   const retornoRuim = Boolean(retorno) && retorno < inicio;
   const ok = Boolean(destino && inicio && retorno) && !retornoRuim;
   const enviar = () =>
@@ -291,24 +273,13 @@ export const TransferirFiscalTemporariamenteModal: React.FC<{ carga: CargaDoFisc
         </div>
         <AppSelect label="Quem assume" value={destino} onChange={(ev) => setDestino(ev.target.value)} data-testid="fisc-temporaria-destino">
           <option value="">Escolher…</option>
-          {ordenados.map((f) => {
-            const n = designadoEm.get(f.id) ?? 0;
-            return (
-              <option key={f.id} value={f.id}>{n ? `${f.nome} · substituto em ${n} de ${carga.contratos}` : f.nome}</option>
-            );
-          })}
+          {destinos.map((f) => (
+            <option key={f.id} value={f.id}>{f.nome}</option>
+          ))}
         </AppSelect>
-        {destino && foraDaPortaria > 0 && (
-          <NoticeBar tone="warning" testId="fisc-temporaria-fora-portaria">
-            {foraDaPortaria === carga.contratos
-              ? `${nomeDestino} não é o substituto designado em nenhum contrato de ${carga.nome}.`
-              : `Em ${foraDaPortaria} de ${carga.contratos} contratos, ${nomeDestino} não é o substituto designado.`}{' '}
-            Informe abaixo o documento SEI da portaria de substituição.
-          </NoticeBar>
-        )}
-        <AppInput label="Documento SEI (opcional)" value={sei} onChange={(ev) => setSei(ev.target.value)} placeholder="ex.: portaria de substituição" />
+        <AppInput label="Documento SEI (opcional)" value={sei} onChange={(ev) => setSei(ev.target.value)} placeholder="ex.: portaria de designação" />
         <NoticeBar tone="info">
-          No retorno, o Desfazer devolve os contratos que ainda estiverem com {nomeDestino || 'quem assumir'}. O substituto de cada contrato continua o mesmo.
+          No retorno, o Desfazer devolve os contratos que ainda estiverem com {nomeDestino || 'quem assumir'}.
         </NoticeBar>
       </div>
     </Modal>
@@ -349,7 +320,7 @@ export const DesfazerTransferenciaFiscalModal: React.FC<{ transferencia: Transfe
       }
     >
       <span style={carteiraDetalhe}>
-        Voltam os {t.contratos} {t.contratos === 1 ? 'contrato' : 'contratos'} que ainda estão com {t.destinoNome}, com o substituto de antes. O que você passou a outra pessoa no período fica onde está.
+        Voltam os {t.contratos} {t.contratos === 1 ? 'contrato' : 'contratos'} que ainda estão com {t.destinoNome}. O que você passou a outra pessoa no período fica onde está.
       </span>
     </Modal>
   );

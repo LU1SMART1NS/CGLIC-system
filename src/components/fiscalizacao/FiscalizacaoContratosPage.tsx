@@ -114,7 +114,7 @@ export const FiscalizacaoContratosPage: React.FC = () => {
         return { c, es, r, agora, mais, dias, seg: segDe };
       });
   }, [contratos, entregas, hoje]);
-  const doFiscal = linhas.filter((l) => !fiscal || l.c.fiscalUserId === fiscal || l.c.substitutoUserId === fiscal);
+  const doFiscal = linhas.filter((l) => !fiscal || l.c.fiscalUserId === fiscal);
   const conta = (s: SegContrato) => doFiscal.filter((l) => s === 'TODOS' || l.seg === s).length;
   const doSeg = doFiscal.filter((l) => seg === 'TODOS' || l.seg === seg);
   const q = busca.trim().toLowerCase();

@@ -98,7 +98,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }} data-testid="fisc-mesa">
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem 1.75rem', alignItems: 'flex-start', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-card)' }} data-testid="fisc-mesa-faixa">
         <Campo rotulo="Fiscalização"><StatusBadge label={c.situacao === 'MISTA' ? 'Mista' : NOME_SFC} variant={c.situacao === 'MISTA' ? 'purple' : 'info'} size="sm" dot={false} /></Campo>
-        <Campo rotulo="Fiscal">{c.fiscalNome ?? '—'}{c.substitutoNome && <span style={carteiraDetalhe}> · substituto {c.substitutoNome}</span>}</Campo>
+        <Campo rotulo="Fiscal">{c.fiscalNome ?? '—'}</Campo>
         <Campo rotulo="Portaria">{c.portariaSei ? <NumeroSeiEtiqueta numero={c.portariaSei} testId="fisc-mesa-portaria" /> : <span style={carteiraDetalhe}>não registrada</span>}</Campo>
         <Campo rotulo="SEI do contrato">{c.processoSei ? <NumeroSeiEtiqueta numero={c.processoSei} testId="fisc-mesa-processo" /> : <span style={{ color: 'var(--color-warning-text)' }}>a autuar</span>}</Campo>
         <Campo rotulo="Origem">{c.emendas.length ? `${c.emendas.length === 1 ? 'Emenda' : 'Emendas'} ${c.emendas.slice(0, 3).join(', ')}${c.emendas.length > 3 ? ` +${c.emendas.length - 3}` : ''}` : 'Sem emenda'}</Campo>
