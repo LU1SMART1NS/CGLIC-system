@@ -212,7 +212,7 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
 
 export interface MovimentoEntrega {
   id: string;
-  tipo: 'CRIADA' | 'ETAPA' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM';
+  tipo: 'CRIADA' | 'ETAPA' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM' | 'BENEFICIARIO';
   etapa: EtapaEntrega | null;
   data: string | null;
   documentoSei: string | null;
@@ -495,6 +495,18 @@ export async function fetchItensDaAtaDoContrato(contractKey: string): Promise<It
 /** Liga itens da planilha (mesmo contrato) a um item da ata; o histórico registra quem conferiu. */
 export async function ligarItensAoItemDaAta(input: { ids: string[]; itemKey: string }): Promise<number> {
   const { data, error } = await cliente().rpc('ligar_entregas_ao_item_da_ata', { p_ids: input.ids, p_item_key: input.itemKey });
+  if (error) throw mapPostgresErrorToAppError(error);
+  return Number(data) || 0;
+}
+
+// ── Beneficiário do cadastro nos itens da planilha (migration 271) ─────────────────────────────────
+
+/**
+ * Liga itens da planilha (beneficiário escrito à mão) a um beneficiário do cadastro. O nome escrito entra nas outras
+ * grafias do cadastro (o mesmo nome se liga sozinho depois); o histórico registra quem ligou.
+ */
+export async function ligarItensAoBeneficiario(input: { ids: string[]; beneficiarioId: string }): Promise<number> {
+  const { data, error } = await cliente().rpc('ligar_entregas_ao_beneficiario', { p_ids: input.ids, p_beneficiario_id: input.beneficiarioId });
   if (error) throw mapPostgresErrorToAppError(error);
   return Number(data) || 0;
 }

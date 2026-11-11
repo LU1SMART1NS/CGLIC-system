@@ -30,6 +30,7 @@ import {
   type ProgramaFiscalizacao,
   fetchItensDaAtaDoContrato,
   ligarItensAoItemDaAta,
+  ligarItensAoBeneficiario,
   type ItemDaAtaDoContrato
 } from '../services/fiscalizacaoService';
 
@@ -207,3 +208,15 @@ export function useItensDaAtaDoContrato(contractKey: string | null | undefined) 
 }
 
 export const useLigarItensAoItemDaAta = () => useMutacaoDeEntregas(async (input: { ids: string[]; itemKey: string }) => { await ligarItensAoItemDaAta(input); });
+
+/** Ligar ao cadastro também muda as outras grafias do beneficiário (Emendas): recarrega os dois. */
+export function useLigarItensAoBeneficiario() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ligarItensAoBeneficiario,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: FISCALIZACAO_ENTREGAS_KEY });
+      void qc.invalidateQueries({ queryKey: ['emendas', 'beneficiarios'] });
+    }
+  });
+}
