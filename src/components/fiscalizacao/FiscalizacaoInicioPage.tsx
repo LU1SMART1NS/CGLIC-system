@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { FileSignature, FolderOpen, LayoutDashboard, Users, ScrollText } from 'lucide-react';
+import { AlertTriangle, Clock, FolderOpen, LayoutDashboard, ScrollText } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
@@ -12,7 +12,8 @@ import { ErrorState } from '../../design-system/components/ErrorState';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
-import { useContratosFiscalizacao } from '../../hooks/useFiscalizacao';
+import { useContratosFiscalizacao, useEntregasFiscalizacao } from '../../hooks/useFiscalizacao';
+import { prazoDaEntrega } from '../../utils/fiscalizacaoEntregas';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, comSfc, ehDoFiscal, numeroDoContrato, pendenciasDoContrato, type PendenciaFiscalizacao } from '../../utils/fiscalizacao';
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
@@ -48,6 +49,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   const { user, role } = useAuth();
   const navigate = useNavigateWithOrigin();
   const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useContratosFiscalizacao();
+  const entregasConsulta = useEntregasFiscalizacao(null);
   const [autuando, setAutuando] = useState<ContratoFiscalizacao | null>(null);
   const [todas, setTodas] = useState(false);
   const coordenador = role === 'admin';
@@ -61,6 +63,14 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   const aAutuar = pendencias.filter((p) => p.tipo === 'AUTUAR');
   const semPortaria = pendencias.filter((p) => p.tipo === 'PORTARIA');
   const mistas = daSfc.filter((c) => c.situacao === 'MISTA').length;
+  const minhasEntregas = useMemo(
+    () => (entregasConsulta.data ?? []).filter((e) => e.responsavel === 'SFC' && (!fiscal || e.fiscalUserId === user?.id || e.substitutoUserId === user?.id)),
+    [entregasConsulta.data, fiscal, user?.id]
+  );
+  const vencidas = minhasEntregas.filter((e) => prazoDaEntrega(e).tom === 'danger');
+  const aVencer = minhasEntregas.filter((e) => prazoDaEntrega(e).tom === 'warning' && prazoDaEntrega(e).dias !== null);
+  const noExercito = minhasEntregas.filter((e) => e.etapa === 'CONTROLADO');
+  const entregasCarregando = entregasConsulta.isLoading;
 
   const comVoce: Array<{ chave: string; titulo: string; detalhe: string; acao: string; onAcao: () => void }> = [];
   if (coordenador && aDefinir.length > 0) {
@@ -95,19 +105,36 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               tom="primary"
               valor={String(fiscal ? titular.length : daSfc.length)}
               unidade={(fiscal ? titular.length : daSfc.length) === 1 ? 'contrato' : 'contratos'}
-              linhas={fiscal ? [{ rotulo: 'Como substituto', valor: String(daSfc.length - titular.length) }] : [{ rotulo: 'Fiscalização mista', valor: String(mistas) }]}
+              linhas={[
+                fiscal ? { rotulo: 'Como substituto', valor: String(daSfc.length - titular.length) } : { rotulo: 'Fiscalização mista', valor: String(mistas) },
+                { rotulo: 'Processo a autuar', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined },
+                { rotulo: 'Sem portaria registrada', valor: String(semPortaria.length), tom: semPortaria.length ? 'warning' : undefined }
+              ]}
               onClick={() => document.getElementById('fisc-inicio-contratos')?.scrollIntoView({ behavior: 'smooth' })}
               testId="fisc-cartao-contratos"
             />
             <PainelCartao
-              rotulo="Processo a autuar"
-              icone={<FileSignature size={16} />}
-              tom={aAutuar.length ? 'amber' : 'success'}
-              valor={aAutuar.length ? String(aAutuar.length) : 'Em dia'}
-              unidade={aAutuar.length ? (aAutuar.length === 1 ? 'contrato' : 'contratos') : undefined}
-              linhas={[{ rotulo: 'Sem portaria registrada', valor: String(semPortaria.length), tom: semPortaria.length ? 'warning' : undefined }]}
-              onClick={() => document.getElementById('fisc-inicio-com-voce')?.scrollIntoView({ behavior: 'smooth' })}
-              testId="fisc-cartao-autuar"
+              rotulo="Entregas vencidas"
+              icone={<AlertTriangle size={16} />}
+              tom={vencidas.length ? 'danger' : 'success'}
+              valor={entregasCarregando ? '…' : vencidas.length ? String(vencidas.length) : 'Em dia'}
+              unidade={vencidas.length ? (vencidas.length === 1 ? 'entrega' : 'entregas') : undefined}
+              linhas={[
+                { rotulo: 'Vencem em 30 dias', valor: String(aVencer.length), tom: aVencer.length ? 'warning' : undefined },
+                { rotulo: 'Entregas acompanhadas', valor: String(minhasEntregas.length) }
+              ]}
+              onClick={() => navigate('/fiscalizacao/entregas?prazo=danger')}
+              testId="fisc-cartao-vencidas"
+            />
+            <PainelCartao
+              rotulo="Aguardando o Exército"
+              icone={<Clock size={16} />}
+              tom={noExercito.length ? 'amber' : 'success'}
+              valor={entregasCarregando ? '…' : noExercito.length ? String(noExercito.length) : 'Nenhuma'}
+              unidade={noExercito.length ? (noExercito.length === 1 ? 'entrega' : 'entregas') : undefined}
+              linhas={[{ rotulo: 'Produto controlado (DFPC)', valor: '' }]}
+              onClick={() => navigate('/fiscalizacao/entregas?fase=EXECUCAO')}
+              testId="fisc-cartao-exercito"
             />
             {!fiscal && (
               <PainelCartao
@@ -119,18 +146,6 @@ export const FiscalizacaoInicioPage: React.FC = () => {
                 linhas={[{ rotulo: 'Sugestão', valor: NOME_SFC }]}
                 onClick={() => navigate(coordenador ? '/fiscalizacao/distribuicao' : '/fiscalizacao/inicio')}
                 testId="fisc-cartao-a-definir"
-              />
-            )}
-            {!fiscal && (
-              <PainelCartao
-                rotulo="Fiscais"
-                icone={<Users size={16} />}
-                tom="primary"
-                valor={String(new Set(daSfc.map((c) => c.fiscalUserId).filter(Boolean)).size)}
-                unidade="com contratos"
-                linhas={[]}
-                onClick={() => navigate(coordenador ? '/fiscalizacao/distribuicao?segmento=EQUIPE' : '/fiscalizacao/inicio')}
-                testId="fisc-cartao-fiscais"
               />
             )}
           </PainelCartoes>

@@ -4,6 +4,14 @@ import { useAuth } from '../context/AuthContext';
 import { useUsers } from './useUsers';
 import {
   definirFiscalizacaoContrato,
+  definirPrevistaEntregas,
+  definirResponsavelEntregas,
+  dividirEntrega,
+  fetchEntregasFiscalizacao,
+  fetchMovimentosDaEntrega,
+  mudarEtapaEntregas,
+  type EntregaFiscalizacao,
+  type MovimentoEntrega,
   fetchContratosFiscalizacao,
   registrarProcessoFiscalizacao,
   type ContratoFiscalizacao,
@@ -11,6 +19,7 @@ import {
 } from '../services/fiscalizacaoService';
 
 export const FISCALIZACAO_CONTRATOS_KEY = ['fiscalizacao', 'contratos'] as const;
+export const FISCALIZACAO_ENTREGAS_KEY = ['fiscalizacao', 'entregas'] as const;
 
 /** Quem lê a fiscalização (fiscalizacao.view, migration 259). */
 export function podeVerFiscalizacao(role: string | null | undefined): boolean {
@@ -53,7 +62,7 @@ export function useDefinirFiscalizacao() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: DefinirFiscalizacaoInput) => definirFiscalizacaoContrato(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY })
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY }), qc.invalidateQueries({ queryKey: FISCALIZACAO_ENTREGAS_KEY })])
   });
 }
 
@@ -64,3 +73,35 @@ export function useRegistrarProcessoFiscalizacao() {
     onSuccess: () => qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY })
   });
 }
+
+/** Entregas de um contrato (ou de todos, sem contrato). */
+export function useEntregasFiscalizacao(contractKey?: string | null) {
+  const { role } = useAuth();
+  return useQuery<EntregaFiscalizacao[], Error>({
+    queryKey: [...FISCALIZACAO_ENTREGAS_KEY, contractKey ?? 'todas'],
+    queryFn: () => fetchEntregasFiscalizacao(contractKey ?? null),
+    enabled: podeVerFiscalizacao(role),
+    staleTime: 60 * 1000
+  });
+}
+
+export function useMovimentosDaEntrega(entregaId: string | null) {
+  return useQuery<MovimentoEntrega[], Error>({
+    queryKey: [...FISCALIZACAO_ENTREGAS_KEY, 'movimentos', entregaId],
+    queryFn: () => fetchMovimentosDaEntrega(entregaId as string),
+    enabled: Boolean(entregaId)
+  });
+}
+
+function useMutacaoDeEntregas<I>(fn: (input: I) => Promise<void>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => qc.invalidateQueries({ queryKey: FISCALIZACAO_ENTREGAS_KEY })
+  });
+}
+
+export const useMudarEtapaEntregas = () => useMutacaoDeEntregas(mudarEtapaEntregas);
+export const useDividirEntrega = () => useMutacaoDeEntregas(dividirEntrega);
+export const useDefinirPrevistaEntregas = () => useMutacaoDeEntregas(definirPrevistaEntregas);
+export const useDefinirResponsavelEntregas = () => useMutacaoDeEntregas(definirResponsavelEntregas);
