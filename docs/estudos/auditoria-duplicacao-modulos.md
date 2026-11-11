@@ -213,8 +213,8 @@ As vazias usadas por funções do banco (`*_ausente_da_fonte`, `correcoes_*`, `v
 
 ## 6. Ordem sugerida de entregas
 
-1. **Valor total da ata (1.1)**: decidir o valor da ata da CGLIC depois do apostilamento e usar uma regra só nas três funções e na sincronização.
-2. **Juntar beneficiários (1.2)**: repassar `emendas_siop`, `fisc_entregas` e o grupo.
+1. **Valor total da ata (1.1)**: feito, PR #508 e migration 269 (soma homologada × preço vigente nas atas da CGLIC).
+2. **Juntar beneficiários (1.2)**: feito, PR #510 e migration 270.
 3. **Ordem de Fornecimento numa fonte só (1.3)**: PR #512, migration 271.
 4. **Entregas × linha do pedido (1.4)**: leitura pela linha, ou conferência com aviso.
 5. **Gestor e fiscal pelo id (2.2)**, que o dado de hoje permite trocar sem risco, e **perfis lidos do banco (2.3)**.
