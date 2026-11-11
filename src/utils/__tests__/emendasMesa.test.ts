@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mesaDoPedido, itensDaMesa, passoDoItem } from '../emendasMesa';
+import { mesaDoPedido, itensDaMesa, passoDoItem, passosDaLinha, PASSO, PASSOS_DO_ITEM } from '../emendasMesa';
 import type { BeneficiarioEmenda, ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
 
 const HOJE = '2026-10-29';
@@ -114,7 +114,7 @@ const nota = (linhaId: string, extra: Partial<NotaDaLinha> = {}): NotaDaLinha =>
 const CONTRATO = '200331|2026|00041';
 
 describe('Mesa do pedido: passo de cada item', () => {
-  it('nota, na CCGA, devolvido, contrato, faturado, liquidado e pago', () => {
+  it('nota, na CCGA, devolvido, contrato e, sem a Fiscalização, faturado = entregue, liquidado = recebido e pago', () => {
     const p = pedido({});
     const passo = (l: LinhaPedido, n?: Partial<NotaDaLinha> | null) => passoDoItem(p, l, new Map(n === null ? [] : [[l.id, nota(l.id, n ?? {})]]));
     expect(passo(linha('a'), null).passo).toBe(-1);
@@ -135,15 +135,15 @@ describe('Mesa do pedido: passo de cada item', () => {
         contractKey: CONTRATO,
         faturas: 1,
         faturadoEm: '2026-10-25'
-      }).passo
-    ).toBe(3);
+      })
+    ).toMatchObject({ passo: PASSO.ENTREGUE, onde: 'faturado em 25/10/2026' });
     expect(
       passo(linha('a'), {
         contractKey: CONTRATO,
         faturas: 1,
         valorLiquidado: 200
       }).passo
-    ).toBe(4);
+    ).toBe(PASSO.RECEBIDO);
     expect(
       passo(linha('a'), {
         contractKey: CONTRATO,
@@ -152,7 +152,50 @@ describe('Mesa do pedido: passo de cada item', () => {
         valorPago: 200,
         pagoEm: '2026-10-28'
       })
-    ).toMatchObject({ passo: 5, onde: 'em 28/10/2026' });
+    ).toMatchObject({ passo: PASSO.PAGO, onde: 'em 28/10/2026' });
+  });
+
+  it('10 passos, na ordem do protótipo da Fiscalização', () => {
+    expect([...PASSOS_DO_ITEM]).toEqual(['Nota', 'Na CCGA', 'Contrato', 'Informações', 'Ordem', 'Produção', 'Entregue', 'Recebido', 'Pago', 'Ofício à SAL']);
+  });
+
+  it('Informação e Ordem do pedido viram passos, sem a Fiscalização', () => {
+    const p = pedido({ ordens: [{ id: 'o', contractKey: CONTRATO, informacaoEm: '2026-10-10', informacaoDocumentoSei: '37530982', ordemEm: null, ordemDocumentoSei: null }] });
+    expect(passoDoItem(p, linha('a'), new Map([['a', nota('a', { contractKey: CONTRATO })]])).passo).toBe(PASSO.INFORMACOES);
+  });
+});
+
+describe('Mesa do pedido: passos pela Fiscalização (migration 263)', () => {
+  const p = pedido({});
+  const notas = (extra: Partial<NotaDaLinha> = {}) => new Map([['a', nota('a', { contractKey: CONTRATO, ...extra })]]);
+  const e = (etapa: string, quantidade = 10, extra: Record<string, unknown> = {}) => ({ quantidade, responsavel: 'SFC' as const, etapa, etapaEm: '2026-10-20', entregueEm: null, ...extra });
+
+  it('a etapa da entrega vira o passo; parado no Exército em vermelho', () => {
+    expect(passosDaLinha(p, linha('a'), notas(), [e('ORDEM')])[0]).toMatchObject({ passo: PASSO.ORDEM, onde: 'Ordem de Fornecimento enviada em 20/10/2026' });
+    expect(passosDaLinha(p, linha('a'), notas(), [e('CONTROLADO')])[0]).toMatchObject({ passo: PASSO.PRODUCAO, parado: 'Aguardando o Exército' });
+    expect(passosDaLinha(p, linha('a'), notas(), [e('TRP', 10, { entregueEm: '2026-10-25' })])[0]).toMatchObject({ passo: PASSO.ENTREGUE, onde: 'recebimento provisório em 25/10/2026' });
+    expect(passosDaLinha(p, linha('a'), notas(), [e('PAGAMENTO')])[0].passo).toBe(PASSO.RECEBIDO);
+    expect(passosDaLinha(p, linha('a'), notas({ valorPago: 200, pagoEm: '2026-10-28' }), [e('PAGAMENTO')])[0].passo).toBe(PASSO.PAGO);
+    expect(passosDaLinha(p, linha('a'), notas(), [e('SAL')])[0].passo).toBe(PASSO.SAL);
+  });
+
+  it('entrega parcial: uma parte por entrega, com "parte de"', () => {
+    const partes = passosDaLinha(p, linha('a', { quantidade: 10 }), notas(), [e('ENTREGUE', 4, { entregueEm: '2026-10-25' }), e('CONTROLADO', 6)]);
+    expect(partes.map((x) => [x.quantidade, x.passo])).toEqual([[4, PASSO.ENTREGUE], [6, PASSO.PRODUCAO]]);
+    expect(partes[0].onde).toContain('parte de 10');
+  });
+
+  it('área requisitante e antes do contrato seguem pelas notas', () => {
+    expect(passosDaLinha(p, linha('a'), notas(), [{ ...e('ORDEM'), responsavel: 'AREA' }])[0]).toMatchObject({ passo: PASSO.CONTRATO });
+    expect(passosDaLinha(p, linha('a', { ccgaSituacao: 'ENVIADA' }), new Map([['a', nota('a')]]), [e('ORDEM')])[0].passo).toBe(PASSO.CCGA);
+  });
+
+  it('no quadro, as partes viram linhas e o resumo conta os parados', () => {
+    const it = itensDaMesa(pedido({ linhas: [linha('a', { quantidade: 10 })] }), itens, notas(), beneficiarios, new Map([['a', [e('ENTREGUE', 4, { entregueEm: '2026-10-25' }), e('CONTROLADO', 6)]]]))!;
+    const todos = it.grupos.flatMap((g) => g.itens);
+    expect(todos.map((x) => x.quantidade).sort()).toEqual([4, 6]);
+    expect(it.uma).toBeNull();
+    expect(it.grupos[0].resumo).toContain('parados no Exército');
   });
 });
 
@@ -397,7 +440,7 @@ describe('Mesa do pedido: ajustes de 30/10/2026', () => {
   it('item único com contrato: a frase leva o contrato, a assinatura e a Ordem', () => {
     const p = pedido({ linhas: [linha('l1', { ccgaSituacao: 'ENVIADA' })], ordens: [{ id: 'o', contractKey: '200331-00041-2026', informacaoEm: null, informacaoDocumentoSei: null, ordemEm: '2026-10-22', ordemDocumentoSei: '37510000' }] });
     const it = itensDaMesa(p, itens, new Map([['l1', nota('l1', { contractKey: '200331-00041-2026', contratoAssinadoEm: '2026-10-02' })]]), beneficiarios)!;
-    expect(it.uma?.texto).toBe('O item está com contrato · Contrato 00041/2026 · assinado em 02/10/2026 · Ordem de Fornecimento em 22/10/2026.');
+    expect(it.uma?.texto).toBe('O item está com a Ordem de Fornecimento · Contrato 00041/2026 · assinado em 02/10/2026 · Ordem de Fornecimento em 22/10/2026.');
   });
 });
 

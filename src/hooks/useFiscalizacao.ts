@@ -7,9 +7,11 @@ import {
   definirPrevistaEntregas,
   definirResponsavelEntregas,
   dividirEntrega,
+  fetchEntregasDoPedido,
   fetchEntregasFiscalizacao,
   fetchMovimentosDaEntrega,
   mudarEtapaEntregas,
+  type EntregaDaLinha,
   type EntregaFiscalizacao,
   type MovimentoEntrega,
   fetchContratosFiscalizacao,
@@ -140,3 +142,24 @@ function useMutacaoDeFiscal<I, R>(fn: (input: I) => Promise<R>) {
 export const useTransferirContratosFiscal = () => useMutacaoDeFiscal(transferirContratosFiscal);
 export const useTransferirFiscalTemporaria = () => useMutacaoDeFiscal(transferirContratosFiscalTemporaria);
 export const useDesfazerTransferenciaFiscal = () => useMutacaoDeFiscal(desfazerTransferenciaFiscal);
+
+/**
+ * Entregas das linhas de um pedido de emenda, por linha (régua do Pedido 360). Lê quem tem fiscalizacao.view, inclusive
+ * o gestor de emendas; sem permissão ou com falha, a régua segue pelas notas (o mapa vem vazio).
+ */
+export function useEntregasDoPedido(pedidoId: string | null | undefined) {
+  const { role } = useAuth();
+  const ler = role === 'admin' || role === 'gestor_emendas' || role === 'gestor_fiscalizacao' || role === 'gestor' || role === 'leitor';
+  const consulta = useQuery<EntregaDaLinha[], Error>({
+    queryKey: [...FISCALIZACAO_ENTREGAS_KEY, 'pedido', pedidoId],
+    queryFn: () => fetchEntregasDoPedido(pedidoId as string),
+    enabled: Boolean(pedidoId) && ler,
+    staleTime: 60 * 1000
+  });
+  const porLinha = useMemo(() => {
+    const m = new Map<string, EntregaDaLinha[]>();
+    for (const e of consulta.data ?? []) m.set(e.linhaId, [...(m.get(e.linhaId) ?? []), e]);
+    return m;
+  }, [consulta.data]);
+  return { consulta, porLinha };
+}

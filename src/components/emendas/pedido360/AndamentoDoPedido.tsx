@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { usePrecosParaEmenda } from '../../../hooks/useEmendasQuadro';
+import { useEntregasDoPedido } from '../../../hooks/useFiscalizacao';
 import { AppButton } from '../../../design-system/components/AppButton';
 import { InfoHint } from '../../../design-system/components/InfoHint';
 import { NoticeBar } from '../../../design-system/components/NoticeBar';
@@ -79,21 +80,21 @@ const marca = (tom: LinhaDaMesa['tom']): React.CSSProperties =>
  * feito com ✓ em verde, o atual em negrito azul, o que falta em cinza; devolvido pela CCGA em vermelho no lugar de
  * "Na CCGA". No celular (index.css) ficam só o passo atual e o próximo.
  */
-const Regua: React.FC<{ passo: number; devolvido: boolean }> = ({ passo, devolvido }) => {
+const Regua: React.FC<{ passo: number; devolvido: boolean; parado?: string | null }> = ({ passo, devolvido, parado }) => {
   const atual = devolvido ? 1 : passo;
-  const fim = passo === PASSOS_DO_ITEM.length - 1 && !devolvido;
+  const fim = passo === PASSOS_DO_ITEM.length - 1 && !devolvido && !parado;
   return (
     <span className="regua-item" data-testid="pedido360-regua">
       {PASSOS_DO_ITEM.map((nome, i) => {
         const feito = i < atual || (fim && i === atual);
         const eAtual = i === atual && !fim;
         const longe = i < atual || i > atual + 1;
-        const cor = devolvido && i === 1 ? 'var(--color-danger-text)' : feito ? 'var(--color-success-text)' : eAtual ? 'var(--primary)' : '#94a3b8';
+        const cor = (devolvido && i === 1) || (parado && eAtual) ? 'var(--color-danger-text)' : feito ? 'var(--color-success-text)' : eAtual ? 'var(--primary)' : '#94a3b8';
         return (
           <span key={nome} className={`regua-item__passo${longe && !(fim && i === atual) ? ' regua-item__passo--longe' : ''}${eAtual || (fim && i === atual) ? ' regua-item__passo--atual' : ''}`} style={{ color: cor, fontWeight: eAtual ? 700 : 400 }}>
             {i > 0 && <span className="regua-item__sep" aria-hidden="true">› </span>}
             {feito ? '✓ ' : ''}
-            {devolvido && i === 1 ? 'Devolvido pela CCGA' : nome}
+            {devolvido && i === 1 ? 'Devolvido pela CCGA' : parado && eAtual ? parado : nome}
           </span>
         );
       })}
@@ -122,7 +123,7 @@ const LinhaDoItem: React.FC<{ x: ItemDaMesa }> = ({ x }) => (
       {x.comVoce && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)' }}>com você</span>}
     </div>
     <div className="regua-item-lado" style={{ fontSize: '0.78rem', minWidth: 0 }}>
-      {x.passo < 0 ? <b style={{ color: 'var(--color-warning-text)' }}>Sem nota</b> : <Regua passo={x.passo} devolvido={x.devolvido} />}
+      {x.passo < 0 ? <b style={{ color: 'var(--color-warning-text)' }}>Sem nota</b> : <Regua passo={x.passo} devolvido={x.devolvido} parado={x.parado} />}
       {x.onde && <div style={{ color: '#64748b' }}>{x.onde}</div>}
     </div>
   </div>
@@ -166,7 +167,7 @@ const OndeEstaCadaItem: React.FC<{ it: ItensDaMesa }> = ({ it }) => {
       Onde está cada item{' '}
       <InfoHint
         label="Sobre os passos dos itens"
-        content="Nota, Na CCGA, Contrato, Faturado, Liquidado e Pago. Do contrato em diante, o sistema atualiza pelo Contratos.gov.br e pelo Tesouro."
+        content="Nota, Na CCGA e Contrato vêm das fontes. Informações, Ordem, Produção, Entregue, Recebido e Ofício à SAL vêm da Fiscalização da SFC/CGLIC (só leitura aqui); sem ela, entregue e recebido seguem a fatura e a liquidação da nota. Pago vem do Tesouro."
         testId="pedido360-itens-info"
       />
     </CarteiraDetailLabel>
@@ -438,7 +439,9 @@ const Caminho: React.FC<{ m: MesaDoPedido; onAcao: AoAgir }> = ({ m, onAcao }) =
  */
 export const AndamentoDoPedido: React.FC<Props> = ({ p, itens, notas, beneficiarios, avisos, hoje, podeGerir, onAcao, onAlterar, onAnular, ccga, onOrdem }) => {
   const { precos } = usePrecosParaEmenda();
-  const m = useMemo(() => mesaDoPedido(p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos), [p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos]);
+  // Entregas da Fiscalização por linha (migration 263): a régua do item mostra os passos da SFC/CGLIC.
+  const { porLinha: entregas } = useEntregasDoPedido(p.id);
+  const m = useMemo(() => mesaDoPedido(p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos, entregas), [p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos, entregas]);
   const [todasComVoce, setTodasComVoce] = useState(false);
   const cancelado = p.etapa === 'CANCELADO';
 

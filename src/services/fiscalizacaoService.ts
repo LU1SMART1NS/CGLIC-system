@@ -343,3 +343,37 @@ export async function desfazerTransferenciaFiscal(id: string): Promise<{ devolvi
   const r = (data ?? {}) as { devolvidos?: number; ficaram?: number };
   return { devolvidos: r.devolvidos ?? 0, ficaram: r.ficaram ?? 0 };
 }
+
+/** Entrega de uma linha de pedido de emenda, para a régua do Pedido 360 (migration 263). */
+export interface EntregaDaLinha {
+  id: string;
+  linhaId: string;
+  contractKey: string;
+  quantidade: number;
+  responsavel: ResponsavelEntrega;
+  etapa: EtapaEntrega;
+  etapaEm: string | null;
+  prevista: string | null;
+  entregueEm: string | null;
+  divididaDe: string | null;
+  fiscalNome: string | null;
+}
+
+export async function fetchEntregasDoPedido(pedidoId: string): Promise<EntregaDaLinha[]> {
+  const { data, error } = await cliente().rpc('fisc_entregas_do_pedido', { p_pedido: pedidoId });
+  if (error) throw mapPostgresErrorToAppError(error);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data || []) as any[]).map((r) => ({
+    id: r.id,
+    linhaId: r.linha_id,
+    contractKey: r.contract_key,
+    quantidade: Number(r.quantidade) || 0,
+    responsavel: r.responsavel,
+    etapa: r.etapa,
+    etapaEm: r.etapa_em || null,
+    prevista: r.prevista || null,
+    entregueEm: r.entregue_em || null,
+    divididaDe: r.dividida_de || null,
+    fiscalNome: r.fiscal_nome || null
+  }));
+}
