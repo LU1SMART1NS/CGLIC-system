@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
+import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 
 /**
  * Fiscalização de contratos pela SFC/CGLIC (migration 259). O coordenador decide, por contrato, quem fiscaliza:
@@ -221,11 +222,19 @@ export interface MovimentoEntrega {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-/** Entregas de um contrato ou de todos (RPC fisc_entregas_lista). */
+/**
+ * Entregas de um contrato ou de todos (RPC fisc_entregas_lista). Lidas de mil em mil, ordenadas pelo id: sem isso o
+ * PostgREST cortava em 1.000 das 4.005 linhas e os itens dos programas (e de vários contratos) sumiam das telas.
+ */
 export async function fetchEntregasFiscalizacao(contractKey?: string | null): Promise<EntregaFiscalizacao[]> {
-  const { data, error } = await cliente().rpc('fisc_entregas_lista', { p_contrato: contractKey ?? null });
-  if (error) throw mapPostgresErrorToAppError(error);
-  return ((data || []) as unknown[]).map(linhaParaEntrega);
+  try {
+    const linhas = await lerTodasAsPaginas<unknown>((de, ate) =>
+      cliente().rpc('fisc_entregas_lista', { p_contrato: contractKey ?? null }).order('id').range(de, ate),
+    );
+    return linhas.map(linhaParaEntrega);
+  } catch (error) {
+    throw mapPostgresErrorToAppError(error);
+  }
 }
 
 export async function fetchMovimentosDaEntrega(entregaId: string): Promise<MovimentoEntrega[]> {
