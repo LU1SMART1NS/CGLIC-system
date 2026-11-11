@@ -8,6 +8,9 @@ import type { ContratoFiscalizacao, TransferenciaFiscal } from '../../services/f
 import { comSfc, dataBR, hojeEmBrasilia, type CargaDoFiscal } from '../../utils/fiscalizacao';
 import { DesfazerTransferenciaFiscalModal, TransferirFiscalModal, TransferirFiscalTemporariamenteModal } from './FiscalizacaoModais';
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
+import { ArrowLeftRight } from 'lucide-react';
+import { AppButton } from '../../design-system/components/AppButton';
+import { useSelecaoFila } from '../atas/distribuicao/DistribuicaoSelecao';
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
@@ -51,7 +54,54 @@ interface FiscaisEquipeProps {
   transferencias: TransferenciaFiscal[];
 }
 
-type Janela = { tipo: 'TRANSFERIR' | 'TEMPORARIA'; carga: CargaDoFiscal } | { tipo: 'DESFAZER'; transferencia: TransferenciaFiscal };
+type Janela =
+  | { tipo: 'TRANSFERIR' | 'TEMPORARIA'; carga: CargaDoFiscal; selecionados?: ContratoFiscalizacao[] }
+  | { tipo: 'DESFAZER'; transferencia: TransferenciaFiscal };
+
+/**
+ * Contratos do fiscal aberto, com caixas de marcar e "Transferir N selecionados", como a Equipe de Atas e Contratos.
+ * Sem ausência em curso: quem está ausente tem os contratos com outra pessoa até o Desfazer.
+ */
+const ContratosDoFiscal: React.FC<{
+  f: CargaDoFiscal;
+  contratos: ContratoFiscalizacao[];
+  podeTransferir: boolean;
+  onTransferir: (selecionados: ContratoFiscalizacao[], limpar: () => void) => void;
+}> = ({ f, contratos, podeTransferir, onTransferir }) => {
+  const chaves = useMemo(() => contratos.map((c) => c.contractKey), [contratos]);
+  const selecao = useSelecaoFila(chaves);
+  const todos = chaves.length > 0 && chaves.every((k) => selecao.selecionadas.has(k));
+  const marcados = contratos.filter((c) => selecao.selecionadas.has(c.contractKey));
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      {podeTransferir && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', minHeight: '32px' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', fontWeight: 700, color: '#475569', cursor: 'pointer', minHeight: '44px' }}>
+            <input type="checkbox" checked={todos} onChange={() => selecao.alternarVarias(chaves)} data-testid={`fisc-equipe-selecionar-${f.userId}`} />
+            Selecionar os {chaves.length} exibidos
+          </label>
+          {marcados.length > 0 && (
+            <AppButton
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => onTransferir(marcados, selecao.limpar)}
+              data-testid={`fisc-equipe-transferir-selecionados-${f.userId}`}
+              icon={<ArrowLeftRight size={14} />}
+            >
+              Transferir {marcados.length} {marcados.length === 1 ? 'selecionado' : 'selecionados'}
+            </AppButton>
+          )}
+        </div>
+      )}
+      <ContratosFiscalizacaoTabela
+        contratos={contratos}
+        testId={`fisc-equipe-contratos-${f.userId}`}
+        selecao={podeTransferir ? { selecionadas: selecao.selecionadas, onAlternar: selecao.alternar } : undefined}
+      />
+    </div>
+  );
+};
 
 /**
  * Início › Fiscalização › Distribuição › Equipe: a carga de cada fiscal da SFC/CGLIC, como a Equipe de Atas e Contratos
@@ -61,6 +111,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
   const [busca, setBusca] = useState('');
   const [aberto, setAberto] = useState<string | null>(null);
   const [janela, setJanela] = useState<Janela | null>(null);
+  const [aoTransferir, setAoTransferir] = useState<(() => void) | null>(null);
   const ausenciaDe = (userId: string) => transferencias.find((t) => t.ausenteUserId === userId) ?? null;
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -149,7 +200,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
                                     size="sm"
                                     onClick={() => setJanela({ tipo: 'TRANSFERIR', carga: f })}
                                     data-testid={`fisc-equipe-transferir-${f.userId}`}
-                                    title="Passar de vez os contratos deste fiscal para outra pessoa"
+                                    title="Passar de vez todos os contratos deste fiscal; para só alguns, abra a lista e marque"
                                   />
                                   {f.contratos > 0 && (
                                     <ActionButton
@@ -171,7 +222,15 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
                       {expandido && (
                         <tr>
                           <td colSpan={5} style={CARTEIRA_EXPANDED_CELL_STYLE}>
-                            <ContratosFiscalizacaoTabela contratos={doFiscal(f.userId)} testId={`fisc-equipe-contratos-${f.userId}`} />
+                            <ContratosDoFiscal
+                              f={f}
+                              contratos={doFiscal(f.userId)}
+                              podeTransferir={!ausencia}
+                              onTransferir={(selecionados, limpar) => {
+                                setAoTransferir(() => limpar);
+                                setJanela({ tipo: 'TRANSFERIR', carga: f, selecionados });
+                              }}
+                            />
                           </td>
                         </tr>
                       )}
@@ -183,7 +242,18 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
           </div>
         </div>
       )}
-      {janela?.tipo === 'TRANSFERIR' && <TransferirFiscalModal carga={janela.carga} ausentes={transferencias} onClose={() => setJanela(null)} />}
+      {janela?.tipo === 'TRANSFERIR' && (
+        <TransferirFiscalModal
+          carga={janela.carga}
+          ausentes={transferencias}
+          selecionados={janela.selecionados}
+          onDone={aoTransferir ?? undefined}
+          onClose={() => {
+            setJanela(null);
+            setAoTransferir(null);
+          }}
+        />
+      )}
       {janela?.tipo === 'TEMPORARIA' && <TransferirFiscalTemporariamenteModal carga={janela.carga} contratos={contratos} ausentes={transferencias} onClose={() => setJanela(null)} />}
       {janela?.tipo === 'DESFAZER' && <DesfazerTransferenciaFiscalModal transferencia={janela.transferencia} onClose={() => setJanela(null)} />}
     </div>

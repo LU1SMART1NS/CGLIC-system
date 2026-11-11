@@ -4,6 +4,7 @@ import { StatusBadge, type StatusBadgeVariant } from '../../design-system/compon
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
 import { carteiraDetalhe, carteiraIdentificacao, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
+import { SELECIONADA_BG } from '../atas/distribuicao/DistribuicaoSelecao';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { ROTULO_SITUACAO, dataBR, numeroDoContrato, rotaDoContrato } from '../../utils/fiscalizacao';
 
@@ -60,15 +61,41 @@ export const CelulaProcesso: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) =>
     <span style={carteiraDetalhe}>—</span>
   );
 
+/** Caixas de marcar na primeira coluna (Equipe: transferir só os marcados). */
+export interface SelecaoDeContratos {
+  selecionadas: Set<string>;
+  onAlternar: (contractKey: string) => void;
+}
+
 /** Contratos com a SFC/CGLIC: a linha abre o Contrato 360 na aba Fiscalização. */
 export const ContratosFiscalizacaoTabela: React.FC<{
   contratos: ContratoFiscalizacao[];
   testId: string;
   comOrigem?: boolean;
   rowActions?: (c: ContratoFiscalizacao) => React.ReactNode;
-}> = ({ contratos, testId, comOrigem = true, rowActions }) => {
+  selecao?: SelecaoDeContratos;
+}> = ({ contratos, testId, comOrigem = true, rowActions, selecao }) => {
   const navigate = useNavigateWithOrigin();
   const colunas: Column<ContratoFiscalizacao>[] = [
+    ...(selecao
+      ? [
+          {
+            key: 'selecao',
+            header: '',
+            width: '36px',
+            render: (c: ContratoFiscalizacao) => (
+              <input
+                type="checkbox"
+                checked={selecao.selecionadas.has(c.contractKey)}
+                onChange={() => selecao.onAlternar(c.contractKey)}
+                aria-label={`Selecionar o contrato ${numeroDoContrato(c)}`}
+                data-testid={`${testId}-marcar-${c.contractKey}`}
+                style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+              />
+            )
+          }
+        ]
+      : []),
     { key: 'contrato', header: 'Contrato', minWidth: '200px', render: (c) => <CelulaContrato c={c} /> },
     ...(comOrigem ? [{ key: 'origem', header: 'Origem', minWidth: '160px', render: (c: ContratoFiscalizacao) => <CelulaOrigem c={c} /> }] : []),
     { key: 'situacao', header: 'Fiscalização', minWidth: '150px', render: (c) => <CelulaSituacao c={c} /> },
@@ -85,6 +112,7 @@ export const ContratosFiscalizacaoTabela: React.FC<{
       columns={colunas}
       rowOpen={(c) => () => navigate(rotaDoContrato(c))}
       rowActions={rowActions}
+      rowStyle={selecao ? (c) => (selecao.selecionadas.has(c.contractKey) ? { background: SELECIONADA_BG } : undefined) : undefined}
     />
   );
 };

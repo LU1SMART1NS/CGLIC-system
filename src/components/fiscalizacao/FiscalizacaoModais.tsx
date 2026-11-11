@@ -169,18 +169,28 @@ function useDestinos(origemUserId: string, ausentes: TransferenciaFiscal[]) {
  * Coordenador: passa de vez os contratos de um fiscal para outro, como o Transferir da Equipe de Atas e Contratos.
  * Onde era fiscal, o destino vira o fiscal; onde era substituto, o destino vira o substituto (migration 261).
  */
-export const TransferirFiscalModal: React.FC<{ carga: CargaDoFiscal; ausentes: TransferenciaFiscal[]; onClose: () => void }> = ({ carga, ausentes, onClose }) => {
+export const TransferirFiscalModal: React.FC<{
+  carga: CargaDoFiscal;
+  ausentes: TransferenciaFiscal[];
+  /** Só estes contratos (marcados na Equipe); sem a lista, todos os do fiscal. */
+  selecionados?: ContratoFiscalizacao[];
+  onClose: () => void;
+  onDone?: () => void;
+}> = ({ carga, ausentes, selecionados, onClose, onDone }) => {
   const toast = useToast();
   const transferir = useTransferirContratosFiscal();
   const { destinos } = useDestinos(carga.userId, ausentes);
   const [destino, setDestino] = useState('');
   const nomeDestino = destinos.find((f) => f.id === destino)?.nome ?? '';
+  const comoFiscal = selecionados ? selecionados.filter((c) => c.fiscalUserId === carga.userId).length : carga.contratos;
+  const comoSubstituto = selecionados ? selecionados.length - comoFiscal : carga.comoSubstituto;
   const enviar = () =>
     transferir.mutate(
-      { origemUserId: carga.userId, destinoUserId: destino },
+      { origemUserId: carga.userId, destinoUserId: destino, contractKeys: selecionados?.map((c) => c.contractKey) },
       {
         onSuccess: (r) => {
           toast.success(`${r.fiscal + r.substituto} ${r.fiscal + r.substituto === 1 ? 'contrato passou' : 'contratos passaram'} de ${carga.nome} para ${nomeDestino}`);
+          onDone?.();
           onClose();
         },
         onError: (err) => toast.error(`Não foi possível transferir: ${erroDe(err)}`)
@@ -190,8 +200,8 @@ export const TransferirFiscalModal: React.FC<{ carga: CargaDoFiscal; ausentes: T
     <Modal
       isOpen
       onClose={onClose}
-      title={`Transferir os contratos de ${carga.nome}`}
-      subtitle={`${carga.contratos} como fiscal · ${carga.comoSubstituto} como substituto`}
+      title={selecionados ? `Transferir ${selecionados.length} ${selecionados.length === 1 ? 'contrato' : 'contratos'} de ${carga.nome}` : `Transferir os contratos de ${carga.nome}`}
+      subtitle={`${comoFiscal} como fiscal · ${comoSubstituto} como substituto`}
       size="sm"
       dismissible={!transferir.isPending}
       testId="fisc-transferir-modal"
