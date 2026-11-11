@@ -8,7 +8,7 @@ function flatLabels(items: ReturnType<typeof filterNavigationByRole>): string[] 
 
 describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', () => {
   describe('Menu chave com 4 áreas e páginas como abas', () => {
-    it('deve conter as 7 áreas do menu chave, com Ajustes no pé', () => {
+    it('deve conter as 8 áreas do menu chave, com Ajustes no pé', () => {
       expect(navigationConfig.map((item) => item.id)).toEqual([
         'visao-geral',
         'carteira',
@@ -16,9 +16,10 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         'vinculacao',
         'execucao-financeira',
         'emendas',
+        'fiscalizacao',
         'configuracoes'
       ]);
-      expect(navigationConfig.map((item) => item.label)).toEqual(['Início', 'Atas e Contratos', 'Alocação', 'Vínculos', 'Financeiro', 'Emendas', 'Ajustes']);
+      expect(navigationConfig.map((item) => item.label)).toEqual(['Início', 'Atas e Contratos', 'Alocação', 'Vínculos', 'Financeiro', 'Emendas', 'Fiscalização', 'Ajustes']);
       expect(navigationConfig.find((i) => i.id === 'configuracoes')?.placement).toBe('bottom');
       expect(navigationConfig.every((i) => (i.children?.length ?? 0) > 0)).toBe(true);
     });
@@ -382,6 +383,8 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const menu = filterNavigationByRole(navigationConfig, 'gestor_fiscalizacao');
       expect(menu.find((i) => i.id === 'visao-geral')?.children?.map((c) => [c.label, c.route, c.group])).toEqual([['Painel', '/fiscalizacao/inicio', undefined]]);
       expect(menu.find((i) => i.id === 'carteira')?.children?.map((c) => c.route)).toEqual(['/contratos']);
+      expect(menu.find((i) => i.id === 'fiscalizacao')?.children?.map((c) => c.route)).toEqual(['/fiscalizacao/entregas']);
+      expect(filterNavigationByRole(navigationConfig, 'gestor').map((i) => i.id)).not.toContain('fiscalizacao');
       expect(menu.map((i) => i.id)).not.toContain('emendas');
       for (const role of ['gestor', 'gestor_saldos', 'gestor_emendas', 'leitor'] as const) {
         const inicio = filterNavigationByRole(navigationConfig, role).find((i) => i.id === 'visao-geral');
@@ -413,7 +416,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const areas = visible.map((i) => i.id);
       expect(areas).not.toContain('vinculacao');
       expect(areas).not.toContain('alocacao');
-      expect(areas).toEqual(['visao-geral', 'carteira', 'execucao-financeira', 'emendas', 'configuracoes']);
+      expect(areas).toEqual(['visao-geral', 'carteira', 'execucao-financeira', 'emendas', 'fiscalizacao', 'configuracoes']);
 
       expect(labels).not.toContain('Modelos de Gestão');
       // Ajustes aparece para o leitor só com as consultas dos grupos das UASGs, das unidades internas e dos beneficiários (e dos grupos deles)

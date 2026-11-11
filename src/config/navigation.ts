@@ -357,6 +357,25 @@ export const navigationConfig: NavItem[] = [
     ]
   },
   {
+    // Fiscalização de contratos pela SFC/CGLIC (migration 260): a área de trabalho, como Emendas; o Painel e a
+    // Distribuição ficam no Início. Programas entra numa próxima entrega.
+    id: 'fiscalizacao',
+    label: 'Fiscalização',
+    icon: ClipboardCheck,
+    status: 'active',
+    children: [
+      {
+        id: 'fiscalizacao-entregas',
+        label: 'Entregas',
+        icon: Boxes,
+        route: '/fiscalizacao/entregas',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/entregas'],
+        allowedRoles: ['admin', 'gestor_fiscalizacao', 'leitor']
+      }
+    ]
+  },
+  {
     id: 'configuracoes',
     label: 'Ajustes',
     icon: Settings,
