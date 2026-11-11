@@ -162,7 +162,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   const chipsDaFaixa: PainelFaixaChip[] = [
     { id: 'contratos', rotulo: escopo ? 'Contratos' : `Com a ${NOME_SFC}`, valor: qtd(daSfc.length), ativo: segmento === 'TODAS', onClick: () => irPara('TODAS') },
     { id: 'autuar', rotulo: 'A autuar', valor: qtd(aAutuar.length), ativo: segmento === 'AUTUAR', onClick: () => irPara('AUTUAR') },
-    { id: 'vencidas', rotulo: 'Entregas vencidas', valor: entregasCarregando ? '…' : qtd(vencidas.length), perigo: vencidas.length > 0, onClick: () => navigate('/fiscalizacao/entregas?prazo=danger') },
+    { id: 'vencidas', rotulo: 'Itens com prazo vencido', valor: entregasCarregando ? '…' : qtd(vencidas.length), perigo: vencidas.length > 0, onClick: () => navigate('/fiscalizacao/itens?prazo=danger') },
     ...(!fiscal && !escopo ? [{ id: 'definir', rotulo: 'A definir', valor: qtd(aDefinir.length), perigo: aDefinir.length > 0, onClick: () => navigate(coordenador ? '/fiscalizacao/distribuicao' : '/fiscalizacao/inicio') }] : [])
   ];
 
@@ -207,26 +207,26 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               testId="fisc-cartao-contratos"
             />
             <PainelCartao
-              rotulo="Entregas vencidas"
+              rotulo="Itens com prazo vencido"
               icone={<AlertTriangle size={16} />}
               tom={vencidas.length ? 'danger' : 'success'}
               valor={entregasCarregando ? '…' : vencidas.length ? String(vencidas.length) : 'Em dia'}
-              unidade={vencidas.length ? (vencidas.length === 1 ? 'entrega' : 'entregas') : undefined}
+              unidade={vencidas.length ? (vencidas.length === 1 ? 'item' : 'itens') : undefined}
               linhas={[
                 { rotulo: 'Vencem em 30 dias', valor: String(aVencer.length), tom: aVencer.length ? 'warning' : undefined },
-                { rotulo: 'Entregas acompanhadas', valor: String(minhasEntregas.length) }
+                { rotulo: 'Itens acompanhados', valor: String(minhasEntregas.length) }
               ]}
-              onClick={() => navigate('/fiscalizacao/entregas?prazo=danger')}
+              onClick={() => navigate('/fiscalizacao/itens?prazo=danger')}
               testId="fisc-cartao-vencidas"
             />
             <PainelCartao
               rotulo="Aguardando o Exército"
               icone={<Clock size={16} />}
               tom={noExercito.length ? 'amber' : 'success'}
-              valor={entregasCarregando ? '…' : noExercito.length ? String(noExercito.length) : 'Nenhuma'}
-              unidade={noExercito.length ? (noExercito.length === 1 ? 'entrega' : 'entregas') : undefined}
+              valor={entregasCarregando ? '…' : noExercito.length ? String(noExercito.length) : 'Nenhum'}
+              unidade={noExercito.length ? (noExercito.length === 1 ? 'item' : 'itens') : undefined}
               linhas={[{ rotulo: 'Produto controlado (DFPC)', valor: '' }]}
-              onClick={() => navigate('/fiscalizacao/entregas?fase=EXECUCAO')}
+              onClick={() => navigate('/fiscalizacao/itens?fase=EXECUCAO')}
               testId="fisc-cartao-exercito"
             />
             {!fiscal && !escopo && (

@@ -67,9 +67,9 @@ export function prazoDaEntrega(e: Pick<EntregaFiscalizacao, 'etapa' | 'prevista'
  * Finalizado só depois de pago; Ofício à SAL só em entrega de emenda.
  */
 export function bloqueioDaEtapa(entregas: Pick<EntregaFiscalizacao, 'responsavel' | 'entregueEm' | 'pagoEm' | 'origem'>[], etapa: EtapaEntrega): string | null {
-  if (entregas.some((e) => e.responsavel === 'AREA')) return 'Entrega da área requisitante não tem etapa na SFC/CGLIC.';
+  if (entregas.some((e) => e.responsavel === 'AREA')) return 'Item da área requisitante não tem etapa na SFC/CGLIC.';
   if ((etapa === 'PAGAMENTO' || etapa === 'SAL' || etapa === 'FINALIZADO') && entregas.some((e) => !e.entregueEm)) return 'Registre a entrega antes do envio para pagamento e doação.';
-  if (etapa === 'SAL' && entregas.some((e) => e.origem !== 'EMENDA')) return 'Ofício à SAL só em entrega de emenda.';
+  if (etapa === 'SAL' && entregas.some((e) => e.origem !== 'EMENDA')) return 'Ofício à SAL só em item de emenda.';
   if ((etapa === 'SAL' || etapa === 'FINALIZADO') && entregas.some((e) => e.origem === 'EMENDA' && !e.pagoEm)) return 'O Ofício à SAL e o fim da fiscalização vêm depois do pagamento: há nota ainda não paga.';
   return null;
 }
@@ -84,3 +84,36 @@ export function rotuloDoBeneficiario(e: Pick<EntregaFiscalizacao, 'beneficiarioS
 export function nomeDoItem(e: Pick<EntregaFiscalizacao, 'itemNome' | 'itemDescricao' | 'itemKey'> & Partial<Pick<EntregaFiscalizacao, 'itemTexto'>>): string {
   return e.itemNome || e.itemDescricao || e.itemTexto || e.itemKey || 'Item';
 }
+
+/** Ata, UASG e número do item a partir da chave do item da ata ("00031/2025-200331-00002"); nulo no item da planilha sem ligação. */
+export function ataEItemDaChave(itemKey: string | null | undefined): { ata: string; uasg: string; item: string } | null {
+  if (!itemKey) return null;
+  const [ata, uasg, item] = itemKey.split('-');
+  return ata && uasg && item ? { ata, uasg, item } : null;
+}
+
+/** Passos do item na fiscalização, com o nome de cada um (o mesmo desenho da régua do Pedido 360). */
+export const PASSOS_FISC = ['Informações', 'Ordem', 'Produção', 'Entregue', 'Recebido', 'Pagamento', 'Ofício à SAL'] as const;
+
+/** Passo em que o item está (o primeiro que falta) e, quando parado, o motivo no lugar do nome. */
+const comSal = (e: Pick<EntregaFiscalizacao, 'origem' | 'emenda'>) => e.origem === 'EMENDA' || Boolean(e.emenda);
+/** Os passos do item: o Ofício à SAL só existe para item de emenda. */
+export const passosDoItem = (e: Pick<EntregaFiscalizacao, 'origem' | 'emenda'>) => (comSal(e) ? PASSOS_FISC : PASSOS_FISC.slice(0, -1));
+
+export function passoDoItem(e: Pick<EntregaFiscalizacao, 'etapa' | 'pagoEm' | 'origem' | 'emenda'>): { passo: number; parado: string | null; fim: boolean } {
+  switch (e.etapa) {
+    case 'INFO_PEDIDA': return { passo: 0, parado: null, fim: false };
+    case 'INFO_ENVIADA': return { passo: 1, parado: null, fim: false };
+    case 'ORDEM':
+    case 'PRODUCAO': return { passo: 2, parado: null, fim: false };
+    case 'CONTROLADO': return { passo: 2, parado: 'Aguardando o Exército', fim: false };
+    case 'TRANSITO': return { passo: 3, parado: 'Em trânsito', fim: false };
+    case 'RETIRADA': return { passo: 3, parado: 'Aguardando retirada', fim: false };
+    case 'ENTREGUE':
+    case 'TRP': return { passo: 4, parado: e.etapa === 'TRP' ? 'Recebido provisoriamente' : null, fim: false };
+    case 'TRD': return { passo: 5, parado: null, fim: false };
+    case 'PAGAMENTO': return e.pagoEm ? (comSal(e) ? { passo: 6, parado: null, fim: false } : { passo: 5, parado: null, fim: true }) : { passo: 5, parado: 'Aguardando o pagamento', fim: false };
+    default: return { passo: comSal(e) ? 6 : 5, parado: null, fim: true };
+  }
+}
+

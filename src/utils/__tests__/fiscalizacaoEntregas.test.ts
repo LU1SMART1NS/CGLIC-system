@@ -45,7 +45,7 @@ describe('regras da mudança de etapa (as mesmas da RPC)', () => {
   it('Ofício à SAL só em emenda e depois de pago', () => {
     expect(bloqueioDaEtapa([e({ entregueEm: '2026-06-01' })], 'SAL')).toMatch(/pagamento/);
     expect(bloqueioDaEtapa([e({ entregueEm: '2026-06-01', pagoEm: '2026-07-01' })], 'SAL')).toBeNull();
-    expect(bloqueioDaEtapa([e({ entregueEm: '2026-06-01', origem: 'CARGA' })], 'SAL')).toMatch(/só em entrega de emenda/);
+    expect(bloqueioDaEtapa([e({ entregueEm: '2026-06-01', origem: 'CARGA' })], 'SAL')).toMatch(/só em item de emenda/);
   });
 });
 
