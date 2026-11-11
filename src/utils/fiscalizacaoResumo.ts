@@ -102,7 +102,7 @@ export const opcoesDePrazo = (contar: (t: TomPrazo) => number) => [
 export const ROTULO_ORIGEM: Record<OrigemDoRecurso, string> = {
   EMENDA: 'Emenda parlamentar',
   FNSP: 'Fundo Nacional de Segurança Pública (FNSP)',
-  FUNDO: 'BNDES ou outro fundo',
+  FUNDO: 'BNDES',
   OUTRO: 'Outro'
 };
 
