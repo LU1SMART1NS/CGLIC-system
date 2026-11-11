@@ -757,7 +757,18 @@ export function mesaDoPedido(
         prazo: t.prazo,
         vencido: t.vencido,
         regra: t.regra,
-        acoes: []
+        // A resposta da outra unidade chega à CAEP, que a registra: o botão da próxima etapa fica na própria linha
+        // (ofício do gabinete, autorização da Diretora, nota da CGOFI). Sem ele, a etapa não tinha botão na tela.
+        acoes: t.proxima
+          ? [
+              {
+                rotulo: t.proxima,
+                jeito: 'botao',
+                faz: { tipo: 'proxima' },
+                testId: `emendas-pedido-proximo-${p.id}`
+              }
+            ]
+          : []
       });
     }
     // CCGA de cada ata, com o prazo do fim da ata e o "Desfazer envio" da própria linha.

@@ -458,3 +458,31 @@ describe('Mesa do pedido: observação e datas do controle anterior (30/10/2026)
     expect(interlocucao.registros.map((r) => r.data)).toEqual(['sem data no controle anterior', 'sem data no controle anterior']);
   });
 });
+
+describe('Mesa do pedido: botão da próxima etapa em "Com outros" (11/11/2026)', () => {
+  const minuta = (extra: Partial<PedidoEmenda> = {}) =>
+    pedido({ etapa: 'MINUTA', oficioEm: null, conferidoEm: null, solicitadoEm: null, autorizadoEm: null, cgofiEm: null, empenhadoEm: null, contratacaoEm: null, ...extra });
+
+  it('minuta enviada: "Registrar o ofício" fica na linha do gabinete', () => {
+    const m = mesaDoPedido(minuta(), itens, new Map(), [], HOJE, true, beneficiarios);
+    const linhaMinuta = m.comOutros.find((l) => l.chave === 'tarefa-minuta')!;
+    expect(linhaMinuta.acoes.map((a) => [a.rotulo, a.faz.tipo])).toEqual([['Registrar o ofício', 'proxima']]);
+  });
+
+  it('sem poder gerir: a linha fica sem botão', () => {
+    const m = mesaDoPedido(minuta(), itens, new Map(), [], HOJE, false, beneficiarios);
+    expect(m.comOutros.find((l) => l.chave === 'tarefa-minuta')!.acoes).toEqual([]);
+  });
+
+  it('solicitação na Diretora: "Registrar a autorização" na linha da assinatura', () => {
+    const p = pedido({ etapa: 'SOLICITADO', autorizadoEm: null, cgofiEm: null, empenhadoEm: null, contratacaoEm: null });
+    const m = mesaDoPedido(p, itens, new Map(), [], HOJE, true, beneficiarios);
+    expect(m.comOutros.find((l) => l.chave === 'tarefa-assinatura')?.acoes.map((a) => a.rotulo)).toEqual(['Registrar a autorização']);
+  });
+
+  it('prazo gravado com a minuta: a linha mostra o mesmo prazo do aviso', () => {
+    const m = mesaDoPedido(minuta({ minutaEm: '2026-10-20', minutaValidaAte: '2026-10-25' }), itens, new Map(), [], HOJE, true, beneficiarios);
+    const linhaMinuta = m.comOutros.find((l) => l.chave === 'tarefa-minuta')!;
+    expect([linhaMinuta.prazo, linhaMinuta.vencido]).toEqual(['25/10/2026', true]);
+  });
+});
