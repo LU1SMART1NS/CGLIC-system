@@ -212,7 +212,7 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
 
 export interface MovimentoEntrega {
   id: string;
-  tipo: 'CRIADA' | 'ETAPA' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM';
+  tipo: 'CRIADA' | 'ETAPA' | 'VOLTA' | 'DESFEITO' | 'CORRECAO' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM';
   etapa: EtapaEntrega | null;
   data: string | null;
   documentoSei: string | null;
@@ -261,6 +261,24 @@ export async function mudarEtapaEntregas(input: { ids: string[]; etapa: EtapaEnt
     p_documento_sei: (input.documentoSei || '').replace(/\D/g, '') || null,
     p_observacao: (input.observacao || '').trim() || null
   });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Corrigir a etapa (só o coordenador, migration 273): pula ou volta várias etapas, com motivo. */
+export async function corrigirEtapaEntregas(input: { ids: string[]; etapa: EtapaEntrega; data: string; documentoSei: string | null; motivo: string }): Promise<void> {
+  const { error } = await cliente().rpc('corrigir_etapa_entregas', {
+    p_ids: input.ids,
+    p_etapa: input.etapa,
+    p_data: input.data,
+    p_documento_sei: (input.documentoSei || '').replace(/\D/g, '') || null,
+    p_motivo: input.motivo.trim()
+  });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Voltar etapa (migration 273): desfaz o último passo do item, com motivo. */
+export async function voltarEtapaEntrega(input: { id: string; motivo: string }): Promise<void> {
+  const { error } = await cliente().rpc('voltar_etapa_entrega', { p_id: input.id, p_motivo: input.motivo.trim() });
   if (error) throw mapPostgresErrorToAppError(error);
 }
 

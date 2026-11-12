@@ -145,8 +145,14 @@ export const HistoricoDaEntrega: React.FC<{ entregaId: string }> = ({ entregaId 
     <ul style={{ margin: 0, padding: '0.25rem 0 0.25rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.8rem' }} data-testid={`fisc-historico-${entregaId}`}>
       {itens.map((m) => (
         <li key={m.id}>
-          <b>{m.etapa ? etapaDef(m.etapa).nome : m.tipo === 'DIVISAO' ? 'Divisão' : m.tipo === 'PREVISTA' ? `Data prevista: ${dataBR(m.data)}` : m.tipo === 'RESPONSAVEL' ? 'Quem fiscaliza' : m.tipo === 'ITEM' ? 'Item da ata' : m.tipo === 'PROGRAMA' ? 'Programa' : 'Registro'}</b>
-          {m.etapa && m.data && <span> em {dataBR(m.data)}</span>}
+          {m.tipo === 'VOLTA' && m.etapa ? (
+            <b style={{ color: 'var(--color-danger-text)' }}>Voltou para {etapaDef(m.etapa).nome}</b>
+          ) : m.tipo === 'DESFEITO' && m.etapa ? (
+            <b style={{ textDecoration: 'line-through', color: '#94a3b8' }}>{etapaDef(m.etapa).nome}</b>
+          ) : <b>{m.etapa ? etapaDef(m.etapa).nome : m.tipo === 'DIVISAO' ? 'Divisão' : m.tipo === 'PREVISTA' ? `Data prevista: ${dataBR(m.data)}` : m.tipo === 'RESPONSAVEL' ? 'Quem fiscaliza' : m.tipo === 'ITEM' ? 'Item da ata' : m.tipo === 'PROGRAMA' ? 'Programa' : 'Registro'}</b>}
+          {m.tipo === 'DESFEITO' && <span style={carteiraDetalhe}> (desfeito)</span>}
+          {m.tipo === 'CORRECAO' && <span style={carteiraDetalhe}> (correção do coordenador)</span>}
+          {m.etapa && m.data && m.tipo !== 'VOLTA' && <span> em {dataBR(m.data)}</span>}
           {m.documentoSei && (
             <span style={{ marginLeft: '0.4rem' }}>
               <NumeroSeiEtiqueta numero={m.documentoSei} testId={`fisc-historico-sei-${m.id}`} />

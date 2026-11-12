@@ -13,6 +13,7 @@ import { formatNumber } from '../../utils/format';
 import { nomeDoPedido } from '../../utils/emendasNomeDoPedido';
 import type { ItemCaep, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
 import { LinhaDoPedido } from './emendasPartes';
+import { VoltarEtapaJanela } from '../mesa/VoltarEtapaJanela';
 
 interface Props {
   pedido: PedidoEmenda;
@@ -274,62 +275,27 @@ export const VoltarEtapaModal: React.FC<Omit<Props, 'itens' | 'notas'>> = ({ ped
   const voltar = useVoltarEtapa();
   const toast = useToast();
   const volta = voltaDaEtapa(pedido);
-  const [motivo, setMotivo] = useState('');
-  const [tentou, setTentou] = useState(false);
-
-  const salvar = async (ev: React.FormEvent) => {
-    ev.preventDefault();
-    setTentou(true);
-    if (!motivo.trim() || !volta) return;
-    try {
-      await voltar.mutateAsync({ id: pedido.id, versao: pedido.versao, motivo: motivo.trim() });
-      toast.success(`${nomeDoAutor}: o pedido voltou para "${ROTULO_ETAPA[volta.para]}".`);
-      onClose();
-    } catch (err) {
-      toast.error((err as Error).message);
-    }
-  };
-
+  // A mesma janela do Voltar etapa do item da Fiscalização (src/components/mesa).
   return (
-    <Modal
-      isOpen
-      onClose={onClose}
-      dismissible={!voltar.isPending}
-      size="md"
+    <VoltarEtapaJanela
       testId="emendas-voltar-etapa-modal"
-      title={volta ? `Voltar para "${ROTULO_ETAPA[volta.para]}"` : 'Voltar etapa'}
-      footer={
-        <>
-          <ActionButton action="cancelar" type="button" onClick={onClose} disabled={voltar.isPending} />
-          <AppButton type="submit" form="emendas-voltar-etapa-form" variant="primary" disabled={voltar.isPending || !volta} isLoading={voltar.isPending} data-testid="emendas-voltar-etapa-salvar">
-            Voltar etapa
-          </AppButton>
-        </>
-      }
-    >
-      <form id="emendas-voltar-etapa-form" onSubmit={salvar} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-          {nomeDoAutor} · {identificacaoDoPedido(pedido)} · hoje em "{ROTULO_ETAPA[pedido.etapa]}"
-        </div>
-        {volta ? (
-          <NoticeBar tone="warning" testId="emendas-voltar-etapa-apaga">
-            Desfaz só o último passo. Será apagado: {volta.apaga}. O registro fica no histórico do pedido.
-          </NoticeBar>
-        ) : (
-          <NoticeBar tone="info" testId="emendas-voltar-etapa-nao">
-            Esta etapa não volta por aqui.
-          </NoticeBar>
-        )}
-        <AppTextarea
-          label="Motivo"
-          rows={2}
-          placeholder="Ex.: a DGFNSP ainda não assinou; marquei por engano"
-          value={motivo}
-          onChange={(e) => setMotivo(e.target.value)}
-          error={tentou && !motivo.trim() ? 'Informe o motivo.' : undefined}
-          data-testid="emendas-voltar-etapa-motivo"
-        />
-      </form>
-    </Modal>
+      para={volta ? ROTULO_ETAPA[volta.para] : null}
+      contexto={`${nomeDoAutor} · ${identificacaoDoPedido(pedido)} · hoje em "${ROTULO_ETAPA[pedido.etapa]}"`}
+      apaga={volta?.apaga ?? null}
+      ondeFica="histórico do pedido"
+      exemplo="Ex.: a DGFNSP ainda não assinou; marquei por engano"
+      salvando={voltar.isPending}
+      onClose={onClose}
+      onVoltar={async (motivo) => {
+        if (!volta) return;
+        try {
+          await voltar.mutateAsync({ id: pedido.id, versao: pedido.versao, motivo });
+          toast.success(`${nomeDoAutor}: o pedido voltou para "${ROTULO_ETAPA[volta.para]}".`);
+          onClose();
+        } catch (err) {
+          toast.error((err as Error).message);
+        }
+      }}
+    />
   );
 };
