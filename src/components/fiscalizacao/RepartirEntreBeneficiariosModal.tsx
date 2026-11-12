@@ -108,7 +108,18 @@ export const RepartirEntreBeneficiariosModal: React.FC<{ entrega: EntregaFiscali
                 data-testid={`fisc-repartir-qtd-${i}`}
               />
               {p.atual ? (
-                <span />
+                /* O de hoje não sai da lista (o item de hoje continua existindo): o × só zera a quantidade dele. */
+                <AppButton
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => mudar(i, '')}
+                  disabled={!Number(p.qtd || 0)}
+                  aria-label={`Zerar ${p.nome}`}
+                  title="Deixar de fora: zera a quantidade (o item passa ao 1º beneficiário com quantidade)"
+                  data-testid={`fisc-repartir-zerar-${i}`}
+                >
+                  <X size={14} aria-hidden="true" />
+                </AppButton>
               ) : (
                 <AppButton variant="ghost" size="xs" onClick={() => tirar(i)} aria-label={`Tirar ${p.nome}`} data-testid={`fisc-repartir-tirar-${i}`}>
                   <X size={14} aria-hidden="true" />
