@@ -76,8 +76,12 @@ const CelulaDaArea: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) => {
   );
 };
 
+/** Motivo da decisão do coordenador, cortado em 60 letras (o texto inteiro no title). */
+const Motivo: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) =>
+  c.motivo ? <div style={carteiraDetalhe} title={c.motivo}>{c.motivo.length > 60 ? `${c.motivo.slice(0, 60)}…` : c.motivo}</div> : null;
+
 export const CelulaSituacao: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) => {
-  const motivo = c.motivo && <div style={carteiraDetalhe} title={c.motivo}>{c.motivo.length > 60 ? `${c.motivo.slice(0, 60)}…` : c.motivo}</div>;
+  const motivo = <Motivo c={c} />;
   if (comArea(c) && c.situacao !== 'MISTA') return <><CelulaDaArea c={c} />{motivo}</>;
   const parte = c.situacao === 'MISTA' ? unidadeDaArea(c) : null;
   return (
@@ -115,6 +119,13 @@ export interface SelecaoDeContratos {
   onAlternar: (contractKey: string) => void;
 }
 
+/** Colunas que a Distribuição tira numa aba em que repetiriam o mesmo valor ou viriam vazias em todas as linhas. */
+export interface ColunasOcultas {
+  situacao?: boolean;
+  fiscal?: boolean;
+  processo?: boolean;
+}
+
 /** Contratos com a SFC/CGLIC: a linha abre o Contrato 360 na aba Fiscalização. */
 export const ContratosFiscalizacaoTabela: React.FC<{
   contratos: ContratoFiscalizacao[];
@@ -122,10 +133,14 @@ export const ContratosFiscalizacaoTabela: React.FC<{
   comOrigem?: boolean;
   rowActions?: (c: ContratoFiscalizacao) => React.ReactNode;
   selecao?: SelecaoDeContratos;
-  /** Lista só de contratos com a SFC/CGLIC: sem a coluna Fiscalização (repetiria a mesma etiqueta); o motivo vai sob o fiscal. */
-  semSituacao?: boolean;
-}> = ({ contratos, testId, comOrigem = false, rowActions, selecao, semSituacao = false }) => {
+  ocultas?: ColunasOcultas;
+  /** Título da coluna Fiscalização (ex.: "Unidade da área" na aba Área requisitante). */
+  rotuloSituacao?: string;
+}> = ({ contratos, testId, comOrigem = false, rowActions, selecao, ocultas = {}, rotuloSituacao = 'Fiscalização' }) => {
   const navigate = useNavigateWithOrigin();
+  // Sem a coluna Fiscalização, o motivo vai para o fiscal ou, sem fiscal, para a origem.
+  const motivoNoFiscal = Boolean(ocultas.situacao) && !ocultas.fiscal;
+  const motivoNaOrigem = Boolean(ocultas.situacao) && Boolean(ocultas.fiscal) && comOrigem;
   const colunas: Column<ContratoFiscalizacao>[] = [
     ...(selecao
       ? [
@@ -147,20 +162,12 @@ export const ContratosFiscalizacaoTabela: React.FC<{
         ]
       : []),
     { key: 'contrato', header: 'Contrato', minWidth: '200px', sortValue: (c) => `${c.numero.split('/')[1] ?? ''}-${c.numero.split('/')[0]?.padStart(6, '0')}`, render: (c) => <CelulaContrato c={c} onAbrir={() => navigate(rotaDoContrato(c))} /> },
-    ...(comOrigem ? [{ key: 'origem', header: 'Origem', minWidth: '160px', render: (c: ContratoFiscalizacao) => <CelulaOrigem c={c} /> }] : []),
-    ...(semSituacao ? [] : [{ key: 'situacao', header: 'Fiscalização', minWidth: '150px', render: (c: ContratoFiscalizacao) => <CelulaSituacao c={c} /> }]),
-    {
-      key: 'fiscal',
-      header: 'Fiscal SFC/CGLIC',
-      sortValue: (c) => c.fiscalNome,
-      render: (c) => (
-        <>
-          <CelulaFiscal c={c} />
-          {semSituacao && c.motivo && <div style={carteiraDetalhe} title={c.motivo}>{c.motivo.length > 60 ? `${c.motivo.slice(0, 60)}…` : c.motivo}</div>}
-        </>
-      )
-    },
-    { key: 'processo', header: 'SEI do contrato', render: (c) => <CelulaProcesso c={c} /> },
+    ...(comOrigem ? [{ key: 'origem', header: 'Origem', minWidth: '160px', render: (c: ContratoFiscalizacao) => <><CelulaOrigem c={c} />{motivoNaOrigem && <Motivo c={c} />}</> }] : []),
+    ...(ocultas.situacao ? [] : [{ key: 'situacao', header: rotuloSituacao, minWidth: '150px', render: (c: ContratoFiscalizacao) => <CelulaSituacao c={c} /> }]),
+    ...(ocultas.fiscal
+      ? []
+      : [{ key: 'fiscal', header: 'Fiscal SFC/CGLIC', sortValue: (c: ContratoFiscalizacao) => c.fiscalNome, render: (c: ContratoFiscalizacao) => <><CelulaFiscal c={c} />{motivoNoFiscal && <Motivo c={c} />}</> }]),
+    ...(ocultas.processo ? [] : [{ key: 'processo', header: 'SEI do contrato', render: (c: ContratoFiscalizacao) => <CelulaProcesso c={c} /> }]),
     { key: 'vigencia', header: 'Vigência', nowrap: true, sortValue: (c) => c.vigenciaFim, render: (c) => <span style={carteiraValor}>{dataBR(c.vigenciaFim)}</span> }
   ];
   return (

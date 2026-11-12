@@ -75,6 +75,16 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
       ...(semUnidade > 0 ? [{ value: UNIDADE_A_INDICAR, label: 'Unidade a indicar', count: semUnidade }] : [])
     ];
   }, [doSeg]);
+  // Colunas que só repetiriam o nome da aba ou viriam vazias em todas as linhas filtradas.
+  const ocultas = useMemo(
+    () => ({
+      situacao: seg === 'SFC' || seg === 'A_DEFINIR',
+      // Na SFC/CGLIC e na Mista o "—" diz que falta escolher o fiscal: a coluna fica.
+      fiscal: seg !== 'SFC' && seg !== 'MISTA' && !filtrados.some((c) => c.fiscalNome),
+      processo: !filtrados.some((c) => c.processoSei || c.situacao === 'SFC' || c.situacao === 'MISTA')
+    }),
+    [seg, filtrados]
+  );
   const fiscais = useMemo(() => fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos)), [servidores, contratos]);
 
 
@@ -132,7 +142,9 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
         <ContratosFiscalizacaoTabela
           contratos={pageItems}
           testId="fisc-dist-tabela"
-          semSituacao={seg === 'SFC'}
+          comOrigem={seg === 'A_DEFINIR'}
+          ocultas={ocultas}
+          rotuloSituacao={seg === 'AREA' ? 'Unidade da área' : seg === 'MISTA' ? 'Fiscalização mista' : 'Fiscalização'}
           rowActions={(c) => (
             <AppButton variant="outline" size="sm" onClick={() => setEditando(c)} data-testid={`fisc-dist-definir-${c.contractKey}`}>
               {c.situacao === 'A_DEFINIR' || c.situacao === 'AREA_PADRAO' ? 'Definir' : 'Alterar'}
