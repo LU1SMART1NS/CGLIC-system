@@ -65,15 +65,15 @@ export function ehDoFiscal(c: Pick<ContratoFiscalizacao, 'fiscalUserId'>, userId
   return Boolean(userId) && c.fiscalUserId === userId;
 }
 
-/** Autuado = tem o NUP do processo de acompanhamento contratual (migration 294); o SEI do contrato não basta. */
+/** Autuado = tem o Processo SEI de acompanhamento contratual (migration 294); o SEI do contrato não basta. */
 export function autuado(c: Pick<ContratoFiscalizacao, 'processoNup'>): boolean {
   return Boolean(c.processoNup);
 }
 
-/** O que falta no contrato com a SFC/CGLIC nesta entrega: portaria e autuação do processo. */
+/** O que falta no contrato com a SFC/CGLIC: a autuação do Processo SEI (a portaria saiu em 12/11/2026). */
 export interface PendenciaFiscalizacao {
   chave: string;
-  tipo: 'AUTUAR' | 'PORTARIA';
+  tipo: 'AUTUAR';
   contrato: ContratoFiscalizacao;
 }
 
@@ -81,7 +81,6 @@ export function pendenciasDoContrato(c: ContratoFiscalizacao): PendenciaFiscaliz
   if (!comSfc(c)) return [];
   const p: PendenciaFiscalizacao[] = [];
   if (!autuado(c)) p.push({ chave: `${c.contractKey}:AUTUAR`, tipo: 'AUTUAR', contrato: c });
-  if (!c.portariaSei) p.push({ chave: `${c.contractKey}:PORTARIA`, tipo: 'PORTARIA', contrato: c });
   return p;
 }
 
@@ -92,8 +91,6 @@ export interface CargaDoFiscal {
   outroPerfil?: string;
   contratos: number;
   aAutuar: number;
-  /** Contratos do fiscal sem portaria registrada. */
-  semPortaria: number;
 }
 
 /** Servidor ativo que pode aparecer como fiscal; `perfil` vem da lista de usuários (gestor_fiscalizacao, coordenador…). */
@@ -123,7 +120,7 @@ export function idsDosFiscaisComContrato(contratos: ContratoFiscalizacao[]): Set
   return new Set(contratos.filter((c) => comSfc(c) && c.fiscalUserId).map((c) => c.fiscalUserId as string));
 }
 
-/** Contratos por fiscal, com os que faltam autuar e os sem portaria. */
+/** Contratos por fiscal, com os que faltam autuar. */
 export function cargaPorFiscal(contratos: ContratoFiscalizacao[], servidores: ServidorFiscal[], rotuloDoPerfil: (perfil: string) => string = rotuloPadraoDoPerfil): CargaDoFiscal[] {
   return fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos))
     .map((f) => {
@@ -133,8 +130,7 @@ export function cargaPorFiscal(contratos: ContratoFiscalizacao[], servidores: Se
         nome: f.nome,
         ...(f.perfil && f.perfil !== PERFIL_FISCAL ? { outroPerfil: rotuloDoPerfil(f.perfil) } : {}),
         contratos: titular.length,
-        aAutuar: titular.filter((c) => !autuado(c)).length,
-        semPortaria: titular.filter((c) => !c.portariaSei).length
+        aAutuar: titular.filter((c) => !autuado(c)).length
       };
     })
     .sort((a, b) => b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));

@@ -11,7 +11,7 @@ import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBa
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
-import { CelulaContrato, CelulaFiscal } from './ContratosFiscalizacaoTabela';
+import { CelulaContrato, CelulaFiscal, CelulaProcesso } from './ContratosFiscalizacaoTabela';
 import { COR, linhasDoContrato, type Linha } from '../../utils/fiscalizacaoMesa';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
@@ -132,6 +132,8 @@ export const FiscalizacaoContratosPage: React.FC = () => {
 
   const colunas: Column<LinhaContrato>[] = [
     { key: 'contrato', header: 'Contrato', minWidth: '210px', priority: 'primary', sortValue: (l) => chaveDeOrdem(l.c.numero), render: (l) => <CelulaContratoDaLista l={l} hoje={hoje} abrir={(c) => navigate(rotaDoContrato(c))} /> },
+    // Processo SEI de acompanhamento contratual (autuação, migration 294) ou "A autuar".
+    { key: 'processo', header: 'Processo SEI', sortValue: (l) => l.c.processoNup ?? '', render: (l) => <CelulaProcesso c={l.c} /> },
     { key: 'passo', header: 'Próximo passo', minWidth: '320px', sortValue: (l) => l.dias ?? 99999, render: (l) => <CelulaAgora l={l} /> },
     { key: 'entrega', header: 'Entrega', sortValue: (l) => pct(l.r.entregues, l.r.acompanhadas), render: (l) => <CelulaAndamento l={l} /> },
     // Fiscal: texto simples e sempre visível, como a coluna Gestor da Carteira.

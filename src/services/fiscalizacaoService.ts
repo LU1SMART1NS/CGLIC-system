@@ -31,7 +31,7 @@ export interface ContratoFiscalizacao {
   processoSei: string | null;
   /** Data do contrato registrada com o número SEI do contrato. */
   autuadoEm: string | null;
-  /** NUP do processo de acompanhamento contratual: é a autuação (migration 294). Sem ele, o contrato está "a autuar". */
+  /** Processo SEI de acompanhamento contratual: é a autuação (migration 294). Sem ele, o contrato está "a autuar". */
   processoNup?: string | null;
   /** AAAA-MM-DD: data da autuação do processo de acompanhamento. */
   processoAutuadoEm?: string | null;
@@ -94,7 +94,7 @@ export interface DefinirFiscalizacaoInput {
   unidadeArea?: string | null;
 }
 
-/** Decisão do coordenador: quem fiscaliza, o fiscal da SFC/CGLIC e a portaria. */
+/** Decisão do coordenador: quem fiscaliza e o fiscal da SFC/CGLIC (a portaria saiu das telas em 12/11/2026). */
 export async function definirFiscalizacaoContrato(input: DefinirFiscalizacaoInput): Promise<void> {
   const { error } = await cliente().rpc('definir_fiscalizacao_contrato', {
     p_contract_key: input.contractKey,
@@ -117,7 +117,7 @@ export async function registrarProcessoFiscalizacao(input: { contractKey: string
   if (error) throw mapPostgresErrorToAppError(error);
 }
 
-/** Autuação: NUP do processo de acompanhamento e a data da autuação (fiscal ou coordenador; migration 294). */
+/** Autuação: Processo SEI de acompanhamento e a data da autuação (fiscal ou coordenador; migration 294). */
 export async function registrarAutuacaoFiscalizacao(input: { contractKey: string; processoNup: string; autuadoEm: string }): Promise<void> {
   const { error } = await cliente().rpc('registrar_autuacao_fiscalizacao', {
     p_contract_key: input.contractKey,
