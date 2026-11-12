@@ -167,6 +167,8 @@ export function buildDistribuicaoEquipe(input: {
   ajustes?: Record<string, ComplexidadeAjuste>;
   /** Capacidade de cada gestor pelo nível (migration 140). Sem ela, ocupação = carga (capacidade 1). */
   capacidadeDoGestor?: (gestorNome: string) => number;
+  /** Nomes que têm carteira mas não entram na média da equipe nem são comparados a ela (coordenador também gestor). */
+  foraDaMedia?: ReadonlySet<string>;
 }): DistribuicaoEquipe {
   const linhas = new Map<string | null, DistribuicaoLinha>();
   const linha = (gestorNome?: string) => {
@@ -325,7 +327,7 @@ export function buildDistribuicaoEquipe(input: {
         a.numero.localeCompare(b.numero)
     );
   }
-  const gestores = ordenadas.filter((l) => l.gestorNome !== null);
+  const gestores = ordenadas.filter((l) => l.gestorNome !== null && !input.foraDaMedia?.has(l.gestorNome));
   for (const l of ordenadas) {
     l.capacidade = l.gestorNome !== null && input.capacidadeDoGestor ? input.capacidadeDoGestor(l.gestorNome) : 1;
     l.ocupacao = l.capacidade > 0 ? l.equivalente / l.capacidade : l.equivalente;
