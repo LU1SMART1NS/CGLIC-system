@@ -11,19 +11,32 @@ const fmt = (n: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigit
 /** Situações em que o gestor de saldo pode confirmar remanejamento ou marcar "continua do órgão". */
 export const SITUACOES_COM_ACAO: ReadonlySet<SituacaoOrgao> = new Set(['GERENCIADO', 'REMANEJADO_A_MENOS']);
 
-/** Órgão que mudou no mesmo segundo no Compras.gov.br e está acima da ata assinada: destino provável. */
+/**
+ * Mesma operação no Compras.gov.br: última mudança até 60 s uma da outra. Um remanejamento em lote grava os órgãos em
+ * segundos vizinhos (00058/2025 item 1: 9 órgãos às 00:32:01 e 2 às 00:32:02). A view usa a mesma janela (migration 291).
+ */
+const JANELA_DA_OPERACAO_MS = 60_000;
+export function mesmaOperacao(a: string | null, b: string | null): boolean {
+  if (!a || !b) return false;
+  const ta = Date.parse(a);
+  const tb = Date.parse(b);
+  return Number.isFinite(ta) && Number.isFinite(tb) && Math.abs(ta - tb) <= JANELA_DA_OPERACAO_MS;
+}
+
+/** Órgão que mudou na mesma operação no Compras.gov.br e está acima da ata assinada: destino provável (o mais próximo). */
 export function destinoSugerido(orgaos: OrgaoQuantitativo[], uasg: string): string | null {
   const o = orgaos.find((x) => x.uasg === uasg);
   if (!o?.atualizadoEm) return null;
-  const par = orgaos.find((x) => x.uasg !== uasg && !x.ehSenasp && x.atualizadoEm === o.atualizadoEm && x.acima > 0);
-  return par?.uasg ?? null;
+  const pares = orgaos.filter((x) => x.uasg !== uasg && !x.ehSenasp && x.acima > 0 && mesmaOperacao(x.atualizadoEm, o.atualizadoEm));
+  const distancia = (x: OrgaoQuantitativo) => Math.abs(Date.parse(x.atualizadoEm ?? '') - Date.parse(o.atualizadoEm ?? ''));
+  return pares.sort((a, b) => distancia(a) - distancia(b))[0]?.uasg ?? null;
 }
 
-/** Órgãos que mudaram no mesmo segundo que este (a mesma operação no Compras.gov.br). */
-export function mudaramNoMesmoSegundo(orgaos: OrgaoQuantitativo[], uasg: string): OrgaoQuantitativo[] {
+/** Órgãos que mudaram na mesma operação que este no Compras.gov.br (até 60 s de diferença). */
+export function mudaramNaMesmaOperacao(orgaos: OrgaoQuantitativo[], uasg: string): OrgaoQuantitativo[] {
   const o = orgaos.find((x) => x.uasg === uasg);
   if (!o?.atualizadoEm || !o.mudou) return [];
-  return orgaos.filter((x) => x.uasg !== uasg && x.atualizadoEm === o.atualizadoEm);
+  return orgaos.filter((x) => x.uasg !== uasg && mesmaOperacao(x.atualizadoEm, o.atualizadoEm));
 }
 
 /** Quanto do remanejamento a menos é definitivo (não marcado como "continua do órgão" nem confirmado). */
@@ -180,7 +193,7 @@ export function textoDaSituacao(o: OrgaoQuantitativo, q: QuantitativosDoItem, no
         tom: o.gerenciado > 0 ? 'info' : 'neutral',
         detalhe: juntar(
           quando ? `em ${quando}` : null,
-          def > 0 ? (destino ? `para ${nomeDe(destino)} (mesmo segundo)` : 'destino não registrado, conta como devolvido à SENASP') : null,
+          def > 0 ? (destino ? `para ${nomeDe(destino)} (mesma operação)` : 'destino não registrado, conta como devolvido à SENASP') : null,
           o.gerenciado > 0 ? `${fmt(o.gerenciado)} continuam do órgão, gerenciados pela SENASP` : null,
           textoConfirmado
         )
