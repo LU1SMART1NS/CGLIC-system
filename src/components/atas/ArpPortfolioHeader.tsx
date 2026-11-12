@@ -23,8 +23,9 @@ export const ArpPortfolioHeader: React.FC<ArpPortfolioHeaderProps> = ({
       subtitle="Todas as atas de registro de preços, com vigência, consumo de saldo e gestor."
       icon={<Package size={26} color="var(--primary)" aria-hidden="true" />}
       actions={
-        // Sem onTriggerSync (perfis que não sincronizam), fica só a data da última sincronização.
-        (onTriggerSync || syncInfo?.ultimoSyncEm) && (
+        <>
+          {/* Sem onTriggerSync (perfis que não sincronizam), fica só a data da última sincronização. */}
+          {(onTriggerSync || syncInfo?.ultimoSyncEm) && (
           <HeaderRefreshAction
             onRefresh={onTriggerSync}
             isRefreshing={isSyncing}
@@ -37,7 +38,8 @@ export const ArpPortfolioHeader: React.FC<ArpPortfolioHeaderProps> = ({
             }
             dataTestId="arp-portfolio-refresh-btn"
           />
-        )
+          )}
+        </>
       }
     />
   );

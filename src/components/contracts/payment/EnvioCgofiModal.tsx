@@ -6,6 +6,7 @@ import { ehBemAIncorporar } from '../../../services/cicloPagamentoApoioService';
 import { DateField, Field, FooterButtons, JustificativaField } from './PaymentCycleModals';
 import { errorMessage, useFaturasDoCiclo } from './cicloPagamentoShared';
 import { FaturasDoCiclo } from './FaturasDoCiclo';
+import { documentoSeiValido, mascaraDocumentoSei } from '../../../utils/mascaras';
 import { isoToBR, parseDateInputBR, prazoExigeJustificativa, prazoPadraoISO, todayISO } from './paymentFormUtils';
 
 /**
@@ -62,6 +63,7 @@ export const EnvioCgofiModal: React.FC<{
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!dataISO) return;
+    if (!documentoSeiValido(sei)) return setError('Documento SEI: só números, de 7 a 10 dígitos.');
     setSaving(true);
     setError(null);
     try {
@@ -120,7 +122,7 @@ export const EnvioCgofiModal: React.FC<{
 
         <div className="form-grid">
           <Field id="envio-sei" label="SEI do despacho *">
-            <input id="envio-sei" className="form-input" type="text" value={sei} onChange={(e) => setSei(e.target.value)} required />
+            <input id="envio-sei" className="form-input" type="text" inputMode="numeric" value={sei} onChange={(e) => setSei(mascaraDocumentoSei(e.target.value))} required />
           </Field>
           <DateField id="envio-data" label="Data de envio *" value={data} onChange={(v) => { setData(v); setPrazoTocado(false); }} />
         </div>

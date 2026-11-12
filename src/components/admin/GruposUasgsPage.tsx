@@ -22,7 +22,7 @@ import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { GtiTag } from '../gti/GtiVisual';
 import { useAuth } from '../../context/AuthContext';
 import { useDefinirGruposUasgs, useUasgsParticipantesGti } from '../../hooks/useGruposGti';
-import { GRUPO_GTI_INFO, GRUPOS_CONFIRMAVEIS, situacaoGrupoUasg, sugerirGrupoGti, type GrupoConfirmavel } from '../../config/gruposGti';
+import { GRUPO_GTI_INFO, GRUPOS_CONFIRMAVEIS, rotuloDoGrupo, situacaoGrupoUasg, sugerirGrupoGti, type GrupoConfirmavel } from '../../config/gruposGti';
 import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import type { UasgParticipanteGti } from '../../services/gruposGtiService';
 import { formatDataHoraBR } from '../../utils/format';
@@ -236,7 +236,7 @@ export const GruposUasgsPage: React.FC = () => {
             <option value="">{l.sugestao ? `A confirmar (sugestão: ${GRUPO_GTI_INFO[l.sugestao].rotulo})` : 'A confirmar'}</option>
             {GRUPOS_CONFIRMAVEIS.map((g) => (
               <option key={g} value={g}>
-                {g === 'OUTROS' ? GRUPO_GTI_INFO[g].rotulo : `${GRUPO_GTI_INFO[g].rotulo} · ${GRUPO_GTI_INFO[g].descricao}`}
+                {rotuloDoGrupo(g)}
               </option>
             ))}
           </AppSelect>
@@ -303,7 +303,7 @@ export const GruposUasgsPage: React.FC = () => {
               emptyValue=""
               options={GRUPOS_CONFIRMAVEIS.map((g) => ({
                 value: g,
-                label: g === 'OUTROS' ? GRUPO_GTI_INFO[g].rotulo : `${GRUPO_GTI_INFO[g].rotulo} · ${GRUPO_GTI_INFO[g].descricao}`,
+                label: rotuloDoGrupo(g),
                 count: contagemPorGrupo[g] ?? 0
               }))}
               onChange={setFiltroGrupo}

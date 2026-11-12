@@ -22,6 +22,7 @@ import {
   todayISO
 } from './paymentFormUtils';
 import { formatCurrency } from '../../../utils/format';
+import { documentoSeiValido, mascaraDocumentoSei, mascaraOrdemBancaria, mascaraProcessoSei, ordemBancariaValida, processoSeiValido } from '../../../utils/mascaras';
 
 
 export const Field: React.FC<{ id: string; label: string; children: React.ReactNode; hint?: React.ReactNode }> = ({ id, label, children, hint }) => (
@@ -196,6 +197,8 @@ export const CreateCycleModal: React.FC<{
     if (!contractKey) return setError('Escolha o contrato.');
     if (!atestoISO || !chegadaISO || !vencimentoISO) return setError('Preencha as datas completas (dd/mm/aaaa).');
     if (atestoISO > chegadaISO) return setError('A chegada à CGLIC não pode ser anterior ao atesto.');
+    if (!processoSeiValido(processo)) return setError('O processo SEI de pagamento tem 17 dígitos (08020.000000/2026-00).');
+    if (itens.some((i) => !documentoSeiValido(i.atestoSei) || (i.notaFiscalSei.trim() && !documentoSeiValido(i.notaFiscalSei)))) return setError('SEI da nota e do atesto: só números, de 7 a 10 dígitos.');
     if (itens.some((i) => aPagar(i) < 0)) return setError('Glosa e desconto não podem passar do valor bruto mais juros.');
     setSaving(true);
     setError(null);
@@ -259,7 +262,7 @@ export const CreateCycleModal: React.FC<{
             </Field>
           )}
           <Field id="payment-processo" label="Processo SEI de pagamento *" hint="Um processo por pagamento (Portaria 50, art. 5º, § 1º).">
-            <input id="payment-processo" className="form-input" type="text" placeholder="08020.000000/2026-00" value={processo} onChange={(e) => setProcesso(e.target.value)} required />
+            <input id="payment-processo" className="form-input" type="text" inputMode="numeric" placeholder="08020.000000/2026-00" value={processo} onChange={(e) => setProcesso(mascaraProcessoSei(e.target.value))} required />
           </Field>
         </div>
 
@@ -291,10 +294,10 @@ export const CreateCycleModal: React.FC<{
                     <input id={`item-nf-${idx}`} className="form-input" type="text" value={item.notaFiscal} onChange={(e) => updateItem(idx, { notaFiscal: e.target.value })} required />
                   </Field>
                   <Field id={`item-nf-sei-${idx}`} label="SEI da nota">
-                    <input id={`item-nf-sei-${idx}`} className="form-input" type="text" value={item.notaFiscalSei} onChange={(e) => updateItem(idx, { notaFiscalSei: e.target.value })} />
+                    <input id={`item-nf-sei-${idx}`} className="form-input" type="text" inputMode="numeric" value={item.notaFiscalSei} onChange={(e) => updateItem(idx, { notaFiscalSei: mascaraDocumentoSei(e.target.value) })} />
                   </Field>
                   <Field id={`item-atesto-${idx}`} label="SEI do atesto *">
-                    <input id={`item-atesto-${idx}`} className="form-input" type="text" value={item.atestoSei} onChange={(e) => updateItem(idx, { atestoSei: e.target.value })} required />
+                    <input id={`item-atesto-${idx}`} className="form-input" type="text" inputMode="numeric" value={item.atestoSei} onChange={(e) => updateItem(idx, { atestoSei: mascaraDocumentoSei(e.target.value) })} required />
                   </Field>
                   <Field id={`item-empenho-${idx}`} label="Empenho *">
                     <select id={`item-empenho-${idx}`} className="form-input" value={item.empenho} onChange={(e) => updateItem(idx, { empenho: e.target.value })} required disabled={!contractKey}>
@@ -449,6 +452,8 @@ export const MarcoSimplesModal: React.FC<{
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!dataISO) return;
+    if (marco === 'ENVIADO_COLOG' && !documentoSeiValido(sei)) return setError('Documento SEI: só números, de 7 a 10 dígitos.');
+    if (marco === 'RESULTADO_CGOFI' && resultado === 'PAGO' && !ordemBancariaValida(numeroOb)) return setError('A ordem bancária tem o ano, OB e 6 dígitos (ex.: 2026OB800123).');
     const comum = { cycleKey: cycle.cycleKey, data: dataISO, registradoPorNome };
     let input: RegisterPaymentMarcoInput;
     if (marco === 'RETORNO') {
@@ -514,13 +519,13 @@ export const MarcoSimplesModal: React.FC<{
 
         {marco === 'ENVIADO_COLOG' && (
           <Field id="marco-sei" label="SEI do despacho à COLOG *">
-            <input id="marco-sei" className="form-input" type="text" value={sei} onChange={(e) => setSei(e.target.value)} required />
+            <input id="marco-sei" className="form-input" type="text" inputMode="numeric" value={sei} onChange={(e) => setSei(mascaraDocumentoSei(e.target.value))} required />
           </Field>
         )}
         {marco === 'RESULTADO_CGOFI' && resultado === 'PAGO' && (
           <>
             <Field id="marco-ob" label="Número da ordem bancária *">
-              <input id="marco-ob" className="form-input" type="text" placeholder="Ex: 2026OB800123" value={numeroOb} onChange={(e) => setNumeroOb(e.target.value.toUpperCase())} required />
+              <input id="marco-ob" className="form-input" type="text" inputMode="numeric" placeholder="Ex: 2026OB800123" value={numeroOb} onChange={(e) => setNumeroOb(mascaraOrdemBancaria(e.target.value, numeroOb))} required />
             </Field>
             <Field id="marco-just-ob" label="Justificativa (só se a OB ainda não aparece no Tesouro)">
               <input id="marco-just-ob" className="form-input" type="text" value={justificativa} onChange={(e) => setJustificativa(e.target.value)} />

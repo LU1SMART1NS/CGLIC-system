@@ -8,6 +8,9 @@ vi.mock('../useContagemVinculacao', () => ({ useContagemVinculacao: vi.fn(() => 
 vi.mock('../../financeiro/useContagemFinanceiro', () => ({ useContagemFinanceiro: vi.fn(() => null) }));
 vi.mock('../../admin/useContagemGruposUasgs', () => ({ useContagemGruposUasgs: vi.fn(() => null) }));
 vi.mock('../../emendas/useContagemEmendas', () => ({ useContagemEmendas: vi.fn(() => null) }));
+vi.mock('../../emendas/useContagemGruposBeneficiarios', () => ({ useContagemGruposBeneficiarios: vi.fn(() => null) }));
+vi.mock('../../emendas/useContagemEmendasAContratar', () => ({ useContagemEmendasAContratar: vi.fn(() => null) }));
+vi.mock('../../atas/montar/useContagemAtasAMontar', () => ({ useContagemAtasAMontar: vi.fn(() => null) }));
 // O espião do cache e os cálculos pesados não rodam no render estático: o que interessa aqui é o número no ícone.
 vi.mock('../ContagensDaCarteira', () => ({ ContagensDaCarteira: () => null }));
 
@@ -45,7 +48,7 @@ describe('número no ícone das áreas', () => {
   beforeEach(() => {
     zerarContagensExtras();
     vi.mocked(useAuth).mockReturnValue({ role: 'admin' } as any);
-    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 3, aoContrato: 2 });
+    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 3, aoContrato: 2, notasForaDoContrato: 0 });
     vi.mocked(useContagemFinanceiro).mockReturnValue(null);
   });
 
@@ -96,11 +99,11 @@ describe('números novos: Financeiro e Início', () => {
     vi.mocked(useContagemEmendas).mockReturnValue(null);
   });
 
-  it('Emendas: pedidos com aviso, vermelho quando há urgente, e o clique abre Pedidos em "Com algum aviso"', () => {
+  it('Emendas: pedidos com aviso, vermelho quando há urgente, e o clique abre Pedidos sem filtro', () => {
     vi.mocked(useContagemEmendas).mockReturnValue({ total: 67, urgentes: 8, semPedido: 2 });
     const html = menu();
     expect(html).toMatch(/class="app-rail-count app-rail-count--urgente"[^>]*data-testid="rail-count-emendas"[^>]*>67</);
-    expect(html).toContain('href="/emendas/pedidos?aviso=com"');
+    expect(html).toContain('href="/emendas/pedidos?ano=todos"');
     vi.mocked(useContagemEmendas).mockReturnValue({ total: 59, urgentes: 0, semPedido: 0 });
     expect(menu()).toMatch(/class="app-rail-count"[^>]*data-testid="rail-count-emendas"[^>]*>59</);
   });
@@ -109,7 +112,7 @@ describe('números novos: Financeiro e Início', () => {
     vi.mocked(useContagemEmendas).mockReturnValue({ total: 3, urgentes: 1, semPedido: 3 });
     const html = menu();
     expect(html).toMatch(/data-testid="rail-count-emendas"[^>]*>3</);
-    expect(html).toContain('href="/emendas/pedidos?ver=emenda&amp;situacao=sem"');
+    expect(html).toContain('href="/emendas/emendas?situacao=sem&amp;ano=todos"');
   });
 
   it('Ajustes (coordenador): UASGs sem grupo confirmado, e o clique abre Grupos das UASGs em "A confirmar"', () => {
@@ -139,8 +142,10 @@ describe('números novos: Financeiro e Início', () => {
   });
 
   it('Vínculos abre na primeira fila com pendência', () => {
-    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 4, aoContrato: 0 });
+    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 4, aoContrato: 0, notasForaDoContrato: 0 });
     expect(menu()).toContain('href="/vinculacao/empenhos-itens"');
+    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 4, aoContrato: 0, notasForaDoContrato: 5 });
+    expect(menu()).toContain('href="/vinculacao/empenhos-contrato?ver=sem-contrato"');
     definirContagemExtra('contratosAta', 1);
     expect(menu()).toContain('href="/vinculacao/contratos"');
   });

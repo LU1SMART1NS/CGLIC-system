@@ -483,6 +483,36 @@ export const SYSTEM_ROLES: RoleDefinition[] = [
       gerenciarUsuarios: false,
       gerenciarPerfis: false
     }
+  },
+  {
+    // Fiscalização de contratos (migration 259): servidor da SFC/CGLIC, id idêntico ao role_id de backend
+    // (public.roles.id = 'gestor_fiscalizacao'). A autoridade vem de fiscalizacao.view/fiscalizacao.manage
+    // (public.role_permissions), não desta matriz de contratos: todas as flags ficam desligadas.
+    id: 'gestor_fiscalizacao',
+    nome: 'Gestor de Fiscalização',
+    badgeColor: '#0e7490',
+    descricao: 'Servidor da SFC/CGLIC que fiscaliza a execução dos contratos de emenda e dos que o coordenador indicar: autuação, Ordem de Fornecimento, entregas e recebimento. Consulta os contratos e o Financeiro dos contratos em que é fiscal; sem alocação ou administração.',
+    isCustom: false,
+    permissoes: {
+      contractScope: 'ASSIGNED',
+      visualizarTodosContratos: false,
+      visualizarContratos: false,
+      visualizarAtas: false,
+      visualizarItens: false,
+      distribuirContratos: false,
+      editarTarefasContratuais: false,
+      aplicarTemplates: false,
+      visualizarEmpenhos: false,
+      sincronizarEmpenhos: false,
+      visualizarPagamentos: false,
+      registrarPagamentos: false,
+      visualizarPrazos: false,
+      gerenciarEventosContratuais: false,
+      gerenciarDepartamentos: false,
+      exportarRelatorios: false,
+      gerenciarUsuarios: false,
+      gerenciarPerfis: false
+    }
   }
 ];
 

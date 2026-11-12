@@ -19,6 +19,7 @@ import { FASES_PEDIDO, faseDaEtapa, identificacaoDoPedido, itensDaLinha, linhasA
 import { rotuloBeneficiario, type LinhaPedido, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 import { AutorDoPedido, SituacaoDaLinhaEtiqueta } from '../emendas/emendasPartes';
 import { ClipboardList } from 'lucide-react';
+import { rotaDoPedido } from '../../utils/emendasNomeDoPedido';
 
 const SEM_NOTAS = new Map<string, NotaDaLinha>();
 type Segmento = FasePedido | 'todos';
@@ -235,7 +236,7 @@ export const EmendasDoItemTab: React.FC<{ itemKey: string; podeVerContratos: boo
             data={filtrados}
             keyExtractor={(u) => u.pedido.id}
             columns={colunas}
-            rowOpen={abreEmendas ? (u) => () => navigate(`/emendas/pedidos?pedido=${u.pedido.id}&item=${encodeURIComponent(itemKey)}`) : undefined}
+            rowOpen={abreEmendas ? (u) => () => navigate(`${rotaDoPedido(u.pedido)}?item=${encodeURIComponent(itemKey)}`) : undefined}
           />
         )}
         {kitsDoItem.length > 0 && (

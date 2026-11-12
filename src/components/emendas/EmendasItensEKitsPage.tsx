@@ -4,11 +4,12 @@ import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { useItensCaep, useKitsEmendas } from '../../hooks/useEmendas';
 import { EmendasPorItemPage } from './EmendasPorItemPage';
 import { EmendasKitsPage } from './EmendasKitsPage';
+import { ExportarItensEKits } from './ExportarItensEKits';
 
 type Ver = 'item' | 'kit';
 
 /**
- * Itens e kits: as antigas abas Itens da CAEP e Kits numa só, com Por item · Por kit no cabeçalho (como Por ata · Por item
+ * Emendas › Itens (antes "Itens e kits"): as antigas abas Itens da CAEP e Kits numa só, com Por item · Por kit no cabeçalho (como Por ata · Por item
  * da Alocação). A visão fica em ?ver=kit e a linha que chega aberta em ?abrir=; o item dentro do kit leva ao item e o
  * item abre o Item 360 na aba Emendas (que lista os kits em que ele entra).
  */
@@ -42,8 +43,8 @@ export const EmendasItensEKitsPage: React.FC = () => {
 
   // key: a linha aberta muda sem trocar de visão (ex.: dois itens do mesmo kit) e a tela recomeça aberta nela.
   return ver === 'kit' ? (
-    <EmendasKitsPage key={`kit-${abrir ?? ''}`} seletor={seletor} abrir={abrir} onAbrirItem={(k) => ir('item', k)} />
+    <EmendasKitsPage key={`kit-${abrir ?? ''}`} seletor={seletor} exportar={<ExportarItensEKits />} abrir={abrir} onAbrirItem={(k) => ir('item', k)} />
   ) : (
-    <EmendasPorItemPage key={`item-${abrir ?? ''}`} seletor={seletor} abrir={abrir} />
+    <EmendasPorItemPage key={`item-${abrir ?? ''}`} seletor={seletor} exportar={<ExportarItensEKits />} abrir={abrir} />
   );
 };

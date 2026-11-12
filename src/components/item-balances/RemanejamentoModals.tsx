@@ -1,9 +1,10 @@
 import React from 'react';
-import { ActionButton, AppButton, AppInput, AppSelect, AppTextarea, Modal, NoticeBar, useToast } from '../../design-system';
+import { ActionButton, AppButton, AppSelect, AppTextarea, Modal, NoticeBar, useToast } from '../../design-system';
 import { useAcoesQuantitativos } from '../../hooks/useQuantitativosDoItem';
 import type { OrgaoQuantitativo, QuantitativosDoItem } from '../../services/quantitativosService';
 import { maximoParaConfirmar, mudaramNoMesmoSegundo } from '../../utils/quantitativos';
 import { formatNumber } from './itemBalanceUtils';
+import { QuantidadeComMaximo } from './QuantidadeComMaximo';
 
 const NAO_SEI = '?';
 
@@ -56,7 +57,8 @@ export const ConfirmarRemanejamentoModal: React.FC<BaseProps> = ({ itemKey, orga
     if (!orgao) return;
     setErro(null);
     const q = Number(quantidade);
-    if (!/^\d+$/.test(quantidade) || q < 1 || q > max) return setErro(`A quantidade vai de 1 a ${formatNumber(max)}.`);
+    if (!/^\d+$/.test(quantidade) || q < 1) return setErro('Informe a quantidade.');
+    if (q > max) return setErro(`Você pode ${informarDestino ? 'informar' : 'confirmar'} no máximo ${formatNumber(max)}.`);
     if (!destino) return setErro('Escolha para onde foi a quantidade.');
     if (justificativa.trim().length < 15) return setErro('Escreva a justificativa (mínimo de 15 caracteres).');
     try {
@@ -88,10 +90,16 @@ export const ConfirmarRemanejamentoModal: React.FC<BaseProps> = ({ itemKey, orga
     >
       {orgao && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-          <label style={campo}>
-            Quantidade remanejada (até {formatNumber(max)})
-            <AppInput inputMode="numeric" value={quantidade} style={{ width: 130 }} onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ''))} data-testid="remanejamento-quantidade" />
-          </label>
+          <QuantidadeComMaximo
+            rotulo="Quantidade remanejada"
+            valor={quantidade}
+            onMudar={(v) => { setQuantidade(v); setErro(null); }}
+            maximo={max}
+            verbo={informarDestino ? 'informar' : 'confirmar'}
+            motivo={informarDestino ? `O órgão tem ${formatNumber(max)} remanejados a menos.` : `O órgão tem ${formatNumber(max)} gerenciados pela SENASP.`}
+            testId="remanejamento-quantidade"
+            disabled={confirmar.isPending}
+          />
           <label style={campo}>
             Para onde foi a quantidade
             <AppSelect value={destino} onChange={(e) => setDestino(e.target.value)} data-testid="remanejamento-destino">
@@ -144,7 +152,8 @@ export const ContinuaDoOrgaoModal: React.FC<BaseProps> = ({ itemKey, orgao, nome
     if (!orgao) return;
     setErro(null);
     const q = Number(quantidade);
-    if (!/^\d+$/.test(quantidade) || q < 1 || q > max) return setErro(`A quantidade vai de 1 a ${formatNumber(max)}.`);
+    if (!/^\d+$/.test(quantidade) || q < 1) return setErro('Informe a quantidade.');
+    if (q > max) return setErro(`Você pode marcar no máximo ${formatNumber(max)}.`);
     if (justificativa.trim().length < 15) return setErro('Escreva a justificativa (mínimo de 15 caracteres).');
     try {
       await marcarContinua.mutateAsync({ uasg: orgao.uasg, quantidade: q, justificativa });
@@ -180,10 +189,16 @@ export const ContinuaDoOrgaoModal: React.FC<BaseProps> = ({ itemKey, orgao, nome
               ? 'Informe quanto da redução ainda é do órgão. Essa parte volta a ser gerenciada pela SENASP e sai da cota própria; o resto continua como remanejamento definitivo.'
               : 'Registra que a quantidade gerenciada pela SENASP continua sendo do órgão. Os números não mudam: fica só o registro de quem confirmou e por quê.'}
           </p>
-          <label style={campo}>
-            Quantidade que continua do órgão (até {formatNumber(max)})
-            <AppInput inputMode="numeric" value={quantidade} style={{ width: 130 }} onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ''))} data-testid="continua-quantidade" />
-          </label>
+          <QuantidadeComMaximo
+            rotulo="Quantidade que continua do órgão"
+            valor={quantidade}
+            onMudar={(v) => { setQuantidade(v); setErro(null); }}
+            maximo={max}
+            verbo="marcar"
+            motivo={reduzido ? `A redução sem destino do órgão é de ${formatNumber(max)}.` : `O órgão tem ${formatNumber(max)} gerenciados pela SENASP.`}
+            testId="continua-quantidade"
+            disabled={marcarContinua.isPending}
+          />
           <label style={campo}>
             Justificativa (obrigatória)
             <AppTextarea rows={3} placeholder="Ex.: a SENASP recolheu a quantidade para redistribuir, mas o órgão mantém o direito" value={justificativa} onChange={(e) => setJustificativa(e.target.value)} data-testid="continua-justificativa" />

@@ -1,0 +1,375 @@
+import React, { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { FileText } from 'lucide-react';
+import { PageContainer } from '../../../design-system/components/PageContainer';
+import { PageHeader } from '../../../design-system/components/PageHeader';
+import { HeaderRefreshAction } from '../../../design-system/components/HeaderRefreshAction';
+import { DataTable, type Column } from '../../../design-system/components/DataTable';
+import { StatusBadge, type StatusBadgeVariant } from '../../../design-system/components/StatusBadge';
+import { ActionButton } from '../../../design-system/components/ActionButton';
+import { NoticeBar } from '../../../design-system/components/NoticeBar';
+import { CarteiraFilterBar, carteiraCounter } from '../../carteira/CarteiraFilterBar';
+import { CarteiraSegmentTabs } from '../../carteira/CarteiraSegmentTabs';
+import { CarteiraPagination } from '../../carteira/CarteiraPagination';
+import { useCarteiraPagination } from '../../carteira/useCarteiraPagination';
+import { carteiraDetalhe, carteiraIdentificacao, carteiraSubtitle } from '../../carteira/carteiraStyles';
+import { AdminListShell } from '../../admin/shared/AdminListShell';
+import { useCarteiraSort, type CarteiraSortColumn } from '../../carteira/useCarteiraSort';
+import { useNavigateWithOrigin } from '../../../hooks/useDetailOrigin';
+import {
+  hojeEmBrasilia,
+  useAutoresEmendas,
+  useContatosDasEmendas,
+  useEmendasPainelSemParlamentar,
+  useEmendasSiop,
+  useItensCaep,
+  useMapaGruposBeneficiarios,
+  useNotasDasLinhas,
+  usePedidosEmendas,
+  usePodeGerirEmendas
+} from '../../../hooks/useEmendas';
+import { formatCurrency } from '../../../utils/format';
+import { dataBR } from '../../../utils/emendasKits';
+import { casaBusca } from '../../../utils/emendasBeneficiarios';
+import { diasSemContatoParaUrgente, emendasNaLista, numeroDaEmenda, reservasParaLigar, ROTULO_SITUACAO_EMENDA, semPedido, type EmendaNaLista } from '../../../utils/emendasSemPedido';
+import { execucaoDosPedidos } from '../../../utils/emendasParlamentar';
+import { contarPorGti, passaFiltroGti, resumirFatias, type FatiasDaAta } from '../../../config/gruposGti';
+import { GRUPOS_CAPTACAO, fatiasDaCaptacao, lerFiltroCaptacao, lerModoCaptacao, type GrupoBeneficiario } from '../../../config/captacaoEmendas';
+import type { EmendaPainelSemParlamentar, NotaDaLinha } from '../../../services/emendasService';
+import { AutorDoPedido, LARGURA_AUTOR, ValoresEmBarra } from '../emendasPartes';
+import { CelulaCaptacao, FiltroCaptacao } from '../CaptacaoDoPedido';
+import { EmendaSiopModal } from '../EmendaSiopModal';
+import { AnoDaEmenda } from '../AnoDaEmenda';
+import { ANO_SEM, ANO_TODOS, anosDaLista, lerAnoDaUrl } from '../../../utils/emendasAno';
+import { useSobraDasEmendas } from '../parlamentares/useSobraDasEmendas';
+import { rotaDaEmenda } from './rotaDaEmenda';
+
+type Segmento = 'sem' | 'com' | 'todas';
+const POR_PAGINA = 25;
+const SEM_NOTAS = new Map<string, NotaDaLinha>();
+const chave = (l: EmendaNaLista) => l.chave;
+const VARIANTE: Record<EmendaNaLista['situacao'], StatusBadgeVariant> = { SEM_CONTATO: 'warning', EM_CONVERSA: 'warning', COM_PEDIDO: 'success' };
+const PESO_SITUACAO: Record<EmendaNaLista['situacao'], number> = { SEM_CONTATO: 2, EM_CONVERSA: 1, COM_PEDIDO: 0 };
+
+/**
+ * Emendas › Emendas (protótipo aprovado em 27/10/2026): uma linha por emenda, as registradas no SIOP (com ou sem pedido)
+ * e os números que só existem nos pedidos, no padrão das carteiras; a linha abre a Emenda 360. Substitui Pedidos › Por
+ * emenda. Situação, ano e Captação principal ficam no endereço (?situacao=, ?ano=, ?captacao=).
+ */
+export const EmendasListaPage: React.FC = () => {
+  const { data: pedidos = [], isLoading: carregandoPedidos, isError: erroPedidos, refetch } = usePedidosEmendas();
+  const emendasQ = useEmendasSiop();
+  const { data: contatos = [] } = useContatosDasEmendas();
+  const { data: autores = [] } = useAutoresEmendas();
+  // Emendas do painel do SIOP que o servidor não registrou por não achar o parlamentar (migration 252).
+  const { data: semParlamentar = [] } = useEmendasPainelSemParlamentar();
+  const { data: notas = SEM_NOTAS } = useNotasDasLinhas();
+  const { data: itensLista = [] } = useItensCaep();
+  const grupos = useMapaGruposBeneficiarios();
+  const podeGerir = usePodeGerirEmendas();
+  const hoje = hojeEmBrasilia();
+  const navegar = useNavigateWithOrigin();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const daUrl = searchParams.get('situacao');
+  const segmento: Segmento = daUrl === 'sem' || daUrl === 'com' ? daUrl : 'todas';
+  // Ano da emenda (28/10/2026): abre no ano corrente; 'sem' = nº sem o ano; 'todos' = todos os anos.
+  const anoCorrente = Number(hoje.slice(0, 4));
+  const filtroAno = lerAnoDaUrl(searchParams.get('ano'), anoCorrente, true);
+  const filtroCaptacao = lerFiltroCaptacao(searchParams.get('captacao'));
+  const modoCaptacao = lerModoCaptacao(searchParams.get('captacaoConta'));
+  const mudarUrl = (mudar: (p: URLSearchParams) => void) =>
+    setSearchParams((atual) => {
+      const prox = new URLSearchParams(atual);
+      mudar(prox);
+      return prox;
+    });
+  const [busca, setBusca] = useState('');
+  const [escolhendo, setEscolhendo] = useState<EmendaPainelSemParlamentar | null>(null);
+
+  const autorPorId = useMemo(() => new Map(autores.map((a) => [a.id, a])), [autores]);
+  const itens = useMemo(() => new Map(itensLista.map((i) => [i.itemKey, i])), [itensLista]);
+  const lista = useMemo(() => emendasNaLista(emendasQ.data ?? [], pedidos, contatos, hoje), [emendasQ.data, pedidos, contatos, hoje]);
+  const anos = useMemo(() => [...new Set(lista.map((l) => l.ano).filter((a): a is number => a != null))].sort((a, b) => b - a), [lista]);
+  const { emendas: sobras, precos } = useSobraDasEmendas(pedidos, itens, notas, anos);
+  const sobraPorCodigo = useMemo(() => new Map(sobras.map((s) => [s.codigo, s])), [sobras]);
+  const sobraDe = (l: EmendaNaLista) => (l.ano ? sobraPorCodigo.get(`${l.ano}${l.numero}`) : undefined);
+
+  // Captação principal (migration 218): pelos pedidos da emenda; sem pedido, pelo beneficiário indicado na emenda.
+  const captacao = useMemo(() => {
+    const m = new Map<string, FatiasDaAta>();
+    for (const l of lista) {
+      if (l.pedidos.length) m.set(l.chave, fatiasDaCaptacao(l.pedidos, grupos, itens, precos));
+      else if (l.emenda?.beneficiarioId) {
+        const grupo: GrupoBeneficiario | 'A_CONFIRMAR' = grupos.get(l.emenda.beneficiarioId) ?? 'A_CONFIRMAR';
+        m.set(l.chave, { ...resumirFatias([{ grupo, quantidade: l.valor ?? 1, orgaos: 1 }]), medida: 'VALOR' });
+      }
+    }
+    return m;
+  }, [lista, grupos, itens, precos]);
+  const pagoPorChave = useMemo(() => new Map(lista.map((l) => [l.chave, execucaoDosPedidos(l.pedidos, notas)])), [lista, notas]);
+
+  const doAno = lista.filter((l) => filtroAno === ANO_TODOS || String(l.ano ?? ANO_SEM) === filtroAno);
+  const conta = { sem: doAno.filter(semPedido).length, com: doAno.filter((l) => !semPedido(l)).length, todas: doAno.length };
+  const doSegmento = doAno.filter((l) => segmento === 'todas' || (segmento === 'sem') === semPedido(l));
+  const contagemCaptacao = contarPorGti(doSegmento.map((l) => captacao.get(l.chave)), modoCaptacao, GRUPOS_CAPTACAO);
+  const doGrupo = doSegmento.filter((l) => passaFiltroGti(captacao.get(l.chave), filtroCaptacao, modoCaptacao));
+  const termo = busca.trim();
+  const filtradas = termo
+    ? doGrupo.filter((l) => {
+        const a = l.autorId ? autorPorId.get(l.autorId) : undefined;
+        return casaBusca(`${l.numero} ${numeroDaEmenda(l.numero)} ${a?.nome ?? ''} ${a?.uf ?? ''} ${l.emenda?.objeto ?? ''}`, termo);
+      })
+    : doGrupo;
+  const filtrosAtivos = Boolean(termo) || filtroCaptacao !== 'TODOS';
+  const ordem = useMemo<Record<string, CarteiraSortColumn<EmendaNaLista>>>(
+    () => ({
+      emenda: { value: (l) => `${l.ano ?? 0}${l.numero}`, firstDir: 'desc' },
+      autor: { value: (l) => (l.autorId ? autorPorId.get(l.autorId)?.nome ?? l.autorId : null) },
+      valor: { value: (l) => l.valor, firstDir: 'desc' },
+      oficios: { value: (l) => sobraPorCodigo.get(`${l.ano}${l.numero}`)?.oficiado ?? null, firstDir: 'desc' },
+      empenhado: { value: (l) => sobraPorCodigo.get(`${l.ano}${l.numero}`)?.empenhado ?? null, firstDir: 'desc' },
+      pago: { value: (l) => pagoPorChave.get(l.chave)?.pago ?? null, firstDir: 'desc' },
+      sobra: { value: (l) => sobraPorCodigo.get(`${l.ano}${l.numero}`)?.sobra ?? null, firstDir: 'desc' },
+      contato: { value: (l) => l.contatos.at(-1)?.contatoEm ?? null },
+      situacao: { value: (l) => PESO_SITUACAO[l.situacao] + (l.urgente ? 10 : 0), firstDir: 'desc' }
+    }),
+    [autorPorId, sobraPorCodigo, pagoPorChave]
+  );
+  const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(filtradas, ordem);
+  const { currentPage, setPage, pageItems } = useCarteiraPagination(sorted, chave, POR_PAGINA);
+  const limite = diasSemContatoParaUrgente();
+  const mostraContato = podeGerir && segmento !== 'com';
+
+  const colunas: Column<EmendaNaLista>[] = [
+    {
+      key: 'emenda',
+      header: 'Emenda',
+      priority: 'primary',
+      nowrap: true,
+      sortValue: ordem.emenda.value,
+      sortFirstDir: 'desc',
+      render: (l) => (
+        <>
+          <div style={carteiraIdentificacao}>{numeroDaEmenda(l.numero)}</div>
+          <div style={{ ...carteiraSubtitle, marginTop: '0.15rem' }}>
+            {l.ano ?? 'ano não informado'}
+            {l.gnd ? ` · ${l.gnd}` : ''}
+            {l.emenda?.origem === 'PAINEL' && (
+              <span title="Registrada sozinha pelo painel do SIOP" data-testid={`emendas-emenda-do-siop-${l.chave}`}>
+                {' · do SIOP'}
+              </span>
+            )}
+          </div>
+        </>
+      )
+    },
+    { key: 'autor', header: 'Parlamentar', width: LARGURA_AUTOR, minWidth: LARGURA_AUTOR, sortValue: ordem.autor.value, render: (l) => <AutorDoPedido autor={l.autorId ? autorPorId.get(l.autorId) : undefined} autorId={l.autorId} /> },
+    {
+      key: 'captacao',
+      header: 'Captação principal',
+      render: (l) => {
+        const f = captacao.get(l.chave);
+        return f ? <CelulaCaptacao fatias={f} testId={`emendas-por-emenda-captacao-${l.chave}`} /> : <span style={carteiraDetalhe}>—</span>;
+      }
+    },
+    {
+      // Valor no SIOP, ofícios, empenhado, pago e a indicar numa coluna só (D2 da revisão das tabelas, 30/10/2026).
+      key: 'execucao',
+      header: 'Valor e execução',
+      minWidth: '220px',
+      sortOptions: [
+        { key: 'valor', label: 'Valor no SIOP', sortValue: ordem.valor.value, sortFirstDir: 'desc' },
+        { key: 'oficios', label: 'Ofícios', sortValue: ordem.oficios.value, sortFirstDir: 'desc' },
+        { key: 'empenhado', label: 'Empenhado', sortValue: ordem.empenhado.value, sortFirstDir: 'desc' },
+        { key: 'pago', label: 'Pago', sortValue: ordem.pago.value, sortFirstDir: 'desc' },
+        { key: 'sobra', label: 'A indicar', sortValue: ordem.sobra.value, sortFirstDir: 'desc' }
+      ],
+      render: (l) => {
+        const x = sobraDe(l);
+        const e = pagoPorChave.get(l.chave);
+        const pago = e && e.notas > 0 ? e.pago : null;
+        const empenhado = x?.empenhado ?? null;
+        const legenda = [
+          ...(x
+            ? [{ rotulo: 'Ofícios', valor: x.oficiosAInformar > 0 ? `${formatCurrency(x.oficiado)} (${x.oficiosAInformar} a informar)` : formatCurrency(x.oficiado) }]
+            : []),
+          { rotulo: 'Empenhado', valor: empenhado != null ? formatCurrency(empenhado) : '—', tom: 'fraca' as const },
+          { rotulo: 'Pago', valor: pago != null ? formatCurrency(pago) : '—', tom: 'forte' as const },
+          { rotulo: 'A indicar', valor: x ? formatCurrency(x.sobra) : '—', tom: 'vazia' as const }
+        ];
+        return (
+          <ValoresEmBarra
+            total={l.valor != null ? formatCurrency(l.valor) : '—'}
+            rotulo="no SIOP"
+            max={l.valor ?? 0}
+            partes={[
+              { valor: pago ?? 0, tom: 'forte' },
+              { valor: Math.max((empenhado ?? 0) - (pago ?? 0), 0), tom: 'fraca' }
+            ]}
+            legenda={legenda}
+            testId={`emendas-emenda-execucao-${l.chave}`}
+          />
+        );
+      }
+    },
+    {
+      // Último contato embaixo da situação (D5): só para quem gere e fora da aba "com pedido", como a antiga coluna.
+      key: 'situacao',
+      header: 'Situação',
+      minWidth: '150px',
+      ...(mostraContato
+        ? {
+            sortOptions: [
+              { key: 'situacao', label: 'Situação', sortValue: ordem.situacao.value, sortFirstDir: 'desc' as const },
+              { key: 'contato', label: 'Último contato', sortValue: ordem.contato.value }
+            ]
+          }
+        : { sortValue: ordem.situacao.value, sortFirstDir: 'desc' as const }),
+      render: (l) => (
+        <span title={l.urgente ? `${l.diasSemContato} dias sem contato registrado (urgente a partir de ${limite})` : undefined} data-testid={`emendas-emenda-situacao-${l.chave}`}>
+          <StatusBadge
+            label={l.situacao === 'COM_PEDIDO' ? (l.pedidos.length > 1 ? `${l.pedidos.length} pedidos` : ROTULO_SITUACAO_EMENDA.COM_PEDIDO) : ROTULO_SITUACAO_EMENDA[l.situacao]}
+            variant={l.urgente ? 'danger' : VARIANTE[l.situacao]}
+            size="sm"
+            dot={false}
+          />
+          {l.urgente && <div style={{ ...carteiraDetalhe, color: 'var(--color-danger-text)' }}>{l.diasSemContato} dias sem contato</div>}
+          {mostraContato && semPedido(l) && (
+            <div style={carteiraDetalhe} data-testid={`emendas-emenda-contato-${l.chave}`}>
+              {l.contatos.at(-1) ? `último contato ${dataBR(l.contatos.at(-1)!.contatoEm)} · ${l.contatos.at(-1)!.comQuem}` : 'nenhum contato'}
+            </div>
+          )}
+          {reservasParaLigar(l, pedidos).length > 0 && (
+            <div style={carteiraDetalhe} data-testid={`emendas-emenda-reserva-${l.chave}`}>
+              reserva do parlamentar a ligar
+            </div>
+          )}
+        </span>
+      )
+    }
+  ];
+
+  const carregando = carregandoPedidos || emendasQ.isLoading;
+  return (
+    <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <PageHeader
+        title="Emendas"
+        subtitle="Emendas indicadas à SENASP no SIOP, com ou sem pedido: as que ainda não viraram pedido avisam até a CAEP falar com o parlamentar."
+        icon={<FileText size={26} color="var(--primary)" aria-hidden="true" />}
+        actions={
+          <>
+            <AnoDaEmenda
+              valor={filtroAno}
+              anoCorrente={anoCorrente}
+              anos={anosDaLista(anos, anoCorrente).map((a) => ({ ano: a, count: lista.filter((l) => l.ano === a).length }))}
+              todos={lista.length}
+              semAno={lista.filter((l) => l.ano == null).length}
+              onChange={(v) => mudarUrl((p) => (v === String(anoCorrente) ? p.delete('ano') : p.set('ano', v)))}
+              testId="emendas-por-emenda-ano"
+            />
+            <HeaderRefreshAction onRefresh={() => void refetch()} isRefreshing={false} lastUpdated={null} dataTestId="emendas-emendas-atualizar" tooltipTitle="Recarregar" />
+          </>
+        }
+      />
+      {podeGerir && semParlamentar.length > 0 && (
+        <NoticeBar tone="warning" testId="emendas-painel-sem-parlamentar">
+          <span style={{ fontWeight: 700 }}>
+            {semParlamentar.length} {semParlamentar.length === 1 ? 'emenda do SIOP sem parlamentar' : 'emendas do SIOP sem parlamentar'} no cadastro
+          </span>
+          <span style={{ ...carteiraDetalhe, color: 'inherit', opacity: 0.85, display: 'block' }}>
+            O servidor não achou um parlamentar só pelo nome do painel. Escolha uma vez: as próximas emendas dele entram sozinhas.
+          </span>
+          {semParlamentar.map((e) => (
+            <span key={`${e.ano}-${e.numero}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.35rem' }} data-testid={`emendas-painel-sem-parlamentar-${e.ano}-${e.numero}`}>
+              <span>
+                <b>
+                  {numeroDaEmenda(e.numero)} / {e.ano}
+                </b>
+                {' · '}
+                {e.autor ?? 'autor não informado'}
+                {e.uf ? ` (${e.uf})` : ''}
+                {' · '}
+                {e.valor != null ? formatCurrency(e.valor) : '—'}
+              </span>
+              <ActionButton action="atribuir" size="sm" label="Escolher o parlamentar" onClick={() => setEscolhendo(e)} data-testid={`emendas-painel-escolher-${e.ano}-${e.numero}`} />
+            </span>
+          ))}
+        </NoticeBar>
+      )}
+      <CarteiraSegmentTabs<Segmento>
+        testIdPrefix="emendas-por-emenda-situacao"
+        ariaLabel="Situação das emendas"
+        active={segmento}
+        onSelect={(s) =>
+          mudarUrl((p) => {
+            if (s === 'todas') p.delete('situacao');
+            else p.set('situacao', s);
+          })
+        }
+        segments={[
+          { id: 'sem', label: 'Sem pedido', count: conta.sem },
+          { id: 'com', label: 'Com pedido', count: conta.com },
+          { id: 'todas', label: 'Todas', count: conta.todas }
+        ]}
+      />
+      <CarteiraFilterBar
+        busca={busca}
+        searchPlaceholder="Buscar pelo nº, parlamentar, UF ou objeto..."
+        onChangeBusca={setBusca}
+        hasActiveFilters={filtrosAtivos}
+        onResetFilters={() => {
+          setBusca('');
+          mudarUrl((p) => {
+            p.delete('captacao');
+            p.delete('captacaoConta');
+          });
+        }}
+        counter={carteiraCounter(filtradas.length, doSegmento.length, filtrosAtivos, 'emenda', 'emendas')}
+        testIdPrefix="emendas-por-emenda"
+      >
+        <FiltroCaptacao gti={filtroCaptacao} modo={modoCaptacao} counts={contagemCaptacao} mudarUrl={mudarUrl} testIdPrefix="emendas-por-emenda" />
+      </CarteiraFilterBar>
+      <AdminListShell
+        testId="emendas-por-emenda-lista"
+        isLoading={carregando}
+        isError={erroPedidos || emendasQ.isError}
+        errorTitle="Não foi possível carregar as emendas"
+        errorMessage={(emendasQ.error as Error | null)?.message || 'Falha ao consultar as emendas.'}
+        onRetry={() => {
+          void refetch();
+          void emendasQ.refetch();
+        }}
+        isEmpty={!carregando && filtradas.length === 0}
+        emptyTitle={segmento === 'sem' && !termo ? 'Nenhuma emenda sem pedido.' : 'Nenhuma emenda encontrada.'}
+        emptyDescription={
+          segmento === 'sem' && !termo
+            ? 'As emendas indicadas no SIOP entram aqui sozinhas, uma vez por dia, antes do pedido.'
+            : 'Ajuste a busca ou escolha outra situação.'
+        }
+      >
+        <DataTable<EmendaNaLista>
+          testId="emendas-por-emenda-tabela"
+          className="data-table-container--flush"
+          data={pageItems}
+          keyExtractor={chave}
+          sort={{ key: sortKey, dir: sortDir }}
+          onSort={toggle}
+          columns={colunas}
+          rowOpen={(l) => () => navegar(rotaDaEmenda(l))}
+        />
+        <CarteiraPagination page={currentPage} pageSize={POR_PAGINA} total={sorted.length} onChange={setPage} testIdPrefix="emendas-por-emenda" />
+      </AdminListShell>
+      {escolhendo && (
+        <EmendaSiopModal
+          key={`${escolhendo.ano}-${escolhendo.numero}`}
+          emenda={null}
+          doPainel={escolhendo}
+          emendas={emendasQ.data ?? []}
+          pedidos={pedidos}
+          autores={autores}
+          onClose={() => setEscolhendo(null)}
+        />
+      )}
+    </PageContainer>
+  );
+};

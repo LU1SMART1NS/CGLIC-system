@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { descricaoItemEmFrase, toSentenceCaseIfAllCaps } from '../textCase';
+import { nomeProprioEmTitulo, descricaoItemEmFrase, toSentenceCaseIfAllCaps } from '../textCase';
 
 describe('toSentenceCaseIfAllCaps', () => {
   it('converte o objeto do contrato que vem todo em maiúsculas', () => {
@@ -65,5 +65,14 @@ describe('descricaoItemEmFrase', () => {
   it('vazio ou ausente vira vazio', () => {
     expect(descricaoItemEmFrase('')).toBe('');
     expect(descricaoItemEmFrase(null)).toBe('');
+  });
+});
+
+describe('nomeProprioEmTitulo', () => {
+  it('põe o nome da Receita no padrão dos cadastros', () => {
+    expect(nomeProprioEmTitulo('POLICIA CIVIL DO ESTADO DE MINAS GERAIS')).toBe('Polícia Civil do Estado de Minas Gerais');
+  });
+  it('não mexe em nome que já tem minúscula', () => {
+    expect(nomeProprioEmTitulo('27º Batalhão de PM')).toBe('27º Batalhão de PM');
   });
 });

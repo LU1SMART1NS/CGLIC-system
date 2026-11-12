@@ -5,6 +5,8 @@ vi.mock('../../../hooks/useCadastroUasgs', () => ({ useCadastroUasgs: () => cada
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AdesoesTab, splitUnidade } from '../AdesoesTab';
 import type { AdesaoItemRecord } from '../../../types';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { vazioDoItem } from '../../../services/quantitativosService';
 
 const item = { numeroItem: '00001', maximoAdesao: 9726, quantidadeHomologadaItem: 4863, valorUnitario: 1528.8 } as any;
 
@@ -106,5 +108,24 @@ describe('AdesoesTab', () => {
       cadastro.clear();
     }
   });
-});
 
+  it('remanejamento a não participante aparece como linha e soma nos 50% da UASG', () => {
+    const quantitativos = {
+      ...vazioDoItem(),
+      remanejamentosNaoParticipante: [{
+        id: 'np1', uasgOrigem: '200109', uasgDestino: '373083', nomeDestino: 'INCRA-SEDE/DF', quantidade: 50, documentoSei: '30203768',
+        justificativa: 'ofício do órgão pedindo', adesoesConhecidas: ['2026-03-10T10:00:00'], registradoPorNome: 'Maria', registradoEm: '2026-10-27T12:00:00Z'
+      }]
+    };
+    const out = renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <AdesoesTab {...baseProps} totalAdesaoAprovada={150} itemKey="00020/2024-200331-00001" quantitativos={quantitativos} />
+      </QueryClientProvider>
+    );
+    expect(out).toContain('data-testid="adesao-remanejamento-np1"');
+    expect(out).toContain('Remanejado a não participantes');
+    expect(out).toContain('150 de 9.726');
+    expect(out).toContain('3,08%'); // 100 + 50 de 4.863
+    expect(out).not.toContain('adesao-a-conferir');
+  });
+});

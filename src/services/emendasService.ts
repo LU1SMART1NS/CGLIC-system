@@ -8,6 +8,7 @@
  * reserva do CEP). Nada disso é sincronização: o que a pessoa confere é o que grava.
  */
 import type { ExecucaoNoPortal } from '../utils/emendasSobra';
+import { nomeDoPedido, pedidoEmTexto } from '../utils/emendasNomeDoPedido';
 import { supabase } from './supabaseClient';
 import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import { mensagemDeErro } from './sincronizacaoFontesService';
@@ -121,6 +122,8 @@ export interface KitEmenda {
   ativo: boolean;
   versao: number;
   itens: ItemDoKit[];
+  /** Pedidos com o kit, mesmo cancelados: com algum, o kit só se desativa (migration 253). */
+  pedidos: number;
   atualizadoPorNome: string | null;
   atualizadoEm: string | null;
 }
@@ -286,9 +289,10 @@ export async function fetchItensCaep(): Promise<ItemCaep[]> {
 }
 
 export async function fetchKitsEmendas(): Promise<KitEmenda[]> {
-  const [kits, itens] = await Promise.all([
+  const [kits, itens, linhas] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_kits').select('*').order('id').range(de, ate)),
-    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_kit_itens').select('kit_id, item_key, quantidade').order('kit_id').order('item_key').range(de, ate))
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_kit_itens').select('kit_id, item_key, quantidade').order('kit_id').order('item_key').range(de, ate)),
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('kit_id, pedido_id').not('kit_id', 'is', null).order('id').range(de, ate))
   ]);
   const porKit = new Map<string, ItemDoKit[]>();
   for (const i of itens) {
@@ -296,6 +300,8 @@ export async function fetchKitsEmendas(): Promise<KitEmenda[]> {
     lista.push({ itemKey: i.item_key, quantidade: num(i.quantidade) });
     porKit.set(i.kit_id, lista);
   }
+  const pedidosDoKit = new Map<string, Set<string>>();
+  for (const l of linhas) pedidosDoKit.set(l.kit_id, (pedidosDoKit.get(l.kit_id) ?? new Set()).add(l.pedido_id));
   return kits
     .map((k) => ({
       id: k.id,
@@ -304,6 +310,7 @@ export async function fetchKitsEmendas(): Promise<KitEmenda[]> {
       ativo: k.ativo,
       versao: k.versao,
       itens: porKit.get(k.id) ?? [],
+      pedidos: pedidosDoKit.get(k.id)?.size ?? 0,
       atualizadoPorNome: k.atualizado_por_nome ?? null,
       atualizadoEm: k.atualizado_em ?? null
     }))
@@ -332,6 +339,12 @@ export async function salvarKitEmenda(k: KitParaSalvar): Promise<{ id: string; v
   });
   if (error) throw new Error(mensagemDoBanco(error));
   return data as { id: string; versao: number };
+}
+
+/** Exclui o kit que nenhum pedido usa; o banco confere de novo (migration 253). */
+export async function excluirKitEmenda(k: Pick<KitEmenda, 'id' | 'versao'>): Promise<void> {
+  const { error } = await db().rpc('excluir_kit_emenda', { p_id: k.id, p_versao: k.versao });
+  if (error) throw new Error(mensagemDoBanco(error));
 }
 
 /** "CONFLITO: Outra pessoa…" → "Outra pessoa…": a mensagem do banco já é a frase para o usuário. */
@@ -499,6 +512,45 @@ export interface LinhaPedido {
   contratoNumero: string | null;
   /** Documento SEI do despacho para contratação da nota desta linha (planilha de execução). */
   despachoDocumentoSei: string | null;
+  /** Item na CCGA (migration 248): enviado ao gestor da ata ou devolvido por ele à CAEP; nulo = não enviado; indefinido = banco sem a migration. */
+  ccgaSituacao?: SituacaoNaCcga | null;
+  /** Dia do envio ou da devolução. */
+  ccgaEm?: string | null;
+  /** Motivo e explicação da devolução, e quem enviou ou devolveu. */
+  ccgaMotivo?: string | null;
+  ccgaExplicacao?: string | null;
+  ccgaPorNome?: string | null;
+  /** Item acrescentado pelo ofício retificador depois do empenho (migration 251): pede empenho complementar. */
+  complementar?: boolean;
+}
+
+export type SituacaoNaCcga = 'ENVIADA' | 'DEVOLVIDA';
+
+/** Motivos da devolução à CAEP (migration 248, D4): os mesmos do banco (emendas_motivos_devolucao_ccga). */
+export const MOTIVOS_DEVOLUCAO_CCGA = [
+  'Item sem saldo na ata',
+  'Preço reajustado ou apostilado',
+  'Ata vencida ou perto de vencer',
+  'Fornecedor não aceita',
+  'Despacho ou documento com erro',
+  'Outro'
+] as const;
+
+/** Vai e volta com a CCGA e etapas voltadas pela CAEP (migration 248), do mais antigo ao mais novo. */
+export interface MovimentoDoPedido {
+  id: string;
+  acao: 'ENVIO_CCGA' | 'DEVOLUCAO_CCGA' | 'DESFEITO_CCGA' | 'VOLTOU_ETAPA' | 'RETIFICADOR';
+  /** Ata como nas telas de Emendas ("NÚMERO-UASG"), no vai e volta com a CCGA. */
+  ataKey: string | null;
+  linhaIds: string[];
+  etapaDe: EtapaPedido | null;
+  etapaPara: EtapaPedido | null;
+  documentoSei: string | null;
+  motivo: string | null;
+  explicacao: string | null;
+  data: string;
+  criadoPorNome: string | null;
+  criadoEm: string;
 }
 
 /** Etapa dos documentos SEI do pedido (migration 177): AUTORIZACAO é a solicitação de empenho, que a DGFNSP assina. */
@@ -550,7 +602,8 @@ export interface AnulacaoPedido {
    */
   destino: 'INTERLOCUCAO' | 'CANCELAR';
   novoPedidoId: string | null;
-  novoPedidoNumero: number | null;
+  /** O pedido novo no meio da frase ("pedido 1/2026", "pedido reservado em ..."): o sequencial do banco não aparece. */
+  novoPedidoNome: string | null;
   notas: string[];
   linhas: Array<{ linhaId: string; novaLinhaId: string | null; itemKey: string | null; kitNome: string | null; quantidade: number }>;
   documentoSei: string;
@@ -561,7 +614,11 @@ export interface AnulacaoPedido {
 
 export interface PedidoEmenda {
   id: string;
+  /** Sequencial do banco: controle interno, não aparece nas telas (use nomeDoPedido). */
   numero: number;
+  /** Número nas telas: ordem no parlamentar dentro do ano da emenda (1/2026, migration 217). Nulo até a emenda ser informada. */
+  numeroNoAno?: number | null;
+  anoDoNumero?: number | null;
   /** Vazio = reserva para um órgão (o beneficiário final), com o parlamentar a definir (migration 163). */
   autorId: string | null;
   etapa: EtapaPedido;
@@ -588,8 +645,18 @@ export interface PedidoEmenda {
   siopEmenda: string | null;
   /** Ano da emenda: o número se repete entre anos (migration 186). */
   siopEmendaAno: number | null;
+  /** Valor visto na conferência (histórico, migration 232). O valor da emenda que vale está em EmendaSiop. */
   siopValor: number | null;
   siopGnd: string | null;
+  /** Valor pedido no ofício do parlamentar (com retificador, o do retificador). Nulo = a informar (migration 232). */
+  oficioValor?: number | null;
+  /** Documento SEI do ofício (ou do retificador) que deu o valor. */
+  oficioValorDocumentoSei?: string | null;
+  oficioValorRetificador?: boolean;
+  /** Preço unitário de cada item (item_key → R$) no quadro da minuta registrada (migration 234); nulo antes disso. */
+  minutaPrecos?: Record<string, number> | null;
+  /** Último dia para o ofício chegar, gravado com a minuta (migration 246); nulo sem minuta registrada. */
+  minutaValidaAte?: string | null;
   conferidoEm: string | null;
   /** Solicitação de empenho (CAEP → DGFNSP). */
   solicitadoEm: string | null;
@@ -607,6 +674,10 @@ export interface PedidoEmenda {
   contratacaoEm: string | null;
   /** Documentos SEI do despacho para contratação: um por nota. */
   contratacaoDocumentosSei: string[];
+  /** O empenho foi registrado pelo sistema, pela nota emitida (migration 230). */
+  empenhadoPelaFonte?: boolean;
+  /** Chegou à contratação pelo contrato no Contratos.gov.br, sem o envio à CCGA registrado (migration 230). */
+  contratacaoPelaFonte?: boolean;
   canceladoEm: string | null;
   canceladoMotivo: string | null;
   versao: number;
@@ -619,13 +690,43 @@ export interface PedidoEmenda {
   documentos: DocumentoSeiDoPedido[];
   /** Pedido de onde vieram os itens, quando este foi aberto por uma anulação parcial de empenho (migration 203). */
   pedidoOrigemId: string | null;
-  pedidoOrigemNumero: number | null;
+  /** O pedido de origem no meio da frase ("pedido 1/2026", "pedido reservado em ..."). */
+  pedidoOrigemNome: string | null;
   /** Anulações de empenho registradas neste pedido, da mais antiga à mais nova (migration 203). */
   anulacoes: AnulacaoPedido[];
   /** Emenda registrada de onde o pedido nasceu, ou a do nº conferido no SIOP (migration 205). */
   emendaId: string | null;
   /** Outras emendas do pedido, além da conferida (migration 211): a sobra de uma emenda antiga que completou o pedido. */
   outrasEmendas: OutraEmendaDoPedido[];
+  /** Trocas da emenda na conferência com o SIOP, com o motivo (migration 243), da mais antiga à mais nova. */
+  trocasDeEmenda?: TrocaDeEmenda[];
+  /** Envios à CCGA, devoluções e etapas voltadas (migration 248), do mais antigo ao mais novo. */
+  movimentos?: MovimentoDoPedido[];
+  /** Informação e Ordem de Fornecimento de cada contrato do pedido (migration 250). */
+  ordens?: OrdemDoContrato[];
+}
+
+export interface TrocaDeEmenda {
+  deNumero: string;
+  deAno: number;
+  paraNumero: string;
+  paraAno: number;
+  motivo: string;
+  criadoPorNome: string | null;
+  criadoEm: string;
+}
+
+/**
+ * Informação da ComprasSUSP para a Ordem de Fornecimento e a Ordem emitida pela SFC, por pedido e contrato
+ * (migration 250). Uma Informação por contrato, que pode valer para vários pedidos do mesmo contrato.
+ */
+export interface OrdemDoContrato {
+  id: string;
+  contractKey: string;
+  informacaoEm: string | null;
+  informacaoDocumentoSei: string | null;
+  ordemEm: string | null;
+  ordemDocumentoSei: string | null;
 }
 
 export interface OutraEmendaDoPedido {
@@ -640,7 +741,7 @@ export interface OutraEmendaDoPedido {
 }
 
 export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
-  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes, anulacoes, outras] = await Promise.all([
+  const [pedidos, linhas, devolucoes, documentos, solicitacaoLinhas, cgofiSolicitacoes, anulacoes, outras, trocas, movimentos, ordens] = await Promise.all([
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedidos').select('*').order('numero').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_linhas').select('*').order('id').range(de, ate)),
     lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_devolucoes').select('*').order('id').range(de, ate)),
@@ -659,9 +760,81 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       db().from('emenda_pedido_anulacoes').select('*').order('id').range(de, ate)
     ).catch(() => []),
     // Outras emendas dos pedidos (migration 211). Antes da migration a tabela não existe: segue sem ela.
-    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_emendas').select('*').order('id').range(de, ate)).catch(() => [])
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_emendas').select('*').order('id').range(de, ate)).catch(() => []),
+    // Trocas da emenda na conferência (migration 243). Antes da migration a tabela não existe: segue sem ela.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('emenda_pedido_trocas_emenda').select('*').order('id').range(de, ate)).catch(() => []),
+    // Vai e volta com a CCGA (migration 248). Antes da migration a tabela não existe: segue sem ela.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+      db().from('emenda_pedido_movimentos').select('id, pedido_id, acao, ata_key, linha_ids, etapa_de, etapa_para, documento_sei, motivo, explicacao, data, criado_por_nome, criado_em').order('id').range(de, ate)
+    ).catch(() => []),
+    // Informação e Ordem de Fornecimento por contrato (migration 250). Antes da migration a tabela não existe: segue sem ela.
+    lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+      db().from('emenda_pedido_ordens').select('id, pedido_id, contract_key, informacao_em, informacao_documento_sei, ordem_em, ordem_documento_sei').order('id').range(de, ate)
+    ).catch(() => [])
   ]);
-  const numeroPorId = new Map(pedidos.map((p) => [p.id as string, p.numero as number]));
+  const ordensPorPedido = new Map<string, OrdemDoContrato[]>();
+  for (const o of ordens) {
+    const ordem: OrdemDoContrato = {
+      id: o.id,
+      contractKey: o.contract_key,
+      informacaoEm: o.informacao_em ?? null,
+      informacaoDocumentoSei: o.informacao_documento_sei ?? null,
+      ordemEm: o.ordem_em ?? null,
+      ordemDocumentoSei: o.ordem_documento_sei ?? null
+    };
+    ordensPorPedido.set(o.pedido_id, [...(ordensPorPedido.get(o.pedido_id) ?? []), ordem]);
+  }
+  const movimentosPorPedido = new Map<string, MovimentoDoPedido[]>();
+  for (const m of movimentos) {
+    const movimento: MovimentoDoPedido = {
+      id: m.id,
+      acao: m.acao,
+      ataKey: m.ata_key ?? null,
+      linhaIds: Array.isArray(m.linha_ids) ? m.linha_ids : [],
+      etapaDe: m.etapa_de ?? null,
+      etapaPara: m.etapa_para ?? null,
+      documentoSei: m.documento_sei ?? null,
+      motivo: m.motivo ?? null,
+      explicacao: m.explicacao ?? null,
+      data: m.data,
+      criadoPorNome: m.criado_por_nome ?? null,
+      criadoEm: m.criado_em
+    };
+    movimentosPorPedido.set(m.pedido_id, [...(movimentosPorPedido.get(m.pedido_id) ?? []), movimento]);
+  }
+  const trocasPorPedido = new Map<string, TrocaDeEmenda[]>();
+  for (const t of trocas) {
+    const troca: TrocaDeEmenda = {
+      deNumero: t.de_numero,
+      deAno: num(t.de_ano),
+      paraNumero: t.para_numero,
+      paraAno: num(t.para_ano),
+      motivo: t.motivo,
+      criadoPorNome: t.criado_por_nome ?? null,
+      criadoEm: t.criado_em
+    };
+    trocasPorPedido.set(t.pedido_id, [...(trocasPorPedido.get(t.pedido_id) ?? []), troca]);
+  }
+  // O pedido de origem e o pedido novo da anulação aparecem pelo nome (o sequencial do banco não vai para a tela).
+  const identidade = (p: Record<string, any>) => ({
+    numeroNoAno: p.numero_no_ano ?? null,
+    anoDoNumero: p.ano_do_numero ?? null,
+    siopEmenda: p.siop_emenda ?? null,
+    reservadoEm: p.reservado_em,
+    origem: p.origem
+  });
+  const emTextoPorId = new Map(pedidos.map((p) => [p.id as string, pedidoEmTexto(identidade(p))]));
+  // Textos que o banco grava com o sequencial (anulação: "voltou à interlocução no pedido 418", "Itens do pedido 418..."):
+  // na leitura, o número vira o nome do pedido.
+  const emTextoPorNumero = new Map(pedidos.map((p) => [Number(p.numero), pedidoEmTexto(identidade(p))]));
+  const semNumeroInterno = (texto: string | null): string | null =>
+    texto
+      ? texto.replace(/\b([Pp])edido (\d+)\b/g, (todo, inicial: string, n: string) => {
+          const emTexto = emTextoPorNumero.get(Number(n));
+          if (!emTexto) return todo;
+          return inicial === 'P' ? emTexto.charAt(0).toUpperCase() + emTexto.slice(1) : emTexto;
+        })
+      : texto;
   const anulacoesPorPedido = new Map<string, AnulacaoPedido[]>();
   for (const a of anulacoes) {
     const lista = anulacoesPorPedido.get(a.pedido_id) ?? [];
@@ -670,7 +843,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       total: Boolean(a.total),
       destino: a.destino === 'CANCELAR' ? 'CANCELAR' : 'INTERLOCUCAO',
       novoPedidoId: a.novo_pedido_id ?? null,
-      novoPedidoNumero: a.novo_pedido_id ? numeroPorId.get(a.novo_pedido_id) ?? null : null,
+      novoPedidoNome: a.novo_pedido_id ? emTextoPorId.get(a.novo_pedido_id) ?? null : null,
       notas: Array.isArray(a.notas) ? a.notas : [],
       linhas: (Array.isArray(a.linhas) ? a.linhas : []).map((l: any) => ({
         linhaId: l.linha_id,
@@ -681,7 +854,7 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       })),
       documentoSei: a.documento_sei,
       anuladoEm: a.anulado_em,
-      motivo: a.motivo,
+      motivo: semNumeroInterno(a.motivo) ?? a.motivo,
       criadoPorNome: a.criado_por_nome ?? null
     });
     anulacoesPorPedido.set(a.pedido_id, lista);
@@ -764,10 +937,17 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       beneficiarioId: l.beneficiario_id ?? null,
       beneficiarioNome: l.beneficiario_nome ?? null,
       cancelada: Boolean(l.cancelada),
-      canceladaMotivo: l.cancelada_motivo ?? null,
+      canceladaMotivo: semNumeroInterno(l.cancelada_motivo ?? null),
       empenhoDocumentoSei: l.empenho_documento_sei ?? null,
       contratoNumero: l.contrato_numero ?? null,
-      despachoDocumentoSei: l.despacho_documento_sei ?? null
+      despachoDocumentoSei: l.despacho_documento_sei ?? null,
+      // Sem a coluna (antes da migration 248), fica indefinido: as telas seguem a etapa do pedido, como antes.
+      ccgaSituacao: !('ccga_situacao' in l) ? undefined : l.ccga_situacao === 'ENVIADA' || l.ccga_situacao === 'DEVOLVIDA' ? l.ccga_situacao : null,
+      ccgaEm: l.ccga_em ?? null,
+      ccgaMotivo: l.ccga_motivo ?? null,
+      ccgaExplicacao: l.ccga_explicacao ?? null,
+      ccgaPorNome: l.ccga_por_nome ?? null,
+      complementar: l.complementar === true
     });
     porPedido.set(l.pedido_id, lista);
   }
@@ -775,10 +955,12 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
     .map((p) => ({
       id: p.id,
       numero: p.numero,
+      numeroNoAno: p.numero_no_ano ?? null,
+      anoDoNumero: p.ano_do_numero ?? null,
       autorId: p.autor_id ?? null,
       etapa: p.etapa,
       origem: p.origem,
-      observacao: p.observacao ?? null,
+      observacao: semNumeroInterno(p.observacao ?? null),
       contatoNome: p.contato_nome ?? null,
       contatoTelefone: p.contato_telefone ?? null,
       contatoEmail: p.contato_email ?? null,
@@ -795,6 +977,11 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       siopEmendaAno: p.siop_emenda_ano ?? null,
       siopValor: p.siop_valor == null ? null : num(p.siop_valor),
       siopGnd: p.siop_gnd ?? null,
+      oficioValor: p.oficio_valor == null ? null : num(p.oficio_valor),
+      oficioValorDocumentoSei: p.oficio_valor_documento_sei ?? null,
+      oficioValorRetificador: p.oficio_valor_retificador === true,
+      minutaPrecos: p.minuta_precos && typeof p.minuta_precos === 'object' ? (p.minuta_precos as Record<string, number>) : null,
+      minutaValidaAte: p.minuta_valida_ate ?? null,
       conferidoEm: p.conferido_em ?? null,
       solicitadoEm: p.solicitado_em ?? null,
       solicitadoDocumentoSei: p.solicitado_documento_sei ?? null,
@@ -806,6 +993,8 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       empenhadoDocumentosSei: Array.isArray(p.empenhado_documentos_sei) ? p.empenhado_documentos_sei : [],
       contratacaoEm: p.contratacao_em ?? null,
       contratacaoDocumentosSei: Array.isArray(p.contratacao_documentos_sei) ? p.contratacao_documentos_sei : [],
+      empenhadoPelaFonte: Boolean(p.empenhado_pela_fonte),
+      contratacaoPelaFonte: Boolean(p.contratacao_pela_fonte),
       canceladoEm: p.cancelado_em ?? null,
       canceladoMotivo: p.cancelado_motivo ?? null,
       versao: p.versao,
@@ -815,10 +1004,13 @@ export async function fetchPedidosEmendas(): Promise<PedidoEmenda[]> {
       devolucoes: (devolucoesPorPedido.get(p.id) ?? []).sort((a, b) => a.rodada - b.rodada),
       documentos: (documentosPorPedido.get(p.id) ?? []).sort((a, b) => (a.data ?? '').localeCompare(b.data ?? '') || a.numero.localeCompare(b.numero)),
       pedidoOrigemId: p.pedido_origem_id ?? null,
-      pedidoOrigemNumero: p.pedido_origem_id ? numeroPorId.get(p.pedido_origem_id) ?? null : null,
+      pedidoOrigemNome: p.pedido_origem_id ? emTextoPorId.get(p.pedido_origem_id) ?? null : null,
       anulacoes: (anulacoesPorPedido.get(p.id) ?? []).sort((a, b) => a.anuladoEm.localeCompare(b.anuladoEm)),
       emendaId: p.emenda_id ?? null,
-      outrasEmendas: (outrasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))
+      outrasEmendas: (outrasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)),
+      trocasDeEmenda: (trocasPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)),
+      movimentos: (movimentosPorPedido.get(p.id) ?? []).sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)),
+      ordens: (ordensPorPedido.get(p.id) ?? []).sort((a, b) => a.contractKey.localeCompare(b.contractKey))
     }))
     .sort((a, b) => b.numero - a.numero);
 }
@@ -844,8 +1036,10 @@ export async function salvarPedidoEmenda(p: {
   contatoTelefone: string | null;
   contatoEmail: string | null;
   motivo?: string | null;
-  /** Só no pedido novo: a emenda registrada de onde ele nasce (migration 205). */
+  /** A emenda registrada do pedido: obrigatória no pedido novo e no antigo que ainda não tem (migration 243). */
   emendaId?: string | null;
+  /** Emenda ainda não registrada, pelo nº e ano (o valor e o GND podem ficar para a conferência): registrada junto. */
+  emendaNova?: { numero: string; ano: number; valor: number | null; gnd: Gnd | null } | null;
   linhas: LinhaParaSalvar[];
   /** Pedido novo com a sobra de uma emenda do mesmo parlamentar (migration 204): nasce com o número e o ano dela. */
   emendaDaSobra?: { numero: string; ano: number } | null;
@@ -862,6 +1056,7 @@ export async function salvarPedidoEmenda(p: {
       contato_email: p.contatoEmail,
       motivo: p.motivo ?? null,
       emenda_id: p.emendaId ?? null,
+      emenda_nova: p.emendaNova ?? null,
       emenda_da_sobra: p.emendaDaSobra ?? null,
       linhas: p.linhas.map((l) => ({ id: l.id ?? null, tipo: l.tipo, item_key: l.itemKey ?? null, kit_id: l.kitId ?? null, quantidade: l.quantidade, beneficiario_id: l.beneficiarioId }))
     }
@@ -874,6 +1069,32 @@ export type AcaoPedido = 'MINUTA' | 'OFICIO' | 'DIVERGENCIA' | 'CONFERIDO' | 'SO
 
 export async function avancarPedidoEmenda(id: string, versao: number, acao: AcaoPedido, dados: Record<string, unknown>): Promise<{ id: string; versao: number }> {
   const { data, error } = await db().rpc('avancar_pedido_emenda', { p_id: id, p_versao: versao, p_acao: acao, p_dados: dados });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/**
+ * Conferência do ofício (migration 234): ajusta as linhas do pedido ao ofício (null = sem ajuste; a linha que fica de
+ * fora é tirada com o motivo) e registra CONFERIDO ou DIVERGENCIA (nova minuta), numa transação só.
+ */
+export async function conferirOficioPedido(v: {
+  id: string;
+  versao: number;
+  acao: 'CONFERIDO' | 'DIVERGENCIA';
+  dados: Record<string, unknown>;
+  linhas: LinhaParaSalvar[] | null;
+  motivo: string | null;
+}): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('conferir_oficio_pedido', {
+    p_id: v.id,
+    p_versao: v.versao,
+    p_acao: v.acao,
+    p_dados: v.dados,
+    p_linhas: v.linhas
+      ? v.linhas.map((l) => ({ id: l.id ?? null, tipo: l.tipo, item_key: l.itemKey ?? null, kit_id: l.kitId ?? null, quantidade: l.quantidade, beneficiario_id: l.beneficiarioId }))
+      : null,
+    p_motivo: v.motivo
+  });
   if (error) throw new Error(mensagemDoBanco(error));
   return data as { id: string; versao: number };
 }
@@ -917,6 +1138,32 @@ export async function registrarEnvioCgofi(v: { pedidoId: string; documentoSei: s
   if (error) throw new Error(mensagemDoBanco(error));
 }
 
+/** Um par pedido × contrato da Informação ou da Ordem de Fornecimento (migration 250). */
+export interface AlvoDaOrdem {
+  pedidoId: string;
+  contractKey: string;
+}
+
+/** A Informação da ComprasSUSP para a Ordem de Fornecimento (migration 250): um SEI para um ou mais pedidos × contratos. */
+export async function registrarInformacaoOrdem(v: { alvos: AlvoDaOrdem[]; data: string; documentoSei: string }): Promise<void> {
+  const { error } = await db().rpc('registrar_informacao_ordem', {
+    p_alvos: v.alvos.map((a) => ({ pedido_id: a.pedidoId, contract_key: a.contractKey })),
+    p_data: v.data,
+    p_documento_sei: v.documentoSei
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
+
+/** A Ordem de Fornecimento emitida pela SFC (migration 250), ou a correção dela. */
+export async function registrarOrdemDoContrato(v: { alvos: AlvoDaOrdem[]; data: string; documentoSei: string }): Promise<void> {
+  const { error } = await db().rpc('registrar_ordem_fornecimento_contrato', {
+    p_alvos: v.alvos.map((a) => ({ pedido_id: a.pedidoId, contract_key: a.contractKey })),
+    p_data: v.data,
+    p_documento_sei: v.documentoSei
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+}
+
 /**
  * Anulação de empenho (migration 203): as linhas marcadas voltam à interlocução. Se são todas as linhas ativas, o pedido
  * volta a "Itens reservados"; senão, vão para um pedido novo ligado a este. Com destino CANCELAR (migration 208), as
@@ -939,6 +1186,84 @@ export async function registrarAnulacaoEmpenho(v: {
   if (error) throw new Error(mensagemDoBanco(error));
   const r = data as Record<string, any>;
   return { id: r.id, versao: r.versao, total: Boolean(r.total), novoPedidoId: r.novo_pedido_id ?? null, novoNumero: r.novo_numero ?? null };
+}
+
+/** Envio à CCGA por ata (migration 248): cada ata vai ao seu gestor, com o despacho SEI dela. */
+export async function enviarPedidoCcga(v: { id: string; versao: number; data: string; envios: Array<{ ataKey: string; documentoSei: string }> }): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('enviar_pedido_ccga', {
+    p_id: v.id,
+    p_versao: v.versao,
+    p_dados: { data: v.data, envios: v.envios.map((e) => ({ ata_key: e.ataKey, documento_sei: e.documentoSei })) }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/** O gestor da ata (ou o coordenador) devolve itens à CAEP, com motivo e explicação (migration 248). */
+export async function devolverItensCcga(v: { pedidoId: string; linhas: string[]; motivo: string; explicacao: string }): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('devolver_itens_ccga', { p_pedido_id: v.pedidoId, p_linha_ids: v.linhas, p_motivo: v.motivo, p_explicacao: v.explicacao });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/** A CAEP tira itens da CCGA sem esperar o gestor da ata, ou encerra uma devolução (migration 248). */
+export async function desfazerEnvioCcga(v: { id: string; versao: number; linhas: string[]; motivo: string }): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('desfazer_envio_ccga', { p_id: v.id, p_versao: v.versao, p_linha_ids: v.linhas, p_motivo: v.motivo });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/** Desfaz o último passo do pedido, até o envio à CGOFI (migration 248). */
+export async function voltarEtapaPedido(v: { id: string; versao: number; motivo: string }): Promise<{ id: string; versao: number; etapa: EtapaPedido }> {
+  const { data, error } = await db().rpc('voltar_etapa_pedido', { p_id: v.id, p_versao: v.versao, p_motivo: v.motivo });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number; etapa: EtapaPedido };
+}
+
+/** Uma linha do que o gestor da ata tem a contratar pelas emendas, ou um envio que a CAEP desfez (migration 248). */
+export interface EmendaAContratar {
+  tipo: 'A_CONTRATAR' | 'DESFEITO';
+  pedidoId: string;
+  pedidoNome: string;
+  autorNome: string | null;
+  autorUf: string | null;
+  /** "NÚMERO-UASG", como nas telas de Emendas. */
+  ataKey: string;
+  gestorUserId: string | null;
+  gestorNome: string | null;
+  linhaId: string | null;
+  itemKey: string | null;
+  quantidade: number;
+  nota: string | null;
+  documentoSei: string | null;
+  data: string | null;
+  /** No envio desfeito: o motivo da CAEP. */
+  motivo: string | null;
+  porNome: string | null;
+}
+
+/** O que o gestor vê no Início (o coordenador recebe todas as atas; a tela escolhe). */
+export async function fetchEmendasAContratar(): Promise<EmendaAContratar[]> {
+  const { data, error } = await db().rpc('emendas_a_contratar');
+  if (error) throw new Error(mensagemDoBanco(error));
+  return ((data ?? []) as Record<string, any>[]).map((r) => ({
+    tipo: r.tipo === 'DESFEITO' ? 'DESFEITO' : 'A_CONTRATAR',
+    pedidoId: r.pedido_id,
+    pedidoNome: nomeDoPedido({ numeroNoAno: r.numero_no_ano ?? null, anoDoNumero: r.ano_do_numero ?? null, siopEmenda: r.siop_emenda ?? null, reservadoEm: r.reservado_em, origem: r.origem }),
+    autorNome: r.autor_nome ?? null,
+    autorUf: r.autor_uf ?? null,
+    ataKey: r.ata_key,
+    gestorUserId: r.gestor_user_id ?? null,
+    gestorNome: r.gestor_nome ?? null,
+    linhaId: r.linha_id ?? null,
+    itemKey: r.item_key ?? null,
+    quantidade: num(r.quantidade),
+    nota: r.nota ?? null,
+    documentoSei: r.documento_sei ?? null,
+    data: r.data ?? null,
+    motivo: r.motivo ?? null,
+    porNome: r.por_nome ?? null
+  }));
 }
 
 export async function cancelarPedidoEmenda(id: string, versao: number, motivo: string): Promise<{ id: string; versao: number }> {
@@ -1010,6 +1335,13 @@ export async function fetchDadosDaAtaParaAutorizacao(ataKey: string): Promise<Da
 }
 
 /** Reservado a parlamentares por item (pedidos não cancelados, kits abertos). */
+/** Reservado a parlamentares de um item (emendas_reservado_do_item, migration 157): o mínimo da CAEP na alocação. */
+export async function fetchReservadoDoItem(itemKey: string): Promise<number> {
+  const { data, error } = await db().rpc('emendas_reservado_do_item', { p_item_key: itemKey });
+  if (error) throw new Error(error.message);
+  return num(data);
+}
+
 export async function fetchReservadoPorItem(): Promise<Map<string, number>> {
   const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => db().from('v_emendas_reservado_por_item').select('item_key, reservado').order('item_key').range(de, ate));
   return new Map(linhas.map((r) => [r.item_key as string, num(r.reservado)]));
@@ -1021,7 +1353,7 @@ export async function fetchReservadoPorItem(): Promise<Map<string, number>> {
  */
 export type RegraDaNota = 'SEI' | 'CONTRATO' | 'ITEM' | 'FORNECEDOR' | 'AUTOR';
 /** Por que a linha empenhada ainda não tem nota. */
-export type MotivoSemNota = 'SEM_CONTRATO' | 'CONTRATO_FORA' | 'CONTRATO_SEM_NOTA' | 'OUTRAS_EMENDAS' | 'VARIAS' | 'SEM_EMENDA';
+export type MotivoSemNota = 'SEM_CONTRATO' | 'CONTRATO_FORA' | 'CONTRATO_SEM_NOTA' | 'OUTRAS_EMENDAS' | 'VARIAS' | 'SEM_EMENDA' | 'FORA_DA_NOTA' | 'COMPLEMENTAR';
 
 export interface NotaDaLinha {
   linhaId: string;
@@ -1037,6 +1369,13 @@ export interface NotaDaLinha {
   entregaPrevistaValor: number | null;
   /** Data de emissão da nota ligada (migration 189). */
   emitidaEm: string | null;
+  /** Data de assinatura do contrato da nota, do Contratos.gov.br (migration 230). */
+  contratoAssinadoEm?: string | null;
+  /** Faturas do Contratos.gov.br que citam a nota, a primeira emissão, a última liquidação e a última ordem bancária (migration 231). */
+  faturas?: number;
+  faturadoEm?: string | null;
+  liquidadoEm?: string | null;
+  pagoEm?: string | null;
   atualizadoEm: string | null;
 }
 
@@ -1064,6 +1403,11 @@ export async function fetchNotasDasLinhas(): Promise<Map<string, NotaDaLinha>> {
         entregaPrevista: r.entrega_prevista ?? null,
         entregaPrevistaValor: numOuNulo(r.entrega_prevista_valor),
         emitidaEm: r.emitida_em ?? null,
+        contratoAssinadoEm: r.contrato_assinado_em ?? null,
+        faturas: num(r.faturas ?? 0),
+        faturadoEm: r.faturado_em ?? null,
+        liquidadoEm: r.liquidado_em ?? null,
+        pagoEm: r.pago_em ?? null,
         atualizadoEm: r.atualizado_em ?? null
       }
     ])
@@ -1265,8 +1609,9 @@ export interface EmendaSiop {
   /** 8 dígitos: os 4 do autor e os 4 da emenda. */
   numero: string;
   autorId: string;
-  valor: number;
-  gnd: Gnd;
+  /** Nulo: registrada na reserva pelo nº e ano, valor a ler no SIOP (migration 243). */
+  valor: number | null;
+  gnd: Gnd | null;
   beneficiarioId: string | null;
   objeto: string | null;
   /** Dia em que a CAEP viu a emenda no SIOP: o aviso conta daqui. */
@@ -1274,6 +1619,24 @@ export interface EmendaSiop {
   observacao: string | null;
   versao: number;
   criadoPorNome: string | null;
+  /** Migration 239 (bancadas, D6): bloqueios da linha de compra direta no SIOP, só informação. */
+  bloqueadoControle?: number | null;
+  bloqueadoProgramacao?: number | null;
+  /** Outras linhas da emenda no SIOP, fora da compra direta (21BM, modalidade 90): não entram no valor. */
+  foraCompraDireta?: LinhaForaDaCompraDireta[] | null;
+  /** Dia da leitura no SIOP que deu esses números. */
+  siopLidoEm?: string | null;
+  /** CAEP: registrada à mão ou pela conferência; PAINEL: registrada pelo servidor a partir do painel do SIOP (migration 252). */
+  origem?: OrigemDaEmenda;
+}
+
+export type OrigemDaEmenda = 'CAEP' | 'PAINEL';
+
+export interface LinhaForaDaCompraDireta {
+  acao: string;
+  modalidade: string;
+  autorizado: number;
+  empenhado: number;
 }
 
 export type MeioDoContato = 'TELEFONE' | 'WHATSAPP' | 'EMAIL' | 'REUNIAO';
@@ -1311,15 +1674,124 @@ export async function fetchEmendasSiop(): Promise<EmendaSiop[]> {
     ano: num(e.ano),
     numero: e.numero,
     autorId: e.autor_id,
-    valor: num(e.valor),
-    gnd: e.gnd,
+    valor: e.valor == null ? null : num(e.valor),
+    gnd: e.gnd ?? null,
     beneficiarioId: e.beneficiario_id ?? null,
     objeto: e.objeto ?? null,
     vistaEm: e.vista_em,
     observacao: e.observacao ?? null,
     versao: e.versao,
-    criadoPorNome: e.criado_por_nome ?? null
+    criadoPorNome: e.criado_por_nome ?? null,
+    bloqueadoControle: e.bloqueado_controle != null ? num(e.bloqueado_controle) : null,
+    bloqueadoProgramacao: e.bloqueado_programacao != null ? num(e.bloqueado_programacao) : null,
+    foraCompraDireta: Array.isArray(e.fora_compra_direta)
+      ? e.fora_compra_direta.map((l: Record<string, any>) => ({ acao: String(l.acao ?? ''), modalidade: String(l.modalidade ?? ''), autorizado: num(l.autorizado), empenhado: num(l.empenhado) }))
+      : null,
+    siopLidoEm: e.siop_lido_em ?? null,
+    origem: e.origem === 'PAINEL' ? 'PAINEL' : 'CAEP'
   }));
+}
+
+/** Emenda de compra direta do painel do SIOP que o servidor não registrou por não achar o parlamentar (migration 252). */
+export interface EmendaPainelSemParlamentar {
+  ano: number;
+  /** 8 dígitos: os 4 do autor e os 4 da emenda. */
+  numero: string;
+  /** Nome do autor como está no painel. */
+  autor: string | null;
+  tipoAutor: string | null;
+  uf: string | null;
+  /** Soma da compra direta (21BM, modalidade 90). */
+  valor: number | null;
+  gnd: Gnd | null;
+  foraCompraDireta: LinhaForaDaCompraDireta[];
+  baseSiafiEm: string | null;
+}
+
+export async function fetchEmendasPainelSemParlamentar(): Promise<EmendaPainelSemParlamentar[]> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) =>
+    db().from('v_emendas_painel_sem_parlamentar').select('*').order('ano', { ascending: false }).order('numero').range(de, ate)
+  );
+  return linhas.map((e) => ({
+    ano: num(e.ano),
+    numero: String(e.numero),
+    autor: e.autor ?? null,
+    tipoAutor: e.tipo_autor ?? null,
+    uf: e.uf ?? null,
+    valor: numOuNulo(e.valor),
+    gnd: e.gnd === 'GND-3' || e.gnd === 'GND-4' ? e.gnd : null,
+    foraCompraDireta: Array.isArray(e.fora_compra_direta)
+      ? e.fora_compra_direta.map((l: Record<string, any>) => ({ acao: String(l.acao ?? ''), modalidade: String(l.modalidade ?? ''), autorizado: num(l.autorizado), empenhado: num(l.empenhado) }))
+      : [],
+    baseSiafiEm: e.base_siafi_em ?? null
+  }));
+}
+
+/** Linha da emenda no Painel do Orçamento Federal do SIOP (migration 252): a emenda numa combinação dos agrupadores. */
+export interface LinhaPainelSiop {
+  /** Ano + 8 dígitos, como emenda_execucao_portal.codigo. */
+  codigo: string;
+  ano: number;
+  emenda: string;
+  autor: string | null;
+  orgao: string | null;
+  unidadeOrcamentaria: string | null;
+  acao: string | null;
+  localizador: string | null;
+  gnd: string | null;
+  modalidade: string | null;
+  naturezaDespesa: string | null;
+  dotacaoInicial: number | null;
+  dotacaoAtual: number | null;
+  empenhado: number | null;
+  liquidado: number | null;
+  pago: number | null;
+  /** Dia da base SIAFI do painel. */
+  baseSiafiEm: string | null;
+  lidoEm: string;
+}
+
+const COLUNAS_PAINEL_SIOP =
+  'codigo,ano,emenda,autor,orgao,unidade_orcamentaria,acao,localizador,gnd,modalidade,natureza_despesa,dotacao_inicial,dotacao_atual,empenhado,liquidado,pago,base_siafi_em,lido_em';
+
+function linhaPainelSiop(l: Record<string, any>): LinhaPainelSiop {
+  return {
+    codigo: String(l.codigo),
+    ano: num(l.ano),
+    emenda: String(l.emenda),
+    autor: l.autor ?? null,
+    orgao: l.orgao ?? null,
+    unidadeOrcamentaria: l.unidade_orcamentaria ?? null,
+    acao: l.acao ?? null,
+    localizador: l.localizador ?? null,
+    gnd: l.gnd ?? null,
+    modalidade: l.modalidade ?? null,
+    naturezaDespesa: l.natureza_despesa ?? null,
+    dotacaoInicial: numOuNulo(l.dotacao_inicial),
+    dotacaoAtual: numOuNulo(l.dotacao_atual),
+    empenhado: numOuNulo(l.empenhado),
+    liquidado: numOuNulo(l.liquidado),
+    pago: numOuNulo(l.pago),
+    baseSiafiEm: l.base_siafi_em ?? null,
+    lidoEm: l.lido_em
+  };
+}
+
+/**
+ * Linhas de uma emenda no painel do SIOP (o painel inteiro, de todos os órgãos, é grande demais para ler de uma vez
+ * no navegador; cada tela pede só a emenda que mostra).
+ */
+export async function fetchEmendaNoPainelSiop(codigo: string): Promise<LinhaPainelSiop[]> {
+  const { data, error } = await db()
+    .from('siop_painel_emendas')
+    .select(COLUNAS_PAINEL_SIOP)
+    .eq('codigo', codigo)
+    .order('acao')
+    .order('modalidade')
+    .order('gnd')
+    .limit(1000);
+  if (error) throw error;
+  return ((data ?? []) as Record<string, any>[]).map(linhaPainelSiop);
 }
 
 export async function fetchContatosDasEmendas(): Promise<ContatoDaEmenda[]> {
@@ -1360,8 +1832,9 @@ export interface EmendaParaSalvar {
   numero: string;
   ano: number | null;
   autorId: string;
-  valor: number;
-  gnd: Gnd;
+  /** Opcional (migration 243): a CAEP confirma na conferência com o SIOP. */
+  valor: number | null;
+  gnd: Gnd | null;
   beneficiarioId: string | null;
   objeto: string | null;
   vistaEm: string;
@@ -1386,6 +1859,57 @@ export async function salvarEmendaSiop(e: EmendaParaSalvar): Promise<{ id: strin
   });
   if (error) throw new Error(mensagemDoBanco(error));
   return data as { id: string; versao: number };
+}
+
+/** Valor do ofício depois da conferência: o que estava a informar, ou o retificador que mudou o valor (migration 232). */
+export async function salvarValorOficioPedido(id: string, versao: number, v: { valor: number; documentoSei: string; retificador: boolean }): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('salvar_valor_oficio_pedido', {
+    p_id: id,
+    p_versao: versao,
+    p: { valor: v.valor, documento_sei: v.documentoSei, retificador: v.retificador }
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/**
+ * Ofício retificador antes do empenho (migration 249): ajusta as linhas (null = sem ajuste), grava a soma dos itens que a
+ * CAEP conferiu como valor do ofício e guarda o ofício anterior no histórico do pedido.
+ */
+export async function registrarOficioRetificador(v: {
+  id: string;
+  versao: number;
+  documentoSei: string;
+  data: string;
+  valorOficio: number;
+  ajustes: string[];
+  linhas: LinhaParaSalvar[] | null;
+  /** Depois do empenho (migration 251): os itens novos, complementares; os empenhados não mudam. */
+  acrescimos?: Array<{ itemKey: string; quantidade: number; beneficiarioId: string }>;
+}): Promise<{ id: string; versao: number }> {
+  const { data, error } = await db().rpc('registrar_oficio_retificador', {
+    p_id: v.id,
+    p_versao: v.versao,
+    p_dados: {
+      documento_sei: v.documentoSei,
+      data: v.data,
+      valor_oficio: v.valorOficio,
+      ajustes: v.ajustes,
+      ...(v.acrescimos ? { acrescimos: v.acrescimos.map((a) => ({ tipo: 'ITEM', item_key: a.itemKey, quantidade: a.quantidade, beneficiario_id: a.beneficiarioId })) } : {})
+    },
+    p_linhas: v.linhas
+      ? v.linhas.map((l) => ({ id: l.id ?? null, tipo: l.tipo, item_key: l.itemKey ?? null, kit_id: l.kitId ?? null, quantidade: l.quantidade, beneficiario_id: l.beneficiarioId }))
+      : null
+  });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { id: string; versao: number };
+}
+
+/** Reserva do parlamentar, ainda sem o nº da emenda, ligada à emenda registrada (migration 242): fica como o pedido criado a partir dela. */
+export async function ligarReservaAEmenda(pedidoId: string, versao: number, emendaId: string): Promise<{ versao: number }> {
+  const { data, error } = await db().rpc('ligar_reserva_a_emenda', { p_pedido_id: pedidoId, p_versao: versao, p_emenda_id: emendaId });
+  if (error) throw new Error(mensagemDoBanco(error));
+  return data as { versao: number };
 }
 
 export async function apagarEmendaSiop(id: string, versao: number): Promise<void> {

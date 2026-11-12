@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { AppInput, AppSelect, AppTextarea } from '../../design-system/components/FormFields';
+import { AppInput, AppSelect, AppTextarea, AppDateInput } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useRegistrarContatoEmenda } from '../../hooks/useEmendas';
 import { NOME_ORGAO_ASPAR, numeroDaEmenda, ROTULO_MEIO } from '../../utils/emendasSemPedido';
@@ -67,7 +67,7 @@ export const ContatoEmendaModal: React.FC<Props> = ({ emenda, nomeDoAutor, uf, o
     >
       <form id="emendas-contato-emenda-form" onSubmit={enviar} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: '0.75rem' }}>
-          <AppInput label="Data" type="date" max={hoje} value={data} onChange={(e) => setData(e.target.value)} data-testid="emendas-contato-emenda-data" />
+          <AppDateInput label="Data" max={hoje} value={data} onValueChange={setData} data-testid="emendas-contato-emenda-data" />
           <AppSelect label="Como" value={meio} onChange={(e) => setMeio(e.target.value as MeioDoContato)} data-testid="emendas-contato-emenda-meio">
             {(Object.keys(ROTULO_MEIO) as MeioDoContato[]).map((m) => (
               <option key={m} value={m}>

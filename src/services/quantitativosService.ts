@@ -43,6 +43,37 @@ export interface OrgaoQuantitativo {
   atualizadoEm: string | null;
   /** Item de ata da SENASP (gerenciadora). Falso na ata de outro órgão, em que só a linha da SENASP aparece (migration 114). */
   ataDaSenasp: boolean;
+  /** Remanejado deste órgão para órgãos não participantes (migration 219). */
+  remanejadoNaoParticipante: number;
+  /** Parte do remanejamento a não participante que sai da cota própria (só a da SENASP muda a cota). */
+  saidaNaoParticipante: number;
+  /** Parte que o Compras.gov.br ainda não mostra: continua no registrado do órgão que cedeu. */
+  naoParticipanteAguardaFonte: number;
+}
+
+/** Remanejamento de um participante (ou da cota da SENASP) para órgão não participante (migration 219). */
+export interface RemanejamentoNaoParticipante {
+  id: string;
+  uasgOrigem: string;
+  uasgDestino: string;
+  nomeDestino: string;
+  quantidade: number;
+  documentoSei: string;
+  justificativa: string;
+  /** dataAprovacaoAnalise das adesões que a UASG de destino já tinha: as outras, se vierem, ficam a conferir. */
+  adesoesConhecidas: string[];
+  registradoPorNome: string;
+  registradoEm: string;
+}
+
+/** Decisão sobre uma adesão que apareceu depois de um remanejamento para a mesma UASG. */
+export interface AdesaoConferida {
+  uasg: string;
+  aprovadaEm: string;
+  remanejamentoId: string;
+  decisao: 'MESMO' | 'DIFERENTES';
+  decididoPorNome: string;
+  decididoEm: string;
 }
 
 /**
@@ -128,6 +159,10 @@ export interface QuantitativosDoItem {
   contratos: ContratoDoParticipante[];
   leituras: Map<string, LeituraDoParticipante>;
   adesoesInformadas: AdesaoInformada[];
+  /** Remanejado da cota própria da SENASP para não participantes, ainda não refletido no Compras.gov.br. */
+  saidaNaoParticipante: number;
+  remanejamentosNaoParticipante: RemanejamentoNaoParticipante[];
+  adesoesConferidas: AdesaoConferida[];
   /** Versões lidas antes dos dados (migration 129); voltam ao salvar para o banco recusar se outra pessoa mexeu. */
   versaoAssinada?: string | null;
   versaoAdesoes?: string | null;
@@ -172,6 +207,9 @@ export function vazioDoItem(): QuantitativosDoItem {
     contratos: [],
     leituras: new Map(),
     adesoesInformadas: [],
+    saidaNaoParticipante: 0,
+    remanejamentosNaoParticipante: [],
+    adesoesConferidas: [],
     versaoAssinada: null,
     versaoAdesoes: null
   };
@@ -196,7 +234,10 @@ export function mapOrgao(r: any): OrgaoQuantitativo {
     mudou: r.mudou === true,
     mudouEm: r.mudou_em ?? null,
     atualizadoEm: r.atualizado_em ?? null,
-    ataDaSenasp: r.ata_da_senasp !== false
+    ataDaSenasp: r.ata_da_senasp !== false,
+    remanejadoNaoParticipante: num(r.remanejado_nao_participante),
+    saidaNaoParticipante: num(r.saida_nao_participante),
+    naoParticipanteAguardaFonte: num(r.nao_participante_aguarda_fonte)
   };
 }
 
@@ -212,7 +253,7 @@ export async function fetchQuantitativosDoItem(itemKey: string): Promise<Quantit
   const versoes = await supabase.rpc('versao_quantitativos_item', { p_item_key: key });
   const versao = versoes.error ? null : ((versoes.data ?? null) as { assinada?: string; adesoes?: string } | null);
 
-  const [item, orgaos, remanejamentos, continua, registros, contratos, leituras, adesoesInformadas] = await Promise.all([
+  const [item, orgaos, remanejamentos, continua, registros, contratos, leituras, adesoesInformadas, naoParticipantes, conferidas] = await Promise.all([
     supabase.from('v_item_quantitativos').select('*').eq('item_key', key).maybeSingle(),
     supabase.from('v_item_quantitativos_orgaos').select('*').eq('item_key', key),
     supabase.from('ata_item_remanejamentos').select('*').eq('item_key', key).is('desfeito_em', null).order('confirmado_em'),
@@ -220,13 +261,15 @@ export async function fetchQuantitativosDoItem(itemKey: string): Promise<Quantit
     supabase.from('ata_item_assinada_registros').select('id, documento_sei, justificativa, informado_por_nome, informado_em, total').eq('item_key', key).order('informado_em', { ascending: false }),
     supabase.from('participantes_contratos_itens').select('*').eq('item_key', key),
     supabase.from('participantes_contratos_leituras').select('uasg, lido_em, contratos_na_ug').eq('uasg_gerenciadora', uasgGerenciadora),
-    supabase.from('adesao_quantidade_informada').select('*').eq('item_key', key)
+    supabase.from('adesao_quantidade_informada').select('*').eq('item_key', key),
+    supabase.from('ata_item_remanejamentos_nao_participante').select('*').eq('item_key', key).is('desfeito_em', null).order('registrado_em'),
+    supabase.from('ata_item_adesao_conferida').select('*').eq('item_key', key)
   ]);
   if (item.error) {
     if (tabelaAusente(item.error)) return vazio;
     throw new Error(item.error.message);
   }
-  for (const r of [orgaos, remanejamentos, continua, registros, contratos, leituras, adesoesInformadas]) {
+  for (const r of [orgaos, remanejamentos, continua, registros, contratos, leituras, adesoesInformadas, naoParticipantes, conferidas]) {
     if (r.error && !tabelaAusente(r.error)) throw new Error(r.error.message);
   }
 
@@ -293,6 +336,27 @@ export async function fetchQuantitativosDoItem(itemKey: string): Promise<Quantit
       justificativa: r.justificativa ?? null,
       informadoPorNome: r.informado_por_nome ?? '',
       informadoEm: r.informado_em
+    })),
+    saidaNaoParticipante: num(i?.saida_nao_participante),
+    remanejamentosNaoParticipante: (naoParticipantes.data ?? []).map((r: any) => ({
+      id: String(r.id),
+      uasgOrigem: String(r.uasg_origem),
+      uasgDestino: String(r.uasg_destino),
+      nomeDestino: r.nome_destino ?? '',
+      quantidade: num(r.quantidade),
+      documentoSei: r.documento_sei ?? '',
+      justificativa: r.justificativa ?? '',
+      adesoesConhecidas: Array.isArray(r.adesoes_conhecidas) ? r.adesoes_conhecidas.map(String) : [],
+      registradoPorNome: r.registrado_por_nome ?? '',
+      registradoEm: r.registrado_em
+    })),
+    adesoesConferidas: (conferidas.data ?? []).map((r: any) => ({
+      uasg: String(r.uasg),
+      aprovadaEm: String(r.aprovada_em ?? '').slice(0, 19),
+      remanejamentoId: String(r.remanejamento_id),
+      decisao: r.decisao === 'MESMO' ? 'MESMO' : 'DIFERENTES',
+      decididoPorNome: r.decidido_por_nome ?? '',
+      decididoEm: r.decidido_em
     })),
     versaoAssinada: versao?.assinada ?? null,
     versaoAdesoes: versao?.adesoes ?? null
@@ -391,4 +455,49 @@ export async function informarQuantidadeAdesao(p: {
     if (rpcInexistente(error)) throw new Error('A quantidade da adesão ainda não pode ser informada no banco (migration 114).');
     throw erroDosQuantitativos(error);
   }
+}
+
+/** Mensagem das funções da migration 219; sem ela no banco, avisa em vez de mostrar o erro técnico. */
+function erroDoNaoParticipante(error: any): Error {
+  if (rpcInexistente(error)) return new Error('O remanejamento para não participante ainda não está disponível no banco (migration 219).');
+  return new Error(mensagemDoErroQuantitativos(error));
+}
+
+/** Remaneja de um participante (ou da cota da SENASP) para um órgão não participante (migration 219). */
+export async function remanejarParaNaoParticipante(p: {
+  itemKey: string;
+  uasgOrigem: string;
+  uasgDestino: string;
+  /** Nome do Compras.gov.br ou digitado; o banco usa o do cadastro de UASGs quando tem. */
+  nomeDestino: string;
+  quantidade: number;
+  documentoSei: string;
+  justificativa: string;
+}): Promise<void> {
+  const { error } = await requireSupabase().rpc('remanejar_para_nao_participante', {
+    p_item_key: p.itemKey,
+    p_uasg_origem: p.uasgOrigem,
+    p_uasg_destino: p.uasgDestino,
+    p_quantidade: p.quantidade,
+    p_documento_sei: p.documentoSei.trim(),
+    p_justificativa: p.justificativa.trim(),
+    p_nome_destino: p.nomeDestino.trim() || null
+  });
+  if (error) throw erroDoNaoParticipante(error);
+}
+
+export async function desfazerRemanejamentoNaoParticipante(p: { id: string; justificativa: string }): Promise<void> {
+  const { error } = await requireSupabase().rpc('desfazer_remanejamento_nao_participante', { p_id: p.id, p_justificativa: p.justificativa.trim() });
+  if (error) throw erroDoNaoParticipante(error);
+}
+
+/** "É o mesmo remanejamento" (não conta no limite) ou "são operações diferentes" (conta). */
+export async function decidirAdesaoDoRemanejamento(p: { itemKey: string; uasg: string; aprovadaEm: string; decisao: 'MESMO' | 'DIFERENTES' }): Promise<void> {
+  const { error } = await requireSupabase().rpc('decidir_adesao_do_remanejamento', {
+    p_item_key: p.itemKey,
+    p_uasg: p.uasg,
+    p_aprovada_em: p.aprovadaEm,
+    p_decisao: p.decisao
+  });
+  if (error) throw erroDoNaoParticipante(error);
 }

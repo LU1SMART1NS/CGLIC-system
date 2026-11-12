@@ -2,7 +2,7 @@
 
 Guia para quem vai trabalhar no código: como o sistema está montado, de onde vêm os dados, quem pode o quê e como publicar e diagnosticar. Visão geral e comandos estão no [README](README.md); as regras de negócio, em [docs/regras-de-dados.md](docs/regras-de-dados.md).
 
-Atualizado em 14/10/2026.
+Atualizado em 03/11/2026.
 
 ## 1. Visão geral
 
@@ -38,7 +38,7 @@ Perfis: **A** = Coordenador (`admin`), **G** = Gestor de atas e contratos (`gest
 | Alocação | Itens às unidades | `/alocacao` | A G GS L |
 | Vínculos | Contratos à ata · Empenhos ao contrato · Empenhos aos itens | `/vinculacao/contratos` · `/vinculacao/empenhos-contrato` · `/vinculacao/empenhos-itens` | A G L |
 | Financeiro | Empenhos · Pagamentos · Previsão | `/empenhos` · `/pagamentos` · `/pagamentos/previsao` | A G L |
-| Emendas | Pedidos (Ver por pedido · por autor) · Itens e kits (Por item · Por kit) | `/emendas/pedidos` (`?ver=autor`; `/emendas/por-autor` redireciona) · `/emendas/itens` (`?ver=kit`; `/emendas/kits` redireciona) | A GE L (edita: A GE) |
+| Emendas | Pedidos · Parlamentares · Emendas · Itens (Por item · Por kit) | `/emendas/pedidos` (Pedido 360 em `/emendas/parlamentares/:autor/pedidos/:ano/:nº`; `?pedido=` e `?ver=` redirecionam) · `/emendas/parlamentares` (`/emendas/por-autor` e `/emendas/autores` redirecionam) · `/emendas/emendas` (Emenda 360 em `/emendas/emendas/:ano/:nº`) · `/emendas/itens` (`?ver=kit`; `/emendas/kits` redireciona) | A GE L (edita: A GE) |
 | Ajustes | Modelos de Gestão | `/configuracoes/modelos` | A G |
 | | Regras de Alertas · Feriados | `/admin/regras-alertas` · `/admin/feriados` | A |
 | | Unidades Internas | `/admin/departamentos` | A G GS L (edita: A GS) |
@@ -51,7 +51,7 @@ O que cada perfil pode fazer (`role_permissions`, migrations 23, 30, 33 e 55):
 - **Coordenador:** tudo. É o único que gerencia usuários, perfis, regras de alertas e feriados, decide conflitos de gestor, marca avisos como resolvidos e força a sincronização ("Atualizar").
 - **Gestor:** contratos atribuídos a ele (escopo ASSIGNED), vincular contrato à ata, vincular nota aos itens e à unidade interna, informar a quantidade da ata assinada, exportar.
 - **Gestor de saldos:** alocações (ver, gerenciar, ligar nota à unidade), unidades internas, remanejamentos de quantitativos. Não vê Financeiro nem Vínculos.
-- **Gestor de emendas (CAEP):** menu Emendas (`emendas.view`/`emendas.manage`, migration 155): pedidos dos parlamentares com etapas até o empenho e trava de saldo (migration 157: o reservado não passa do alocado à CAEP e a alocação da CAEP não baixa abaixo do reservado), kits com os itens alocados à CAEP, quadro da reserva para copiar no SEI e no WhatsApp no formato do Anexo, com o valor já pelo reajuste previsto e total por GND (migration 165), beneficiários pelo CNPJ e o cadastro dos autores (Câmara e Senado, lidos pelo servidor toda segunda-feira; consulta em Pedidos › Ver por autor). Na Carteira, só Atas e Itens.
+- **Gestor de emendas (CAEP):** menu Emendas (`emendas.view`/`emendas.manage`, migration 155): pedidos dos parlamentares com etapas até o empenho e trava de saldo (migration 157: o reservado não passa do alocado à CAEP e a alocação da CAEP não baixa abaixo do reservado), kits com os itens alocados à CAEP, quadro da reserva para copiar no SEI e no WhatsApp no formato do Anexo, com o valor já pelo reajuste previsto e total por GND (migration 165), beneficiários pelo CNPJ e o cadastro dos autores (Câmara e Senado, lidos pelo servidor toda segunda-feira; consulta em Emendas › Parlamentares). Na Carteira, só Atas e Itens.
 - **Consulta:** só leitura e exportação.
 
 Os nomes exibidos dos perfis são editáveis pelo coordenador (migration 68). As Edge Functions `invite-user` e `manage-user` convertem os nomes da tela (coordenador, gestor, consulta, gestor_saldos, gestor_emendas) nos perfis do banco (`supabase/functions/_shared/roleMapping.ts`).
@@ -61,8 +61,8 @@ Os nomes exibidos dos perfis são editáveis pelo coordenador (migration 68). As
 - **Código:** `server/sincronizar-fontes/` (`index.ts` com `Deno.serve`, `handler.ts`, `executar.ts`, `proxyDeFontes.ts`, `supabaseServidor.ts`). Reaproveita os serviços de `src/services`.
 - **Empacotamento:** `scripts/build-sincronizar-fontes.mjs` junta tudo com rolldown num arquivo só (`supabase/functions/sincronizar-fontes/index.ts`, gerado e fora do git), troca o cliente do navegador pelo cliente do servidor e recusa o pacote se encontrar chave ou variável do navegador.
 - **Quem chama:** o pg_cron, com o cabeçalho `x-cron-secret` (nunca força), ou o coordenador logado, que pode forçar. A resposta é 202 e o trabalho segue em segundo plano. O modo `dry` só consulta e conta, sem gravar.
-- **Recursos** (`RECURSOS_DO_SERVIDOR` em `executar.ts`): `contratos`, `atas`, `saldos_itens`, `itens_contratos`, `unidades_itens`, `atas_participacao`, `contratos_participantes`, `empenhos`, `faturas`, `ordens_bancarias`, `cadastro_uasgs`, `itens_notas_siafi`.
-- **Fontes** (prefixos em `vercel.json`, `vite.config.ts` e `proxyDeFontes.ts`): `/api-arp` → Compras.gov.br dados abertos; `/api-pncp` → PNCP; `/api-contratos-gov` → Contratos.gov.br; `/api-sta` → STA do Tesouro; `/api-transparencia` → Portal da Transparência (só no servidor, exige chave).
+- **Recursos** (`RECURSOS_DO_SERVIDOR` em `executar.ts`): `contratos`, `atas`, `saldos_itens`, `itens_contratos`, `unidades_itens`, `atas_participacao`, `contratos_participantes`, `empenhos`, `faturas`, `ordens_bancarias`, `cadastro_uasgs`, `itens_notas_siafi`, e os demais da lista, entre eles `emendas_siop_painel` (emendas do Painel do Orçamento Federal do SIOP, migration 252).
+- **Fontes** (prefixos em `vercel.json`, `vite.config.ts` e `proxyDeFontes.ts`): `/api-arp` → Compras.gov.br dados abertos; `/api-pncp` → PNCP; `/api-contratos-gov` → Contratos.gov.br; `/api-sta` → STA do Tesouro; `/api-transparencia` → Portal da Transparência (só no servidor, exige chave). `/api-siop` → Painel do Orçamento Federal do SIOP (QlikView, só no servidor: sessão anônima, XML; a leitura em `src/services/siopPainelQlik.ts` limpa os filtros, liga os doze agrupadores e pede páginas grandes).
 - **Agendamento:** `disparar_sincronizacao(recurso, uasg)` (migration 77) lê o endereço e o segredo do Vault e chama a função. Jobs e horários em [docs/migrations.md](docs/migrations.md#jobs-do-pg_cron).
 - **Limites:** cada execução tem orçamento de ~100 s (a Edge Function para em 150 s); o que não couber fica para a próxima. Cada chamada a uma fonte tem 30 s. O recurso só roda se passou da validade e respeita a trava em `sincronizacao_fontes`.
 - **Instalação inicial:** `scripts/ativar-sincronizacao-no-servidor.sh` gera o segredo, publica a função, aplica as migrations, grava o Vault e faz um teste `dry`.

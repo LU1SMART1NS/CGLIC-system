@@ -34,6 +34,8 @@ import { displayContractNumber } from '../../utils/contractNumber';
 import { useItensDoContrato } from '../../hooks/useItensDoContrato';
 import { Instrument360Head } from '../instrument360/Instrument360Head';
 import { Instrument360Tabs } from '../instrument360/Instrument360Tabs';
+import { FiscalizacaoDoContrato } from '../fiscalizacao/FiscalizacaoDoContrato';
+import { podeVerFiscalizacao } from '../../hooks/useFiscalizacao';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
 import { useContractManager } from '../../hooks/useContractManager';
 import { useContractPaymentFollowUp } from '../../hooks/useContractPaymentFollowUp';
@@ -44,7 +46,7 @@ import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
 import { useLeiturasComFalha, type LeituraDaTela } from '../fonte/useLeiturasComFalha';
 import { EscopoNaoConferido, escopoNaoConferido } from '../instrument360/EscopoNaoConferido';
 
-const TAB_IDS: Contract360Tab[] = ['acoes', 'plano', 'itens', 'financeiro', 'pagamentos', 'historico'];
+const TAB_IDS: Contract360Tab[] = ['acoes', 'plano', 'itens', 'financeiro', 'pagamentos', 'fiscalizacao', 'historico'];
 
 interface Contract360PageProps {
   contractKeyOverride?: string;
@@ -183,6 +185,8 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
     { id: 'itens', label: totalItens > 0 ? `Itens (${totalItens})` : 'Itens' },
     { id: 'financeiro', label: totalEmpenhos > 0 ? `Empenhos (${totalEmpenhos})` : 'Empenhos' },
     { id: 'pagamentos', label: totalFaturas > 0 ? `Pagamentos (${totalFaturas})` : 'Pagamentos' },
+    // Fiscalização (migration 259): quem lê a fiscalização vê a aba; a consulta do contrato continua igual para os demais.
+    ...(podeVerFiscalizacao(role) ? [{ id: 'fiscalizacao' as const, label: 'Fiscalização' }] : []),
     { id: 'historico', label: 'Histórico' }
   ];
 
@@ -291,6 +295,8 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
             />
           </InstrumentSection>
         )}
+
+        {activeTab === 'fiscalizacao' && podeVerFiscalizacao(role) && resolvedContractKey && <FiscalizacaoDoContrato contractKey={resolvedContractKey} />}
 
         {activeTab === 'historico' && (
           <InstrumentSection

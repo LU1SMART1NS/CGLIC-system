@@ -1345,6 +1345,49 @@ export async function fetchNomeUasg(codigoUasg: string): Promise<NomeUasgResulta
   }
 }
 
+/** UASG ativa do cadastro do Compras.gov.br, para escolher o órgão pelo nome. */
+export interface UasgDaUf {
+  uasg: string;
+  nome: string;
+  municipio: string | null;
+  uf: string;
+}
+
+/**
+ * UASGs ativas de uma UF (/modulo-uasg/1_consultarUasg): a API não busca por nome, então a tela lê a UF inteira
+ * (SP: 3.138 em 27/10/2026, 7 páginas de 500) e filtra na memória. Falha de uma página derruba a leitura: lista
+ * pela metade esconderia órgãos sem aviso.
+ */
+export async function fetchUasgsDaUf(uf: string, esperar: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms))): Promise<UasgDaUf[]> {
+  const lista: UasgDaUf[] = [];
+  let pagina = 1;
+  let totalPaginas = 1;
+  do {
+    const url = `/api-arp/modulo-uasg/1_consultarUasg${buildQueryString({ pagina, tamanhoPagina: 500, siglaUf: uf, statusUasg: 'true' })}`;
+    let response: Response | null = null;
+    // O Compras.gov.br limita consultas seguidas (429): até 3 tentativas por página.
+    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+      if (tentativa > 1) await esperar(1_500 * (tentativa - 1));
+      try {
+        response = await fetch(url);
+      } catch {
+        response = null;
+        continue;
+      }
+      if (response.ok || (response.status !== 429 && response.status < 500)) break;
+    }
+    if (!response?.ok) throw new Error('O Compras.gov.br não respondeu agora. Tente de novo em instantes.');
+    const data = await response.json() as { resultado?: Array<{ codigoUasg?: string; nomeUasg?: string; nomeMunicipioIbge?: string | null; siglaUf?: string | null }>; totalPaginas?: number };
+    for (const u of data.resultado ?? []) {
+      if (!u.codigoUasg || !u.nomeUasg?.trim()) continue;
+      lista.push({ uasg: u.codigoUasg, nome: u.nomeUasg.trim(), municipio: u.nomeMunicipioIbge ?? null, uf: u.siglaUf ?? uf });
+    }
+    totalPaginas = Number(data.totalPaginas) || 1;
+    pagina++;
+  } while (pagina <= totalPaginas);
+  return lista;
+}
+
 /**
  * 4. Consultar Empenhos Saldo Item
  * Endereço: /modulo-arp/4_consultarEmpenhosSaldoItem

@@ -3,15 +3,36 @@
  * linha ocupa e avisos (30 dias sem ofício, divergência com o SIOP, ata vencendo ou vencida antes do empenho).
  */
 import type { AcaoPedido, ConferenciaEmpenho, DocumentoSeiDoPedido, EtapaDoDocumento, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, MotivoSemNota, NotaDaLinha, PedidoEmenda, RegraDaNota } from '../services/emendasService';
-import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR, diasEntre, passouDoCorte } from './emendasKits';
+import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR, diasEntre, nomeDaLinhaDoPedido, passouDoCorte } from './emendasKits';
 import { chaveDoContrato, numeroDaChave } from './contractKeyUtils';
-import { formatCurrency } from './format';
 import { avisosDeEmpenho } from './emendasEmpenho';
 import { avisoDeCredor, type CredorNoPedido } from './emendasConferenciaNota';
-import type { PrecoPrevisto } from '../services/emendasQuadroService';
+import type { PrecoDoItem } from '../services/emendasQuadroService';
+import { podeIrNaMinuta, reajusteDoItem, rotuloDoReajuste, tramiteAteContratoDias } from './emendasReajuste';
+import { formatCurrency } from './format';
 
 /** Dias de reserva sem ofício até o aviso (decisão de 23/10/2026). */
 export const AVISO_SEM_OFICIO_DIAS = 30;
+/** Dias parado na mesma etapa nas etapas sem tempo medido (Ofício e Conferido), para o aviso de pedido parado. */
+export const AVISO_PARADO_DIAS = 30;
+
+/**
+ * Prazo de cada etapa em dias corridos, contado da entrada na etapa (D5 do protótipo de 28/10/2026). É o tempo em que
+ * 80% dos pedidos já tinham passado ao próximo passo; Ofício e Conferido, sem casos suficientes, ficam com 30 dias. Na
+ * contratação conta da nota (o contrato leva 32 dias na mediana e 56 em 80% dos casos).
+ */
+export const PRAZO_DA_ETAPA: Partial<Record<EtapaPedido, { dias: number; proximo: string }>> = {
+  OFICIO: { dias: AVISO_PARADO_DIAS, proximo: 'conferir a emenda no SIOP' },
+  CONFERIDO: { dias: AVISO_PARADO_DIAS, proximo: 'elaborar a solicitação de empenho' },
+  SOLICITADO: { dias: 6, proximo: 'cobrar a assinatura da solicitação na DGFNSP' },
+  AUTORIZADO: { dias: 7, proximo: 'enviar o processo à CGOFI' },
+  // 5 dias úteis.
+  CGOFI: { dias: 7, proximo: 'cobrar a nota de empenho da CGOFI' },
+  EMPENHADO: { dias: 10, proximo: 'enviar o processo à CCGA' },
+  CONTRATACAO: { dias: 60, proximo: 'cobrar o contrato da CCGA' }
+};
+
+const somaDiasIso = (iso: string, dias: number): string => new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) + dias * 86_400_000).toISOString().slice(0, 10);
 
 export const ETAPAS: ReadonlyArray<{ etapa: Exclude<EtapaPedido, 'CANCELADO'>; rotulo: string; curto: string; descricao: string }> = [
   { etapa: 'RESERVADO', rotulo: 'Itens reservados', curto: 'Reservados', descricao: 'A CAEP combinou com o parlamentar e separou a quantidade.' },
@@ -39,8 +60,8 @@ export const FASES_PEDIDO: ReadonlyArray<{ id: FasePedido; nome: string; etapas:
 /** Fase de uma etapa (o cancelado não tem fase). */
 export const faseDaEtapa = (etapa: EtapaPedido): FasePedido | null => FASES_PEDIDO.find((f) => (f.etapas as readonly EtapaPedido[]).includes(etapa))?.id ?? null;
 
-/** Etapas da linha do tempo: as 9 gravadas e Contratado. */
-export const TOTAL_ETAPAS_PEDIDO = ETAPAS.length + 1;
+/** Passos do caminho: as 9 etapas gravadas, Contratado e a execução (Faturado, Liquidado e Pago). */
+export const TOTAL_ETAPAS_PEDIDO = ETAPAS.length + 4;
 
 export const ROTULO_ETAPA: Record<EtapaPedido, string> = {
   ...(Object.fromEntries(ETAPAS.map((e) => [e.etapa, e.rotulo])) as Record<Exclude<EtapaPedido, 'CANCELADO'>, string>),
@@ -71,7 +92,7 @@ export function proximaAcao(etapa: EtapaPedido, rodada = 1): { acao: Exclude<Aca
     case 'MINUTA':
       return { acao: 'OFICIO', rotulo: rodada > 1 ? `Registrar o ${rodada}º ofício` : 'Registrar o ofício' };
     case 'OFICIO':
-      return { acao: 'CONFERIDO', rotulo: 'Conferir com o SIOP' };
+      return { acao: 'CONFERIDO', rotulo: 'Conferir o ofício' };
     case 'CONFERIDO':
       return { acao: 'SOLICITADO', rotulo: 'Registrar a solicitação de empenho' };
     case 'SOLICITADO':
@@ -104,6 +125,42 @@ export function itensDaLinha(l: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitCompo
 
 export const linhasAtivas = (p: PedidoEmenda): LinhaPedido[] => p.linhas.filter((l) => !l.cancelada);
 
+/** Uma linha da coluna "Itens e beneficiários" da lista de pedidos: quantidade, nome curto do item e quem recebe. */
+export interface LinhaDaLista {
+  id: string;
+  quantidade: number;
+  nome: string;
+  kit: boolean;
+  /** Sigla do beneficiário (ou o nome, se não tem sigla); null = a definir. */
+  beneficiario: string | null;
+  /** Nome por extenso, para a dica. */
+  beneficiarioNome: string | null;
+}
+
+/**
+ * As linhas ativas do pedido como a lista mostra: o item pelo nome curto da CAEP (sem ele, o começo da descrição do
+ * catálogo), o kit pelo nome do kit e o beneficiário pela sigla do cadastro; sem cadastro, o nome do controle anterior.
+ */
+export function linhasDaLista(
+  p: PedidoEmenda,
+  itens: Map<string, ItemCaep>,
+  beneficiarios: Map<string, { nome: string; sigla?: string | null }>
+): LinhaDaLista[] {
+  return linhasAtivas(p).map((l) => {
+    const b = l.beneficiarioId ? beneficiarios.get(l.beneficiarioId) : undefined;
+    const nomeBen = b?.nome?.trim() || l.beneficiarioNome?.trim() || null;
+    const item = l.tipo === 'ITEM' ? itens.get(l.itemKey ?? '') : undefined;
+    return {
+      id: l.id,
+      quantidade: l.quantidade,
+      nome: l.tipo === 'KIT' ? l.kitNome ?? 'kit' : item?.nomeCurto?.trim() || curto(item?.descricao ?? l.itemKey ?? '', 34),
+      kit: l.tipo === 'KIT',
+      beneficiario: b?.sigla?.trim() || nomeBen,
+      beneficiarioNome: nomeBen
+    };
+  });
+}
+
 /** Reservado por item somando pedidos e linhas não cancelados (a mesma conta da view do banco). */
 export function reservadoPorItem(pedidos: PedidoEmenda[], excluirPedidoId?: string): Map<string, number> {
   const m = new Map<string, number>();
@@ -117,34 +174,30 @@ export function reservadoPorItem(pedidos: PedidoEmenda[], excluirPedidoId?: stri
 const centavos = (v: number): number => Math.round(v * 100) / 100;
 
 /**
- * Preço unitário de hoje e o previsto para a emenda (o mesmo do quadro do parlamentar: reajuste da ata pelo empenho
- * provável, ver aplicarPrazoDoEmpenho). Sem os preços previstos, vale o de hoje.
+ * Preço unitário para a emenda: o de hoje da ata, o mesmo do quadro do parlamentar (desde 29/10/2026 o ofício e o
+ * empenho são pelo preço de hoje, sem projeção do reajuste). Sem a leitura dos preços, o da lista de itens.
  */
-export function precoParaEmenda(itemKey: string, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): { previsto: number; hoje: number; preco: PrecoPrevisto | undefined } {
+export function precoParaEmenda(itemKey: string, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoDoItem>): { valor: number; preco: PrecoDoItem | undefined } {
   const preco = precos?.get(itemKey);
-  const hoje = preco?.precoAtual ?? itens.get(itemKey)?.valorUnitario ?? 0;
-  return { previsto: preco?.precoPrevisto ?? hoje, hoje, preco };
+  return { valor: preco?.precoAtual ?? itens.get(itemKey)?.valorUnitario ?? 0, preco };
 }
 
-/** Valor da linha: pelo preço previsto para a emenda quando vêm os preços; sem eles, pelo preço de hoje. */
-export function valorDaLinha(l: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitComposicao' | 'quantidade'>, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): number {
-  return centavos(itensDaLinha(l).reduce((s, x) => s + centavos(x.quantidade * precoParaEmenda(x.itemKey, itens, precos).previsto), 0));
+/** Valor da linha pelo preço de hoje. */
+export function valorDaLinha(l: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitComposicao' | 'quantidade'>, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoDoItem>): number {
+  return centavos(itensDaLinha(l).reduce((s, x) => s + centavos(x.quantidade * precoParaEmenda(x.itemKey, itens, precos).valor), 0));
 }
 
-export function valorDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): number {
+export function valorDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoDoItem>): number {
   return centavos(linhasAtivas(p).reduce((s, l) => s + valorDaLinha(l, itens, precos), 0));
 }
 
-/** O preço em texto corrido: "R$ 1.093.706,02 previsto (hoje R$ 1.051.438,15)", ou só o valor quando não muda. */
-export const textoDoPreco = (previsto: number, hoje: number, unidade = ''): string =>
-  Math.abs(previsto - hoje) > 0.004 ? `${formatCurrency(previsto)}${unidade} previsto (hoje ${formatCurrency(hoje)})` : `${formatCurrency(previsto)}${unidade}`;
-
 /**
- * O valor que as telas mostram do pedido: o da emenda no SIOP, quando já foi conferida; antes disso, o previsto pelos
- * itens. O empenhado das notas não entra: a nota inteira pode ter outros itens da mesma emenda.
+ * O valor que as telas mostram do pedido: o do ofício do parlamentar, quando já foi informado (migration 232; o valor da
+ * emenda inteira fica na emenda); antes disso, o previsto pelos itens. O empenhado das notas não entra: a nota inteira
+ * pode ter outros itens da mesma emenda.
  */
-export function valorDoPedidoNaEtapa(p: PedidoEmenda, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoPrevisto>): { valor: number; fonte: 'EMENDA' | 'PREVISTO' } {
-  if (p.siopValor != null && p.etapa !== 'CANCELADO') return { valor: p.siopValor, fonte: 'EMENDA' };
+export function valorDoPedidoNaEtapa(p: PedidoEmenda, itens: Map<string, ItemCaep>, precos?: Map<string, PrecoDoItem>): { valor: number; fonte: 'OFICIO' | 'PREVISTO' } {
+  if (p.oficioValor != null && p.etapa !== 'CANCELADO') return { valor: p.oficioValor, fonte: 'OFICIO' };
   return { valor: valorDoPedido(p, itens, precos), fonte: 'PREVISTO' };
 }
 
@@ -153,7 +206,11 @@ export function valorDoPedidoNaEtapa(p: PedidoEmenda, itens: Map<string, ItemCae
  * 174); senão, pelo número da emenda; antes disso, pela data da reserva. A reserva é uma conversa com a assessoria, não
  * um documento: o número interno do banco não aparece nas telas. A reserva da planilha não tem data.
  */
-export function identificacaoDoPedido(p: Pick<PedidoEmenda, 'reservadoEm'> & Partial<Pick<PedidoEmenda, 'oficioProcessoSei' | 'siopEmenda' | 'origem'>>): string {
+export function identificacaoDoPedido(
+  p: Pick<PedidoEmenda, 'reservadoEm'> & Partial<Pick<PedidoEmenda, 'oficioProcessoSei' | 'siopEmenda' | 'origem' | 'numeroNoAno' | 'anoDoNumero'>>
+): string {
+  // Com número (migration 217), ele vem primeiro: "Pedido 1/2026 · Processo 08027...".
+  if (p.numeroNoAno && p.anoDoNumero) return `Pedido ${p.numeroNoAno}/${p.anoDoNumero}${p.oficioProcessoSei ? ` · Processo ${p.oficioProcessoSei}` : ''}`;
   if (p.oficioProcessoSei) return `Processo ${p.oficioProcessoSei}`;
   if (p.siopEmenda) return `Emenda ${p.siopEmenda}`;
   return p.origem === 'PLANILHA' ? 'Reserva da planilha' : `Reserva de ${dataBR(p.reservadoEm)}`;
@@ -209,6 +266,8 @@ export function ultimoContatoPorAutor(pedidos: PedidoEmenda[]): Map<string, Pick
 }
 
 /** Nome mostrado no lugar do autor na reserva para um órgão (migration 163). */
+/** Chave do filtro de parlamentar para as reservas sem parlamentar (migration 163), nos endereços (?autor=a-definir). */
+export const AUTOR_A_DEFINIR_CHAVE = 'a-definir';
 export const AUTOR_A_DEFINIR = 'Parlamentar a definir';
 
 /** Reserva feita a pedido de um órgão (o beneficiário final), ainda sem parlamentar. */
@@ -225,16 +284,23 @@ export type TipoAviso =
   | 'empenhoAnulado'
   | 'semOficio'
   | 'divergencia'
+  | 'devolvidoCcga'
   | 'ataVencida'
   | 'ataNoCorte'
   | 'ataVencendo'
   | 'semNota'
+  | 'semBeneficiario'
+  | 'pedidoParado'
   | 'semAutorizacao'
   | 'empenhoAMais'
   | 'empenhoAMenos'
   | 'notaEmitida'
   | 'credorDiferente'
-  | 'semEnvioCgofi';
+  | 'semEnvioCgofi'
+  | 'reajusteAntesDoContrato'
+  | 'reajusteFora'
+  | 'prazoDoOficio'
+  | 'reajusteProximo';
 
 export interface AvisoPedido {
   tipo: TipoAviso;
@@ -249,18 +315,25 @@ export interface AvisoPedido {
 /** Do mais grave ao mais leve: na lista aparece só o primeiro, com "+N" para os outros. */
 export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = {
   empenhoAnulado: 0,
-  ataVencida: 1,
-  ataNoCorte: 2,
-  empenhoAMais: 3,
-  divergencia: 4,
-  semOficio: 5,
-  ataVencendo: 6,
-  semEnvioCgofi: 7,
-  credorDiferente: 8,
-  notaEmitida: 9,
-  empenhoAMenos: 10,
-  semAutorizacao: 11,
-  semNota: 12
+  reajusteAntesDoContrato: 1,
+  ataVencida: 2,
+  ataNoCorte: 3,
+  reajusteFora: 4,
+  empenhoAMais: 5,
+  divergencia: 6,
+  devolvidoCcga: 7,
+  prazoDoOficio: 8,
+  semOficio: 9,
+  reajusteProximo: 10,
+  ataVencendo: 11,
+  semEnvioCgofi: 12,
+  credorDiferente: 13,
+  notaEmitida: 14,
+  empenhoAMenos: 15,
+  semAutorizacao: 16,
+  semNota: 17,
+  pedidoParado: 18,
+  semBeneficiario: 19
 };
 
 /** Os tipos de aviso do mais grave ao mais leve (ordem de GRAVIDADE_DO_AVISO): trilhos, filtros e cartões percorrem esta lista. */
@@ -269,18 +342,25 @@ export const TIPOS_AVISO: readonly TipoAviso[] = (Object.keys(GRAVIDADE_DO_AVISO
 /** Nome de cada aviso, o mesmo em todas as telas (filtro de Pedidos, cartões e filtro do Início). */
 export const ROTULO_AVISO: Record<TipoAviso, string> = {
   empenhoAnulado: 'Empenho anulado',
+  reajusteAntesDoContrato: 'Ata reajustada antes do contrato',
   ataVencida: 'Ata encerrada',
   ataNoCorte: 'Prazo de indicação vencido',
   empenhoAMais: 'Empenhado a mais',
+  reajusteFora: 'Item fora da minuta pelo reajuste',
   divergencia: 'Ofício devolvido',
+  devolvidoCcga: 'Devolvido pela CCGA',
+  prazoDoOficio: 'Prazo do ofício vencido',
   semOficio: `Sem ofício há mais de ${AVISO_SEM_OFICIO_DIAS} dias`,
+  reajusteProximo: 'Reajuste da ata próximo',
   ataVencendo: 'Ata vence em breve',
   semEnvioCgofi: 'Sem envio à CGOFI',
   credorDiferente: 'Nota de outro fornecedor',
-  notaEmitida: 'Nota já emitida',
+  notaEmitida: 'Item sem nota',
   empenhoAMenos: 'Empenhado a menos',
   semAutorizacao: 'Item sem empenho autorizado',
-  semNota: 'Sem nota de empenho'
+  semNota: 'Sem nota de empenho',
+  semBeneficiario: 'Item sem beneficiário',
+  pedidoParado: 'Parado além do prazo da etapa'
 };
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
@@ -310,22 +390,29 @@ export function ataDaLinha(p: PedidoEmenda, l: LinhaPedido, itens: Map<string, I
   return null;
 }
 
+/** Dias depois da primeira nota do pedido para avisar o item que ficou sem nota (D1 do protótipo de 28/10/2026). */
+export const AVISO_ITEM_SEM_NOTA_DIAS = 30;
+
 /**
- * A CGOFI já emitiu nota para linhas do pedido, mas a CAEP ainda não registrou o empenho (migration 189: o sistema liga
- * a nota pela emenda e pelo fornecedor, emitida depois da assinatura da solicitação da linha).
+ * A CGOFI já emitiu nota para parte dos itens e outro item continua sem nota (migration 189: o sistema liga a nota pela
+ * emenda e pelo fornecedor). Com nota em todos os itens o sistema registra o empenho sozinho (migration 230); por isso
+ * o aviso fica só para o item que falta, 30 dias depois da primeira nota: a CAEP cobra a CGOFI ou cancela o item.
  */
-export function notaEmitidaSemRegistro(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): AvisoPedido | null {
+export function notaEmitidaSemRegistro(p: PedidoEmenda, notas: Map<string, NotaDaLinha>, hoje: string): AvisoPedido | null {
   if (jaEmpenhado(p.etapa) || p.etapa === 'CANCELADO') return null;
-  const comNota = linhasAtivas(p).filter((l) => notas.get(l.id)?.nota);
-  if (!comNota.length) return null;
+  const ativas = linhasAtivas(p);
+  const comNota = ativas.filter((l) => notas.get(l.id)?.nota);
+  const semNota = ativas.filter((l) => !notas.get(l.id)?.nota);
+  if (!comNota.length || !semNota.length) return null;
   const datas = comNota.map((l) => notas.get(l.id)!.emitidaEm).filter((d): d is string => Boolean(d)).sort();
-  const desde = datas.length ? ` em ${dataBR(datas[0])}` : '';
-  const falta = p.etapa === 'CGOFI' ? 'o empenho' : p.etapa === 'AUTORIZADO' ? 'o envio à CGOFI e o empenho' : 'as etapas até o empenho';
+  if (!datas.length) return null;
+  const dias = diasEntre(datas[0], hoje);
+  if (dias <= AVISO_ITEM_SEM_NOTA_DIAS) return null;
   return {
     tipo: 'notaEmitida',
-    curto: 'Nota já emitida',
-    texto: `Nota de empenho emitida${desde} para ${comNota.length === 1 ? '1 item' : `${comNota.length} itens`}: registre ${falta}`,
-    linhaId: comNota[0].id
+    curto: 'Item sem nota',
+    texto: `Nota de empenho emitida em ${dataBR(datas[0])} para ${comNota.length} de ${ativas.length} itens; ${semNota.length === 1 ? '1 item continua' : `${semNota.length} itens continuam`} sem nota há ${dias} dias: cobre a CGOFI ou cancele o item`,
+    linhaId: semNota[0].id
   };
 }
 
@@ -382,9 +469,10 @@ export function avisosDoPedido(
   hoje: string,
   notas?: Map<string, NotaDaLinha>,
   empenho?: ConferenciaEmpenho[],
-  credor?: CredorNoPedido[]
+  credor?: CredorNoPedido[],
+  precos?: Map<string, PrecoDoItem>
 ): AvisoPedido[] {
-  const avisos: AvisoPedido[] = [];
+  const avisos: AvisoPedido[] = precos ? avisosDoReajuste(p, hoje, precos, notas) : [];
   const anuladas = linhasComEmpenhoAnulado(p, notas);
   if (anuladas.length) {
     const ns = notasDasLinhas(anuladas, notas!);
@@ -407,9 +495,21 @@ export function avisosDoPedido(
       avisos.push({ tipo: 'divergencia', curto: 'Ofício devolvido', texto: `Ofício devolvido em ${dataBR(p.devolvidoEm)}: ${p.divergencia}` });
     }
   }
+  // Itens devolvidos pelo gestor da ata (migration 248): a CAEP reenvia com novo despacho ou registra a anulação.
+  const devolvidas =
+    p.etapa === 'EMPENHADO' || p.etapa === 'CONTRATACAO' ? linhasAtivas(p).filter((l) => l.ccgaSituacao === 'DEVOLVIDA' && !notas?.get(l.id)?.contractKey) : [];
+  if (devolvidas.length) {
+    const d = devolvidas[0];
+    avisos.push({
+      tipo: 'devolvidoCcga',
+      curto: 'Devolvido pela CCGA',
+      texto: `${devolvidas.length === 1 ? '1 item devolvido' : `${devolvidas.length} itens devolvidos`} pelo gestor da ata em ${dataBR(d.ccgaEm)}: ${d.ccgaMotivo ?? 'sem motivo'}${d.ccgaExplicacao ? ` (${d.ccgaExplicacao})` : ''}. Reenvie à CCGA ou registre a anulação`,
+      linhaId: d.id
+    });
+  }
   const semAutorizacao = itensSemEmpenhoAutorizado(p);
   if (semAutorizacao) avisos.push(semAutorizacao);
-  const emitida = notas ? notaEmitidaSemRegistro(p, notas) : null;
+  const emitida = notas ? notaEmitidaSemRegistro(p, notas, hoje) : null;
   if (emitida) avisos.push(emitida);
   const deOutroFornecedor = p.etapa === 'CANCELADO' ? null : avisoDeCredor(credor);
   if (deOutroFornecedor) avisos.push(deOutroFornecedor);
@@ -423,6 +523,26 @@ export function avisosDoPedido(
       // A linha da primeira solicitação sem envio: o Início mostra esse item na coluna Item · ata.
       linhaId: linhasAtivas(p).find((l) => solicitacaoDaLinha(p, l)?.id === semEnvio[0].id)?.id
     });
+  }
+  // Prazo medido de cada etapa (D5, 28/10/2026), contado da entrada na etapa atual. O item sem nota já tem o aviso dele.
+  const prazo = prazoDaEtapa(p, notas, hoje);
+  if (prazo?.vencido && !emitida) {
+    avisos.push({
+      tipo: 'pedidoParado',
+      curto: `${prazo.dias} dias parado`,
+      texto: `${prazo.dias} dias em "${rotuloDaEtapaDoPedido(p, notas ?? new Map())}" desde ${dataBR(prazo.desde)} (prazo de ${prazo.prazo} dias): ${prazo.proximo}`
+    });
+  }
+  if (p.etapa !== 'CANCELADO' && !jaEmpenhado(p.etapa)) {
+    const sem = linhasAtivas(p).filter((l) => !l.beneficiarioId);
+    if (sem.length) {
+      avisos.push({
+        tipo: 'semBeneficiario',
+        curto: `${sem.length} sem beneficiário`,
+        texto: `${sem.length === 1 ? '1 item sem beneficiário' : `${sem.length} itens sem beneficiário`}: sem isso o quadro e o ofício saem incompletos`,
+        linhaId: sem[0].id
+      });
+    }
   }
   if (notas && jaEmpenhado(p.etapa)) {
     const semNota = linhasSemNota(p, notas).length;
@@ -446,6 +566,103 @@ export function avisosDoPedido(
     avisos.push(atas.sort((a, b) => prioridade(a) - prioridade(b) || a.texto.localeCompare(b.texto))[0]);
   }
   return avisos.sort((a, b) => GRAVIDADE_DO_AVISO[a.tipo] - GRAVIDADE_DO_AVISO[b.tipo]);
+}
+
+const DEPOIS_DO_OFICIO: ReadonlySet<EtapaPedido> = new Set(['OFICIO', 'CONFERIDO', 'SOLICITADO', 'AUTORIZADO', 'CGOFI', 'EMPENHADO', 'CONTRATACAO']);
+
+/**
+ * Avisos da minuta pelo preço de hoje (migration 246): o prazo do ofício gravado com a minuta venceu; o item reservado
+ * ficou perto do reajuste da ata (ainda vai na minuta até o tempo do contrato, depois não); e, com o ofício recebido, o
+ * contrato do item ainda não assinado quando a ata está para reajustar ou já reajustou (o empenho fica abaixo do preço
+ * novo: anular os itens dela e voltar à minuta, decisão de 29/10/2026).
+ */
+export function avisosDoReajuste(p: PedidoEmenda, hoje: string, precos: Map<string, PrecoDoItem>, notas?: Map<string, NotaDaLinha>): AvisoPedido[] {
+  if (p.etapa === 'CANCELADO') return [];
+  const avisos: AvisoPedido[] = [];
+  const ativas = linhasAtivas(p);
+  const ataDe = (k: string) => k.split('-')[0];
+  if (p.etapa === 'MINUTA' && p.minutaValidaAte && p.minutaValidaAte < hoje) {
+    avisos.push({ tipo: 'prazoDoOficio', curto: 'Prazo do ofício vencido', texto: `O prazo do ofício venceu em ${dataBR(p.minutaValidaAte)}: gere uma nova minuta com o preço do dia` });
+  }
+  if (p.etapa === 'RESERVADO' || p.etapa === 'MINUTA') {
+    let fora: AvisoPedido | null = null;
+    let proximo: AvisoPedido | null = null;
+    for (const l of ativas)
+      for (const x of itensDaLinha(l)) {
+        const r = reajusteDoItem(precos.get(x.itemKey), hoje);
+        if (!fora && !podeIrNaMinuta(r)) {
+          fora = {
+            tipo: 'reajusteFora',
+            curto: 'Fora da minuta',
+            texto: `Ata ${ataDe(x.itemKey)}: ${r.rotulo?.toLowerCase()}. ${p.etapa === 'MINUTA' ? 'Se o ofício não chegar a tempo, a nova minuta não sai com o item: ' : 'A minuta não sai com o item: '}troque ou retire o item`,
+            linhaId: l.id
+          };
+        } else if (!proximo && r.situacao === 'ESMAECIDO' && p.etapa === 'RESERVADO' && r.data) {
+          proximo = {
+            tipo: 'reajusteProximo',
+            curto: 'Reajuste próximo',
+            texto: `Ata ${ataDe(x.itemKey)}: ${r.rotulo?.toLowerCase()}. Envie a minuta até ${dataBR(somaDiasIso(r.data, -tramiteAteContratoDias()))}, para o contrato sair pelo preço de hoje`,
+            linhaId: l.id
+          };
+        }
+      }
+    if (fora) avisos.push(fora);
+    if (proximo) avisos.push(proximo);
+    return avisos;
+  }
+  if (!DEPOIS_DO_OFICIO.has(p.etapa)) return avisos;
+  // Preço novo do item: com o reajuste devido, o reajustado; senão, o de hoje (já com o apostilamento informado).
+  const precoNovo = (k: string): number => {
+    const pr = precos.get(k);
+    return pr ? (pr.devido ? pr.precoDevido ?? pr.precoAtual : pr.precoAtual) : 0;
+  };
+  // O que a nota precisa cobrir pelo preço novo: as linhas do pedido ligadas a ela (D6, 29/10/2026).
+  const precisaDaNota = new Map<string, number>();
+  for (const l of ativas) {
+    const n = notas?.get(l.id)?.nota;
+    if (n) precisaDaNota.set(n, (precisaDaNota.get(n) ?? 0) + itensDaLinha(l).reduce((s, x) => s + x.quantidade * precoNovo(x.itemKey), 0));
+  }
+  let antes: AvisoPedido | null = null;
+  let perto: AvisoPedido | null = null;
+  for (const l of ativas) {
+    const nl = notas?.get(l.id);
+    if (nl?.contratoAssinadoEm) continue;
+    for (const x of itensDaLinha(l)) {
+      const pr = precos.get(x.itemKey);
+      if (!pr) continue;
+      const naMinuta = p.minutaPrecos?.[x.itemKey];
+      const mudou = typeof naMinuta === 'number' && Math.abs(naMinuta - pr.precoAtual) > 0.004;
+      // Com nota: só avisa quando a nota ficou abaixo do preço novo; sem nota: quando o ofício saiu com o preço antigo.
+      const precisa = nl?.nota ? precisaDaNota.get(nl.nota) ?? 0 : 0;
+      const notaAbaixo = Boolean(nl?.nota) && nl!.valorEmpenhado != null && nl!.valorEmpenhado + 0.01 < precisa;
+      if (!antes && (nl?.nota ? notaAbaixo : pr.devido || mudou)) {
+        const oQue = pr.devido ? 'tem reajuste devido' : mudou ? `mudou de preço depois da minuta (${formatCurrency(naMinuta!)} → ${formatCurrency(pr.precoAtual)})` : 'mudou de preço';
+        antes = {
+          tipo: 'reajusteAntesDoContrato',
+          curto: 'Reajuste antes do contrato',
+          texto: nl?.nota
+            ? `Ata ${ataDe(x.itemKey)} ${oQue} e o contrato do item não foi assinado: a nota ${nl.nota} (${formatCurrency(nl.valorEmpenhado!)}) fica abaixo do preço novo (${formatCurrency(precisa)}). Anule o empenho dos itens dela e volte à minuta`
+            : `Ata ${ataDe(x.itemKey)} ${oQue} e o contrato do item não foi assinado: o ofício saiu com o preço antigo. Volte o pedido à minuta`,
+          linhaId: l.id
+        };
+      } else if (!perto && pr.dataReajuste) {
+        const dias = diasEntre(hoje, pr.dataReajuste);
+        if (dias > tramiteAteContratoDias()) continue;
+        const viraOAno = hoje.slice(5, 7) === '12' && pr.dataReajuste.slice(0, 4) > hoje.slice(0, 4);
+        perto = {
+          tipo: 'reajusteProximo',
+          curto: `Reajuste em ${Math.max(dias, 0)} dias`,
+          texto:
+            `Ata ${ataDe(x.itemKey)}: ${rotuloDoReajuste(pr)?.toLowerCase()} (${Math.max(dias, 0)} dias) e o contrato do item não foi assinado: cobre a assinatura` +
+            (viraOAno ? '. O reajuste cai no ano que vem: se o contrato não puder sair antes dele, anule ainda este ano (em restos a pagar o crédito não volta à emenda)' : ''),
+          linhaId: l.id
+        };
+      }
+    }
+  }
+  if (antes) avisos.push(antes);
+  else if (perto) avisos.push(perto);
+  return avisos;
 }
 
 /** Data em que o pedido entrou em cada etapa (para a linha do tempo). */
@@ -490,7 +707,10 @@ export const ROTULO_MOTIVO_SEM_NOTA: Record<MotivoSemNota, string> = {
   CONTRATO_SEM_NOTA: 'o contrato ainda não tem nota no sistema',
   OUTRAS_EMENDAS: 'o contrato só tem notas de outras emendas',
   VARIAS: 'há mais de uma nota possível',
-  SEM_EMENDA: 'o pedido não tem o número da emenda'
+  SEM_EMENDA: 'o pedido não tem o número da emenda',
+  /** Migration 241: a nota do fornecedor não tem este item na lista do SIAFI. */
+  FORA_DA_NOTA: 'a nota do fornecedor não tem este item (SIAFI)',
+  COMPLEMENTAR: 'item do retificador: aguarda a solicitação do empenho complementar'
 };
 
 /** Nota da linha: a achada pelo sistema (a nota não é mais digitada; migrations 174 e 177). */
@@ -508,11 +728,19 @@ export interface ContratosDoPedido {
   contratos: string[];
   /** Todas as notas já têm contrato no Contratos.gov.br. */
   contratado: boolean;
+  /** Itens ativos e quantos já estão num contrato ("Contratado em parte · 2 de 4 itens"). */
+  itens: number;
+  itensContratados: number;
+  /** Data de assinatura do primeiro contrato dos itens (Contratos.gov.br, migration 230). */
+  assinadoEm: string | null;
+  /** Na contratação com parte dos itens já contratados. */
+  emParte: boolean;
 }
 
 /**
  * Contratos das notas do pedido, pelo contrato achado no sistema (Contratos.gov.br, refeito de hora em hora). O pedido
  * está Contratado quando foi enviado à CCGA e toda nota tem contrato; o número da planilha sem contrato no sistema não conta.
+ * Desde a migration 230 o contrato leva o pedido à contratação sozinho (o envio à CCGA fica comprovado pelo contrato).
  */
 export function contratosDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): ContratosDoPedido {
   const porNota = new Map<string, string | null>();
@@ -523,7 +751,67 @@ export function contratosDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinh
   }
   const contratos = [...new Set([...porNota.values()].filter((c): c is string => Boolean(c)))].sort();
   const comContrato = [...porNota.values()].filter(Boolean).length;
-  return { notas: porNota.size, comContrato, contratos, contratado: p.etapa === 'CONTRATACAO' && porNota.size > 0 && comContrato === porNota.size };
+  const ativas = linhasAtivas(p);
+  const contratadas = ativas.filter((l) => notas.get(l.id)?.contractKey);
+  const assinaturas = contratadas.map((l) => notas.get(l.id)?.contratoAssinadoEm).filter((d): d is string => Boolean(d)).sort();
+  const contratado = p.etapa === 'CONTRATACAO' && porNota.size > 0 && comContrato === porNota.size;
+  return {
+    notas: porNota.size,
+    comContrato,
+    contratos,
+    contratado,
+    itens: ativas.length,
+    itensContratados: contratadas.length,
+    assinadoEm: assinaturas[0] ?? null,
+    emParte: p.etapa === 'CONTRATACAO' && !contratado && contratadas.length > 0
+  };
+}
+
+/** Onde o pedido está na contratação e na execução (D3 e D4 do protótipo de 28/10/2026). */
+export type PassoNaContratacao = 'AGUARDANDO_CONTRATO' | 'PARTE_CONTRATADA' | 'CONTRATADO' | 'EM_EXECUCAO' | 'PAGO';
+
+const porcento = (parte: number, total: number) => Math.min(99, Math.floor((parte / total) * 100));
+
+/**
+ * O passo do pedido na contratação, o rótulo da tela e a posição no caminho (de TOTAL_ETAPAS_PEDIDO). Depois de
+ * contratado, a execução pelas notas: Faturado (a primeira fatura no Contratos.gov.br), Liquidado e Pago (valores da
+ * nota no Tesouro, com a porcentagem enquanto houver parte). Com parte dos itens sem contrato, fica em "Contratado em
+ * parte": é o que a CAEP precisa acompanhar.
+ */
+export function passoNaContratacao(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): { passo: PassoNaContratacao; rotulo: string; posicao: number } | null {
+  if (p.etapa !== 'CONTRATACAO') return null;
+  const base = ORDEM_ETAPA.CONTRATACAO + 1;
+  const c = contratosDoPedido(p, notas);
+  if (!c.contratado) return c.emParte ? { passo: 'PARTE_CONTRATADA', rotulo: 'Contratado em parte', posicao: base } : { passo: 'AGUARDANDO_CONTRATO', rotulo: ROTULO_ETAPA.CONTRATACAO, posicao: base };
+  const e = execucaoDoPedido(p, notas);
+  const quase = (a: number) => e.empenhado > 0 && a >= e.empenhado - 0.01;
+  if (quase(e.pago)) return { passo: 'PAGO', rotulo: 'Pago', posicao: base + 4 };
+  if (e.pago > 0) return { passo: 'EM_EXECUCAO', rotulo: `Pago ${porcento(e.pago, e.empenhado)}%`, posicao: base + 3 };
+  if (e.liquidado > 0) return { passo: 'EM_EXECUCAO', rotulo: `Liquidado ${quase(e.liquidado) ? 100 : porcento(e.liquidado, e.empenhado)}%`, posicao: base + 3 };
+  if (e.notasFaturadas > 0) return { passo: 'EM_EXECUCAO', rotulo: 'Faturado', posicao: base + 2 };
+  return { passo: 'CONTRATADO', rotulo: 'Contratado', posicao: base + 1 };
+}
+
+/**
+ * Prazo do pedido na etapa atual (PRAZO_DA_ETAPA): de quando entrou nela, até quando e se já venceu. Na contratação só
+ * enquanto falta contrato, contado da nota. Sem data de entrada (pedidos da carga antiga), sem prazo.
+ */
+export function prazoDaEtapa(p: PedidoEmenda, notas: Map<string, NotaDaLinha> | undefined, hoje: string): { desde: string; ate: string; dias: number; vencido: boolean; prazo: number; proximo: string } | null {
+  const regra = PRAZO_DA_ETAPA[p.etapa];
+  if (!regra) return null;
+  if (p.etapa === 'CONTRATACAO' && (!notas || contratosDoPedido(p, notas).contratado)) return null;
+  const entrou = { OFICIO: p.oficioEm, CONFERIDO: p.conferidoEm, SOLICITADO: p.solicitadoEm, AUTORIZADO: p.autorizadoEm, CGOFI: p.cgofiEm, EMPENHADO: p.empenhadoEm, CONTRATACAO: p.empenhadoEm }[
+    p.etapa as 'OFICIO'
+  ];
+  if (!entrou) return null;
+  const desde = entrou.slice(0, 10);
+  const ate = somaDiasIso(desde, regra.dias);
+  return { desde, ate, dias: diasEntre(desde, hoje), vencido: diasEntre(ate, hoje) > 0, prazo: regra.dias, proximo: regra.proximo };
+}
+
+/** Etapa do pedido como a tela mostra: na contratação, o passo pelos contratos e pela execução das notas. */
+export function rotuloDaEtapaDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha>): string {
+  return passoNaContratacao(p, notas)?.rotulo ?? ROTULO_ETAPA[p.etapa];
 }
 
 export interface ExecucaoDoPedido {
@@ -534,6 +822,11 @@ export interface ExecucaoDoPedido {
   /** Próxima entrega prevista nos contratos das notas (informada pelo gestor do contrato). */
   proximaEntrega: { data: string; valor: number | null } | null;
   linhasSemNota: number;
+  /** Notas com fatura no Contratos.gov.br, a primeira fatura, a última liquidação e o último pagamento (migration 231). */
+  notasFaturadas: number;
+  faturadoEm: string | null;
+  liquidadoEm: string | null;
+  pagoEm: string | null;
 }
 
 /**
@@ -550,13 +843,18 @@ export function execucaoDoPedido(p: PedidoEmenda, notas: Map<string, NotaDaLinha
     if (n.entregaPrevista && (!proximaEntrega || n.entregaPrevista < proximaEntrega.data)) proximaEntrega = { data: n.entregaPrevista, valor: n.entregaPrevistaValor };
   }
   const soma = (f: (n: NotaDaLinha) => number | null) => [...porNota.values()].reduce((s, n) => s + (f(n) ?? 0), 0);
+  const datas = (f: (n: NotaDaLinha) => string | null | undefined) => [...porNota.values()].map(f).filter((d): d is string => Boolean(d)).sort();
   return {
     notas: porNota.size,
     empenhado: soma((n) => n.valorEmpenhado),
     liquidado: soma((n) => n.valorLiquidado),
     pago: soma((n) => n.valorPago),
     proximaEntrega,
-    linhasSemNota: linhasSemNota(p, notas).length
+    linhasSemNota: linhasSemNota(p, notas).length,
+    notasFaturadas: [...porNota.values()].filter((n) => (n.faturas ?? 0) > 0).length,
+    faturadoEm: datas((n) => n.faturadoEm)[0] ?? null,
+    liquidadoEm: datas((n) => n.liquidadoEm).at(-1) ?? null,
+    pagoEm: datas((n) => n.pagoEm).at(-1) ?? null
   };
 }
 
@@ -805,6 +1103,8 @@ export function solicitacaoDaLinha(p: PedidoEmenda, l: LinhaPedido): DocumentoSe
   const sols = solicitacoesComAta(p);
   const direta = sols.find((d) => d.linhas.some((x) => x.linhaId === l.id));
   if (direta) return direta;
+  // O item complementar do retificador (migration 251) espera a sua própria solicitação: a antiga da ata não o cobre.
+  if (l.complementar) return null;
   for (const ata of [...new Set(itensDaLinha(l).map((x) => ataDoItem(x.itemKey)))]) {
     const daAta = sols.filter((d) => d.ataKey === ata);
     if (daAta.length === 1) return daAta[0];
@@ -839,6 +1139,13 @@ export function situacaoDaLinha(p: PedidoEmenda, l: LinhaPedido, notas: Map<stri
     if (nota?.contractKey) {
       return { situacao: 'CONTRATADO', rotulo: `Contratado · ${numeroDaChave(nota.contractKey)}`, detalhe: notaLigada, pendente: !temNota, solicitacao };
     }
+    // Envio por ata (migration 248): o item devolvido ou ainda não enviado espera a CAEP.
+    if (l.ccgaSituacao === 'DEVOLVIDA') {
+      return { situacao: 'EMPENHADO', rotulo: 'Devolvido pela CCGA', detalhe: `${dataBR(l.ccgaEm)} · ${l.ccgaMotivo ?? 'sem motivo'}${l.ccgaExplicacao ? `: ${l.ccgaExplicacao}` : ''}`, pendente: true, solicitacao };
+    }
+    if (l.ccgaSituacao === null) {
+      return { situacao: 'EMPENHADO', rotulo: ROTULO_SITUACAO_LINHA.EMPENHADO.etiqueta, detalhe: `${notaLigada} · aguarda o envio à CCGA`, pendente: true, solicitacao };
+    }
     return { situacao: 'NA_CCGA', rotulo: ROTULO_SITUACAO_LINHA.NA_CCGA.etiqueta, detalhe: `aguarda o contrato no Contratos.gov.br${temNota ? '' : ' · sem nota ligada'}`, pendente: !temNota, solicitacao };
   }
   if (p.etapa === 'EMPENHADO' || temNota || l.empenhoDocumentoSei) {
@@ -847,7 +1154,7 @@ export function situacaoDaLinha(p: PedidoEmenda, l: LinhaPedido, notas: Map<stri
       ? 'sem nota ligada · o sistema procura de hora em hora'
       : jaEmpenhado(p.etapa)
         ? `${notaLigada} · aguarda o envio à CCGA`
-        : `NE ${nota!.nota} emitida${nota!.emitidaEm ? ` em ${dataBR(nota!.emitidaEm)}` : ''} · registre o empenho`;
+        : `NE ${nota!.nota} emitida${nota!.emitidaEm ? ` em ${dataBR(nota!.emitidaEm)}` : ''} · o empenho se registra sozinho com nota em todos os itens`;
     return { situacao: 'EMPENHADO', rotulo: ROTULO_SITUACAO_LINHA.EMPENHADO.etiqueta, detalhe, pendente: !temNota, solicitacao };
   }
   if (p.etapa === 'CGOFI') {
@@ -1001,8 +1308,7 @@ export interface TarefaDoPedido {
     | { tipo: 'envio'; rotulo: string };
 }
 
-const nomeDaLinha = (l: LinhaPedido, itens: Map<string, ItemCaep>): string =>
-  l.tipo === 'KIT' ? `${l.quantidade} ${l.kitNome ?? 'kit'}` : `${l.quantidade} ${itens.get(l.itemKey ?? '')?.nomeCurto?.trim() || curto(itens.get(l.itemKey ?? '')?.descricao ?? l.itemKey ?? '', 28)}`;
+const nomeDaLinha = (l: LinhaPedido, itens: Map<string, ItemCaep>): string => nomeDaLinhaDoPedido(l, itens, 28);
 const plural = (n: number, uma: string, varias: string) => `${n} ${n === 1 ? uma : varias}`;
 
 /**
@@ -1010,7 +1316,14 @@ const plural = (n: number, uma: string, varias: string) => `${n} ${n === 1 ? uma
  * solicitação e a assinatura de cada ata, as linhas sem solicitação marcada, os beneficiários a informar, as notas
  * que o sistema ainda não ligou, os contratos que a CCGA ainda não gerou e os avisos das atas.
  */
-export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, notas: Map<string, NotaDaLinha>, hoje: string, podeGerir: boolean): TarefaDoPedido[] {
+export function tarefasDoPedido(
+  p: PedidoEmenda,
+  itens: Map<string, ItemCaep>,
+  notas: Map<string, NotaDaLinha>,
+  hoje: string,
+  podeGerir: boolean,
+  precos?: Map<string, PrecoDoItem>
+): TarefaDoPedido[] {
   const t: TarefaDoPedido[] = [];
   if (p.etapa === 'CANCELADO') return t;
   const linhas = linhasAtivas(p);
@@ -1073,7 +1386,18 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
         });
       }
       const semSolicitacao = daAta.filter((l) => situacoes.get(l.id)!.situacao === 'SOLICITACAO_A_INFORMAR');
-      if (semSolicitacao.length && a.solicitacoes.length > 1) {
+      // Item do retificador depois do empenho (migration 251): nova solicitação só para ele, e depois nova rodada.
+      const complementares = semSolicitacao.filter((l) => l.complementar);
+      if (complementares.length && a.solicitacoes.length > 0) {
+        t.push({
+          chave: `sol-complementar-${a.ataKey}`,
+          titulo: `Solicitar o empenho complementar · ata ${a.numeroAta}`,
+          detalhe: `${nomes(complementares)}, ${complementares.length === 1 ? 'acrescentado' : 'acrescentados'} pelo ofício retificador. Informe a nova solicitação e marque só ${complementares.length === 1 ? 'este item' : 'estes itens'}.`,
+          tom: 'acao',
+          botao: { tipo: 'solicitacao', rotulo: 'Informar a solicitação', ataKey: a.ataKey }
+        });
+      }
+      if (semSolicitacao.length > complementares.length && a.solicitacoes.length > 1) {
         const ultima = a.solicitacoes[a.solicitacoes.length - 1];
         t.push({
           chave: `marcar-${a.ataKey}`,
@@ -1127,8 +1451,8 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
   }
 
   // 5) Avisos das atas e do pedido (os mesmos da lista), menos os que já viraram tarefa acima.
-  for (const a of avisosDoPedido(p, itens, hoje, notas)) {
-    if (a.tipo === 'semNota' || a.tipo === 'semAutorizacao' || a.tipo === 'semEnvioCgofi') continue;
+  for (const a of avisosDoPedido(p, itens, hoje, notas, undefined, undefined, precos)) {
+    if (a.tipo === 'semNota' || a.tipo === 'semAutorizacao' || a.tipo === 'semEnvioCgofi' || a.tipo === 'semBeneficiario' || a.tipo === 'pedidoParado') continue;
     t.push({ chave: `aviso-${a.tipo}`, titulo: a.curto, detalhe: a.texto, tom: 'atencao' });
   }
   // Depois do empenho a ata ainda importa: o contrato precisa estar assinado antes do fim.
@@ -1148,4 +1472,30 @@ export function tarefasDoPedido(p: PedidoEmenda, itens: Map<string, ItemCaep>, n
   }
   const ordem: Record<TarefaDoPedido['tom'], number> = { acao: 0, atencao: 1, espera: 2 };
   return t.sort((a, b) => ordem[a.tom] - ordem[b.tom]);
+}
+
+
+/** Reserva de um item: o total nos pedidos ativos e a parte que ainda não virou contrato. */
+export interface ReservaDoItem {
+  total: number;
+  semContrato: number;
+}
+
+/**
+ * Reserva de um item nos pedidos ativos. A linha que já tem contrato (nota ligada a um contrato do Contratos.gov.br)
+ * está na coluna Contratado da CAEP; o reservado da alocação é só o que ainda não virou contrato.
+ */
+export function reservaDoItem(pedidos: PedidoEmenda[], itemKey: string, notas: Map<string, NotaDaLinha>): ReservaDoItem {
+  let total = 0;
+  let semContrato = 0;
+  for (const p of pedidos) {
+    if (p.etapa === 'CANCELADO') continue;
+    for (const l of linhasAtivas(p)) {
+      const q = itensDaLinha(l).filter((x) => x.itemKey === itemKey).reduce((s, x) => s + x.quantidade, 0);
+      if (!q) continue;
+      total += q;
+      if (!notas.get(l.id)?.contractKey) semContrato += q;
+    }
+  }
+  return { total, semContrato };
 }

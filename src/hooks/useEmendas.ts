@@ -5,6 +5,8 @@ import { conferenciaPorItem, diferencasPorPedido } from '../utils/emendasEmpenho
 import { credorPorPedido } from '../utils/emendasConferenciaNota';
 import { useAuth } from '../context/AuthContext';
 import { semContratos } from '../types/rbac';
+import { definirGruposBeneficiarios, fetchGruposBeneficiarios } from '../services/captacaoEmendasService';
+import { mapaDeGrupos, type GrupoBeneficiario } from '../config/captacaoEmendas';
 import {
   fetchAutoresEmendas,
   fetchBeneficiariosEmendas,
@@ -15,27 +17,42 @@ import {
   fetchKitsEmendas,
   salvarBeneficiarioEmenda,
   salvarKitEmenda,
+  excluirKitEmenda,
   fetchPedidosEmendas,
   fetchReservadoPorItem,
+  fetchReservadoDoItem,
   fetchNotasDasLinhas,
   fetchConferenciaEmpenho,
   fetchCredorDiferente,
   fetchNotasSemPedido,
   ligarEmendaAoPedido,
+  ligarReservaAEmenda,
   removerEmendaDoPedido,
   salvarPedidoEmenda,
   avancarPedidoEmenda,
+  conferirOficioPedido,
   cancelarPedidoEmenda,
   registrarAnulacaoEmpenho,
   fetchExecucaoEmendas,
   fetchDadosDaAtaParaAutorizacao,
   informarSolicitacaoDaAta,
   registrarEnvioCgofi,
+  registrarInformacaoOrdem,
+  registrarOrdemDoContrato,
+  enviarPedidoCcga,
+  devolverItensCcga,
+  desfazerEnvioCcga,
+  voltarEtapaPedido,
+  fetchEmendasAContratar,
   fetchEmendasSiop,
+  fetchEmendaNoPainelSiop,
+  fetchEmendasPainelSemParlamentar,
   fetchContatosDasEmendas,
   fetchAsparDosOrgaos,
   salvarEmendaSiop,
   apagarEmendaSiop,
+  salvarValorOficioPedido,
+  registrarOficioRetificador,
   registrarContatoEmenda,
   salvarAsparEmenda,
   type AcaoPedido,
@@ -43,7 +60,9 @@ import {
   type BeneficiarioEmenda,
   type BeneficiarioParaSalvar,
   type ConferenciaEmpenho,
-  type KitParaSalvar
+  type KitParaSalvar,
+  type KitEmenda,
+  type PedidoEmenda
 } from '../services/emendasService';
 
 /** Mesma regra do banco (emendas.manage): coordenador e gestor de emendas alteram; a consulta só lê. */
@@ -77,8 +96,30 @@ export function useAutoresEmendas() {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'autores'], queryFn: fetchAutoresEmendas, staleTime: 10 * 60_000 });
 }
 
-export function useBeneficiariosEmendas() {
-  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'beneficiarios'], queryFn: fetchBeneficiariosEmendas });
+export function useBeneficiariosEmendas({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'beneficiarios'], queryFn: fetchBeneficiariosEmendas, enabled });
+}
+
+/** Grupo confirmado de cada beneficiário (migration 218). `data` null: migration ainda não aplicada. */
+export function useGruposBeneficiarios({ enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'grupos-beneficiarios'], queryFn: fetchGruposBeneficiarios, staleTime: 5 * 60_000, enabled });
+}
+
+const SEM_GRUPOS = new Map<string, GrupoBeneficiario>();
+
+/** Mapa beneficiário → grupo confirmado (colunas de Captação principal); vazio enquanto carrega. */
+export function useMapaGruposBeneficiarios(): Map<string, GrupoBeneficiario> {
+  const { data } = useGruposBeneficiarios();
+  return useMemo(() => (data ? mapaDeGrupos(data) : SEM_GRUPOS), [data]);
+}
+
+export function useDefinirGruposBeneficiarios() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: definirGruposBeneficiarios,
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'grupos-beneficiarios'] })
+  });
 }
 
 export function useBeneficiariosDiferentes() {
@@ -135,12 +176,26 @@ export function useSalvarKit() {
   });
 }
 
+export function useExcluirKit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (k: Pick<KitEmenda, 'id' | 'versao'>) => excluirKitEmenda(k),
+    retry: 0,
+    onSettled: () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'kits'] })
+  });
+}
+
 export function usePedidosEmendas({ enabled = true }: LeituraOpcional = {}) {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'pedidos'], queryFn: fetchPedidosEmendas, enabled });
 }
 
 export function useReservadoPorItem() {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'reservado'], queryFn: fetchReservadoPorItem });
+}
+
+/** Reservado a parlamentares de um item: mínimo da CAEP na alocação e no remanejamento da cota SENASP. */
+export function useReservadoDoItem(itemKey: string, { enabled = true }: LeituraOpcional = {}) {
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'reservado', itemKey], queryFn: () => fetchReservadoDoItem(itemKey), enabled: enabled && Boolean(itemKey) });
 }
 
 /** Nota de empenho e execução de cada linha empenhada (migration 164; o banco refaz de hora em hora). */
@@ -191,6 +246,11 @@ export function useLigarEmendaAoPedido() {
   });
 }
 
+export function useLigarReservaAEmenda() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: (v: { pedidoId: string; versao: number; emendaId: string }) => ligarReservaAEmenda(v.pedidoId, v.versao, v.emendaId), retry: 0, onSettled: invalidar });
+}
+
 export function useRemoverEmendaDoPedido() {
   const qc = useQueryClient();
   return useMutation({
@@ -200,10 +260,24 @@ export function useRemoverEmendaDoPedido() {
   });
 }
 
-/** Pedido mexe no saldo: recarrega pedidos, reservado e kits (kits possíveis). */
+/**
+ * Pedido mexe no saldo: recarrega pedidos, reservado e kits (kits possíveis). Os pedidos vêm primeiro e sozinhos (a
+ * janela espera só por eles); o resto das Emendas recarrega depois, sem segurar a janela. Recarregar tudo junto
+ * disparava umas 25 consultas de uma vez e, com o banco lento, a lista de pedidos podia ficar com a etapa antiga.
+ */
 function useInvalidarPedidos() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS] });
+  return async () => {
+    await qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS, 'pedidos'], exact: true });
+    void qc.invalidateQueries({ queryKey: [...CHAVE_EMENDAS], predicate: (q) => q.queryKey[1] !== 'pedidos' });
+  };
+}
+
+/** Se a lista de pedidos na tela já tem a versão que o banco devolveu ao gravar (senão, a tela ficou para trás). */
+export function usePedidoEmDiaNaTela() {
+  const qc = useQueryClient();
+  return (id: string, versao: number): boolean =>
+    (qc.getQueryData<PedidoEmenda[]>([...CHAVE_EMENDAS, 'pedidos'])?.find((p) => p.id === id)?.versao ?? 0) >= versao;
 }
 
 export function useSalvarPedido() {
@@ -220,6 +294,11 @@ export function useAvancarPedido() {
   });
 }
 
+export function useConferirOficio() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: conferirOficioPedido, retry: 0, onSettled: invalidar });
+}
+
 export function useInformarSolicitacaoDaAta() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: informarSolicitacaoDaAta, retry: 0, onSettled: invalidar });
@@ -228,6 +307,50 @@ export function useInformarSolicitacaoDaAta() {
 export function useRegistrarEnvioCgofi() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: registrarEnvioCgofi, retry: 0, onSettled: invalidar });
+}
+
+/** Envio à CCGA por ata, desfazer o envio e voltar etapa (migration 248): só coordenador e gestor de emendas. */
+export function useEnviarCcga() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: enviarPedidoCcga, retry: 0, onSettled: invalidar });
+}
+
+export function useDesfazerEnvioCcga() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: desfazerEnvioCcga, retry: 0, onSettled: invalidar });
+}
+
+export function useVoltarEtapa() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: voltarEtapaPedido, retry: 0, onSettled: invalidar });
+}
+
+/** O gestor da ata devolve à CAEP (migration 248): recarrega o Início dele e os pedidos. */
+export function useDevolverCcga() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: devolverItensCcga, retry: 0, onSettled: invalidar });
+}
+
+/** Itens a contratar pelas emendas e envios desfeitos, para o Início do gestor da ata e do coordenador (migration 248). */
+export function useEmendasAContratar({ enabled = true }: LeituraOpcional = {}) {
+  const { role } = useAuth();
+  return useQuery({
+    queryKey: [...CHAVE_EMENDAS, 'a-contratar'],
+    queryFn: fetchEmendasAContratar,
+    enabled: enabled && (role === 'admin' || role === 'gestor'),
+    staleTime: 5 * 60_000
+  });
+}
+
+/** Informação da ComprasSUSP e Ordem de Fornecimento por contrato (migration 250). */
+export function useRegistrarInformacaoOrdem() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: registrarInformacaoOrdem, retry: 0, onSettled: invalidar });
+}
+
+export function useRegistrarOrdemDoContrato() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: registrarOrdemDoContrato, retry: 0, onSettled: invalidar });
 }
 
 /** Execução de cada emenda pelo Portal da Transparência (migration 204), lida uma vez por dia pelo servidor. */
@@ -255,6 +378,22 @@ export function useEmendasSiop({ enabled = true }: LeituraOpcional = {}) {
   return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-siop'], queryFn: fetchEmendasSiop, enabled });
 }
 
+/** A emenda como está no Painel do Orçamento Federal do SIOP (migration 252), lida pelo servidor uma vez por dia. */
+export function useEmendaNoPainelSiop(codigo: string | null) {
+  return useQuery({
+    queryKey: [...CHAVE_EMENDAS, 'emenda-painel-siop', codigo],
+    queryFn: () => fetchEmendaNoPainelSiop(codigo as string),
+    enabled: Boolean(codigo),
+    staleTime: 30 * 60_000
+  });
+}
+
+/** Emendas do painel do SIOP sem parlamentar no cadastro (migration 252): só quem registra emendas. */
+export function useEmendasPainelSemParlamentar() {
+  const podeGerir = usePodeGerirEmendas();
+  return useQuery({ queryKey: [...CHAVE_EMENDAS, 'emendas-painel-sem-parlamentar'], queryFn: fetchEmendasPainelSemParlamentar, enabled: podeGerir });
+}
+
 /** Contatos das emendas e ASPAR dos órgãos: só quem trata com eles, coordenador e gestor de emendas (o banco também). */
 export function useContatosDasEmendas({ enabled = true }: LeituraOpcional = {}) {
   const podeGerir = usePodeGerirEmendas();
@@ -270,6 +409,22 @@ export function useAsparDosOrgaos() {
 export function useSalvarEmendaSiop() {
   const invalidar = useInvalidarPedidos();
   return useMutation({ mutationFn: salvarEmendaSiop, retry: 0, onSettled: invalidar });
+}
+
+/** Ofício retificador antes do empenho (migration 249). */
+export function useRegistrarOficioRetificador() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({ mutationFn: registrarOficioRetificador, retry: 0, onSettled: invalidar });
+}
+
+export function useSalvarValorOficio() {
+  const invalidar = useInvalidarPedidos();
+  return useMutation({
+    mutationFn: (v: { id: string; versao: number; valor: number; documentoSei: string }) =>
+      salvarValorOficioPedido(v.id, v.versao, { valor: v.valor, documentoSei: v.documentoSei, retificador: false }),
+    retry: 0,
+    onSettled: invalidar
+  });
 }
 
 export function useApagarEmendaSiop() {

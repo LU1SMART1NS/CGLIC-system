@@ -12,7 +12,7 @@ import {
   BellRing,
   CalendarOff,
   UsersRound,
-  Briefcase,
+  Files,
   ListChecks,
   Building2,
   Link2,
@@ -22,7 +22,8 @@ import {
   ScrollText,
   ClipboardList,
   Building,
-  Contact
+  Contact,
+  ClipboardCheck
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AppRole } from '../types/rbac';
@@ -33,6 +34,8 @@ export interface NavItem {
   icon?: LucideIcon;
   route?: string;
   children?: NavItem[];
+  /** Aba em que a área abre ao clicar no menu, quando não é a primeira da barra (id de um filho). */
+  entradaId?: string;
   /** 'active' = funcionalidade real, navegável. 'planned' = item de roadmap, desabilitado ("Em breve"). */
   status: 'active' | 'planned';
   badge?: {
@@ -52,8 +55,17 @@ export interface NavItem {
    * filtro — ver `filterNavigationByRole`.
    */
   allowedRoles?: AppRole[];
+  /**
+   * Área com grupos: mostra a segunda linha (páginas do grupo) mesmo quando o grupo tem uma página só. No Início, todo
+   * grupo tem "Painel" embaixo, para as telas terem o mesmo desenho (decisão de 11/11/2026).
+   */
+  segundaLinhaSempre?: boolean;
   /** Rótulo do grupo em que a aba aparece na barra de abas da área (ex.: Ajustes → Gestão · Emendas · Acesso). */
   group?: string;
+  /** Número ao lado da aba (ex.: Atas › A montar mostra quantas atas faltam montar). */
+  contagem?: 'atas-a-montar';
+  /** A aba tem filtros próprios: não leva os filtros em comum da Carteira ao ser aberta. */
+  filtrosProprios?: boolean;
   /** 'bottom' = área fica no pé do menu chave (ex.: Ajustes). */
   placement?: 'bottom';
 }
@@ -62,14 +74,16 @@ export interface NavItem {
  * Navegação do CGLIC em dois níveis: o menu chave (trilha de ícones no desktop,
  * barra inferior no celular) lista as áreas, e as páginas de cada área aparecem
  * como abas no topo da página (`AreaTabs`). As rotas são as mesmas de antes.
- * - Início, em dois grupos como Ajustes: Atas e Contratos (Painel /instrumentos · Distribuição /atas/distribuicao) e
+ * - Início, em grupos como Ajustes: Atas e Contratos (Painel /instrumentos · Distribuição /atas/distribuicao), Fiscalização
+ *   (Painel /fiscalizacao/inicio · Distribuição /fiscalizacao/distribuicao; o gestor de fiscalização vê só o Painel dele) e
  *   Emendas (/emendas/inicio, coordenador e consulta). O gestor de emendas tem o Painel dele em /emendas/inicio.
- * - Carteira: Atas (/atas) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
+ * - Carteira: Atas (Registradas /atas · A montar /atas/montar) · Contratos (/contratos) · Itens (/itens). Unidade interna e órgão partícipe
  *   são filtros dessas abas, não páginas.
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
- * - Vínculos: Contratos à ata · Empenhos ao contrato · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
- * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
- * - Emendas: Pedidos (Ver por pedido ou por autor) · Itens e kits (Por item · Por kit) (CAEP reparte a sua alocação entre parlamentares; migration 155)
+ * - Vínculos: Contratos à ata · Empenhos ao contrato (citadas em fatura · sem contrato) · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
+ * - Emendas: Parlamentares (/emendas/parlamentares) · Emendas (/emendas/emendas) · Pedidos (/emendas/pedidos) · Itens
+ *   (/emendas/itens: Por item · Por kit). Cada linha abre a tela 360 (Pedido, Parlamentar, Emenda), como na Carteira.
+ * - Financeiro (última área antes de Ajustes): Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
  * - Ajustes (no pé do menu), em três grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas), Emendas (Beneficiários) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
@@ -79,6 +93,7 @@ export const navigationConfig: NavItem[] = [
     label: 'Início',
     icon: LayoutDashboard,
     status: 'active',
+    segundaLinhaSempre: true,
     children: [
       {
         id: 'gestao-instrumentos',
@@ -116,33 +131,81 @@ export const navigationConfig: NavItem[] = [
       },
       {
         // O coordenador vê o mesmo resumo das emendas numa aba do Início dele (decisão de 23/10/2026); a consulta
-        // também, só leitura, porque já lê Pedidos e Itens e kits (decisão de 25/10/2026).
+        // também, só leitura, porque já lê Pedidos e Itens (decisão de 25/10/2026).
         id: 'emendas-inicio-coordenador',
-        label: 'Emendas',
-        icon: ScrollText,
+        label: 'Painel',
+        icon: LayoutDashboard,
         route: '/emendas/inicio',
         status: 'active',
         matchPrefixes: ['/emendas/inicio'],
         allowedRoles: ['admin', 'leitor'],
         group: 'Emendas'
+      },
+      {
+        // Fiscalização de contratos (migration 259): o gestor de fiscalização tem só o Painel dele, como o gestor de
+        // emendas; o coordenador e a consulta veem o grupo Fiscalização (Painel · Distribuição) no Início deles.
+        id: 'fiscalizacao-inicio',
+        label: 'Painel',
+        icon: LayoutDashboard,
+        route: '/fiscalizacao/inicio',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/inicio'],
+        allowedRoles: ['gestor_fiscalizacao']
+      },
+      {
+        id: 'fiscalizacao-inicio-coordenador',
+        label: 'Painel',
+        icon: LayoutDashboard,
+        route: '/fiscalizacao/inicio',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/inicio'],
+        allowedRoles: ['admin', 'leitor'],
+        group: 'Fiscalização'
+      },
+      {
+        // Só o coordenador decide quem fiscaliza cada contrato e escolhe o fiscal da SFC/CGLIC.
+        id: 'fiscalizacao-distribuicao',
+        label: 'Distribuição',
+        icon: UsersRound,
+        route: '/fiscalizacao/distribuicao',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/distribuicao'],
+        allowedRoles: ['admin'],
+        group: 'Fiscalização'
       }
     ]
   },
   {
     id: 'carteira',
-    label: 'Carteira',
-    icon: Briefcase,
+    label: 'Atas e Contratos',
+    icon: Files,
     status: 'active',
     children: [
       {
+        // Atas em duas linhas, como o Início (pedido de 29/10/2026): "Atas · Contratos · Itens" e, embaixo da aba
+        // Atas, "Registradas · A montar". Quem não monta ata vê só a primeira linha.
         id: 'atas-consulta',
-        label: 'Atas',
+        label: 'Registradas',
         icon: Package,
         route: '/atas',
         status: 'active',
         matchPrefixes: ['/atas', '/atas/detalhe'],
-        excludePrefixes: ['/atas/distribuicao'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor']
+        excludePrefixes: ['/atas/distribuicao', '/atas/montar'],
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor'],
+        group: 'Atas'
+      },
+      {
+        // Pregões homologados sem ata (migration 238): quem monta a ata é o gestor da ata ou o coordenador (D8).
+        id: 'atas-a-montar',
+        label: 'A montar',
+        icon: FileSignature,
+        route: '/atas/montar',
+        status: 'active',
+        matchPrefixes: ['/atas/montar'],
+        allowedRoles: ['admin', 'gestor'],
+        group: 'Atas',
+        contagem: 'atas-a-montar',
+        filtrosProprios: true
       },
       {
         id: 'contratos-acompanhamento',
@@ -152,7 +215,8 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/contratos'],
         // Gestor de saldo cuida da alocação: sem contratos (o empenhado por unidade fica na Alocação e no Item).
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'leitor', 'gestor_fiscalizacao'],
+        group: 'Contratos'
       },
       {
         id: 'itens-carteira',
@@ -161,7 +225,8 @@ export const navigationConfig: NavItem[] = [
         route: '/itens',
         status: 'active',
         matchPrefixes: ['/itens'],
-        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'gestor_saldos', 'gestor_emendas', 'leitor'],
+        group: 'Itens'
       }
     ]
   },
@@ -207,7 +272,7 @@ export const navigationConfig: NavItem[] = [
         icon: FileSignature,
         route: '/vinculacao/empenhos-contrato',
         status: 'active',
-        matchPrefixes: ['/vinculacao/empenhos-contrato'],
+        matchPrefixes: ['/vinculacao/empenhos-contrato', '/vinculacao/notas-fora-do-contrato'],
         allowedRoles: ['admin', 'gestor']
       },
       {
@@ -218,6 +283,104 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/vinculacao/empenhos-itens'],
         allowedRoles: ['admin', 'gestor']
+      }
+    ]
+  },
+  {
+    // Emendas parlamentares (migration 155): só o gestor de emendas (CAEP) e o coordenador alteram; a consulta lê.
+    id: 'emendas',
+    label: 'Emendas',
+    icon: ScrollText,
+    status: 'active',
+    // Abas na ordem da cadeia (Parlamentares → Emendas → Pedidos → Itens); o trabalho do dia a dia segue abrindo em Pedidos.
+    entradaId: 'emendas-pedidos',
+    children: [
+      {
+        // Parlamentares (protótipo aprovado em 27/10/2026): a linha abre o Parlamentar 360, que também acende Emendas.
+        id: 'emendas-parlamentares',
+        label: 'Parlamentares',
+        icon: Users,
+        route: '/emendas/parlamentares',
+        status: 'active',
+        matchPrefixes: ['/emendas/parlamentares'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
+        // Emendas (protótipo aprovado em 27/10/2026): a linha abre a Emenda 360, que também acende Emendas.
+        id: 'emendas-emendas',
+        label: 'Emendas',
+        icon: FileText,
+        route: '/emendas/emendas',
+        status: 'active',
+        matchPrefixes: ['/emendas/emendas'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
+        id: 'emendas-pedidos',
+        label: 'Pedidos',
+        icon: ClipboardList,
+        route: '/emendas/pedidos',
+        status: 'active',
+        matchPrefixes: ['/emendas/pedidos'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
+        id: 'emendas-itens',
+        label: 'Itens',
+        icon: Boxes,
+        route: '/emendas/itens',
+        status: 'active',
+        matchPrefixes: ['/emendas/itens'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      }
+    ]
+  },
+  {
+    // Fiscalização de contratos pela SFC/CGLIC (migration 260): a área de trabalho, como Emendas; o Painel e a
+    // Distribuição ficam no Início.
+    id: 'fiscalizacao',
+    label: 'Fiscalização',
+    icon: ClipboardCheck,
+    status: 'active',
+    // Abas na ordem decidida em 11/11/2026: Programas (cadastro da migration 265) · Contratos · Beneficiários · Itens;
+    // abre em Contratos, a fila de trabalho do fiscal.
+    entradaId: 'fiscalizacao-contratos',
+    children: [
+      {
+        id: 'fiscalizacao-programas',
+        label: 'Programas',
+        icon: Network,
+        route: '/fiscalizacao/programas',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/programas'],
+        allowedRoles: ['admin', 'gestor_fiscalizacao', 'leitor']
+      },
+      {
+        id: 'fiscalizacao-contratos',
+        label: 'Contratos',
+        icon: FileText,
+        route: '/fiscalizacao/contratos',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/contratos'],
+        allowedRoles: ['admin', 'gestor_fiscalizacao', 'leitor']
+      },
+      {
+        id: 'fiscalizacao-beneficiarios',
+        label: 'Beneficiários',
+        icon: Building2,
+        route: '/fiscalizacao/beneficiarios',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/beneficiarios'],
+        allowedRoles: ['admin', 'gestor_fiscalizacao', 'leitor']
+      },
+      {
+        id: 'fiscalizacao-itens',
+        label: 'Itens',
+        icon: Boxes,
+        route: '/fiscalizacao/itens',
+        status: 'active',
+        matchPrefixes: ['/fiscalizacao/itens', '/fiscalizacao/entregas'],
+        allowedRoles: ['admin', 'gestor_fiscalizacao', 'leitor']
       }
     ]
   },
@@ -235,7 +398,8 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/empenhos'],
         // Gestor de saldo fica fora do Financeiro: o empenhado que ele usa já aparece no Item e na Alocação.
-        allowedRoles: ['admin', 'gestor', 'leitor']
+        // O gestor de fiscalização consulta (sem gravar), como a consulta: acompanha o pagamento dos contratos que fiscaliza.
+        allowedRoles: ['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']
       },
       {
         id: 'execucao-pagamentos',
@@ -244,34 +408,7 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         route: '/pagamentos',
         matchPrefixes: ['/pagamentos'],
-        allowedRoles: ['admin', 'gestor', 'leitor']
-      }
-    ]
-  },
-  {
-    // Emendas parlamentares (migration 155): só o gestor de emendas (CAEP) e o coordenador alteram; a consulta lê.
-    id: 'emendas',
-    label: 'Emendas',
-    icon: ScrollText,
-    status: 'active',
-    children: [
-      {
-        id: 'emendas-pedidos',
-        label: 'Pedidos',
-        icon: ClipboardList,
-        route: '/emendas/pedidos',
-        status: 'active',
-        matchPrefixes: ['/emendas/pedidos'],
-        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
-      },
-      {
-        id: 'emendas-itens',
-        label: 'Itens e kits',
-        icon: Boxes,
-        route: '/emendas/itens',
-        status: 'active',
-        matchPrefixes: ['/emendas/itens'],
-        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+        allowedRoles: ['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']
       }
     ]
   },
@@ -282,6 +419,17 @@ export const navigationConfig: NavItem[] = [
     status: 'active',
     placement: 'bottom',
     children: [
+      {
+        // Cadastro dos programas da Fiscalização (migration 265), antes dos Modelos de Gestão (decisão de 11/11/2026).
+        id: 'config-programas',
+        label: 'Programas',
+        icon: Network,
+        route: '/configuracoes/programas',
+        status: 'active',
+        group: 'Gestão',
+        matchPrefixes: ['/configuracoes/programas'],
+        allowedRoles: ['admin', 'gestor_fiscalizacao']
+      },
       {
         id: 'config-modelos',
         label: 'Modelos de Gestão',
@@ -346,6 +494,17 @@ export const navigationConfig: NavItem[] = [
         allowedRoles: ['admin', 'gestor_emendas', 'leitor']
       },
       {
+        // Conselho de cada beneficiário (migration 218): base da coluna Captação principal das telas de Pedidos.
+        id: 'emendas-grupos-beneficiarios',
+        label: 'Grupos dos beneficiários',
+        icon: Network,
+        route: '/emendas/grupos-beneficiarios',
+        status: 'active',
+        group: 'Emendas',
+        matchPrefixes: ['/emendas/grupos-beneficiarios'],
+        allowedRoles: ['admin', 'gestor_emendas', 'leitor']
+      },
+      {
         // Assessoria parlamentar dos órgãos estaduais (migration 205): contatos para a emenda sem pedido.
         id: 'emendas-aspar',
         label: 'ASPAR dos órgãos',
@@ -382,7 +541,9 @@ export const navigationConfig: NavItem[] = [
 
 /** Primeira tela do perfil ao entrar no sistema: o gestor de emendas tem o próprio Início. */
 export function rotaInicialDoPerfil(role: AppRole | null): string {
-  return role === 'gestor_emendas' ? '/emendas/inicio' : '/instrumentos';
+  if (role === 'gestor_emendas') return '/emendas/inicio';
+  if (role === 'gestor_fiscalizacao') return '/fiscalizacao/inicio';
+  return '/instrumentos';
 }
 
 /**
@@ -435,10 +596,12 @@ export interface BreadcrumbEntry {
 const staticRouteLabels: Record<string, string> = {
   '/instrumentos': 'Início',
   '/atas': 'Carteira de Atas',
+  '/atas/montar': 'Atas a montar',
   '/itens': 'Carteira de Itens',
-  '/atas/distribuicao': 'Central de Distribuição',
+  '/atas/distribuicao': 'Distribuição',
   '/contratos': 'Carteira de Contratos',
   '/configuracoes/modelos': 'Modelos de Gestão',
+  '/configuracoes/programas': 'Programas',
   '/pagamentos': 'Pagamentos',
   '/empenhos': 'Empenhos',
   '/vinculacao/contratos': 'Contratos à ata',
@@ -459,7 +622,7 @@ export function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
   if (pathname === '/atas/distribuicao') {
     return [
       { label: 'Início', route: '/instrumentos' },
-      { label: 'Central de Distribuição', route: '/atas/distribuicao' }
+      { label: 'Distribuição', route: '/atas/distribuicao' }
     ];
   }
 

@@ -338,6 +338,24 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       expect(rm.attention.items.filter((i) => i.category === 'ATA_CRITICA')).toHaveLength(1);
     });
 
+    it('pedido enviado com a resposta vencida vira "Cobrar resposta", crítico com 2 dias úteis (migration 225)', () => {
+      const now = new Date('2026-11-13T12:00:00-03:00'); // sexta-feira
+      const ata = { numeroAtaRegistroPreco: '00060/2025', codigoUnidadeGerenciadora: '200331', dataVigenciaFinal: '2027-06-30' } as ArpRecord;
+      const tarefa = (id: string, prazoResposta: string) => ({
+        id, nome: 'Pedir ao fornecedor a manifestação', prazo: '2026-10-06', status: 'EM_ANDAMENTO', acao: 'ORIENTAR',
+        pedidoEnviadoEm: '2026-10-06', pedidoSei: '36188820', prazoResposta
+      });
+      const plan = { id: 'p', ataKey: '00060/2025', templateNome: 'T', appliedAt: '', progresso: {}, macrotarefas: [{ id: 'm', planId: 'p', nome: 'Início', ordem: 1, tarefas: [tarefa('a', '2026-11-11'), tarefa('b', '2026-11-12'), tarefa('c', '2026-11-20')] }] } as any;
+      const rm = buildManagementDashboardReadModel({ uasg: '200331', arps: [ata], ataPlans: { '00060/2025': plan }, currentDate: now });
+      const porId = new Map(rm.attention.items.map((i) => [i.id, i]));
+      expect(porId.get('ATT-ATA-TASK-a')).toMatchObject({ category: 'COBRAR_RESPOSTA', severity: 'CRITICA' });
+      expect(porId.get('ATT-ATA-TASK-a')!.description).toContain('Pedido em 06/10/2026 (SEI 36188820) · resposta era até 11/11/2026 · 2 dias úteis de atraso');
+      expect(porId.get('ATT-ATA-TASK-b')).toMatchObject({ category: 'COBRAR_RESPOSTA', severity: 'URGENTE' });
+      // Resposta ainda no prazo: continua como tarefa próxima, não como cobrança.
+      expect(porId.get('ATT-ATA-TASK-c')?.category).toBe('TAREFA_PROXIMA');
+      expect(rm.attention.items.some((i) => i.category === 'TAREFA_ATRASADA')).toBe(false);
+    });
+
     it('ata de outro órgão vigente com o número de uma ata da CGLIC vencida: alertas, plano e link próprios', () => {
       const now = new Date('2026-10-09T12:00:00-03:00');
       const daCglicVencida = { numeroAtaRegistroPreco: '00005/2025', codigoUnidadeGerenciadora: '200331', dataVigenciaFinal: '2026-01-01' } as ArpRecord;

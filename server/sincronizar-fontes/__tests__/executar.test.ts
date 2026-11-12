@@ -28,11 +28,15 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarAutoresEmendas: vi.fn(async () => ({ legislatura: 57, deputados: 648, deputadosNoCargo: 513, senadores: 126, senadoresNoCargo: 81 })),
     sincronizarReajusteAtas: vi.fn(async () => sucesso(29)),
     contarReajusteAtasPendentes: vi.fn(async () => ({ pendentes: 149, semEdital: 64, mesesProjetados: 25 })),
+    sincronizarAtasAMontar: vi.fn(async () => sucesso(15)),
+    testarAtasAMontar: vi.fn(async () => ({ compras: 15, itensLidos: 2, minutasLidas: 1, pendentes: 0, falhas: [], pregoes: [], naFila: 0, leituras: [] })),
     sincronizarNotasDasEmendasDoTesouro: vi.fn(async () => sucesso(181)),
     contarNotasEmendasTesouroPendentes: vi.fn(async () => ({ pendentes: 198, amostra: '2026NE000043', amostraUgs: [] })),
     medirEmendasDoPortal: vi.fn(async () => ({ ano2026: { emendas: 12 } })),
     sincronizarExecucaoDasEmendas: vi.fn(async () => sucesso(44)),
     contarExecucaoEmendasPendentes: vi.fn(async () => ({ emendas: 44, amostra: null })),
+    sincronizarEmendasDoPainelSiop: vi.fn(async () => sucesso(561)),
+    testarEmendasDoPainelSiop: vi.fn(async () => ({ linhasNoPainel: 562, linhasLidas: 79 })),
     chaveDoPortal: () => 'chave-de-teste',
     sincronizarEmpenhosDaCarteira: vi.fn(async () => sucesso(9)),
     consultarEmpenhosDeTeste: vi.fn(async () => ({ carteira: 10, elegiveis: 6, amostra: '200331-00296-2026', empenhosDaAmostra: 1 })),
@@ -286,6 +290,40 @@ describe('reajuste das atas', () => {
     const r = await executarPedido({ recurso: 'reajuste_atas', forcar: false, dry: true }, d);
     expect(d.sincronizarReajusteAtas).not.toHaveBeenCalled();
     expect(r).toMatchObject({ dry: true, consulta: { pendentes: 149 } });
+  });
+});
+
+describe('emendas do painel do SIOP', () => {
+  it('vale para todas as carteiras (sem UASG) e grava com o orçamento de tempo', async () => {
+    expect(validarPedido({ recurso: 'emendas_siop_painel' })).toMatchObject({ ok: true, pedido: { recurso: 'emendas_siop_painel' } });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'emendas_siop_painel', forcar: true, dry: false }, d);
+    expect(d.sincronizarEmendasDoPainelSiop).toHaveBeenCalledWith({ forcar: true, orcamentoMs: expect.any(Number) });
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 561 } });
+  });
+
+  it('no teste (dry) lê o painel sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'emendas_siop_painel', forcar: false, dry: true }, d);
+    expect(d.sincronizarEmendasDoPainelSiop).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ dry: true, consulta: { linhasNoPainel: 562 } });
+  });
+});
+
+describe('atas a montar', () => {
+  it('vale para as duas carteiras (sem UASG) e lê a minuta com o leitor de PDF do servidor', async () => {
+    expect(validarPedido({ recurso: 'atas_a_montar' })).toMatchObject({ ok: true, pedido: { recurso: 'atas_a_montar' } });
+    const d = deps();
+    const r = await executarPedido({ recurso: 'atas_a_montar', forcar: false, dry: false }, d);
+    expect(d.sincronizarAtasAMontar).toHaveBeenCalledWith(expect.objectContaining({ forcar: false, orcamentoMs: expect.any(Number), leitor: expect.objectContaining({ textoDoPdf: expect.any(Function) }) }));
+    expect(r).toMatchObject({ dry: false, resultado: { status: 'SUCESSO', total: 15 } });
+  });
+
+  it('no teste (dry) lê sem gravar', async () => {
+    const d = deps();
+    const r = await executarPedido({ recurso: 'atas_a_montar', forcar: false, dry: true }, d);
+    expect(d.sincronizarAtasAMontar).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ dry: true, consulta: { compras: 15, minutasLidas: 1 } });
   });
 });
 

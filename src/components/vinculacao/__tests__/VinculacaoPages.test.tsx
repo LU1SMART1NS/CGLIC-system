@@ -25,6 +25,10 @@ vi.mock('../../../hooks/useAvisosResolvidos', async (orig) => ({ ...(await orig<
 // Janelas: não abrem no render estático; os hooks delas não rodam.
 vi.mock('../VincularAosItensDialog', () => ({ VincularAosItensDialog: () => null }));
 vi.mock('../../alocacao/AlocarUnidadeModal', () => ({ AlocarUnidadeModal: () => null }));
+// Divisão planejada na montagem da ata (migration 240): o item "a" (sem alocação) tem uma.
+vi.mock('../../../hooks/useAtasAMontar', () => ({
+  useDivisoesDasAtasMontadas: () => new Map([['a', { itemKey: 'a', unidades: [{ unidade: 'CAEP', quantidade: 50 }, { unidade: 'DFNSP', quantidade: 29 }], montadaPorNome: 'Alan', montadaEm: '2026-10-29' }]])
+}));
 vi.mock('@tanstack/react-query', async (orig) => ({ ...(await orig<typeof import('@tanstack/react-query')>()), useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 
 import { useAuth } from '../../../context/AuthContext';
@@ -228,7 +232,7 @@ describe('Vínculos → Empenhos ao contrato', () => {
 
   it('lista as notas a conferir do escopo do gestor, com o veredito e o botão Conferir, sem vincular à mão', () => {
     const html = render(<EmpenhosContratoPage />);
-    expect(html).toContain('Empenhos citados fora do contrato');
+    expect(html).toContain('Empenhos ao contrato');
     expect(html).toContain('2024NE000412');
     expect(html).toContain('Fora dos contratos');
     expect(html).toContain('vinc-ne-contrato-conferir-1490|g412');
@@ -356,6 +360,8 @@ describe('Alocação → Itens às unidades', () => {
     expect(html).not.toContain('Capacete balístico');
     expect(html).toContain('vinc-itens-alocar-a');
     expect(html).not.toContain('ainda sem unidade');
+    // Sem alocação e com divisão planejada na montagem da ata: a linha mostra a sugestão.
+    expect(html).toContain('Planejado na montagem: CAEP 50 · DFNSP 29');
   });
 
   it('parcialmente alocados mostram o que falta e as unidades', () => {
@@ -491,7 +497,7 @@ describe('Vínculos: uma leitura falha, a faixa avisa e o resto fica', () => {
   it('Empenhos ao contrato: as notas não carregaram → faixa e "não carregaram", sem travar a tela', () => {
     vi.mocked(useEmpenhosForaDoContrato).mockReturnValue({ ...falhou(), isLoading: false } as any);
     const html = render(<EmpenhosContratoPage />);
-    expect(html).toContain('Empenhos citados fora do contrato');
+    expect(html).toContain('Empenhos ao contrato');
     expect(html).toContain('data-testid="vinc-ne-contrato-fontes-com-falha"');
     expect(html).toContain('<strong>Notas citadas fora do contrato</strong>');
     expect(html).toContain('data-testid="vinc-ne-contrato-nao-carregou"');

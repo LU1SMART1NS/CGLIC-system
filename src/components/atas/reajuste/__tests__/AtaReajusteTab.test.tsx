@@ -22,9 +22,10 @@ const ATA_93: ReajusteDaAta = {
     numeroItem: '00001', precoHomologado: 14695, homologadoLido: true, precoAtual: 15454.73, percentualNoPreco: 5.17, precoDevido: 15454.73,
     precoAplicado: 15454.73, situacao: 'EM_DIA', proximoEfeito: null, proximoSituacao: null, proximoPercentual: null, proximoMesesEstimados: null, precoProjetado: null
   }],
+  apostilados: [],
   publicados: [{
     id: 'r1', origem: 'PNCP', efeitoInicio: '2026-01-09', percentual: 5.17, periodoInicio: '2024-10-01', periodoFim: '2025-09-01', documentoSequencial: 2,
-    documentoTitulo: 'PRIMEIRO TERMO ADITIVO DA ATA DE REGISTRO DE PREÇOS', documentoPublicadoEm: '2026-01-15', seiCitado: '29255776', seiApostilamento: null, informadoEm: null
+    documentoTitulo: 'PRIMEIRO TERMO ADITIVO DA ATA DE REGISTRO DE PREÇOS', documentoPublicadoEm: '2026-01-15', seiCitado: '29255776', seiDocumento: '33963384', seiApostilamento: null, informadoEm: null
   }],
   indices: [{ mes: '2024-10-01', variacao: 0.56, oficial: true }]
 };
@@ -67,10 +68,61 @@ describe('AtaReajusteTab', () => {
     expect(html).toContain('conta do sistema: 5,17%, confere');
     expect(html).toContain('out/2024 a set/2025');
     expect(html).toContain('PRIMEIRO TERMO ADITIVO DA ATA DE REGISTRO DE PREÇOS');
-    expect(html).toContain('ESTEIRA ERGOMÉTRICA PARA EXERCÍCIOS');
-    expect(html).toContain('+5,17% já aplicado');
     expect(html).toContain('Os preços estão em dia');
     expect(html).toContain('data-testid="reajuste-linha-do-tempo"');
+  });
+
+  it('item em dia: a projeção vira uma linha e a tabela fica recolhida', () => {
+    const html = desenhar();
+    expect(html).toContain('Nada a aplicar no item: o reajuste de 5,17% com efeitos desde 09/01/2026 já está no preço, e não há novo reajuste até o fim da vigência.');
+    expect(html).toContain('data-testid="reajuste-ver-itens"');
+    expect(html).not.toContain('data-testid="reajuste-itens"');
+    expect(html).not.toContain('a aplicar<');
+  });
+
+  it('preço devido com sobra de arredondamento não mostra "a aplicar" (ata 00056/2025, 06/11/2026)', () => {
+    const it0 = { ...ATA_93.itens[0], precoHomologado: 273000, precoAtual: 285899, precoDevido: 285899.0043, percentualNoPreco: 4.72 };
+    const html = desenhar({ dados: { ...ATA_93, itens: [it0] }, saldos: [{ numeroItem: '1', saldo: 174 }] });
+    expect(html).toContain('Nada a aplicar');
+    expect(html).not.toContain('R$ 0,75');
+  });
+
+  it('item com pendência: tabela inteira, com homologado e saldo nas colunas de preço e impacto', () => {
+    const it0 = { ...ATA_93.itens[0], situacao: 'DEVIDO' as const, precoAtual: 14695, percentualNoPreco: 0, precoDevido: 15454.73 };
+    const html = desenhar({ dados: { ...ATA_93, itens: [it0] } });
+    expect(html).toContain('data-testid="reajuste-itens"');
+    expect(html).not.toContain('data-testid="reajuste-itens-resumo"');
+    expect(html).toContain('ESTEIRA ERGOMÉTRICA PARA EXERCÍCIOS');
+    expect(html).toContain('homologado R$');
+    expect(html).toContain('saldo 324');
+    expect(html).toContain('a aplicar');
+  });
+
+  it('mostra o SEI do próprio termo lido do PNCP e não oferece excluir o reajuste do PNCP', () => {
+    const html = desenhar();
+    expect(html).toContain('33963384');
+    expect(html).not.toContain('data-testid="reajuste-excluir-1"');
+  });
+
+  it('o reajuste informado pelo gestor pode ser excluído (só por quem edita)', () => {
+    // Ata 00056/2025 (06/11/2026): o termo do PNCP e a cópia informada pelo gestor.
+    const dados: ReajusteDaAta = {
+      ...ATA_93,
+      ciclos: [
+        { ...ATA_93.ciclos[0] },
+        { ...ATA_93.ciclos[0], ciclo: 2, dataBase: '2026-01-09', aniversario: '2027-01-09', efeitoInicio: '2026-01-10', reajusteId: 'r2' }
+      ],
+      publicados: [
+        ATA_93.publicados[0],
+        { ...ATA_93.publicados[0], id: 'r2', origem: 'INFORMADO', documentoSequencial: null, documentoTitulo: null, documentoPublicadoEm: null,
+          seiCitado: null, seiDocumento: null, seiApostilamento: '36938954', informadoEm: '2026-11-05T20:40:29Z' }
+      ]
+    };
+    const html = desenhar({ dados });
+    expect(html).toContain('data-testid="reajuste-excluir-2"');
+    expect(html).not.toContain('data-testid="reajuste-excluir-1"');
+    expect(html).toContain('36938954');
+    expect(desenhar({ dados, podeEditar: false })).not.toContain('data-testid="reajuste-excluir-2"');
   });
 
   it('gestor da ata ou coordenador: botões de informar e corrigir', () => {

@@ -22,6 +22,9 @@ const controller = (somenteLeitura: boolean): TaskPlanController => ({
   useRegistrarResposta: mutacao as unknown as TaskPlanController['useRegistrarResposta'],
   useAjustarPrazo: mutacao as unknown as TaskPlanController['useAjustarPrazo'],
   useAtualizarModulo: mutacao as unknown as TaskPlanController['useAtualizarModulo'],
+  useDispensarModulo: mutacao as unknown as TaskPlanController['useDispensarModulo'],
+  useResponderPergunta: mutacao as unknown as TaskPlanController['useResponderPergunta'],
+  useConcluirPregao: mutacao as unknown as TaskPlanController['useConcluirPregao'],
   templates: [{ id: 't1', nome: 'Modelo padrão' }],
   loadingTemplates: false,
   applyTemplate: acao,
@@ -193,5 +196,78 @@ describe('Plano do gestor: ação, marcas do orientar e contadores (modelo de ge
     expect(html).toContain('O que pedir (2)');
     expect(html).not.toContain('Pedido enviado');
     expect(html).not.toContain('Informar processo');
+  });
+});
+
+describe('Plano automático: módulo que entrou sozinho, fonte e pergunta da etapa (migration 225)', () => {
+  const planoAuto: ContractTaskPlan = {
+    ...plano,
+    progresso: { total: 3, concluidas: 1, pendentes: 2, emAndamento: 0, naoAplicaveis: 0, atrasadas: 0, percentual: 33 },
+    macrotarefas: [
+      {
+        id: 'm1',
+        planId: 'p1',
+        nome: 'Publicação',
+        ordem: 1,
+        modulo: { id: 'mod1', nome: 'Contrato assinado', appliedAt: '2026-11-03T10:00:00Z', origem: 'AUTO', motivoAuto: 'Contrato lido do Contratos.gov.br (assinado em 01/11/2026)' },
+        tarefas: [
+          {
+            id: 'f1',
+            macrotaskId: 'm1',
+            nome: 'Lançar o contrato e publicar no PNCP',
+            ordem: 1,
+            status: 'CONCLUIDA',
+            acao: 'LANCAR',
+            fechadaPelaFonte: 'Publicado no PNCP (controle 00394494000136-2-000312/2026)',
+            criadoEm: '2026-11-03',
+            atualizadoEm: '2026-11-05'
+          },
+          {
+            id: 'g0',
+            macrotaskId: 'm1',
+            nome: 'O contrato exige garantia?',
+            ordem: 2,
+            status: 'PENDENTE',
+            acao: 'CONFERIR',
+            perguntaEtapa: true,
+            criadoEm: '2026-11-03',
+            atualizadoEm: '2026-11-03'
+          }
+        ]
+      },
+      {
+        id: 'm2',
+        planId: 'p1',
+        nome: 'Extinção',
+        ordem: 2,
+        modulo: { id: 'mod2', nome: 'Encerramento', origem: 'AUTO', dispensadoEm: '2026-11-04T12:00:00Z', dispensadoPorNome: 'Maria', dispensaJustificativa: 'Contrato já encerrado pela CPL.' },
+        tarefas: [
+          { id: 'e1', macrotaskId: 'm2', nome: 'Conferir o recebimento definitivo', ordem: 1, status: 'NAO_APLICAVEL', criadoEm: '2026-11-03', atualizadoEm: '2026-11-04' }
+        ]
+      }
+    ]
+  };
+
+  it('gestor: vê que o módulo entrou sozinho e por quê, pode dispensar, reabrir e responder a pergunta', () => {
+    const html = render(planoAuto, false);
+    expect(html).toContain('Entrou sozinho em 03/11/2026');
+    expect(html).toContain('Contrato lido do Contratos.gov.br');
+    expect(html).toContain('Dispensar módulo');
+    expect(html).toContain('Fechada pela fonte');
+    expect(html).toContain('00394494000136-2-000312/2026');
+    expect(html).toContain('Reabrir');
+    expect(html).toMatch(/>Sim<\/button>/);
+    expect(html).toMatch(/>Não<\/button>/);
+    expect(html).toContain('Dispensado');
+    expect(html).toContain('por Maria: Contrato já encerrado pela CPL.');
+  });
+
+  it('consulta: vê a origem e a fonte, sem dispensar, reabrir ou responder', () => {
+    const html = render(planoAuto, true);
+    expect(html).toContain('Entrou sozinho');
+    expect(html).toContain('Fechada pela fonte');
+    expect(html).not.toContain('Dispensar módulo');
+    expect(html).not.toContain('Reabrir');
+    expect(html).not.toMatch(/>Sim<\/button>/);
   });
 });

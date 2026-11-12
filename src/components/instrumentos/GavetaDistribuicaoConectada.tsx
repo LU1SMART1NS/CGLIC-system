@@ -1,5 +1,5 @@
 import React from 'react';
-import { GavetaDistribuicao, type OcupacoesDaEquipe } from './GavetaDistribuicao';
+import { GavetaDistribuicao, type DestinoSemGestorDoPainel, type OcupacoesDaEquipe } from './GavetaDistribuicao';
 import type { ResumoDoGestor } from './painelResumo';
 import { usePendenciasVinculoAta } from '../atas/distribuicao/usePendenciasVinculoAta';
 import { useDistribuicaoDaCarteira } from '../atas/distribuicao/useDistribuicaoDaCarteira';
@@ -16,7 +16,7 @@ export const GavetaDistribuicaoConectada: React.FC<{
   linhas: ResumoDoGestor[];
   isLoading: boolean;
   onEscolherGestor: (nome: string) => void;
-  onDistribuir: () => void;
+  onDistribuir: (destino: DestinoSemGestorDoPainel) => void;
 }> = (props) => {
   const { atas, contratos, links, isBusy } = usePendenciasVinculoAta();
   const { data: ajustes } = useComplexidadeAjustes();

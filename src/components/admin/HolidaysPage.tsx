@@ -25,7 +25,7 @@ import {
 } from '../../services/holidayService';
 import { formatDateBR, parseDateBRT } from '../../services/temporalEngineService';
 import { DataTable } from '../../design-system/components/DataTable';
-import { AppInput, AppSelect } from '../../design-system/components/FormFields';
+import { AppInput, AppSelect, AppDateInput } from '../../design-system/components/FormFields';
 import { AdminListShell } from './shared/AdminListShell';
 
 const WEEKDAYS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
@@ -142,7 +142,7 @@ export const HolidaysPage: React.FC = () => {
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Feriados"
-        subtitle="Datas sem expediente descontadas dos prazos em dias úteis."
+        subtitle="Datas sem expediente descontadas dos prazos em dias úteis. O sistema cadastra sozinho o ano corrente e o seguinte, se estiverem vazios; confira os pontos facultativos com a portaria do ano."
         icon={<CalendarOff size={26} color="var(--primary)" aria-hidden="true" />}
         actions={
           <>
@@ -271,7 +271,7 @@ export const HolidaysPage: React.FC = () => {
       >
         {editing && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            <AppInput label="Data" type="date" value={editing.form.data} onChange={(e) => setForm({ data: e.target.value })} data-testid="holiday-form-data" />
+            <AppDateInput label="Data" value={editing.form.data} onValueChange={(v) => setForm({ data: v })} data-testid="holiday-form-data" />
             <AppInput label="Nome" type="text" maxLength={150} value={editing.form.nome} onChange={(e) => setForm({ nome: e.target.value })} placeholder="Ex.: Dia do Servidor Público" data-testid="holiday-form-nome" />
             <AppSelect label="Tipo" value={editing.form.tipo} onChange={(e) => setForm({ tipo: e.target.value as HolidayTipo })} data-testid="holiday-form-tipo">
               {(Object.keys(HOLIDAY_TIPO_LABEL) as HolidayTipo[]).map((t) => (

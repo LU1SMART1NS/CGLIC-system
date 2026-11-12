@@ -58,7 +58,8 @@ export interface Instrument360HeroProps {
   manager?: React.ReactNode;
   /** Linha logo abaixo do título (ex.: fornecedor). */
   subtitle?: React.ReactNode;
-  objeto?: string;
+  /** Texto corrido (com "ver mais" quando longo) ou uma linha já montada pela tela (ex.: resumo dos itens do pedido). */
+  objeto?: string | React.ReactNode;
   /** Primeira linha da coluna lateral, acima das datas (ex.: ata de origem). */
   origin?: Instrument360Origin;
   /** Linhas da coluna lateral, abaixo do gestor e da origem. */
@@ -110,7 +111,8 @@ const Instrument360HeroCompleto: React.FC<Instrument360HeroProps> = ({
   children
 }) => {
   const [objetoAberto, setObjetoAberto] = React.useState(false);
-  const texto = toSentenceCaseIfAllCaps(objeto);
+  const objetoMontado = objeto != null && typeof objeto !== 'string' ? objeto : null;
+  const texto = toSentenceCaseIfAllCaps(typeof objeto === 'string' ? objeto : null);
   const objetoLongo = Boolean(texto && texto.length > OBJETO_LIMITE);
   const dock = useInstrument360Dock();
   const min = dock?.min ?? false;
@@ -167,10 +169,11 @@ const Instrument360HeroCompleto: React.FC<Instrument360HeroProps> = ({
             {dockSubtitle && <span className="i360-sub-inline" aria-hidden="true">{dockSubtitle}</span>}
           </div>
 
-          {(subtitle || texto) && (
+          {(subtitle || texto || objetoMontado) && (
             <Fold>
               <div style={{ display: 'grid', gap: '2px', paddingTop: '4px' }}>
                 {subtitle && <div style={{ fontSize: '0.9rem', color: COLORS.inkSoft }}>{subtitle}</div>}
+                {objetoMontado && <div style={{ marginTop: subtitle ? '2px' : 0, fontSize: '0.92rem', color: COLORS.inkSoft, lineHeight: 1.45, maxWidth: '1200px' }}>{objetoMontado}</div>}
                 {texto && (
                   <p style={{ margin: subtitle ? '2px 0 0 0' : 0, fontSize: '0.92rem', color: COLORS.inkSoft, lineHeight: 1.45, maxWidth: '1200px' }}>
                     {objetoLongo && !objetoAberto ? `${texto.slice(0, OBJETO_LIMITE).trimEnd()}…` : texto}

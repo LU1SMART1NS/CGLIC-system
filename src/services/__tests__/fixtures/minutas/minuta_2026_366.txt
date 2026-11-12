@@ -1,0 +1,103 @@
+Processo Administrativo n° xxxxx.xxxxxx/xxxx-xx
+1.1. A presente Ata tem por objeto o registro de preços para a eventual contratação de solução integrada de blindagem
+automotiva, contemplando o fornecimento de plataforma veicular nova e a execução completa da blindagem integral nível
+III, especificado(s) no(s) item(ns) XX do Termo de Referência, anexo XX do edital de licitação n.º xxx/xxxxx, que é parte
+integrante desta Ata, assim como as propostas cujos preços tenham sido registrados, independentemente de transcrição.
+2. DOS PREÇOS, ESPECIFICAÇÕES E QUANTITATIVOS
+2.1. O preço registrado, as especificações do objeto, as quantidades mínimas e máximas de cada item, fornecedor(es) e as demais
+condições ofertadas na(s) proposta(s) são as que seguem:
+Fornecedor [razão social, CNPJ/MF, endereço, contatos, representante]
+Item Descrição Marca
+/Modelo Unidade Quantidade Valor
+Unitário
+Valor
+Total
+1 Solução integrada de veículo base e blindagem automotiva nível III integral, em
+plataforma tipo Camioneta/SUV de grande porte, caracterizada und 655
+2 Solução integrada de veículo base e blindagem automotiva nível III integral, em
+plataforma tipo Camioneta/SUV de grande porte, caracterizada und 578
+1.2. A listagem do cadastro de reserva referente ao presente registro de preços consta como anexo a esta Ata.
+3. ÓRGÃO(S) GERENCIADOR E PARTICIPANTE(S)
+3.1. O órgão gerenciador será a Secretaria Nacional de Segurança Pública - UASG 200331.
+Órgão Gerenciador: Secretaria Nacional de Segurança Pública / SENASP - UASG 200331
+ITEM DESCRIÇÃO UNIDADE QUANTIDADE
+1 Solução integrada de veículo base e blindagem automotiva nível III integral, em plataforma
+tipo Camioneta/SUV de grande porte, caracterizada und 27
+2 Solução integrada de veículo base e blindagem automotiva nível III integral, em plataforma
+tipo Camioneta/SUV de grande porte, descaracterizada und 6
+3.2. Além do gerenciador, são órgãos e entidades públicas participantes do registro de preços:
+Órgão Participantes
+ITEM DESCRIÇÃO
+1 Solução integrada de veículo base e blindagem automotiva nível III integral, em plataforma tipo Camioneta/SUV de
+grande porte, caracterizada
+UASG ORGÃO UF QUANTIDADE
+200323 Diretoria do Sistema Penitenciário Federal DF 60
+200334 Coordenação de Administração (COAD) Polícia Federal DF 55
+450955 Secretaria de Estado de Segurança Pública do Maranhão MA 3
+453079 Secretaria da Segurança Pública do Estado do Paraná PR 15
+458494 Polícia Militar do Estado do Amazonas AM 25
+462843 Polícia Militar do Estado do Acre AC 3
+463337 Polícia Militar do Estado de Santa Catarina SC 15
+925722 Secretaria de Estado da Seg. Púb. e Defesa Social do Estado do ES ES 12
+925957 Secretaria da Seg. Pública do Estado de TO TO 1
+=== PAG 3 ===
+3 de 10
+926016 Polícia Militar do Distrito Federal DF 12
+926111 Corpo de Bombeiros Militar do Estado de AL AL 4
+926474 Secretaria de Estado da Segurança Pública do Estado de AL AL 4
+926477 Polícia Militar do Estado do Amapá AP 10
+926974 Polícia Militar do Estado do Ceará CE 30
+927042 Secretaria da Segurança Pública do Estado da Bahia BA 30
+927094 Fundo Estadual de Segurança Pública do Estado do CE CE 30
+927115 Polícia Civil do Estado de Minas Gerais MG 30
+927119 Secretaria de Segurança Pública do Estado Piauí PI 20
+927136 Polícia Militar do Estado de Sergipe SE 5
+927499 Secretaria de Estado de Polícia Civil do Estado do RJ RJ 9
+927570 Secretaria Estadual da Polícia Militar do Estado do RJ RJ 100
+928082 Administração Penitenciária do Estado do Amapá AP 2
+928093 Fundo Estadual de Segurança Pública do Estado de RO RO 6
+928441 Polícia Militar de Pernambuco PE 35
+928595 Delegacia Geral de Polícia Civil do Estado do Piauí PI 10
+929604 Fundo Estadual de Segurança Pública do Estado de SC SC 100
+930201 Polícia Civil do Estado da Paraíba PB 2
+TOTAL 628
+Órgãos Participantes
+ITEM DESCRIÇÃO
+2 Solução integrada de veículo base e blindagem automotiva nível III integral, em plataforma tipo Camioneta/SUV de
+grande porte, descaracterizada
+UASG ORGÃO UF QUANTIDADE
+170010 Receita Federal do Brasil DF 35
+200109 Polícia Rodoviária Federal DF 4
+200323 Diretoria do Sistema Penitenciário Federal DF 71
+200334 Coordenação de Administração (COAD) Polícia Federal DF 12
+450955 Secretaria de Estado de Segurança Pública do Maranhão MA 3
+453079 Secretaria da Segurança Pública do Estado do Paraná PR 156
+453129 Corpo de Bombeiros Militar do Estado do Ceará CE 2
+458494 Polícia Militar do Estado do Amazonas AM 13
+463337 Polícia Militar do Estado de Santa Catarina SC 15
+925722 Secretaria de Estado da Seg. Púb. e Defesa Social do Estado do ES ES 12
+925957 Secretaria da Seg. Pública do Estado de TO TO 1
+926111 Corpo de Bombeiros Militar do Estado de AL AL 4
+926474 Secretaria de Estado da Segurança Pública do Estado de AL AL 4
+926926 Superintendência da Polícia Civil do Estado do Ceará CE 10
+926974 Polícia Militar do Estado do Ceará CE 5
+927005 Polícia Militar do Estado de Rondônia RO 1
+927042 Secretaria da Segurança Pública do Estado da Bahia BA 31
+927094 Fundo Estadual de Segurança Pública do Estado do CE CE 5
+927115 Polícia Civil do Estado de Minas Gerais MG 20
+927119 Secretaria de Segurança Pública do Estado Piauí PI 20
+927136 Polícia Militar do Estado de Sergipe SE 5
+927499 Secretaria de Estado de Polícia Civil do Estado do RJ RJ 10
+927570 Secretaria Estadual da Polícia Militar do Estado do RJ RJ 10
+927667 Polícia Civil do Estado do Acre AC 2
+928082 Administração Penitenciária do Estado do Amapá AP 4
+=== PAG 4 ===
+4 de 10
+928093 Fundo Estadual de Segurança Pública do Estado de RO RO 5
+928595 Delegacia Geral de Polícia Civil do Estado do Piauí PI 10
+929604 Fundo Estadual de Segurança Pública do Estado de SC SC 100
+930890 Secretaria de Estado de Segurança Pública do Estado de RJ RJ 2
+TOTAL 572
+3.3. A requisição mínima e máxima por pedido será respectivamente de 1 e 50 unidades, do quantitativo total individualizado do
+órgão integrante da ata de registro de preços.
+4. DA ADESÃO À ATA DE R

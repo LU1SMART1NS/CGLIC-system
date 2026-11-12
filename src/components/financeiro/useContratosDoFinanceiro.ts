@@ -4,6 +4,8 @@ import { useContractsPortfolio } from '../../hooks/useContractsPortfolio';
 import { canFilterByGestor } from '../carteira/carteiraGestor';
 import { formatContractNumber } from '../../utils/contractNumber';
 import { naoCarregou } from '../fonte/useLeiturasComFalha';
+import { useContratosFiscalizacao } from '../../hooks/useFiscalizacao';
+import { ehDoFiscal } from '../../utils/fiscalizacao';
 
 export interface ContratoDoFinanceiro {
   numero: string;
@@ -31,11 +33,12 @@ export function uasgDaChave(contractKey: string): string {
 
 /**
  * Contratos da carteira (mesmo cache da Carteira de Contratos) para as abas do Financeiro: número, fornecedor e
- * gestor de cada chave, e o recorte do perfil "gestor", que vê só o financeiro dos próprios contratos. Usa a versão
+ * gestor de cada chave, e o recorte do perfil "gestor", que vê só o financeiro dos próprios contratos, e do gestor de
+ * fiscalização, que vê só o dos contratos em que é o fiscal. Usa a versão
  * leve da carteira, sem o painel do Início: nenhuma aba do Financeiro mostra as pendências dos contratos.
  */
 export function useContratosDoFinanceiro({ enabled = true }: { enabled?: boolean } = {}) {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   // enabled: false (números do menu antes de a tela encher) não lê nada; as telas do Financeiro e de Vínculos leem na hora.
   const { rows, isLoading, isLoadingScope, leiturasDosContratos } = useContractsPortfolio({ pendencias: false, enabled });
   const showGestorFilter = canFilterByGestor(role);
@@ -56,11 +59,20 @@ export function useContratosDoFinanceiro({ enabled = true }: { enabled?: boolean
     return map;
   }, [rows]);
 
-  const leituras = leiturasDosContratos ?? [];
-  const contratosNaoCarregaram = leituras.some((l) => (role === 'gestor' || l.rotulo.startsWith('contratos da UASG')) && naoCarregou(l.query));
+  // Gestor de fiscalização: o recorte vem da Fiscalização (contratos em que ele é o fiscal), não da carteira.
+  const ehFiscal = role === 'gestor_fiscalizacao';
+  const fiscalizacao = useContratosFiscalizacao({ enabled: enabled && ehFiscal });
+  const leituras = [...(leiturasDosContratos ?? []), ...(ehFiscal ? [{ rotulo: 'contratos da fiscalização', query: fiscalizacao }] : [])];
+  const contratosNaoCarregaram =
+    leituras.some((l) => (role === 'gestor' || l.rotulo.startsWith('contratos da UASG')) && naoCarregou(l.query)) ||
+    (ehFiscal && naoCarregou(fiscalizacao));
 
-  /** Perfil gestor: só as chaves da carteira dele. Demais perfis: sem recorte (null). */
-  const escopo = useMemo(() => (role === 'gestor' ? new Set(porChave.keys()) : null), [role, porChave]);
+  /** Gestor: só as chaves da carteira dele. Gestor de fiscalização: só os contratos em que é o fiscal. Demais perfis: sem recorte (null). */
+  const escopo = useMemo(() => {
+    if (role === 'gestor') return new Set(porChave.keys());
+    if (ehFiscal) return new Set((fiscalizacao.data ?? []).filter((c) => ehDoFiscal(c, user?.id)).map((c) => c.contractKey));
+    return null;
+  }, [role, ehFiscal, porChave, fiscalizacao.data, user?.id]);
 
   /** Contratos para abrir um ciclo de pagamento: vigentes primeiro, depois pelo número. */
   const lista = useMemo(
@@ -87,7 +99,7 @@ export function useContratosDoFinanceiro({ enabled = true }: { enabled?: boolean
     lista,
     escopo,
     showGestorFilter,
-    isLoading: isLoading || (role === 'gestor' && isLoadingScope),
+    isLoading: isLoading || (role === 'gestor' && isLoadingScope) || (ehFiscal && fiscalizacao.isLoading),
     /** Contratos, gestores e o escopo do gestor: se falharem, a tela avisa (sem eles o gestor veria o Financeiro vazio). */
     leituras,
     /**

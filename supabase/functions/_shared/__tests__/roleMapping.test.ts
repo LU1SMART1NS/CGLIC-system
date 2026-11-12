@@ -23,6 +23,11 @@ describe('mapPerfilToDbRole — Fase 0.1 (fail-closed RBAC)', () => {
     expect(mapPerfilToDbRole('gestor_emenda')).toBeNull();
   });
 
+  it('Fiscalização: perfil "gestor_fiscalizacao" -> "gestor_fiscalizacao"', () => {
+    expect(mapPerfilToDbRole('gestor_fiscalizacao')).toBe('gestor_fiscalizacao');
+    expect(mapPerfilToDbRole('gestor_fiscal')).toBeNull();
+  });
+
   it('Caso 3: perfil customizado explicitamente não mapeado -> null (nenhuma role)', () => {
     expect(mapPerfilToDbRole('custom-1700000000-123')).toBeNull();
     expect(mapPerfilToDbRole('gestor_saldo')).toBeNull();

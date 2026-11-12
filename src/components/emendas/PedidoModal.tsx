@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Plus, Search } from 'lucide-react';
 import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
@@ -7,20 +7,24 @@ import { InfoHint } from '../../design-system/components/InfoHint';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { AppInput, AppTextarea } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
-import { usePodeGerirEmendas, useSalvarPedido } from '../../hooks/useEmendas';
+import { useEmendasSiop, usePedidosEmendas, usePodeGerirEmendas, useSalvarPedido } from '../../hooks/useEmendas';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
 import { buscarItensCaep, calcularKit, curto, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta } from '../../utils/emendasKits';
 import { casaBusca, daUfDoParlamentar, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import { identificacaoDoPedido, itensDaLinha, numeroDaEmendaEmTexto, orgaoDoPedido, precoParaEmenda, valorDaLinha, VOLTA_AO_OFICIO } from '../../utils/emendasPedidos';
-import { nomeDoItem, notaDoPreco } from '../../utils/emendasQuadro';
+import { emendaDoPedidoNoQuadro, nomeDoItem } from '../../utils/emendasQuadro';
+import { podeReservar, reajusteDoItem } from '../../utils/emendasReajuste';
 import type { SobraDaEmenda } from '../../utils/emendasSobra';
 import { agruparPorBeneficiario, beneficiarioDaLinha, chaveDoConteudo, definirNoGrupo, gradePorItem, moverLinha, repartirLinha, type GrupoReserva } from '../../utils/emendasReserva';
 import { formatarTelefone, localDoBeneficiario, nomeESigla, rotuloBeneficiario, soDigitos } from '../../services/emendasService';
 import type { AutorEmenda, BeneficiarioEmenda, EmendaSiop, ItemCaep, ItemDoKit, KitEmenda, PedidoEmenda } from '../../services/emendasService';
-import { numeroDaEmenda } from '../../utils/emendasSemPedido';
+import { lerNumeroDaEmenda, numeroDaEmenda } from '../../utils/emendasSemPedido';
+import { emendaSugerida, emendasParaAReserva, emendasSemPedido } from '../../utils/emendasDaReserva';
+import { lerValorBR, mascaraTelefone, mascaraValorBR } from '../../utils/mascaras';
 import { QuadroGabinete } from './QuadroGabinete';
+import { BeneficiarioModal } from './BeneficiarioModal';
 
 interface Props {
   pedido: PedidoEmenda | null;
@@ -37,6 +41,8 @@ interface Props {
   emenda?: EmendaSiop | null;
   /** "Novo pedido com a sobra" (migration 204): o parlamentar e a emenda já escolhidos, e o disponível dela no topo. */
   sobra?: SobraDaEmenda | null;
+  /** Nova reserva aberta pelo Parlamentar 360: o parlamentar já vem escolhido e não troca. */
+  autorInicial?: string | null;
   onClose: () => void;
 }
 
@@ -72,7 +78,6 @@ type Pendencia = { texto: string; alvo: string; lado: 'itens' | 'pedido' };
 const MAX_RESULTADOS = 40;
 const MAX_BENEFICIARIOS = 60;
 const CHAVE_RASCUNHO = 'emendas-reserva-rascunho';
-const MARCAS = ['¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const TIPO_AUTOR: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
 const iniciais = (nome: string) =>
@@ -83,27 +88,24 @@ const iniciais = (nome: string) =>
     .map((p) => p[0]?.toUpperCase())
     .join('');
 const metaDoAutor = (a: AutorEmenda) => [TIPO_AUTOR[a.tipo], a.partido, a.uf, a.emExercicio === false ? 'fora do cargo' : null].filter(Boolean).join(' · ');
-const doisPrecos = (previsto: number, hoje: number) => Math.abs(previsto - hoje) > 0.004;
 let seq = 0;
 const novaChave = () => `n${++seq}`;
 const novoGrupo = () => `g${++seq}`;
 
-/** Cartão de item ou kit na busca da reserva: nome do quadro (descrição no ⓘ), preço numa coluna fixa e saldo no pé. */
+/** Cartão de item ou kit na busca da reserva: nome na ata (descrição no ⓘ), preço numa coluna fixa e saldo no pé. */
 function CartaoResultado(props: {
   nome: React.ReactNode;
   descricao: string;
   rotuloDescricao: string;
   meta: React.ReactNode;
-  previsto: number;
-  hoje: number;
+  preco: number;
   unidade: string;
-  notaPreco?: string | null;
   saldo: React.ReactNode;
   noPedido: number;
   pode: boolean;
   acao: React.ReactNode;
 }) {
-  const { nome, descricao, rotuloDescricao, meta, previsto, hoje, unidade, notaPreco, saldo, noPedido, pode, acao } = props;
+  const { nome, descricao, rotuloDescricao, meta, preco, unidade, saldo, noPedido, pode, acao } = props;
   return (
     <div className={`reserva-resultado${pode ? '' : ' reserva-resultado--off'}${noPedido ? ' reserva-resultado--no-pedido' : ''}`}>
       <div className="reserva-resultado__nome">
@@ -111,10 +113,9 @@ function CartaoResultado(props: {
         <InfoHint content={descricao} label={rotuloDescricao} testId="emendas-pedido-descricao" />
       </div>
       <div className="reserva-resultado__meta reserva-mudo">{meta}</div>
-      <div className="reserva-resultado__preco" title={notaPreco ?? undefined}>
-        <span className="reserva-resultado__valor">{formatCurrency(previsto)}</span>
-        <span className="reserva-mudo">{unidade} · previsto</span>
-        {doisPrecos(previsto, hoje) && <span className="reserva-mudo">hoje {formatCurrency(hoje)}</span>}
+      <div className="reserva-resultado__preco">
+        <span className="reserva-resultado__valor">{formatCurrency(preco)}</span>
+        <span className="reserva-mudo">{unidade}</span>
       </div>
       <div className="reserva-resultado__acao">{acao}</div>
       <div className="reserva-resultado__saldo">{saldo}</div>
@@ -148,10 +149,10 @@ function guardarRascunho(r: Rascunho | null) {
  * beneficiários, Mover para leva a linha inteira, e a visão Por item mostra a grade item × beneficiário. Os valores são
  * os previstos para a emenda, os mesmos do quadro do parlamentar. A trava de saldo é conferida aqui e de novo no banco.
  */
-export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, beneficiarios, reservadoFora, ultimoContato, hoje, emenda = null, sobra, onClose }) => {
+export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, beneficiarios, reservadoFora, ultimoContato, hoje, emenda = null, sobra, autorInicial = null, onClose }) => {
   const salvar = useSalvarPedido();
   const toast = useToast();
-  const { precos, ipca, semPrevisao } = usePrecosParaEmenda();
+  const { precos, semPrevisao } = usePrecosParaEmenda();
   const semAutorGravado = Boolean(pedido && !pedido.autorId);
 
   // Linhas gravadas: um grupo por beneficiário, na ordem em que aparecem.
@@ -164,12 +165,22 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // O pedido da emenda e o da sobra não usam o rascunho da reserva comum: abrem já com o parlamentar.
-  const [rascunhoAntigo] = useState(() => (pedido || emenda || sobra ? null : lerRascunho()));
-  const contatoDaEmenda = emenda ? ultimoContato.get(emenda.autorId) : undefined;
+  const [rascunhoAntigo] = useState(() => (pedido || emenda || sobra || autorInicial ? null : lerRascunho()));
+  // Pedido da emenda ou do Parlamentar 360: o contato da assessoria vem do último pedido do parlamentar.
+  const contatoDaEmenda = emenda ? ultimoContato.get(emenda.autorId) : autorInicial ? ultimoContato.get(autorInicial) : undefined;
 
-  const [autorId, setAutorId] = useState(pedido?.autorId ?? emenda?.autorId ?? sobra?.autorId ?? '');
-  // Reserva para um órgão (migration 163): nova reserva sem parlamentar.
-  const [paraOrgao, setParaOrgao] = useState(false);
+  const [autorId, setAutorId] = useState(pedido?.autorId ?? emenda?.autorId ?? sobra?.autorId ?? autorInicial ?? '');
+  // D1 (migration 243): a reserva para um órgão sem parlamentar acabou; a que ficou de antes indica o parlamentar.
+  const paraOrgao = false;
+  // Migration 243: todo pedido nasce com a emenda. O pedido antigo sem emenda informa a emenda ao gravar.
+  const emendasQ = useEmendasSiop();
+  const pedidosQ = usePedidosEmendas();
+  const precisaEmenda = !sobra && !emenda && (!pedido || (!pedido.emendaId && !pedido.siopEmenda));
+  /** id da emenda registrada, 'nova' (nº e ano digitados) ou nulo (ainda não tocou: vale a sugerida). */
+  const [emendaEscolhida, setEmendaEscolhida] = useState<string | null>(null);
+  const [novaNumero, setNovaNumero] = useState('');
+  const [novaAno, setNovaAno] = useState(Number(hoje.slice(0, 4)));
+  const [novaValor, setNovaValor] = useState('');
   const [buscaAutor, setBuscaAutor] = useState('');
   const [observacao, setObservacao] = useState(pedido?.observacao ?? '');
   const [obsAberta, setObsAberta] = useState(Boolean(pedido?.observacao));
@@ -193,10 +204,11 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const [lado, setLado] = useState<'itens' | 'pedido'>('itens');
   const [seletorAberto, setSeletorAberto] = useState<string | null>(null);
   const [buscaBeneficiario, setBuscaBeneficiario] = useState('');
+  /** Cadastro de órgão aberto por cima da reserva: bloco que recebe o órgão salvo e o que estava digitado na busca. */
+  const [cadastro, setCadastro] = useState<{ alvo: string; nome: string } | null>(null);
   const [todasUfs, setTodasUfs] = useState(false);
   const [abertas, setAbertas] = useState<ReadonlySet<string>>(new Set());
   const [recado, setRecado] = useState<{ texto: string; desfazer?: () => void } | null>(null);
-  const [confirmarSaida, setConfirmarSaida] = useState(false);
   const [tentou, setTentou] = useState(false);
   const [piscando, setPiscando] = useState<string | null>(null);
   const [rascunhoEm, setRascunhoEm] = useState<string | null>(null);
@@ -230,22 +242,12 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const livre = (k: string) => saldoAntes(k) - (consumo.get(k) ?? 0);
   const passaDoSaldo = (l: LinhaEdicao) => itensDaLinha(l).some((x) => livre(x.itemKey) < 0);
   const unidadeDaLinha = (l: LinhaEdicao) => (l.tipo === 'ITEM' ? (l.itemKey ? [{ itemKey: l.itemKey, quantidade: 1 }] : []) : (l.kitComposicao ?? []));
-  const cabeMaisUm = (l: LinhaEdicao) => unidadeDaLinha(l).every((x) => livre(x.itemKey) >= x.quantidade);
-
-  // Notas do preço na ordem em que os itens aparecem no pedido, como no quadro do parlamentar.
-  const notas = useMemo(() => {
-    const n: string[] = [];
-    for (const l of linhas)
-      for (const x of itensDaLinha(l)) {
-        const t = notaDoPreco(precos?.get(x.itemKey), ipca);
-        if (t && !n.includes(t)) n.push(t);
-      }
-    return n;
-  }, [linhas, precos, ipca]);
-  const marcasDaLinha = (l: LinhaEdicao) => [...new Set(itensDaLinha(l).map((x) => notaDoPreco(precos?.get(x.itemKey), ipca)).filter((t): t is string => Boolean(t)).map((t) => MARCAS[notas.indexOf(t)] ?? ''))].join('');
+  // Perto do reajuste da ata o item sai da reserva (migration 246): a linha já reservada fica, mas não aumenta.
+  const reajuste = (k: string) => reajusteDoItem(precos?.get(k), hoje);
+  const reajusteDaLinha = (l: LinhaEdicao) => unidadeDaLinha(l).map((x) => reajuste(x.itemKey)).find((r) => !podeReservar(r));
+  const cabeMaisUm = (l: LinhaEdicao) => !reajusteDaLinha(l) && unidadeDaLinha(l).every((x) => livre(x.itemKey) >= x.quantidade);
 
   const total = valorTotal(linhas, porChave, precos);
-  const totalHoje = valorTotal(linhas, porChave);
   const unidades = linhas.reduce((s, l) => s + (l.quantidade || 0), 0);
   const tirou = pedido ? pedido.linhas.filter((l) => !l.cancelada && !linhas.some((x) => x.id === l.id)).length : 0;
 
@@ -274,7 +276,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const foraDoPrazo = (i: ItemCaep) => Boolean(i.vigenciaFinal) && passouDoCorte(diasEntre(hoje, i.vigenciaFinal!));
   // Quem cadastra o nome na ata assinada (Emendas › Itens) vê quais itens ainda saem no quadro pelo começo da descrição.
   const avisarSemNomeCurto = usePodeGerirEmendas();
-  const podeItem = (i: ItemCaep) => !foraDoPrazo(i) && livre(i.itemKey) > 0;
+  const podeCadastrarOrgao = avisarSemNomeCurto;
+  const podeItem = (i: ItemCaep) => !foraDoPrazo(i) && podeReservar(reajuste(i.itemKey)) && livre(i.itemKey) > 0;
 
   const ativosBen = useMemo(() => beneficiarios.filter((b) => b.ativo).sort((a, b) => rotuloBeneficiario(a).localeCompare(rotuloBeneficiario(b), 'pt-BR')), [beneficiarios]);
   const beneficiariosNaBusca = ativosBen.filter((b) => casaBusca(textoDeBuscaDoBeneficiario(b), buscaBeneficiario));
@@ -284,9 +287,42 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const beneficiariosEncontrados = (filtraUf ? beneficiariosNaBusca.filter((b) => daUfDoParlamentar(b, ufDoAutor)) : beneficiariosNaBusca).slice(0, MAX_BENEFICIARIOS);
   const deOutraUf = (b: BeneficiarioEmenda) => !daUfDoParlamentar(b, ufDoAutor);
 
+  // Emendas do parlamentar com o valor a indicar de cada uma (a mesma conta da conferência do ofício).
+  const emendasDoAutor = useMemo(
+    () => (precisaEmenda ? emendasParaAReserva({ autorId: autorId || null, pedidoId: pedido?.id ?? null, emendas: emendasQ.data ?? [], pedidos: pedidosQ.data ?? [], itens: porChave, precos }) : []),
+    [precisaEmenda, autorId, pedido?.id, emendasQ.data, pedidosQ.data, porChave, precos]
+  );
+  // Reserva nova (03/11/2026): as emendas registradas sem pedido aparecem antes da busca; o clique escolhe o parlamentar e a emenda.
+  const semPedido = useMemo(
+    () => (precisaEmenda && !pedido ? emendasSemPedido(emendasQ.data ?? [], pedidosQ.data ?? []) : []),
+    [precisaEmenda, pedido, emendasQ.data, pedidosQ.data]
+  );
+  const autorPorId = useMemo(() => new Map(autores.map((a) => [a.id, a])), [autores]);
+  const escolha = emendaEscolhida === 'nova' || emendasDoAutor.some((x) => x.emenda.id === emendaEscolhida) ? emendaEscolhida! : emendaEscolhida === null ? emendaSugerida(emendasDoAutor) ?? '' : '';
+  const daLista = emendasDoAutor.find((x) => x.emenda.id === escolha);
+  const novaLida = escolha === 'nova' ? lerNumeroDaEmenda(novaNumero, novaAno) : null;
+  const novaJaRegistrada = novaLida ? (emendasQ.data ?? []).find((e) => e.numero === novaLida.numero && e.ano === novaLida.ano) : undefined;
+  const novaValorLido = lerValorBR(novaValor);
+  // D3: o pedido não passa do valor a indicar da emenda, quando o valor no SIOP é conhecido.
+  const teto = sobra ? sobra.sobra : precisaEmenda ? daLista?.aIndicar ?? (escolha === 'nova' && novaValorLido && novaValorLido > 0 ? novaValorLido : null) : null;
+  const passaDoTeto = teto != null && total > teto + 0.004;
+  // Emenda que sai no quadro da minuta: a do pedido, a escolhida aqui ou a digitada.
+  const emendaDoQuadro = sobra
+    ? { numero: sobra.emenda, ano: sobra.ano }
+    : emenda
+      ? { numero: emenda.numero, ano: emenda.ano }
+      : (emendaDoPedidoNoQuadro(pedido) ?? (daLista ? { numero: daLista.emenda.numero, ano: daLista.emenda.ano } : novaLida));
+
   const tel = soDigitos(contatoTelefone);
   const pendencias: Pendencia[] = [];
-  if (!autorId && !pedido && !paraOrgao) pendencias.push({ texto: 'o parlamentar', alvo: 'emendas-pedido-busca-autor', lado: 'pedido' });
+  if (!autorId && (!pedido || semAutorGravado)) pendencias.push({ texto: 'o parlamentar', alvo: 'emendas-pedido-busca-autor', lado: 'pedido' });
+  if (precisaEmenda && autorId) {
+    if (!escolha) pendencias.push({ texto: 'a emenda', alvo: 'emendas-pedido-emenda', lado: 'pedido' });
+    else if (escolha === 'nova' && !novaLida) pendencias.push({ texto: 'nº da emenda com 8 dígitos', alvo: 'emendas-pedido-emenda-numero', lado: 'pedido' });
+    else if (novaJaRegistrada) pendencias.push({ texto: novaJaRegistrada.autorId === autorId ? 'escolher na lista a emenda já registrada' : 'emenda deste parlamentar (o nº está registrado para outro)', alvo: 'emendas-pedido-emenda-numero', lado: 'pedido' });
+    if (escolha === 'nova' && novaValor.trim() && !(novaValorLido && novaValorLido > 0)) pendencias.push({ texto: 'valor da emenda maior que zero (ou em branco)', alvo: 'emendas-pedido-emenda-valor', lado: 'pedido' });
+  }
+  if (passaDoTeto) pendencias.push({ texto: 'o pedido caber no valor a indicar da emenda', alvo: 'emendas-pedido-teto', lado: 'pedido' });
   const grupoSemOrgao = orgaoNaFrente ? grupos.find((g) => !g.beneficiarioId && linhas.some((l) => l.grupo === g.chave)) : undefined;
   if (grupoSemOrgao) pendencias.push({ texto: 'o órgão que pediu', alvo: `emendas-pedido-beneficiario-${grupoSemOrgao.chave}`, lado: 'pedido' });
   if (linhas.length === 0) pendencias.push({ texto: 'pelo menos um item', alvo: 'emendas-pedido-busca', lado: 'itens' });
@@ -303,17 +339,16 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
 
   // Rascunho só da reserva nova: some ao reservar ou descartar.
   useEffect(() => {
-    if (pedido || emenda || rascunhoAntigo || sobra) return;
+    if (pedido || emenda || rascunhoAntigo || sobra || autorInicial) return;
     if (!temConteudo) return guardarRascunho(null);
     const salvoEm = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     guardarRascunho({ autorId, paraOrgao, contato: { nome: contatoNome, telefone: contatoTelefone, email: contatoEmail }, grupos, ativo, linhas, observacao, salvoEm });
     setRascunhoEm(salvoEm);
-  }, [pedido, emenda, rascunhoAntigo, sobra, temConteudo, autorId, paraOrgao, contatoNome, contatoTelefone, contatoEmail, grupos, ativo, linhas, observacao]);
+  }, [pedido, emenda, rascunhoAntigo, sobra, autorInicial, temConteudo, autorId, paraOrgao, contatoNome, contatoTelefone, contatoEmail, grupos, ativo, linhas, observacao]);
   const [rascunhoPendente, setRascunhoPendente] = useState(Boolean(rascunhoAntigo));
   const recuperarRascunho = () => {
     const r = rascunhoAntigo!;
     setAutorId(r.autorId);
-    setParaOrgao(r.paraOrgao);
     setContatoNome(r.contato.nome);
     setContatoTelefone(r.contato.telefone);
     setContatoEmail(r.contato.email);
@@ -349,6 +384,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   }, [piscando]);
   // Tecla "/" vai para a busca dos itens (fora de um campo de texto).
   useEffect(() => {
+    if (cadastro) return;
     const onKey = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement;
       if (e.key !== '/' || /INPUT|TEXTAREA|SELECT/.test(alvo.tagName)) return;
@@ -358,11 +394,12 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  }, [cadastro]);
 
   /** Escolher o autor sugere o último contato da assessoria usado com ele (só se os campos estiverem vazios). */
   const escolherAutor = (id: string) => {
     setAutorId(id);
+    setEmendaEscolhida(null);
     setBuscaAutor('');
     const c = ultimoContato.get(id);
     if (c && !contatoNome && !contatoTelefone && !contatoEmail) {
@@ -416,6 +453,17 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
   const escolherBeneficiario = (grupo: string, id: string | null) => {
     setGrupos((gs) => gs.map((g) => (g.chave === grupo ? { ...g, beneficiarioId: id } : g)));
     setSeletorAberto(null);
+  };
+  /** Órgão salvo (ou já existente, pelo "Usar este") no cadastro aberto pela reserva: fica escolhido no bloco. */
+  const usarDoCadastro = (id: string) => {
+    if (!cadastro) return;
+    const outro = grupos.find((g) => g.chave !== cadastro.alvo && g.beneficiarioId === id);
+    if (outro) {
+      toast.error('Este órgão já está em outro bloco da reserva.');
+      return;
+    }
+    escolherBeneficiario(cadastro.alvo, id);
+    setCadastro(null);
   };
   const desfazivel = (texto: string) => {
     const antes = { linhas, grupos, ativo };
@@ -471,8 +519,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
 
   const pedirParaFechar = () => {
     if (salvar.isPending) return;
-    if (mudou) setConfirmarSaida(true);
-    else onClose();
+    descartar();
   };
   const descartar = () => {
     if (!pedido) guardarRascunho(null);
@@ -497,11 +544,12 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         contatoTelefone: tel || null,
         contatoEmail: contatoEmail.trim() || null,
         motivo: motivo.trim() || null,
-        emendaId: !pedido && emenda ? emenda.id : null,
+        emendaId: precisaEmenda ? daLista?.emenda.id ?? null : !pedido && emenda ? emenda.id : null,
+        emendaNova: precisaEmenda && escolha === 'nova' && novaLida ? { numero: novaLida.numero, ano: novaLida.ano, valor: novaValorLido && novaValorLido > 0 ? novaValorLido : null, gnd: null } : null,
         emendaDaSobra: sobra ? { numero: sobra.emenda, ano: sobra.ano } : null,
         linhas: linhas.map((l) => ({ id: l.id, tipo: l.tipo, itemKey: l.itemKey, kitId: l.kitId, quantidade: l.quantidade, beneficiarioId: beneficiarioDaLinha(l, grupos) }))
       });
-      if (!pedido && !emenda && !sobra) guardarRascunho(null);
+      if (!pedido && !emenda && !sobra && !autorInicial) guardarRascunho(null);
       const primeiro = grupos.find((g) => g.beneficiarioId)?.beneficiarioId;
       const para = autor?.nome ?? (pedido ? orgaoDoPedido(pedido, nomeDoBeneficiario) : primeiro ? nomeDoBeneficiario(primeiro) : null) ?? 'o órgão';
       toast.success(semAutorGravado && autorId ? `Parlamentar indicado: ${autor?.nome ?? ''}.` : pedido ? `Pedido de ${para} atualizado.` : `Reserva para ${para} registrada.`);
@@ -567,13 +615,21 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               ))}
               {opcoes.length === 0 && (
                 <div className="reserva-mudo reserva-lista__vazia">
-                  {filtraUf ? `Nenhum órgão de ${ufDoAutor} encontrado.` : 'Nenhum órgão encontrado. Cadastre em Ajustes › Beneficiários.'}
+                  {filtraUf ? `Nenhum órgão de ${ufDoAutor} encontrado.` : podeCadastrarOrgao ? 'Nenhum órgão encontrado.' : 'Nenhum órgão encontrado. Peça o cadastro à CAEP.'}
                 </div>
               )}
               {podeAInformar && (
                 <button type="button" role="option" aria-selected={!atual} onClick={() => escolherBeneficiario(alvo, null)}>
                   <b>A informar depois</b>
                   <small>O gabinete ainda não disse para quem é</small>
+                </button>
+              )}
+              {podeCadastrarOrgao && (
+                <button type="button" className="reserva-lista__cadastrar" onClick={() => setCadastro({ alvo, nome: buscaBeneficiario.trim() })} data-testid={`${testId}-cadastrar`}>
+                  <b>
+                    <Plus size={14} aria-hidden="true" /> Cadastrar novo órgão
+                  </b>
+                  <small>Abre o cadastro por cima; ao salvar, o órgão fica escolhido aqui</small>
                 </button>
               )}
             </div>
@@ -596,7 +652,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     const passa = passaDoSaldo(l);
     const item = l.itemKey ? porChave.get(l.itemKey) : undefined;
     const valor = valorDaLinha(l, porChave, precos);
-    const valorHoje = valorDaLinha(l, porChave);
+    const noReajuste = reajusteDaLinha(l);
     const umKit = l.tipo === 'KIT' ? valorDaLinha({ ...l, quantidade: 1 }, porChave, precos) : 0;
     // O mesmo item (ou kit) em outros blocos, para quem reparte saber onde mais ele está.
     const tambem = grupos.filter((g) => g.chave !== l.grupo && linhas.some((x) => x.grupo === g.chave && chaveDoConteudo(x) === chaveDoConteudo(l))).map(nomeDoGrupo);
@@ -669,10 +725,14 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         </div>
         <div className="reserva-linha__valor">
           {formatCurrency(valor)}
-          {marcasDaLinha(l)}
-          <small>{doisPrecos(valor, valorHoje) ? `previsto · hoje ${formatCurrency(valorHoje)}` : l.tipo === 'KIT' ? `${formatCurrency(umKit)} por kit` : item ? `${formatCurrency(preco(item.itemKey).previsto)} un.` : ''}</small>
+          <small>{l.tipo === 'KIT' ? `${formatCurrency(umKit)} por kit` : item ? `${formatCurrency(preco(item.itemKey).valor)} un.` : ''}</small>
         </div>
         <div className="reserva-linha__pe">
+          {noReajuste && (
+            <span className="reserva-alerta" title={noReajuste.detalhe ?? undefined} data-testid={`emendas-pedido-reajuste-${l.chave}`}>
+              {noReajuste.avisoNaReserva}
+            </span>
+          )}
           {tambem.length > 0 && <span className="reserva-etiqueta reserva-etiqueta--propria">Também em {tambem.join(', ')}</span>}
           <span className={passa ? 'reserva-alerta' : 'reserva-mudo'}>
             {l.tipo === 'KIT'
@@ -839,7 +899,8 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
     <Modal
       isOpen
       onClose={pedirParaFechar}
-      dismissible={!salvar.isPending}
+      // Com mudanças, só o Cancelar fecha: sem caixa de confirmação, o clique fora ou o Esc não perdem o trabalho (29/10/2026).
+      dismissible={!salvar.isPending && !mudou}
       size="xxl"
       className="reserva-modal"
       testId="emendas-pedido-modal"
@@ -847,7 +908,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         pedido
           ? `${semAutorGravado ? 'Reserva para' : 'Alterar o pedido de'} ${tituloDoPedido} · ${identificacaoDoPedido(pedido)}`
           : sobra
-            ? `Novo pedido com a sobra da emenda ${numeroDaEmendaEmTexto(sobra.emenda)} / ${sobra.ano}`
+            ? `Novo pedido com o valor a indicar da emenda ${numeroDaEmendaEmTexto(sobra.emenda)} / ${sobra.ano}`
             : emenda
               ? `Novo pedido da emenda ${numeroDaEmenda(emenda.numero)} / ${emenda.ano}`
               : 'Nova reserva'
@@ -868,25 +929,15 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               .
             </div>
           )}
-          {confirmarSaida && (
-            <div className="reserva-confirmar" role="alertdialog" aria-label="Descartar a reserva" data-testid="emendas-pedido-confirmar-saida">
-              <span>{pedido ? 'Sair sem salvar? As mudanças neste pedido se perdem.' : `Descartar esta reserva? ${linhas.length ? `${linhas.length === 1 ? 'O item some' : `Os ${linhas.length} itens somem`} e nada fica reservado.` : ''}`}</span>
-              <AppButton type="button" variant="outline" size="sm" onClick={() => setConfirmarSaida(false)}>
-                Continuar editando
-              </AppButton>
-              <ActionButton action="descartar" type="button" size="sm" label={pedido ? 'Sair sem salvar' : undefined} onClick={descartar} data-testid="emendas-pedido-descartar" />
-            </div>
-          )}
           <div className="reserva-total" data-testid="emendas-pedido-total">
-            <span className="reserva-total__rotulo">Total previsto para a emenda</span> <b>{formatCurrency(total)}</b>
+            <span className="reserva-total__rotulo">Total para a emenda</span> <b>{formatCurrency(total)}</b>
             <div className="reserva-mudo">
               {linhas.length} {linhas.length === 1 ? 'item' : 'itens'} · {formatNumber(unidades)} {unidades === 1 ? 'unidade' : 'unidades'}
-              {doisPrecos(total, totalHoje) && ` · pelo preço de hoje ${formatCurrency(totalHoje)} (+${formatCurrency(total - totalHoje)})`}
               {rascunhoEm && !pedido && ` · rascunho guardado às ${rascunhoEm}`}
             </div>
           </div>
           <div className="reserva-botoes">
-            <ActionButton action="cancelar" type="button" onClick={pedirParaFechar} disabled={salvar.isPending} />
+            <ActionButton action="cancelar" type="button" onClick={pedirParaFechar} disabled={salvar.isPending} data-testid="emendas-pedido-cancelar" />
             <AppButton type="submit" form="emendas-pedido-form" disabled={salvar.isPending} isLoading={salvar.isPending} data-testid="emendas-pedido-salvar">
               {pedido ? 'Salvar pedido' : linhas.length ? `Reservar ${linhas.length} ${linhas.length === 1 ? 'item' : 'itens'}` : 'Reservar'}
             </AppButton>
@@ -962,8 +1013,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   descricao={k.itens.map((x) => `${formatNumber(x.quantidade)} × ${nomeDe(x) ? descricaoItemEmFrase(nomeDe(x)!.descricao) : x.itemKey}`).join('; ')}
                   rotuloDescricao={`Itens do kit ${k.nome}`}
                   meta={k.itens.map((x) => `${x.quantidade} ${curto(nomeDoItem(nomeDe(x), x.itemKey), 28).toLowerCase()}`).join(' · ')}
-                  previsto={c.valorPorKit}
-                  hoje={c.valorPorKitHoje}
+                  preco={c.valorPorKit}
                   unidade="por kit"
                   saldo={
                     <>
@@ -992,6 +1042,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
               const fica = livre(i.itemKey);
               const p = preco(i.itemKey);
               const fora = foraDoPrazo(i);
+              const r = reajuste(i.itemKey);
               const pode = podeItem(i);
               return (
                 <CartaoResultado
@@ -1012,12 +1063,15 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                       )}
                     </>
                   }
-                  previsto={p.previsto}
-                  hoje={p.hoje}
+                  preco={p.valor}
                   unidade="por unidade"
-                  notaPreco={notaDoPreco(p.preco, ipca)}
                   saldo={
-                    fora ? (
+                    !podeReservar(r) ? (
+                      <>
+                        <Etiqueta texto={r.rotulo ?? 'Reajuste da ata'} variante="danger" />
+                        <span className="reserva-mudo">{r.detalhe}</span>
+                      </>
+                    ) : fora ? (
                       <>
                         <Etiqueta texto="Prazo de indicação vencido" variante="danger" />
                         <span className="reserva-mudo">
@@ -1079,31 +1133,9 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
             <span className="reserva-rotulo">{semAutorGravado ? 'Parlamentar que assumiu a reserva (quando houver)' : 'Para quem é a reserva'}</span>
             {emenda && (
               <p className="reserva-ok" data-testid="emendas-pedido-da-emenda">
-                Pedido da emenda {numeroDaEmenda(emenda.numero)} / {emenda.ano} · {formatCurrency(emenda.valor)} · {emenda.gnd}, vista no SIOP.
+                Pedido da emenda {numeroDaEmenda(emenda.numero)} / {emenda.ano}
+                {emenda.valor != null ? ` · ${formatCurrency(emenda.valor)}${emenda.gnd ? ` · ${emenda.gnd}` : ''}, vista no SIOP.` : ' · valor a ler no SIOP.'}
               </p>
-            )}
-            {!pedido && !emenda && !sobra && (
-              <div className="reserva-segmentos" role="group" aria-label="Tipo de reserva">
-                <button
-                  type="button"
-                  aria-pressed={!paraOrgao}
-                  onClick={() => setParaOrgao(false)}
-                  data-testid="emendas-pedido-para-parlamentar"
-                >
-                  Parlamentar
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={paraOrgao}
-                  onClick={() => {
-                    setParaOrgao(true);
-                    setAutorId('');
-                  }}
-                  data-testid="emendas-pedido-para-orgao"
-                >
-                  Órgão (parlamentar a definir)
-                </button>
-              </div>
             )}
             {paraOrgao ? (
               <p className="reserva-mudo reserva-texto">O órgão pediu e a CAEP separa os itens enquanto procura o parlamentar. Ele é indicado depois, antes da minuta.</p>
@@ -1116,7 +1148,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   <b>{autor.nome}</b>
                   <small>{metaDoAutor(autor)}</small>
                 </span>
-                {((!pedido && !emenda && !sobra) || semAutorGravado) && (
+                {((!pedido && !emenda && !sobra && !autorInicial) || semAutorGravado) && (
                   <ActionButton action="editar" type="button" size="sm" label="Trocar" onClick={() => setAutorId('')} />
                 )}
               </div>
@@ -1149,9 +1181,94 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 ) : (
                   <p className="reserva-mudo reserva-texto">{buscaAutor.trim() ? `Ninguém encontrado com "${buscaAutor.trim()}".` : 'Digite e tecle Enter para escolher o primeiro.'}</p>
                 )}
+                {!buscaAutor.trim() && semPedido.length > 0 && (
+                  <>
+                    <span className="reserva-rotulo">Emendas sem pedido · {semPedido.length}</span>
+                    <div className="reserva-lista reserva-lista--borda" style={{ maxHeight: 280, overflowY: 'auto' }} data-testid="emendas-pedido-sem-pedido">
+                      {semPedido.map((e) => {
+                        const a = autorPorId.get(e.autorId);
+                        return (
+                          <button
+                            type="button"
+                            key={e.id}
+                            onClick={() => {
+                              escolherAutor(e.autorId);
+                              setEmendaEscolhida(e.id);
+                            }}
+                            data-testid={`emendas-pedido-sem-pedido-${e.id}`}
+                          >
+                            <b>{a?.nome ?? e.autorId}</b>
+                            <small>
+                              {[a ? metaDoAutor(a) : null, `Emenda ${numeroDaEmenda(e.numero)} / ${e.ano}`, e.valor != null ? formatCurrency(e.valor) : 'valor a ler no SIOP'].filter(Boolean).join(' · ')}
+                            </small>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
+
+          {precisaEmenda && autor && (
+            <div className="reserva-secao" data-testid="emendas-pedido-emenda">
+              <span className="reserva-rotulo">Emenda</span>
+              <div className="reserva-emendas" role="radiogroup" aria-label="Emenda do pedido">
+                {emendasDoAutor.map((x) => (
+                  <label key={x.emenda.id} className={`reserva-emenda${escolha === x.emenda.id ? ' reserva-emenda--sel' : ''}`}>
+                    <input type="radio" name="emendas-pedido-emenda" checked={escolha === x.emenda.id} onChange={() => setEmendaEscolhida(x.emenda.id)} data-testid={`emendas-pedido-emenda-${x.emenda.id}`} />
+                    <span>
+                      <b>
+                        {numeroDaEmenda(x.emenda.numero)} / {x.emenda.ano}
+                      </b>{' '}
+                      {x.outros.length === 0 && <span className="reserva-etiqueta">Sem pedido</span>}{' '}
+                      <span className="reserva-mudo">· {x.emenda.valor != null ? `${formatCurrency(x.emenda.valor)} no SIOP` : 'valor a ler no SIOP'}</span>
+                      <small className="reserva-mudo">
+                        {x.aIndicar != null ? `A indicar: ${formatCurrency(Math.max(0, x.aIndicar))}` : 'Sem o valor, o limite fica para a conferência com o SIOP'}
+                        {x.outros.length > 0 && ` · ${x.outros.length === 1 ? '1 outro pedido' : `${x.outros.length} outros pedidos`} da emenda`}
+                      </small>
+                    </span>
+                  </label>
+                ))}
+                <label className={`reserva-emenda${escolha === 'nova' ? ' reserva-emenda--sel' : ''}`}>
+                  <input type="radio" name="emendas-pedido-emenda" checked={escolha === 'nova'} onChange={() => setEmendaEscolhida('nova')} data-testid="emendas-pedido-emenda-nova" />
+                  <span>
+                    <b>{emendasDoAutor.length ? 'Outra emenda' : 'Informar a emenda'}</b>
+                    <small className="reserva-mudo">Ainda não registrada: o nº e o ano saem na minuta; o valor pode ficar para a conferência.</small>
+                  </span>
+                </label>
+              </div>
+              {escolha === 'nova' && (
+                <div className="reserva-grade3">
+                  <AppInput
+                    label="Nº da emenda"
+                    placeholder="0000 0000"
+                    inputMode="numeric"
+                    value={novaNumero}
+                    onChange={(e) => {
+                      setNovaNumero(e.target.value);
+                      const l = lerNumeroDaEmenda(e.target.value, null);
+                      if (l) setNovaAno(l.ano);
+                    }}
+                    error={falta('emendas-pedido-emenda-numero') ? (novaJaRegistrada ? (novaJaRegistrada.autorId === autorId ? 'Já registrada: escolha na lista.' : 'Registrada para outro parlamentar.') : '8 dígitos, ou 12 com o ano.') : undefined}
+                    data-testid="emendas-pedido-emenda-numero"
+                  />
+                  <AppInput label="Ano" type="number" min={2015} max={2100} value={String(novaAno)} onChange={(e) => setNovaAno(Number(e.target.value))} data-testid="emendas-pedido-emenda-ano" />
+                  <AppInput
+                    label="Valor no SIOP (opcional)"
+                    placeholder="a ler no SIOP"
+                    inputMode="decimal"
+                    value={novaValor}
+                    onChange={(e) => setNovaValor(mascaraValorBR(e.target.value, novaValor))}
+                    error={falta('emendas-pedido-emenda-valor') ? 'Maior que zero, ou em branco.' : undefined}
+                    data-testid="emendas-pedido-emenda-valor"
+                  />
+                </div>
+              )}
+              {falta('emendas-pedido-emenda') && <span className="reserva-alerta">Escolha a emenda do pedido: o nº sai na minuta do ofício.</span>}
+            </div>
+          )}
 
           <div className="reserva-secao">
             <span className="reserva-rotulo">
@@ -1177,10 +1294,9 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                   placeholder="(00) 00000-0000"
                   value={contatoTelefone}
                   onChange={(e) => {
-                    setContatoTelefone(e.target.value);
+                    setContatoTelefone(mascaraTelefone(e.target.value));
                     setContatoSugerido(false);
                   }}
-                  onBlur={() => setContatoTelefone(formatarTelefone(contatoTelefone))}
                   data-testid="emendas-pedido-contato-telefone"
                 />
                 <AppInput label="E-mail" type="email" placeholder="nome@camara.leg.br" value={contatoEmail} onChange={(e) => setContatoEmail(e.target.value)} data-testid="emendas-pedido-contato-email" />
@@ -1191,7 +1307,7 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
           {sobra && (
             <div className={`reserva-teto${total > sobra.sobra + 0.004 ? ' reserva-teto--passa' : ''}`} data-testid="emendas-pedido-teto">
               <div className="reserva-barra">
-                <b>Disponível da emenda: {formatCurrency(sobra.sobra)}</b>
+                <b>A indicar da emenda: {formatCurrency(sobra.sobra)}</b>
                 <span className="reserva-espaco" />
                 <span className="reserva-mudo">
                   Pedido: {formatCurrency(total)} ·{' '}
@@ -1202,8 +1318,29 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 <i style={{ width: `${Math.min(100, sobra.sobra > 0 ? (total / sobra.sobra) * 100 : 100)}%` }} />
               </div>
               <span className="reserva-mudo">
-                Valor da emenda {formatCurrency(sobra.valor ?? 0)} − empenhado {formatCurrency(sobra.empenhado)} − em andamento {formatCurrency(sobra.emAndamento)}. Preço previsto, como no quadro do parlamentar.
-                {total > sobra.sobra + 0.004 ? ' O pedido passa do disponível: reduza as quantidades ou confirme com o parlamentar outra fonte para a diferença.' : ''}
+                Valor da emenda {formatCurrency(sobra.valor ?? 0)} − empenhado {formatCurrency(sobra.empenhado)} − em andamento {formatCurrency(sobra.emAndamento)}. Preço de hoje, como no quadro do parlamentar.
+                {passaDoTeto ? ' O pedido passa do valor a indicar: diminua as quantidades.' : ''}
+              </span>
+            </div>
+          )}
+          {!sobra && teto != null && (
+            <div className={`reserva-teto${passaDoTeto ? ' reserva-teto--passa' : ''}`} data-testid="emendas-pedido-teto">
+              <div className="reserva-barra">
+                <b>A indicar da emenda: {formatCurrency(teto)}</b>
+                <span className="reserva-espaco" />
+                <span className="reserva-mudo">
+                  Pedido: {formatCurrency(total)} · {passaDoTeto ? <b className="reserva-alerta">passa {formatCurrency(total - teto)}</b> : `restam ${formatCurrency(teto - total)}`}
+                </span>
+              </div>
+              <div className="reserva-teto__barra">
+                <i style={{ width: `${Math.min(100, teto > 0 ? (total / teto) * 100 : 100)}%` }} />
+              </div>
+              <span className="reserva-mudo">
+                {daLista
+                  ? `Valor da emenda ${formatCurrency(daLista.emenda.valor ?? 0)} − outros pedidos dela ${formatCurrency(daLista.usado)} (pelo ofício, ou pelos itens sem ofício).`
+                  : 'Valor da emenda informado acima.'}{' '}
+                Preço de hoje, como no quadro do parlamentar.
+                {passaDoTeto ? ' O pedido passa do valor a indicar: diminua as quantidades ou escolha outra emenda.' : ''}
               </span>
             </div>
           )}
@@ -1304,20 +1441,9 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 />
                 <span className="reserva-mudo">{temSemBeneficiario ? 'Escolha o órgão do bloco acima antes de abrir outro.' : 'O mesmo item pode ir para vários órgãos: use Repartir na linha.'}</span>
               </div>
-            {notas.length > 0 && (
-              <div className="reserva-notas" data-testid="emendas-pedido-notas">
-                <b>Preço previsto para a emenda</b>, o mesmo do quadro do parlamentar:
-                <ol>
-                  {notas.map((n, i) => (
-                    <li key={n}>
-                      <span>{MARCAS[i] ?? `(${i + 1})`}</span>
-                      {n}
-                    </li>
-                  ))}
-                </ol>
-              </div>
+            {semPrevisao && (
+              <div className="reserva-aviso">Não foi possível ler o reajuste das atas: os itens perto do reajuste não aparecem esmaecidos, mas o sistema confere ao salvar.</div>
             )}
-            {semPrevisao && <div className="reserva-aviso">Não foi possível ler o reajuste previsto: os valores são pelo preço de hoje das atas.</div>}
           </div>
 
           {tirou > 0 && (
@@ -1339,13 +1465,25 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
                 autor={autor}
                 linhas={linhas.map((l) => ({ ...l, beneficiarioId: beneficiarioDaLinha(l, grupos) }))}
                 data={pedido?.reservadoEm ?? hoje}
-                devolvidoEm={pedido?.devolvidoEm}
+                minutaValidaAte={pedido?.etapa === 'MINUTA' ? pedido.minutaValidaAte : null}
+                emenda={emendaDoQuadro}
               />
             </details>
           )}
 
         </section>
       </form>
+      {/* Fora do formulário da reserva: o envio do cadastro não sobe até ele. */}
+      {cadastro && (
+        <BeneficiarioModal
+          beneficiario={null}
+          lista={beneficiarios}
+          inicial={{ nome: cadastro.nome, entregaUf: ufDoAutor ?? '' }}
+          onAbrir={(b) => usarDoCadastro(b.id)}
+          onSalvo={usarDoCadastro}
+          onClose={() => setCadastro(null)}
+        />
+      )}
       {recado && (
         <div className="reserva-recado" role="status" data-testid="emendas-pedido-recado">
           <span>{recado.texto}</span>

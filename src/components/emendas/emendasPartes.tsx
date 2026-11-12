@@ -4,10 +4,11 @@ import { buildAtaItemPath, buildAtaPath } from '../../hooks/useAta';
 import { StatusBadge } from '../../design-system/components/StatusBadge';
 import { SummaryBar } from '../../design-system/components/SummaryBar';
 import { InfoHint } from '../../design-system/components/InfoHint';
-import { carteiraDescricaoItem, carteiraDetalhe, carteiraFornecedor, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
+import { carteiraDescricaoItem, carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitle, carteiraValor } from '../carteira/carteiraStyles';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { dataBR, diasEntre } from '../../utils/emendasKits';
+import type { ReajusteDoItem } from '../../utils/emendasReajuste';
 import { AUTOR_A_DEFINIR, chaveDoContratoDaEmenda, ORDEM_SITUACAO_LINHA, ROTULO_MOTIVO_SEM_NOTA, ROTULO_REGRA_DA_NOTA, type ExecucaoDoPedido, type SituacaoDaLinha } from '../../utils/emendasPedidos';
 import { numeroDaChave } from '../../utils/contractKeyUtils';
 import { formatCurrency } from '../../utils/format';
@@ -17,12 +18,15 @@ import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqu
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
 
+/** "Deputado · PL · RJ": a segunda linha do parlamentar em todas as telas. */
+export const linhaDoAutor = (autor: AutorEmenda): string => [TIPO[autor.tipo], autor.partido, autor.uf].filter(Boolean).join(' · ');
+
 /**
  * Autor em duas linhas: nome e "Deputado · PL · RJ". Sem autor (reserva para um órgão, migration 163): "Parlamentar a
  * definir" e, embaixo, para qual órgão a CAEP separou.
  */
 /** Mesma largura da coluna do parlamentar em todas as tabelas de Emendas (o navegador não estica conforme as outras colunas). */
-export const LARGURA_AUTOR = '240px';
+export const LARGURA_AUTOR = '200px';
 
 export const AutorDoPedido: React.FC<{ autor: AutorEmenda | undefined; autorId: string | null; orgao?: string | null; destaque?: boolean }> = ({ autor, autorId, orgao, destaque }) => {
   // Como coluna de identificação (destaque): nome forte e azul e a 2ª linha da Ata; nas outras colunas, valor e detalhe.
@@ -50,11 +54,15 @@ const ataEmCinza: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b',
  * número do item abre o Item 360 na aba Emendas e o da ata abre a Ata 360 (o clique não abre a linha da tabela).
  */
 export const ItemDaAta: React.FC<{
-  item: Pick<ItemCaep, 'numeroAta' | 'numeroItem' | 'descricao' | 'codigoUasg'> | null | undefined;
+  item: (Pick<ItemCaep, 'numeroAta' | 'numeroItem' | 'descricao' | 'codigoUasg'> & Partial<Pick<ItemCaep, 'nomeCurto'>>) | null | undefined;
   semItem?: string;
   extra?: React.ReactNode;
   comLinks?: boolean;
-}> = ({ item, semItem, extra, comLinks }) => {
+  /** Mostra o nome curto da CAEP (o do quadro do gabinete) em destaque, com a descrição do edital embaixo. */
+  comNomeCurto?: boolean;
+  /** Sem "· Ata 00018/2025" ao lado do número: a tabela já está agrupada pela ata. */
+  semAta?: boolean;
+}> = ({ item, semItem, extra, comLinks, comNomeCurto, semAta }) => {
   const parar = (e: React.MouseEvent) => e.stopPropagation();
   return (
     <>
@@ -73,22 +81,33 @@ export const ItemDaAta: React.FC<{
           ) : (
             <span style={carteiraIdentificacao}>{String(item.numeroItem).padStart(5, '0')}</span>
           )}
-          <span style={ataEmCinza}>·</span>
-          {comLinks ? (
-            <Link to={buildAtaPath(item.numeroAta, item.codigoUasg)} onClick={parar} style={{ ...ataEmCinza, textDecoration: 'none' }} title={`Abrir a Ata 360 (UASG ${item.codigoUasg})`} data-testid="emendas-ata-link">
-              Ata {item.numeroAta}
-            </Link>
-          ) : (
-            <span style={ataEmCinza} title={`UASG ${item.codigoUasg}`}>
-              Ata {item.numeroAta}
-            </span>
+          {!semAta && (
+            <>
+              <span style={ataEmCinza}>·</span>
+              {comLinks ? (
+                <Link to={buildAtaPath(item.numeroAta, item.codigoUasg)} onClick={parar} style={{ ...ataEmCinza, textDecoration: 'none' }} title={`Abrir a Ata 360 (UASG ${item.codigoUasg})`} data-testid="emendas-ata-link">
+                  Ata {item.numeroAta}
+                </Link>
+              ) : (
+                <span style={ataEmCinza} title={`UASG ${item.codigoUasg}`}>
+                  Ata {item.numeroAta}
+                </span>
+              )}
+            </>
           )}
           {extra}
         </div>
       )}
-      <div title={item?.descricao} style={carteiraDescricaoItem}>
-        {item ? descricaoItemEmFrase(item.descricao) : semItem}
-      </div>
+      {comNomeCurto && item?.nomeCurto?.trim() ? (
+        // Com nome curto, a descrição do edital sai da tela e fica na dica.
+        <div title={item.descricao} style={{ ...carteiraValor, marginTop: '0.15rem' }} data-testid="emendas-item-nome-curto">
+          {item.nomeCurto.trim()}
+        </div>
+      ) : (
+        <div title={item?.descricao} style={carteiraDescricaoItem}>
+          {item ? descricaoItemEmFrase(item.descricao) : semItem}
+        </div>
+      )}
     </>
   );
 };
@@ -106,7 +125,12 @@ export const VigenciaDaAta: React.FC<{ item: Pick<ItemCaep, 'vigenciaFinal' | 'a
 };
 
 /** Linha do pedido: kit (nome e composição) ou item (ata · item e descrição). */
-export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitNome' | 'kitComposicao' | 'quantidade'>; itens: Map<string, ItemCaep>; comLinks?: boolean }> = ({ linha, itens, comLinks }) => {
+export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKey' | 'kitNome' | 'kitComposicao' | 'quantidade'>; itens: Map<string, ItemCaep>; comLinks?: boolean; semAta?: boolean }> = ({
+  linha,
+  itens,
+  comLinks,
+  semAta
+}) => {
   if (linha.tipo === 'KIT') {
     return (
       <>
@@ -125,7 +149,7 @@ export const LinhaDoPedido: React.FC<{ linha: Pick<LinhaPedido, 'tipo' | 'itemKe
     );
   }
   const i = linha.itemKey ? itens.get(linha.itemKey) : undefined;
-  return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} comLinks={comLinks} />;
+  return <ItemDaAta item={i} semItem={`${linha.itemKey} · item sem alocação da CAEP`} comLinks={comLinks} comNomeCurto semAta={semAta} />;
 };
 
 /** Nome da unidade e, ao lado, a sigla mais clara (padrão "00001 · Ata 00055/2025" das carteiras). */
@@ -140,25 +164,14 @@ export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigl
   </div>
 );
 
-/** Embaixo do nome, na linha da emenda: a razão social do CNPJ vinculado e a cidade - UF (aqui não há coluna de entrega). */
-export const RazaoELocal: React.FC<{ b: Pick<BeneficiarioEmenda, 'razaoSocial' | 'entregaMunicipio' | 'entregaUf'> }> = ({ b }) => {
-  const local = localDoBeneficiario(b);
-  return (
-    <>
-      {b.razaoSocial && <div style={carteiraFornecedor}>{b.razaoSocial}</div>}
-      {local && <div style={carteiraDetalhe}>{local}</div>}
-    </>
-  );
-};
-
-/** Beneficiário da linha: o nome com a sigla e embaixo a razão social (migration 166). */
+/** Beneficiário da linha: o nome com a sigla e, embaixo, o local de entrega; a razão social fica no cadastro (decisão de 28/10/2026). */
 export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficiarioId'>; beneficiarios: Map<string, BeneficiarioEmenda> }> = ({ linha, beneficiarios }) => {
   const b = linha.beneficiarioId ? beneficiarios.get(linha.beneficiarioId) : undefined;
   if (b) {
     return (
       <>
         <NomeComSigla b={b} />
-        <RazaoELocal b={b} />
+        {localDoBeneficiario(b) && <div style={carteiraDetalhe}>{localDoBeneficiario(b)}</div>}
         {!b.cnpj && <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />}
       </>
     );
@@ -217,6 +230,48 @@ export const SituacaoDaLinhaEtiqueta: React.FC<{ s: SituacaoDaLinha; testId?: st
   </div>
 );
 
+/** Parte da barra: `forte` (pago) em azul cheio, `fraca` (empenhado ainda não pago, reservado) em azul claro. */
+export interface ParteDaBarra {
+  valor: number;
+  tom: 'forte' | 'fraca';
+}
+
+const COR_DA_PARTE: Record<ParteDaBarra['tom'] | 'vazia', string> = { forte: 'var(--primary)', fraca: 'rgba(var(--primary-rgb), 0.38)', vazia: '#e2e8f0' };
+
+/**
+ * Valores que se leem juntos numa célula só (D2 da revisão das tabelas, 30/10/2026): o total em cima, a barra das partes
+ * e embaixo cada valor com o quadradinho da cor dele. Junta colunas como Empenhado · Pago · Sobra sem esconder nenhuma.
+ */
+export const ValoresEmBarra: React.FC<{
+  total: React.ReactNode;
+  rotulo?: string;
+  max: number;
+  partes: ParteDaBarra[];
+  legenda: { rotulo: string; valor: React.ReactNode; tom?: ParteDaBarra['tom'] | 'vazia' }[];
+  testId?: string;
+}> = ({ total, rotulo, max, partes, legenda, testId }) => (
+  <div data-testid={testId} style={{ minWidth: '13rem', maxWidth: '18rem' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
+      <span style={{ ...carteiraValor, ...carteiraNumero, whiteSpace: 'nowrap' }}>{total}</span>
+      {rotulo && <span style={{ ...carteiraDetalhe, marginTop: 0, whiteSpace: 'nowrap' }}>{rotulo}</span>}
+    </div>
+    <div aria-hidden="true" style={{ display: 'flex', height: 6, borderRadius: 999, overflow: 'hidden', background: COR_DA_PARTE.vazia, margin: '0.35rem 0 0.3rem' }}>
+      {max > 0 &&
+        partes.map((p, i) => (
+          <span key={i} style={{ display: 'block', height: '100%', width: `${Math.max(0, Math.min(100, (p.valor / max) * 100))}%`, background: COR_DA_PARTE[p.tom] }} />
+        ))}
+    </div>
+    <div style={{ ...carteiraDetalhe, marginTop: 0, display: 'flex', flexWrap: 'wrap', gap: '0 0.7rem' }}>
+      {legenda.map((l) => (
+        <span key={l.rotulo} style={{ whiteSpace: 'nowrap' }}>
+          {l.tom && <span aria-hidden="true" style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, marginRight: 3, background: COR_DA_PARTE[l.tom] }} />}
+          {l.rotulo} <b style={{ ...carteiraNumero, color: '#0f172a' }}>{l.valor}</b>
+        </span>
+      ))}
+    </div>
+  </div>
+);
+
 /**
  * Execução do pedido empenhado pelas notas achadas, no resumo de uma linha das abas do Contrato 360 (SummaryBar):
  * notas, empenhado, liquidado e pago, a barra do pago e a próxima entrega prevista; a ressalva fica no ⓘ.
@@ -251,24 +306,21 @@ export const ExecucaoDoPedidoResumo: React.FC<{ execucao: ExecucaoDoPedido }> = 
 );
 
 /**
- * Valor pelo preço previsto para a emenda (o mesmo do quadro do parlamentar), com o de hoje embaixo quando muda e o
- * motivo ao passar o mouse.
+ * Preço de hoje para a emenda (o mesmo do quadro do parlamentar) e, embaixo, quando o item já não entra em reserva por
+ * causa do reajuste da ata (migration 246), o motivo; o detalhe ao passar o mouse.
  */
-export const ValorPrevisto: React.FC<{ previsto: number; hoje: number; nota?: string | null; marca?: string; testId?: string }> = ({ previsto, hoje, nota, marca, testId }) => (
-  <span title={nota ?? undefined} data-testid={testId} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-    <span style={carteiraNumero}>
-      {formatCurrency(previsto)}
-      {marca}
-    </span>
-    {Math.abs(previsto - hoje) > 0.004 && <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>hoje {formatCurrency(hoje)}</span>}
+export const PrecoDaEmenda: React.FC<{ valor: number; reajuste?: ReajusteDoItem; testId?: string }> = ({ valor, reajuste, testId }) => (
+  <span title={reajuste?.detalhe ?? undefined} data-testid={testId} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+    <span style={carteiraNumero}>{formatCurrency(valor)}</span>
+    {reajuste?.rotulo && <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap', color: 'var(--color-warning-text, #8a5300)' }}>{reajuste.rotulo}</span>}
   </span>
 );
 
-/** Valor do pedido: o da emenda no SIOP depois da conferência; antes, o previsto pelos itens (ver valorDoPedidoNaEtapa). */
-export const ValorDoPedido: React.FC<{ valor: number; fonte: 'EMENDA' | 'PREVISTO' }> = ({ valor, fonte }) => (
-  <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }} title={fonte === 'EMENDA' ? 'Valor da emenda no SIOP' : 'Previsto pelos itens, com o reajuste das atas (o mesmo do quadro do parlamentar)'}>
+/** Valor do pedido: o do ofício depois de informado; antes, o previsto pelos itens (ver valorDoPedidoNaEtapa). */
+export const ValorDoPedido: React.FC<{ valor: number; fonte: 'OFICIO' | 'PREVISTO' }> = ({ valor, fonte }) => (
+  <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }} title={fonte === 'OFICIO' ? 'Valor pedido no ofício do parlamentar' : 'Pelos itens, ao preço de hoje das atas (o mesmo do quadro do parlamentar)'}>
     <span style={carteiraNumero}>{formatCurrency(valor)}</span>
-    <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{fonte === 'EMENDA' ? 'da emenda' : 'previsto'}</span>
+    <span style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{fonte === 'OFICIO' ? 'do ofício' : 'pelos itens'}</span>
   </span>
 );
 

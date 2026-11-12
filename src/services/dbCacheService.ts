@@ -32,6 +32,8 @@ export async function cacheArpsInDb(arps: ArpRecord[]): Promise<boolean> {
       numero_compra: arp.numeroCompra,
       modalidade: arp.nomeModalidadeCompra,
       objeto: arp.objeto,
+      // Só vale enquanto a ata não tem itens no banco: depois, o banco calcula o valor pelos itens
+      // (gatilho trg_ata_valor_pelos_itens, migration 20261111000269).
       valor_total: arp.valorTotal,
       data_vigencia_inicial: arp.dataVigenciaInicial,
       data_vigencia_final: arp.dataVigenciaFinal,

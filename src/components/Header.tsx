@@ -3,11 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { UserMenu } from './UserMenu';
 import govbrLogo from '../assets/govbr-logo.svg';
 
-interface HeaderProps {
-  onOpenExportModal?: () => void;
-}
-
-export const Header: React.FC<HeaderProps> = () => {
+export const Header: React.FC = () => {
   const { user } = useAuth();
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>

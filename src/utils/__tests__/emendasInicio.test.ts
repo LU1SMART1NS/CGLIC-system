@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { avisosDosPedidosParaOMenu, prazoDoAviso, resumoInicioEmendas } from '../emendasInicio';
+import { avisosDosPedidosParaOMenu, prazoDoAviso, resumoInicioEmendas, NOME_LONGO } from '../emendasInicio';
 import type { ConferenciaEmpenho, ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
 
 const HOJE = '2026-10-23';
@@ -9,7 +9,7 @@ const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
 });
 const linha = (extra: Partial<LinhaPedido>): LinhaPedido => ({
   id: 'l' + Math.random(), ordem: 1, tipo: 'ITEM', itemKey: 'longe', kitId: null, kitNome: null, kitVersao: null, kitComposicao: null,
-  quantidade: 1, beneficiarioId: null, cancelada: false, canceladaMotivo: null,
+  quantidade: 1, beneficiarioId: 'b1', cancelada: false, canceladaMotivo: null,
   empenhoDocumentoSei: null, contratoNumero: null, despachoDocumentoSei: null, ...extra
 });
 const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
@@ -17,7 +17,7 @@ const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null, siopEmendaAno: null,
   siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
   empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNome: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
 });
 const nota = (linhaId: string): NotaDaLinha => ({
   linhaId, nota: '2026NE000001', regra: 'CONTRATO', motivo: null, contractKey: null, empenhoId: 'e1',
@@ -26,7 +26,7 @@ const nota = (linhaId: string): NotaDaLinha => ({
 
 const ITENS = [
   item('longe', { alocado: 100 }),
-  item('perto', { numeroAta: '00051/2024', vigenciaFinal: '2026-12-10', alocado: 50 }),
+  item('perto', { numeroAta: '00051/2024', vigenciaFinal: '2027-01-10', alocado: 50 }),
   item('corte', { numeroAta: '00024/2024', vigenciaFinal: '2026-10-25', alocado: 30 }),
   item('fim', { numeroAta: '00020/2025', vigenciaFinal: '2026-05-28', ataEncerrada: true, alocado: 40 })
 ];
@@ -80,14 +80,14 @@ describe('Início do gestor de emendas', () => {
   it('saldo da CAEP só nas atas vigentes e o livre perto do fim', () => {
     // longe: 100 − (3 empenhadas + 20) = 77; perto: 50 − 10 = 40; corte: 30 − 30 = 0
     expect([r.itensVigentes, r.alocado, r.reservado, r.livre]).toEqual([3, 180, 63, 117]);
-    expect(r.livrePertoDoFim.map((x) => [x.item.itemKey, x.livre, x.diasParaVencer, x.indicarAte, x.passouDoCorte])).toEqual([['perto', 40, 48, '2026-11-05', false]]);
+    expect(r.livrePertoDoFim.map((x) => [x.item.itemKey, x.livre, x.diasParaVencer, x.indicarAte, x.passouDoCorte])).toEqual([['perto', 40, 79, '2026-11-11', false]]);
   });
 
   it('prazo curto de cada aviso', () => {
     const [encerrada, corte, vencendo, empenhado] = r.pedidosComAviso;
     expect(prazoDoAviso(encerrada.avisos[0], encerrada.itemDoAviso, HOJE)).toBe('encerrou em 28/05/2026');
     expect(prazoDoAviso(corte.avisos[0], corte.itemDoAviso, HOJE)).toBe('ata termina em 2 dias');
-    expect(prazoDoAviso(vencendo.avisos[0], vencendo.itemDoAviso, HOJE)).toBe('indicar até 05/11/2026');
+    expect(prazoDoAviso(vencendo.avisos[0], vencendo.itemDoAviso, HOJE)).toBe('indicar até 11/11/2026');
     expect(prazoDoAviso(empenhado.avisos[0], null, HOJE)).toBe('procurar a nota pelo contrato');
   });
 
@@ -101,13 +101,20 @@ describe('Início do gestor de emendas', () => {
     ];
     expect(resumoInicioEmendas([], lista, new Map(), HOJE).semNomeCurto.map((i) => i.itemKey)).toEqual(['branco', 'novo']);
   });
+
+  it('itens com nome da ata acima de 80 letras (D12, 30/10/2026): a CAEP decide se encurta', () => {
+    const longo = 'Lanterna dedicada para armas longas com acionador remoto e botão traseiro, com conexão para trilhos Picatinny, 550lm';
+    const lista = [item('curto', { nomeCurto: 'Pistola' }), item('longo', { nomeCurto: longo }), item('longoZerado', { nomeCurto: longo, alocado: 0 })];
+    expect(longo.length).toBeGreaterThan(NOME_LONGO);
+    expect(resumoInicioEmendas([], lista, new Map(), HOJE).nomeLongo.map((i) => i.itemKey)).toEqual(['longo']);
+  });
 });
 
 describe('prazo dos avisos novos (Início)', () => {
   it('cada aviso diz o que fazer, sem cair no texto da nota', () => {
     const a = (tipo: Parameters<typeof prazoDoAviso>[0]['tipo']) => prazoDoAviso({ tipo, curto: '', texto: '' }, null, '2026-10-25');
     expect(a('semEnvioCgofi')).toBe('registrar o envio à CGOFI');
-    expect(a('notaEmitida')).toBe('registrar o empenho');
+    expect(a('notaEmitida')).toBe('cobrar a CGOFI ou cancelar o item');
     expect(a('credorDiferente')).toBe('conferir a nota e o item');
     expect(a('semNota')).toBe('procurar a nota pelo contrato');
   });

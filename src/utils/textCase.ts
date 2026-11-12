@@ -75,3 +75,33 @@ export function descricaoItemEmFrase(text: string | null | undefined): string {
   });
   return capitalizarFrases(emFrase);
 }
+
+const PARTICULAS_DE_NOME = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos', 'a', 'o', 'por']);
+
+/** A Receita manda sem acento; palavras comuns de órgãos de segurança voltam com acento. */
+const ACENTOS_DE_NOME: Record<string, string> = {
+  policia: 'Polícia', publica: 'Pública', seguranca: 'Segurança', municipio: 'Município', secretaria: 'Secretaria',
+  batalhao: 'Batalhão', policial: 'Policial', penal: 'Penal', cientifica: 'Científica', tecnica: 'Técnica',
+  federal: 'Federal', rodoviaria: 'Rodoviária', judiciaria: 'Judiciária', criminalistica: 'Criminalística',
+  periciais: 'Periciais', pericia: 'Perícia', medico: 'Médico', legal: 'Legal', instituto: 'Instituto',
+  administracao: 'Administração', coordenadoria: 'Coordenadoria', diretoria: 'Diretoria', delegacia: 'Delegacia',
+  'sao': 'São', 'goias': 'Goiás', 'para': 'Pará', 'amapa': 'Amapá', 'ceara': 'Ceará', 'piaui': 'Piauí',
+  'maranhao': 'Maranhão', 'paraiba': 'Paraíba', 'rondonia': 'Rondônia', 'brasilia': 'Brasília', 'espirito': 'Espírito'
+};
+
+/**
+ * Nome de órgão/unidade em maiúsculas (razão social da Receita) no padrão dos cadastros:
+ * cada palavra com inicial maiúscula, menos "de/do/da/e…" (ex.: "Polícia Civil do Estado de Minas Gerais").
+ * Texto que já tem minúscula não é alterado. Siglas conhecidas e palavras com número ficam como estão.
+ */
+export function nomeProprioEmTitulo(text: string | null | undefined): string {
+  if (!text) return '';
+  if (HAS_LOWERCASE.test(text)) return text;
+  return text.replace(/[A-ZÀ-Ý0-9ºª]+/g, (word, offset: number) => {
+    if (SIGLAS.has(word) || /\d/.test(word)) return word;
+    const baixa = word.toLowerCase();
+    if (ACENTOS_DE_NOME[baixa]) return ACENTOS_DE_NOME[baixa];
+    if (offset > 0 && PARTICULAS_DE_NOME.has(baixa)) return baixa;
+    return baixa.charAt(0).toUpperCase() + baixa.slice(1);
+  });
+}

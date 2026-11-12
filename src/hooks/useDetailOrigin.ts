@@ -16,7 +16,10 @@ interface OriginState {
   origin?: DetailOrigin;
 }
 
-const DETAIL_PATH = /^\/(atas\/detalhe\/|contratos\/[^/])/;
+// Pedido 360 (Emendas): pelo número (parlamentar, ano e ordem) ou, sem número, pelo identificador interno.
+// Parlamentar 360 (e o Pedido 360 abaixo dele) e o Pedido 360 sem número, pelo identificador interno.
+// Ata a montar (atas_a_montar, migration 238): /atas/montar/<ano>/<sequencial>/<fornecedor>.
+const DETAIL_PATH = /^\/(atas\/detalhe\/|atas\/montar\/|contratos\/[^/]|emendas\/parlamentares\/[^/?#]|emendas\/pedidos\/id\/|emendas\/emendas\/[^/?#])/;
 
 /** Telas de detalhe: só elas recebem a origem. */
 export function isDetailPath(to: string): boolean {
@@ -28,17 +31,25 @@ export function originLabel(path: string): string | null {
   const pathname = path.split(/[?#]/)[0];
   switch (pathname) {
     case '/instrumentos': return 'Início';
-    case '/atas': return 'Carteira';
+    case '/atas': return new URLSearchParams(path.split('?')[1] ?? '').get('ver') === 'montar' ? 'Atas a montar' : 'Carteira';
+    case '/atas/montar': return 'Atas a montar';
     case '/contratos': return 'Carteira';
     case '/itens': return 'Carteira';
     case '/atas/distribuicao': return 'Distribuição';
     case '/pagamentos': return 'Pagamentos';
     case '/empenhos': return 'Empenhos';
+    case '/emendas/inicio': return 'Início';
+    case '/emendas/pedidos': return 'Pedidos';
+    case '/emendas/parlamentares': return 'Parlamentares';
+    case '/emendas/emendas': return 'Emendas';
     default: break;
   }
   if (/^\/atas\/detalhe\/[^/]+\/itens\/[^/]+/.test(pathname)) return 'o item';
   if (/^\/atas\/detalhe\/[^/]+/.test(pathname)) return 'a ata';
   if (/^\/contratos\/[^/]+/.test(pathname)) return 'o contrato';
+  if (/^\/emendas\/(parlamentares\/[^/]+\/pedidos|pedidos\/id)\/[^/]+/.test(pathname)) return 'o pedido';
+  if (/^\/emendas\/parlamentares\/[^/]+/.test(pathname)) return 'o parlamentar';
+  if (/^\/emendas\/emendas\/[^/]+\/[^/]+/.test(pathname)) return 'a emenda';
   return null;
 }
 

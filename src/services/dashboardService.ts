@@ -13,6 +13,8 @@
  * 3. Funções puras para cálculos em memória e orquestração assíncrona paralela (Promise.all).
  */
 
+import { chaveDaAtaDoTermo, fetchAtasComProrrogacaoSoSaldo } from './termosProrrogacaoService';
+import { fetchDecisoesRegistradoAcima } from './registradoAcimaDecisaoService';
 import { formatContractNumber, formatContractKey } from '../utils/contractNumber';
 import { fetchResumoReajusteAtas, type ResumoReajusteAta } from './reajusteAtasService';
 import { avisosDoReajusteDasAtas } from './reajusteAtasAvisos';
@@ -74,7 +76,7 @@ import { alocadoAcimaDoLimite, limiteComPreposicao, limiteProvisorio } from '../
 import { VIGENCIA_RULES, PAGAMENTO_RULES, TAREFA_RULES, classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
 import { motivoDoLembrete, motivoDoReajuste } from '../utils/motivoDetalhe';
-import { prazoEfetivo } from '../utils/modeloGestao';
+import { aguardandoResposta, COBRAR_CRITICO_DIAS, prazoEfetivo, textoCobrarResposta } from '../utils/modeloGestao';
 
 /**
  * Auxiliar para cálculo de dias restantes de vigência
@@ -332,6 +334,10 @@ export function calculateAttentionSummary(params: {
   ausentesDaFonte?: AusenteDaFonte[];
   /** Contrato × item com a quantidade real das notas acima do contratado (migration 133). */
   empenhadoAcima?: EmpenhadoAcima[];
+  /** Atas cujo termo de prorrogação cobre só o saldo (migration 222): o aviso "registrado acima" delas sai da fila. */
+  atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
+  /** Chaves dos avisos "registrado acima" com decisão do gestor da ata (migration 223): saem da fila. */
+  registradoAcimaDecididos?: ReadonlySet<string>;
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
   const {
@@ -530,7 +536,25 @@ export function calculateAttentionSummary(params: {
   const tarefasHumanas = prazosItems.filter((pItem) => pItem.tipoItem === 'TAREFA_HUMANA');
 
   for (const pItem of tarefasHumanas) {
-    if (pItem.estadoTemporal === 'ATRASADO') {
+    if (pItem.estadoTemporal === 'ATRASADO' && pItem.aguardandoResposta) {
+      // Pedido enviado e resposta vencida: o que falta é cobrar, não fazer (migration 225).
+      const atraso = Math.abs(pItem.diasRestantes);
+      items.push({
+        id: `ATT-TASK-COBRAR-${pItem.id}`,
+        category: 'COBRAR_RESPOSTA',
+        severity: atraso >= COBRAR_CRITICO_DIAS ? 'CRITICA' : 'URGENTE',
+        title: pItem.acaoDescricao || 'Cobrar resposta',
+        description: `${pItem.identificadorFormatado} — ${textoCobrarResposta({ pedidoEnviadoEm: pItem.pedidoEnviadoEm, pedidoSei: pItem.pedidoSei, prazoResposta: pItem.dataAlvo }, atraso)}`,
+        contractKey: pItem.contractKey,
+        numeroContrato: pItem.identificadorFormatado,
+        arpKey: pItem.arpKey,
+        taskId: pItem.tarefaId,
+        diasRelevantes: pItem.diasRestantes,
+        dataAlvo: pItem.dataAlvo,
+        targetUrl: pItem.contractKey ? `/contratos/${pItem.contractKey}` : undefined,
+        badgeLabel: `Cobrar (${atraso} d.u.)`
+      });
+    } else if (pItem.estadoTemporal === 'ATRASADO') {
       items.push({
         id: `ATT-TASK-OVERDUE-${pItem.id}`,
         category: 'TAREFA_ATRASADA',
@@ -866,6 +890,10 @@ export function calculateAttentionSummary(params: {
     const uasgItem = aItem.codigo_uasg || aItem.codigoUasg || aItem.uasg || '200331';
     const itemKey = aItem.item_key || aItem.itemKey || (numAta && numItem ? `${numAta}-${uasgItem}-${numItem}` : '');
     if (!itemKey) continue;
+    // Ata prorrogada com termo "só o saldo" (migration 222): o termo explica o excedente; o desconto continua.
+    if (params.atasComProrrogacaoSoSaldo?.has(chaveDaAtaDoTermo(numAta, uasgItem))) continue;
+    // Gestor da ata decidiu manter fora do saldo (ou aceitar) (migration 223).
+    if (params.registradoAcimaDecididos?.has(chave)) continue;
     items.push(itemRegistradoAcima(aItem, itemKey, numAta, uasgItem, numItem, chave));
   }
 
@@ -930,6 +958,24 @@ export function calculateAttentionSummary(params: {
         const nivelPrazo = classifyTarefaPrazo(dias);
         if (nivelPrazo === 'DISTANTE') continue;
         const du = (n: number) => `${n} ${n === 1 ? 'dia útil' : 'dias úteis'}`;
+        if (dias < 0 && aguardandoResposta(task)) {
+          // Pedido enviado e resposta vencida: "Cobrar resposta" (migration 225).
+          items.push({
+            id: `ATT-ATA-TASK-${task.id}`,
+            category: 'COBRAR_RESPOSTA',
+            severity: Math.abs(dias) >= COBRAR_CRITICO_DIAS ? 'CRITICA' : 'URGENTE',
+            title: task.nome,
+            description: `ARP ${numAta} — ${textoCobrarResposta(task, Math.abs(dias))}`,
+            arpKey: `${numAta}-${arp.codigoUnidadeGerenciadora}`,
+            numeroAta: numAta,
+            numeroContrato: `ARP ${numAta}`,
+            taskId: task.id,
+            diasRelevantes: dias,
+            dataAlvo: prazoTarefa,
+            badgeLabel: `Cobrar (${Math.abs(dias)} d.u.)`
+          });
+          continue;
+        }
         items.push({
           id: `ATT-ATA-TASK-${task.id}`,
           category: nivelPrazo === 'VENCIDA' ? 'TAREFA_ATRASADA' : 'TAREFA_PROXIMA',
@@ -1404,6 +1450,8 @@ export function buildManagementDashboardReadModel(params: {
   ausentesDaFonte?: AusenteDaFonte[];
   empenhadoAcima?: EmpenhadoAcima[];
   reajustesAtas?: ResumoReajusteAta[];
+  atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
+  registradoAcimaDecididos?: ReadonlySet<string>;
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1665,6 +1713,8 @@ export function buildManagementDashboardReadModel(params: {
     ausentesDaFonte: params.ausentesDaFonte,
     empenhadoAcima: params.empenhadoAcima,
     reajustesAtas: params.reajustesAtas,
+    atasComProrrogacaoSoSaldo: params.atasComProrrogacaoSoSaldo,
+    registradoAcimaDecididos: params.registradoAcimaDecididos,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1739,7 +1789,9 @@ export async function fetchManagementDashboardData(
     vinculosAConferir,
     ausentesDaFonte,
     empenhadoAcima,
-    reajustesAtas
+    reajustesAtas,
+    atasComProrrogacaoSoSaldo,
+    registradoAcimaDecididos
   ] = await Promise.all([
     ler('contratos', 'contratos', cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg), [] as ContractDashboardRecord[]),
     ler('arps', 'atas (ARPs)', cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
@@ -1755,7 +1807,9 @@ export async function fetchManagementDashboardData(
     lerSemUasg('vinculos', 'vínculos a conferir', fetchVinculosAConferir, [] as VinculoAConferir[]),
     lerSemUasg('ausentes', 'notas e faturas a conferir', fetchAusentesDaFonte, [] as AusenteDaFonte[]),
     lerSemUasg('empenhadoAcima', 'empenhado acima do contratado', fetchEmpenhadoAcima, [] as EmpenhadoAcima[]),
-    lerSemUasg('reajusteAtas', 'reajuste das atas', fetchResumoReajusteAtas, [] as ResumoReajusteAta[])
+    lerSemUasg('reajusteAtas', 'reajuste das atas', fetchResumoReajusteAtas, [] as ResumoReajusteAta[]),
+    lerSemUasg('termosProrrogacao', 'termos de prorrogação das atas', fetchAtasComProrrogacaoSoSaldo, new Set<string>()),
+    lerSemUasg('decisoesRegistradoAcima', 'decisões do registrado acima do homologado', () => fetchDecisoesRegistradoAcima().then((l) => new Set(l.map((d) => d.chave))), new Set<string>())
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
   const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
@@ -1778,6 +1832,8 @@ export async function fetchManagementDashboardData(
     ausentesDaFonte,
     empenhadoAcima,
     reajustesAtas,
+    atasComProrrogacaoSoSaldo,
+    registradoAcimaDecididos,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate

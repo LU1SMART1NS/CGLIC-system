@@ -1,9 +1,8 @@
 import React from 'react';
-import { ChevronDown } from 'lucide-react';
 import { formatCurrencyCompact, formatNumber } from '../../utils/format';
-import { scrollToSummary, useInstrument360Dock } from '../instrument360/instrument360Dock';
 import type { GestaoInstrumentosCardId, GestaoInstrumentosCounts } from './GestaoInstrumentosSummaryCards';
-import { PAINEL_GAVETA_NOMES, type PainelGavetaId } from './painelGavetasConfig';
+import type { PainelGavetaId } from './painelGavetasConfig';
+import { PainelFaixa } from './PainelFaixa';
 
 interface GestaoInstrumentosDockStripProps {
   counts: GestaoInstrumentosCounts;
@@ -19,8 +18,8 @@ interface GestaoInstrumentosDockStripProps {
 }
 
 /**
- * Faixa azul do Início com os cartões encolhidos (mesmo bloco das telas 360): o nome leva de volta ao
- * topo e os números em miniatura filtram a lista como os cartões. Só aparece com o bloco encolhido.
+ * Faixa azul do Painel de Atas e Contratos (peça comum `PainelFaixa`): o nome leva de volta ao topo e os números
+ * em miniatura filtram a lista como os cartões. Só aparece com o bloco encolhido.
  */
 export const GestaoInstrumentosDockStrip: React.FC<GestaoInstrumentosDockStripProps> = ({
   counts,
@@ -32,8 +31,6 @@ export const GestaoInstrumentosDockStrip: React.FC<GestaoInstrumentosDockStripPr
   gavetaAberta = null,
   onToggleGaveta
 }) => {
-  const min = useInstrument360Dock()?.min ?? false;
-  const tab = min ? 0 : -1;
   const chips: Array<{ id: GestaoInstrumentosCardId; label: string; value: string; danger?: boolean }> = [
     { id: 'ARP', label: 'Atas', value: formatNumber(counts.totalAtas) },
     ...(saldosOnly
@@ -46,46 +43,14 @@ export const GestaoInstrumentosDockStrip: React.FC<GestaoInstrumentosDockStripPr
   ];
 
   return (
-    <div className="vg-strip" aria-hidden={!min} data-testid="instrumentos-dock-strip">
-      <div className="vg-strip-in">
-        <div className="vg-strip-row">
-          <button type="button" className="vg-strip-title" onClick={scrollToSummary} tabIndex={tab} aria-label="Início: voltar ao resumo completo">
-            Início{gestorNome ? ` · ${gestorNome}` : ''}
-          </button>
-          <div className="vg-chips">
-            {chips.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                tabIndex={tab}
-                aria-pressed={activeCard === c.id}
-                className={c.danger ? 'vg-chip vg-chip--danger' : 'vg-chip'}
-                onClick={() => onSelectCard(c.id)}
-                data-testid={`instrumentos-dock-chip-${c.id}`}
-              >
-                {c.label} <strong>{c.value}</strong>
-              </button>
-            ))}
-          </div>
-          {gavetas.length > 0 && onToggleGaveta && (
-            <div className="vg-chips vg-chips--gavetas">
-              {gavetas.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  tabIndex={tab}
-                  aria-expanded={gavetaAberta === id}
-                  className="vg-chip"
-                  onClick={() => onToggleGaveta(id)}
-                  data-testid={`instrumentos-dock-gaveta-${id}`}
-                >
-                  {PAINEL_GAVETA_NOMES[id]} <ChevronDown size={14} aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <PainelFaixa
+      titulo={`Início${gestorNome ? ` · ${gestorNome}` : ''}`}
+      chips={chips.map((c) => ({ id: c.id, rotulo: c.label, valor: c.value, perigo: c.danger, ativo: activeCard === c.id, onClick: () => onSelectCard(c.id) }))}
+      gavetas={gavetas}
+      gavetaAberta={gavetaAberta}
+      onToggleGaveta={onToggleGaveta}
+      testId="instrumentos-dock-strip"
+      prefixo="instrumentos-dock"
+    />
   );
 };

@@ -17,7 +17,7 @@ const item = (i: Partial<ItemReajuste>): ItemReajuste => ({
   precoAplicado: 355230, situacao: 'EM_DIA', proximoEfeito: null, proximoSituacao: null, proximoPercentual: null, proximoMesesEstimados: null,
   precoProjetado: null, ...i
 });
-const dados = (d: Partial<ReajusteDaAta>): ReajusteDaAta => ({ ataId: 'ata', parametros: par(), ciclos: [], itens: [], publicados: [], indices: [], ...d });
+const dados = (d: Partial<ReajusteDaAta>): ReajusteDaAta => ({ ataId: 'ata', parametros: par(), ciclos: [], itens: [], publicados: [], apostilados: [], indices: [], ...d });
 
 // Ata 00032/2025 (dados reais de 23/10/2026): termo aditivo de 4,44% publicado, preço do Compras.gov.br ainda homologado.
 const ATA_32 = dados({
@@ -55,6 +55,12 @@ describe('impacto no saldo', () => {
     expect(impactoDoItem(i, [{ numeroItem: '00001', saldo: -7 }])).toEqual({ devido: 0, proximo: 0, saldo: 0 });
   });
 
+  it('sobra abaixo do centavo não é reajuste', () => {
+    const i = { ...ATA_32.itens[0], precoAtual: 285899, precoDevido: 285899.0043 };
+    expect(impactoDoItem(i, [{ numeroItem: '1', saldo: 174 }]).devido).toBe(0);
+    expect(impactoDoItem({ ...i, precoDevido: 285899.01 }, [{ numeroItem: '1', saldo: 174 }]).devido).toBeCloseTo(1.74, 2);
+  });
+
   it('próximo: preço projetado sobre o maior entre o devido e o atual', () => {
     const i = ATA_39.itens[0];
     expect(impactoDoItem(i, [{ numeroItem: '2', saldo: 102 }]).proximo).toBeCloseTo(102 * 5701.66, 2);
@@ -72,8 +78,18 @@ describe('situação da ata', () => {
 
   it('00032/2025: preço do Compras.gov.br sem o reajuste publicado', () => {
     expect(avisoDaAba(ATA_32, [], HOJE)).toMatchObject({ tone: 'warning' });
-    expect(avisoDaAba(ATA_32, [], HOJE).texto).toMatch(/de 4,44% está publicado no PNCP, mas o preço da ata no Compras.gov.br ainda é o homologado/);
-    expect(quadroDoCartao(ATA_32, [], HOJE)).toEqual({ valor: 'Conferir preço', hint: 'Reajuste publicado, preço antigo', tone: 'warning' });
+    expect(avisoDaAba(ATA_32, [], HOJE)).toMatchObject({ acao: 'INFORMAR_PRECO' });
+    expect(avisoDaAba(ATA_32, [], HOJE).texto).toMatch(/de 4,44% está publicado no PNCP, mas o Compras.gov.br ainda mostra o preço homologado.*Informe o preço do apostilamento/);
+    expect(quadroDoCartao(ATA_32, [], HOJE)).toEqual({ valor: 'Informar preço', hint: 'Apostilamento sem o preço no sistema', tone: 'warning' });
+  });
+
+  it('preço do apostilamento informado e a fonte trouxe outro preço novo: conferir (migration 247)', () => {
+    const apostilado = { numeroItem: '00001', preco: 371002.21, precoAntes: 355230, fonteValor: 355230, seiApostilamento: '12345678', informadoPorNome: null, informadoEm: '2026-10-29' };
+    const emDia = dados({ ...ATA_32, itens: [item({ precoAtual: 371002.21 })], apostilados: [apostilado] });
+    expect(avisoDaAba(emDia, [], HOJE).acao).toBeUndefined();
+    const diferente = avisoDaAba({ ...emDia, apostilados: [{ ...apostilado, fonteValor: 372000 }] }, [], HOJE);
+    expect(diferente).toMatchObject({ tone: 'warning', acao: 'INFORMAR_PRECO' });
+    expect(diferente.texto).toMatch(/item 1: R\$\s372\.000,00 na fonte, R\$\s371\.002,21 informado/);
   });
 
   it('00039/2026: reajuste na prorrogação, se houver', () => {

@@ -24,8 +24,7 @@ import { getLookupKey, getInstrumentoInfo, motivoDoEndereco, motivoNoFiltro, typ
 import type { CarteiraFilterOption } from '../carteira/CarteiraFilterButton';
 import { UASGS_CGLIC } from '../../config/unidadesGestoras';
 import { AvisosResolvidosLista, useResolverAviso } from '../avisos/ResolverAviso';
-import { Instrument360DockProvider } from '../instrument360/Instrument360DockProvider';
-import { Instrument360Head } from '../instrument360/Instrument360Head';
+import { PainelComFaixa } from './PainelFaixa';
 import { scrollToDock } from '../instrument360/instrument360Dock';
 import { GestaoInstrumentosDockStrip } from './GestaoInstrumentosDockStrip';
 import { useAllAtaManagers } from '../../hooks/useAtaManagers';
@@ -38,10 +37,21 @@ import { EmptyState } from '../../design-system/components/EmptyState';
 import { PainelFiltros, TODAS_UASGS, TODOS_OS_GESTORES } from './PainelFiltros';
 import { PainelBotoesGavetas, PainelGaveta, type PainelBotaoGaveta, type PainelGavetaId } from './PainelGavetas';
 import { GavetaSituacao } from './GavetaSituacao';
+import { useTransferenciasTemporarias } from '../../hooks/useTransferenciasTemporarias';
+import { AvisoAusencias } from '../atas/distribuicao/AvisoAusencias';
+import { AvisoMinhaAusencia } from '../atas/distribuicao/AvisoMinhaAusencia';
+import { ausenciaDe } from '../atas/distribuicao/transferenciaTemporaria';
 import { GavetaDistribuicaoConectada } from './GavetaDistribuicaoConectada';
+import { CENTRAL_DISTRIBUICAO_PATH } from '../carteira/ManagerAssign';
+import { SEM_GESTOR } from '../carteira/carteiraGestor';
 import { GavetaAlocacao } from './GavetaAlocacao';
+import { GavetaEmendasAContratar } from './GavetaEmendasAContratar';
+import { useEmendasAContratar } from '../../hooks/useEmendas';
+import { enviosParaContratar } from '../../utils/emendasCcga';
 import { contarFaixas, criticasPorInstrumento, resumoPorGestor, type InstrumentoNoPainel } from './painelResumo';
 import { formatNumber } from '../../utils/format';
+import { ComVoce, type ItemComVoce } from './ComVoce';
+import { ROTAS_VINCULACAO } from '../vinculacao/vinculacaoConfig';
 
 type TipoFilter = 'TODOS' | 'ARP' | 'CONTRATO';
 
@@ -52,7 +62,7 @@ const TAB_CATEGORY_MAP: Record<Exclude<GestaoInstrumentosCategoryTab, 'TODAS'>, 
   SALDOS: ['ATA_CRITICA', 'QUANTITATIVOS', 'REGISTRADO_ACIMA', 'ATA_ASSINADA', 'UNIDADE_PENDENTE', 'FORNECEDOR_PNCP', 'VINCULO_A_CONFERIR'],
   REAJUSTES: ['REAJUSTE_RADAR', 'REAJUSTE_ATA'],
   PAGAMENTOS: ['PAGAMENTO_CRITICO', 'PAGAMENTO_PREVISTO', 'FONTE_A_CONFERIR', 'EMPENHO_ACIMA'],
-  TAREFAS: ['TAREFA_ATRASADA', 'TAREFA_PROXIMA'],
+  TAREFAS: ['TAREFA_ATRASADA', 'COBRAR_RESPOSTA', 'TAREFA_PROXIMA'],
   LEMBRETES: ['LEMBRETE']
 };
 
@@ -109,9 +119,10 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   const ataManagersQuery = useAllAtaManagers();
   const { data: ataManagers, isLoading: ataManagersLoading } = ataManagersQuery;
 
-  const { role } = useAuth();
+  const { role, user } = useAuth();
+  // Férias, licença…: avisos de quem está fora (coordenador) e do que o gestor recebeu ou deixou com colegas.
+  const { data: transferencias = [] } = useTransferenciasTemporarias();
   const saldosOnly = role === 'gestor_saldos';
-  const semQuantitativos = role === 'gestor';
   const ehGestor = role === 'gestor';
   // Coordenador e consulta escolhem um gestor: o painel inteiro passa a ser a carteira dele, com o mesmo recorte
   // que ele vê no próprio painel (useAssignedManagementScope / escopoDoGestor).
@@ -133,7 +144,10 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   );
   const gestorNome = podeFiltrarGestor ? searchParams.get('gestor') || TODOS_OS_GESTORES : TODOS_OS_GESTORES;
   const gestorEscolhido = gestorNome ? gestores.find((g) => g.nome === gestorNome) : undefined;
-  const gestoresCarregando = Boolean(gestorNome) && (managers200330.isLoading || managers200331.isLoading || ataManagersLoading);
+  // Saldo dos itens (consumo e quantitativos) é do gestor de saldo: o gestor de atas e contratos não recebe esses avisos,
+  // nem quando o coordenador abre a carteira dele pelo filtro.
+  const semAvisosDeSaldo = ehGestor || Boolean(gestorNome);
+  const gestoresCarregando = Boolean(gestorNome) &&(managers200330.isLoading || managers200331.isLoading || ataManagersLoading);
 
   // Perfil "gestor" tem escopo ASSIGNED em contratos (role_domain_scopes,
   // migration 20260925000023), agora derivado também das Atas atribuídas
@@ -236,7 +250,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       const jaResolvidos = new Set(attention?.resolvidos || []);
       for (const item of [...(attention?.items || []), ...(attention?.resolvidos || [])]) {
         if (saldosOnly && item.category !== 'ATA_CRITICA' && item.category !== 'QUANTITATIVOS') continue;
-        if (semQuantitativos && item.category === 'QUANTITATIVOS') continue;
+        if (semAvisosDeSaldo && (item.category === 'ATA_CRITICA' || item.category === 'QUANTITATIVOS')) continue;
         if (item.taskId && tarefasConcluidas.has(item.taskId)) continue;
         const resolvido = resolvidosDoPainel ? jaResolvidos.has(item) : Boolean(item.avisoChave && avisosResolvidos.has(item.avisoChave));
         (resolvido ? resolvidos : ativos).push({ ...item, uasg });
@@ -253,7 +267,7 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     }
     return { allItems: ativos, itensResolvidos: resolvidos };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash200330.readModel, dash200331.readModel, uasgsAtivas, gestorEscolhido, scope200330.contractKeys, scope200331.contractKeys, saldosOnly, semQuantitativos, avisosPagamento, avisosResolvidos, resolvidosDoPainel, tarefasConcluidas]);
+  }, [dash200330.readModel, dash200331.readModel, uasgsAtivas, gestorEscolhido, scope200330.contractKeys, scope200331.contractKeys, saldosOnly, semAvisosDeSaldo, avisosPagamento, avisosResolvidos, resolvidosDoPainel, tarefasConcluidas]);
 
   const tabCounts = useMemo(() => {
     return {
@@ -311,13 +325,13 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
       totalEmpenhado: sum((rm) => rm.financial.totalEmpenhado),
       // Só CRITICA: é o que o clique no card filtra. Urgentes aparecem na linha própria do card.
       criticalCount: allItems.filter((i) => i.severity === 'CRITICA').length,
-      // Gestor de Saldo: o total do banco soma avisos de todo tipo; conta só os de saldo, como a lista.
-      totalAlertasAtivos: saldosOnly ? allItems.length : sum((rm) => rm.attention.totalAlertasAtivos),
+      // Gestor de saldo e gestor de atas e contratos: o total do banco soma avisos de todo tipo; conta os da lista.
+      totalAlertasAtivos: saldosOnly || semAvisosDeSaldo ? allItems.length : sum((rm) => rm.attention.totalAlertasAtivos),
       urgenteCount,
       atencaoCount
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dashboards, allItems, saldosOnly]);
+  }, [dashboards, allItems, saldosOnly, semAvisosDeSaldo]);
 
   const activeCard: GestaoInstrumentosCardId | null = useMemo(() => {
     if (activeTab === 'SALDOS') return 'ARP';
@@ -435,11 +449,17 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
   // ---- Gavetas: botões com resumo e uma área aberta por vez -------------------------------------------------------
   const extras = useContagensExtras();
   // A gaveta Distribuição (ocupação de cada gestor) é só do coordenador, como a Central (decisão de 25/10/2026).
-  const gavetasDisponiveis: PainelGavetaId[] = saldosOnly
-    ? ['situacao', 'alocacao']
-    : role === 'admin' && !gestorNome
-      ? ['situacao', 'distribuicao']
-      : ['situacao'];
+  // Emendas a contratar (migration 248, D1): o gestor vê as atas dele; o coordenador, as sem gestor ou as do gestor escolhido.
+  const aContratarConsulta = useEmendasAContratar();
+  const emendasAContratar = useMemo(
+    () => enviosParaContratar(aContratarConsulta.data ?? [], { coordenador: role === 'admin', gestorNome: gestorNome || null }),
+    [aContratarConsulta.data, role, gestorNome]
+  );
+  const temEmendasAContratar = emendasAContratar.aContratar.length + emendasAContratar.desfeitos.length > 0;
+  const gavetasDisponiveis: PainelGavetaId[] = [
+    ...(saldosOnly ? (['situacao', 'alocacao'] as const) : role === 'admin' && !gestorNome ? (['situacao', 'distribuicao'] as const) : (['situacao'] as const)),
+    ...(temEmendasAContratar && (role === 'admin' || ehGestor) ? (['emendasAContratar'] as const) : [])
+  ];
   const gavetaUrl = searchParams.get('gaveta') as PainelGavetaId | null;
   const gavetaAberta: PainelGavetaId | null = gavetaUrl && gavetasDisponiveis.includes(gavetaUrl) ? gavetaUrl : null;
   const rolarParaGaveta = useRef(false);
@@ -455,12 +475,34 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
     scrollToDock(dockRef.current);
   }, [gavetaAberta]);
 
+  // "Com você" do coordenador (decisão de 11/11/2026): as decisões que são só dele. O gestor já vê só a carteira dele,
+  // e as Pendências são o "com você" dele. Escolhido um gestor, o Painel é o daquele gestor: sem o bloco.
+  const comVoceVisivel = role === 'admin' && !gestorNome;
+  const qtd = (n: number, um: string, varios: string) => `${formatNumber(n)} ${n === 1 ? um : varios}`;
+  const comVoce: ItemComVoce[] = [];
+  if (comVoceVisivel && (extras.atasSemGestor ?? 0) > 0) {
+    const n = extras.atasSemGestor as number;
+    comVoce.push({ chave: 'atas-sem-gestor', titulo: `Atribuir gestor a ${qtd(n, 'ata', 'atas')}`, detalhe: 'Vigentes ou com contrato vigente. Os contratos vinculados seguem o gestor da ata.', acao: 'Distribuir', onAcao: () => navigate(`${CENTRAL_DISTRIBUICAO_PATH}?aba=ATAS`) });
+  }
+  if (comVoceVisivel && (extras.gestorDiferente ?? 0) > 0) {
+    const n = extras.gestorDiferente as number;
+    comVoce.push({ chave: 'gestor-diferente', titulo: `Conferir ${qtd(n, 'contrato', 'contratos')} com gestor diferente da ata`, detalhe: 'Contrato vinculado deve seguir o gestor da ata.', acao: 'Conferir', onAcao: () => navigate(`${CENTRAL_DISTRIBUICAO_PATH}?aba=DIVERGENCIAS`) });
+  }
+  if (comVoceVisivel && (extras.contratosAta ?? 0) > 0) {
+    const n = extras.contratosAta as number;
+    comVoce.push({ chave: 'contratos-a-vincular', titulo: `Vincular ${qtd(n, 'contrato', 'contratos')} à ata`, detalhe: 'Sem item de ata vinculado: o contrato só segue o gestor da ata depois do vínculo.', acao: 'Vincular', onAcao: () => navigate(ROTAS_VINCULACAO.contratos) });
+  }
+
   const vencem90Contratos = summaryCounts.contratosEmAtencao60a90d + summaryCounts.contratosAVencer30d;
   const botoesGavetas: PainelBotaoGaveta[] = gavetasDisponiveis.map((id) => {
     if (id === 'situacao') {
       return saldosOnly
         ? { id, resumo: `${formatNumber(summaryCounts.itensCriticosArp)} itens acima de 80%`, atencao: summaryCounts.itensCriticosArp > 0 }
         : { id, resumo: `${formatNumber(vencem90Contratos)} ${vencem90Contratos === 1 ? 'contrato vence' : 'contratos vencem'} em 90 dias`, atencao: vencem90Contratos > 0 };
+    }
+    if (id === 'emendasAContratar') {
+      const n = emendasAContratar.aContratar.length;
+      return { id, resumo: n ? `${formatNumber(n)} ${n === 1 ? 'pedido' : 'pedidos'} a contratar` : 'envio desfeito', atencao: n > 0 };
     }
     if (id === 'distribuicao') {
       const sem = extras.atasSemGestor;
@@ -503,7 +545,9 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
           ? 'Clique numa faixa para abrir os registros.'
           : gavetaAberta === 'distribuicao'
             ? 'Vigentes de cada carteira; vencem = em até 90 dias; críticas = pendências críticas. Clique num gestor para ver o painel dele.'
-            : 'Itens com quantitativo SENASP das atas não encerradas, pelo quanto já foi alocado às unidades.'
+            : gavetaAberta === 'emendasAContratar'
+              ? 'Pedidos de emenda que a CAEP enviou à CCGA, só com os itens da ata. Saem sozinhos quando o contrato aparece no Contratos.gov.br.'
+              : 'Itens com quantitativo SENASP das atas não encerradas, pelo quanto já foi alocado às unidades.'
       }
     >
       {gavetaAberta === 'situacao' && (
@@ -524,10 +568,22 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
             mudarEndereco({ gestor: nome, gaveta: null });
             window.scrollTo({ top: 0 });
           }}
-          onDistribuir={() => navigate('/atas/distribuicao')}
+          onDistribuir={(destino) =>
+            navigate(destino === 'ATAS' ? CENTRAL_DISTRIBUICAO_PATH : `/contratos?gestor=${encodeURIComponent(SEM_GESTOR)}`)
+          }
         />
       )}
       {gavetaAberta === 'alocacao' && <GavetaAlocacao onAbrir={navigate} />}
+      {gavetaAberta === 'emendasAContratar' && (
+        <GavetaEmendasAContratar
+          aContratar={emendasAContratar.aContratar}
+          desfeitos={emendasAContratar.desfeitos}
+          isLoading={aContratarConsulta.isLoading}
+          erro={aContratarConsulta.isError}
+          semGestor={role === 'admin' && !gestorNome}
+          onAbrir={navigate}
+        />
+      )}
     </PainelGaveta>
   );
 
@@ -576,101 +632,99 @@ export const GestaoInstrumentosDashboard: React.FC = () => {
         testIdPrefix="inicio-fontes"
       />
 
-      {semCarteira ? (
+      {role === 'admin' && <AvisoAusencias transferencias={transferencias} onVer={() => navigate('/atas/distribuicao?aba=AUSENCIAS')} />}
+      {ehGestor && <AvisoMinhaAusencia transferencias={transferencias} userId={user?.id} />}
+
+      {semCarteira && ausenciaDe(transferencias, user?.id) ? (
+        <EmptyState
+          title="Sua carteira está com colegas durante a sua ausência"
+          description="As atas e os contratos voltam para você quando a coordenação desfizer a transferência temporária."
+          testId="instrumentos-carteira-transferida"
+        />
+      ) : semCarteira ? (
         <EmptyState
           title="Você ainda não tem atas ou contratos atribuídos"
           description="Este painel mostra a sua carteira. Quando a coordenação distribuir atas ou contratos para você, os números e as pendências aparecem aqui."
           testId="instrumentos-sem-carteira"
         />
       ) : (
-      // Cartões + trilho grudam no alto e encolhem em faixa azul ao rolar (mesmo bloco das telas 360).
-      // A lista tem de ser o irmão seguinte do bloco; o espaço perdido ao encolher volta no fim (--i360-lost).
-      <Instrument360DockProvider>
-        <div style={{ paddingBottom: 'var(--i360-lost, 0px)' }}>
-          <Instrument360Head>
-            <GestaoInstrumentosDockStrip
+      // Cartões + trilho grudam no alto e encolhem em faixa azul ao rolar: moldura comum dos Painéis (PainelComFaixa).
+      <PainelComFaixa
+        dockRef={dockRef}
+        faixa={
+          <GestaoInstrumentosDockStrip
+            counts={summaryCounts}
+            activeCard={activeCard}
+            onSelectCard={selectCardAndDock}
+            saldosOnly={saldosOnly}
+            gestorNome={gestorNome || undefined}
+            gavetas={gavetasDisponiveis}
+            gavetaAberta={gavetaAberta}
+            onToggleGaveta={alternarGaveta}
+          />
+        }
+        topo={
+          <>
+            <GestaoInstrumentosSummaryCards
               counts={summaryCounts}
               activeCard={activeCard}
               onSelectCard={selectCardAndDock}
               saldosOnly={saldosOnly}
-              gestorNome={gestorNome || undefined}
-              gavetas={gavetasDisponiveis}
-              gavetaAberta={gavetaAberta}
-              onToggleGaveta={alternarGaveta}
+              semSaldoDosItens={semAvisosDeSaldo}
             />
-            <div className="i360-fold" ref={dockRef}>
-              <div className="i360-fold-in">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '0.75rem' }}>
-                  <GestaoInstrumentosSummaryCards
-                    counts={summaryCounts}
-                    activeCard={activeCard}
-                    onSelectCard={selectCardAndDock}
-                    saldosOnly={saldosOnly}
-                  />
-                  <PainelBotoesGavetas botoes={botoesGavetas} aberta={gavetaAberta} onToggle={alternarGaveta} />
-                  <SectionHeader
-                    title="Pendências da carteira"
-                    subtitle="Saldos, reajustes, pagamentos, tarefas e lembretes que exigem sua ação."
-                    className="section-header--flush"
-                    testId="instrumentos-pendencias-header"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {!saldosOnly && (
-              <div className="vg-rail">
-                <GestaoInstrumentosCategoryTabs
-                  counts={tabCounts}
-                  active={activeTab}
-                  onSelect={selectTabAndDock}
-                />
-              </div>
+            <PainelBotoesGavetas botoes={botoesGavetas} aberta={gavetaAberta} onToggle={alternarGaveta} />
+            {comVoceVisivel && (
+              <ComVoce itens={comVoce} testId="instrumentos-com-voce" carregando={extras.atasSemGestor === null || extras.gestorDiferente === null || extras.contratosAta === null} />
             )}
-          </Instrument360Head>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {gaveta}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '0.75rem'
-            }}>
-              <div style={{ flex: '1 1 360px', minWidth: 0 }}>
-                <GestaoInstrumentosCompactFilters
-                  filters={{ severidade, motivo, busca }}
-                  onChangeFilter={handleChangeFilter}
-                  onResetFilters={handleResetFilters}
-                  motivoOptions={motivoOptions}
-                  totalFiltered={filteredItems.length}
-                  totalItems={allItems.length}
-                />
-              </div>
-            </div>
-
-            {isLoading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <SkeletonLoader variant="card" height="96px" />
-                <SkeletonLoader variant="card" height="96px" />
-                <SkeletonLoader variant="card" height="96px" />
-                <SkeletonLoader variant="card" height="96px" />
-              </div>
-            ) : (
-              <GestaoInstrumentosTable
-                items={filteredItems}
-                totalItems={allItems.length}
-                fornecedorByKey={fornecedorByKey}
-                responsavelByContractKey={responsavelByContractKey}
-                onResetFilters={handleResetFilters}
-                onResolver={resolucao.abrir}
-                podeResolverAlvo={resolucao.podeResolverAlvo}
-              />
-            )}
+            <SectionHeader
+              title="Pendências da carteira"
+              subtitle="Saldos, reajustes, pagamentos, tarefas e lembretes que exigem sua ação."
+              className="section-header--flush"
+              testId="instrumentos-pendencias-header"
+            />
+          </>
+        }
+        trilho={saldosOnly ? undefined : <GestaoInstrumentosCategoryTabs counts={tabCounts} active={activeTab} onSelect={selectTabAndDock} />}
+      >
+        {gaveta}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          <div style={{ flex: '1 1 360px', minWidth: 0 }}>
+            <GestaoInstrumentosCompactFilters
+              filters={{ severidade, motivo, busca }}
+              onChangeFilter={handleChangeFilter}
+              onResetFilters={handleResetFilters}
+              motivoOptions={motivoOptions}
+              totalFiltered={filteredItems.length}
+              totalItems={allItems.length}
+            />
           </div>
         </div>
-      </Instrument360DockProvider>
+
+        {isLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <SkeletonLoader variant="card" height="96px" />
+            <SkeletonLoader variant="card" height="96px" />
+            <SkeletonLoader variant="card" height="96px" />
+            <SkeletonLoader variant="card" height="96px" />
+          </div>
+        ) : (
+          <GestaoInstrumentosTable
+            items={filteredItems}
+            totalItems={allItems.length}
+            fornecedorByKey={fornecedorByKey}
+            responsavelByContractKey={responsavelByContractKey}
+            onResetFilters={handleResetFilters}
+            onResolver={resolucao.abrir}
+            podeResolverAlvo={resolucao.podeResolverAlvo}
+          />
+        )}
+      </PainelComFaixa>
       )}
 
       <AvisosResolvidosLista

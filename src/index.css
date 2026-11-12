@@ -27,6 +27,7 @@
   --gti-cnpc: #22262e;
   --gti-condpci: #2e6b4a;
   --gti-consesp: #7a4fb8;
+  --gti-cngm: #0e7490;
   --gti-outros: #94a3b8;
   --gti-a-confirmar: #e2e8f0;
 
@@ -765,6 +766,8 @@ h1, h2, h3, h4 {
 }
 .area-subtab:hover { color: #0f172a; text-decoration: none; }
 .area-subtab[data-active='true'] { color: var(--primary); border-bottom-color: var(--primary); font-weight: 800; }
+.area-tab-count { margin-left: 0.4rem; color: #7b8798; font-weight: 700; font-variant-numeric: tabular-nums; }
+[data-active='true'] > .area-tab-count { color: var(--primary); }
 .app-rail-link:hover,
 .area-tab:hover { text-decoration: none; }
 .area-tab[data-active='true'] { color: var(--primary); border-bottom-color: var(--primary); font-weight: 800; }
@@ -1024,6 +1027,12 @@ html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que est
 .pn-gcard:hover { border-color: var(--border-color-hover); box-shadow: var(--shadow-sm); }
 .pn-gcard:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 .pn-gcard--sem { background: var(--color-warning-bg); border-color: var(--color-warning-border); }
+.pn-gcard--partido { cursor: default; }
+.pn-gc-lado-btn { display: flex; min-width: 0; margin: -4px; padding: 4px; border: 0; border-radius: var(--radius-sm); background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.pn-gc-lado-btn:hover { background: var(--bg-card); }
+.pn-gc-lado-btn:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 0; }
+.pn-gc-lado-btn + .pn-gc-lado-btn { padding-left: 12px; border-left: 1px solid var(--border-color); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.pn-gc-lado-btn > .pn-gc-lado { flex: 1; }
 .pn-gc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 0.85rem; }
 .pn-gc-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pn-gc-ir { flex: none; font-size: 0.78rem; font-weight: 700; color: var(--primary); }
@@ -1917,6 +1926,66 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .emendas-bloco-ata__ata:hover { text-decoration: underline; }
 .emendas-bloco-ata__forn { color: #64748b; }
 .emendas-bloco-ata__num { font-size: 0.78rem; color: #64748b; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Conferência do ofício no Pedido 360 (migration 234): itens com ✓, ajuste ao ofício e rodapé fixo com o resultado. */
+.conferencia-oficio { display: flex; flex-direction: column; gap: 1.1rem; padding-bottom: 1rem; }
+.conferencia-oficio__topo { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; justify-content: space-between; }
+.conferencia-oficio__titulo { margin: 0; font-size: 1.1rem; color: var(--primary); }
+.conferencia-oficio__sub { display: block; font-size: 0.8rem; color: #64748b; }
+.conferencia-oficio__parte { display: flex; flex-direction: column; gap: 0.75rem; }
+.conferencia-oficio__parte-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.6rem; }
+.conferencia-oficio__parte-cab h3 { margin: 0; font-size: 0.98rem; }
+.conferencia-oficio__num { display: inline-grid; place-items: center; width: 1.45rem; height: 1.45rem; border-radius: 50%; background: var(--primary); color: #fff; font-weight: 800; font-size: 0.8rem; }
+.conferencia-oficio__dica { flex-basis: 100%; font-size: 0.82rem; color: #64748b; }
+.conferencia-oficio__ata-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.7rem; padding: 0.5rem 0.7rem; background: #f8fafc; font-size: 0.82rem; color: #334155; }
+.conferencia-oficio__contagem { font-size: 0.75rem; font-weight: 700; padding: 0.05rem 0.55rem; border-radius: 999px; background: #f1f5f9; color: #64748b; }
+.conferencia-oficio__contagem--ok { background: var(--color-success-bg); color: var(--color-success-text); }
+.conferencia-oficio__tabela { overflow-x: auto; }
+.conferencia-oficio__tabela table { width: 100%; min-width: 820px; border-collapse: collapse; font-size: 0.85rem; }
+.conferencia-oficio__tabela th, .conferencia-oficio__tabela td { text-align: left; padding: 0.45rem 0.7rem; border-top: 1px solid #e2e8f0; vertical-align: middle; }
+.conferencia-oficio__tabela th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; white-space: nowrap; }
+.conferencia-oficio__n { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.conferencia-oficio__c { text-align: center !important; width: 4.5rem; }
+.conferencia-oficio__linha--ok td { background: var(--color-success-bg); }
+.conferencia-oficio__linha--nova td { background: var(--color-info-bg); }
+.conferencia-oficio__linha--retirada td { opacity: 0.55; }
+.conferencia-oficio__linha--retirada .conferencia-oficio__item strong { text-decoration: line-through; }
+.conferencia-oficio__item strong { display: block; }
+.conferencia-oficio__nota { display: block; font-size: 0.75rem; font-weight: 700; color: var(--color-warning-text); }
+.conferencia-oficio__nota--nova { color: var(--color-info-text); }
+.conferencia-oficio__nota--erro { color: var(--color-danger-text); }
+.conferencia-oficio__chk { width: 1.1rem; height: 1.1rem; accent-color: var(--color-success-solid); cursor: pointer; }
+.conferencia-oficio__etiqueta { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 0.05rem 0.5rem; border-radius: 999px; background: #f1f5f9; color: #64748b; white-space: nowrap; }
+.conferencia-oficio__etiqueta--ajuste { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.conferencia-oficio__passo { display: inline-flex; align-items: stretch; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; vertical-align: middle; }
+.conferencia-oficio__passo .ds-btn { border-radius: 0; min-width: 1.8rem; font-weight: 700; }
+.conferencia-oficio__passo input { width: 3.4rem; border: 0; text-align: center; font: inherit; font-weight: 700; font-variant-numeric: tabular-nums; }
+.conferencia-oficio__acrescentar { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.8rem; border: 1px dashed var(--color-info-border); border-radius: 8px; }
+.conferencia-oficio__grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 0.8rem; }
+.conferencia-oficio__acoes { display: flex; gap: 0.6rem; align-items: center; }
+.conferencia-oficio__check { display: flex; gap: 0.45rem; align-items: center; font-size: 0.85rem; }
+.conferencia-oficio__soma { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 0.8rem; align-items: start; }
+.conferencia-oficio__kpi { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.55rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; }
+.conferencia-oficio__kpi span { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
+.conferencia-oficio__kpi b { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.conferencia-oficio__kpi small { font-size: 0.75rem; color: #64748b; }
+.conferencia-oficio__kpi--destaque { border: 2px solid var(--primary); background: var(--color-info-bg); }
+.conferencia-oficio__kpi--destaque b { font-size: 1.45rem; color: var(--primary); }
+.conferencia-oficio__bate { color: var(--color-success-text); }
+.conferencia-oficio__nao-bate { color: var(--color-danger-text); }
+.conferencia-oficio__aviso { font-size: 0.82rem; font-weight: 600; padding: 0.5rem 0.7rem; border-radius: 6px; background: var(--color-info-bg); color: var(--color-info-text); }
+.conferencia-oficio__aviso--erro { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.conferencia-oficio__aviso--atencao { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.conferencia-oficio__aviso--ok { background: var(--color-success-bg); color: var(--color-success-text); }
+.conferencia-oficio__pontos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 0.5rem; }
+.conferencia-oficio__ponto { display: flex; gap: 0.5rem; align-items: center; padding: 0.45rem 0.65rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.conferencia-oficio__ponto small { display: block; font-size: 0.72rem; font-weight: 500; color: #64748b; }
+.conferencia-oficio__ponto--ok { border-color: var(--color-success-border); background: var(--color-success-bg); }
+.conferencia-oficio__rodape { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; padding: 0.7rem 0.9rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 -6px 18px rgba(12, 50, 111, 0.1); }
+.conferencia-oficio__estado { flex: 1 1 260px; display: flex; flex-wrap: wrap; gap: 0.2rem 0.6rem; align-items: center; font-size: 0.85rem; }
+.conferencia-oficio__estado .conferencia-oficio__sub { flex-basis: 100%; }
+.conferencia-oficio__falta { flex-basis: 100%; font-size: 0.8rem; font-weight: 600; color: var(--color-danger-text); }
+.conferencia-oficio__devolver { flex: 1 1 320px; display: flex; flex-direction: column; gap: 0.25rem; }
 .emendas-bloco-ata__sit { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; }
 .emendas-bloco-ata__corpo { display: flex; flex-direction: column; }
 .emendas-bloco-ata__sols { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; padding: 0.4rem 0.7rem; border-top: 1px solid #e2e8f0; font-size: 0.78rem; color: #475569; }
@@ -1929,6 +1998,19 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .emendas-falta__item--atencao { border-color: var(--color-warning-text); }
 .emendas-falta__item--espera { border-color: #94a3b8; }
 .emendas-falta__titulo { font-size: 0.84rem; font-weight: 700; color: #0f172a; }
+/* Régua de passos do item no Andamento do Pedido 360: no celular, só o passo atual e o próximo. */
+.regua-item-lado { text-align: right; }
+.regua-item { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 0.35rem; }
+.regua-item__passo { white-space: nowrap; }
+@media (max-width: 900px) {
+  .fisc-mesa-item { grid-template-columns: minmax(0, 1fr) !important; }
+}
+@media (max-width: 640px) {
+  .regua-item-lado { text-align: left; }
+  .regua-item { justify-content: flex-start; }
+  .regua-item__passo--longe { display: none; }
+  .regua-item__passo--atual > .regua-item__sep { display: none; }
+}
 
 /* Aba Reajuste da Ata 360: linha do tempo do Termo de Conformidade ao limite de 2 anos da ata. Rola no celular. */
 .reaj-tempo-caixa { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); overflow-x: auto; }
@@ -2030,6 +2112,7 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .reserva-lista button:first-child { border-top: 0; }
 .reserva-lista button:hover, .reserva-lista button:focus-visible, .reserva-lista button[aria-selected='true'] { background: var(--primary-light); }
 .reserva-lista__vazia { padding: 0.6rem 0.75rem; }
+.reserva-lista button.reserva-lista__cadastrar b { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--primary); }
 .reserva-contato { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.5rem 0.75rem; font-size: 0.85rem; }
 .reserva-grade3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 0.6rem; }
 .reserva-seletor { position: relative; }
@@ -2073,6 +2156,11 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 @media (max-width: 900px) { .emendas-autorizacao { grid-template-columns: minmax(0, 1fr); } }
 .reserva-teto { display: flex; flex-direction: column; gap: 0.35rem; background: var(--bg-page, #f8fafc); border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.6rem 0.75rem; font-size: 0.82rem; }
 .reserva-teto--passa { border-color: var(--color-danger-border); background: var(--color-danger-bg); }
+.reserva-emendas { display: flex; flex-direction: column; gap: 0.4rem; }
+.reserva-emenda { display: flex; align-items: flex-start; gap: 0.6rem; border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.5rem 0.75rem; font-size: 0.85rem; cursor: pointer; background: var(--surface, #fff); }
+.reserva-emenda input { margin-top: 0.2rem; }
+.reserva-emenda small { display: block; }
+.reserva-emenda--sel { border-color: var(--primary); background: var(--primary-light); }
 .reserva-teto__barra { height: 8px; border-radius: 999px; background: var(--surface, #fff); overflow: hidden; }
 .reserva-teto__barra i { display: block; height: 100%; background: var(--color-warning-text, #b45309); }
 .reserva-teto--passa .reserva-teto__barra i { background: var(--color-danger-text); }
@@ -2081,6 +2169,7 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .emendas-sobra-barra__empenhado { background: var(--primary); }
 .emendas-sobra-barra__andamento { background: var(--primary-light, #9bb8e8); }
 .emendas-sobra-barra__sobra { background: var(--color-warning-text, #b45309); }
+.emendas-sobra-barra__perdido { background: #b9c1ce; }
 .emendas-sobra-autor { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.4rem 0; }
 .emendas-sobra-emenda { display: flex; flex-direction: column; gap: 0.45rem; border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; padding: 0.65rem 0.8rem; background: var(--surface, #fff); }
 .emendas-sobra-emenda__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; }
@@ -2127,8 +2216,6 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .reserva-botoes { display: flex; gap: 0.5rem; }
 .reserva-falta { flex-basis: 100%; background: var(--color-danger-bg); color: var(--color-danger-text); border: 1px solid var(--color-danger-border); border-radius: 8px; padding: 0.45rem 0.75rem; font-size: 0.82rem; font-weight: 600; }
 .reserva-falta .reserva-link--falta { color: var(--color-danger-text); font-size: inherit; padding: 0; min-height: 0; height: auto; }
-.reserva-confirmar { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; background: var(--color-warning-bg); border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.82rem; }
-.reserva-confirmar > span { flex: 1; min-width: 200px; font-weight: 600; color: var(--color-warning-text); }
 @media (max-width: 860px) {
   .reserva-abas { display: flex; gap: 0.4rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--color-border, #e2e8f0); }
   .reserva-abas button { flex: 1; min-height: 40px; border: 1px solid var(--color-border, #cbd5e1); border-radius: 8px; background: var(--surface, #fff); font: inherit; font-weight: 700; cursor: pointer; }

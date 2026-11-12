@@ -24,6 +24,12 @@ Levantamentos e medições feitos antes de mudar o sistema. Nenhum estudo altera
 | [emendas-carga-sei.md](emendas-carga-sei.md) | 24/10/2026 | Onde cada etapa do pedido está no SEI e como carregá-las. |
 | [notas-das-emendas-pelo-tesouro.md](notas-das-emendas-pelo-tesouro.md) | 25/10/2026 | Por que algumas notas das emendas não chegam ao sistema. |
 
+## Fiscalização de contratos
+
+| Estudo | Data | Pergunta |
+|---|---|---|
+| [modulo-fiscalizacao.md](modulo-fiscalizacao.md) | 10/11/2026 | Como a SFC/CGLIC controla a fiscalização hoje (planilha e fluxo) e como o módulo de Fiscalização entra no sistema. |
+
 ## Desempenho das telas
 
 | Estudo | Data | Pergunta |

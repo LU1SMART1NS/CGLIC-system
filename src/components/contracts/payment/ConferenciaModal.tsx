@@ -165,9 +165,10 @@ export const ConferenciaModal: React.FC<{
                     <input
                       className="form-input"
                       type="text"
+                      inputMode="numeric"
                       aria-label={`Nº SEI de ${l.label}`}
                       value={l.sei}
-                      onChange={(e) => setLinhas((prev) => prev.map((x) => (x.item === l.item ? { ...x, sei: e.target.value } : x)))}
+                      onChange={(e) => setLinhas((prev) => prev.map((x) => (x.item === l.item ? { ...x, sei: e.target.value.replace(/[^\d, ]/g, '') } : x)))}
                       style={{ minWidth: '110px' }}
                       disabled={l.resposta === 'NA'}
                     />

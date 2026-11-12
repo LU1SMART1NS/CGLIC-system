@@ -259,7 +259,7 @@ export function buildDistribuicaoEquipe(input: {
     const urgente = alerta.severity === 'CRITICA' || alerta.severity === 'URGENTE';
     if (urgente) pendencias.urgentes++;
     else pendencias.acompanhar++;
-    if (alerta.category === 'TAREFA_ATRASADA') pendencias.atrasadas++;
+    if (alerta.category === 'TAREFA_ATRASADA' || alerta.category === 'COBRAR_RESPOSTA') pendencias.atrasadas++;
     if (alvo) {
       if (urgente) alvo.urgentes++;
       else alvo.acompanhar++;

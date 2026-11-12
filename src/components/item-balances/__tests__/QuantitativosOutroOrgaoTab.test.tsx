@@ -20,7 +20,8 @@ const UNID_PART = [
 const senasp = (p: Partial<OrgaoQuantitativo>): OrgaoQuantitativo => ({
   uasg: '200331', nomeOrgao: null, tipoUnidade: 'PARTICIPANTE', ehSenasp: true, quantidadeAssinada: 2400, quantidadeRegistrada: 2003, semRegistro: false,
   situacao: 'REMANEJADO_A_MENOS', falta: 397, acima: 0, remanejadoConfirmado: 0, resto: 397, continuaDoOrgao: null, gerenciado: 0, mudou: true,
-  mudouEm: '2026-10-06T16:47:39', atualizadoEm: '2026-10-06T16:47:39', ataDaSenasp: false, ...p
+  mudouEm: '2026-10-06T16:47:39', atualizadoEm: '2026-10-06T16:47:39', ataDaSenasp: false,
+  remanejadoNaoParticipante: 0, saidaNaoParticipante: 0, naoParticipanteAguardaFonte: 0, ...p
 });
 const informado = (o: OrgaoQuantitativo): QuantitativosDoItem => ({
   ...vazioDoItem(),

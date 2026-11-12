@@ -8,7 +8,7 @@ const arp = (numero: string, uasg = '200331') => ({ numeroAtaRegistroPreco: nume
 const resumo = (r: Partial<ResumoReajusteAta> & { numeroAta: string }): ResumoReajusteAta => ({
   ataId: `id-${r.numeroAta}`, codigoUasg: '200331', ataKey: r.numeroAta, indice: 'IPCA', clausula: 'COM_REAJUSTE', dataBaseOrigem: 'APOSTILAMENTO',
   dataBase: '2025-02-01', itens: 1, percentualAInformar: 0, indiceIndisponivel: 0, precoDesatualizado: 0, devido: 0, previsto: 0, seProrrogar: 0,
-  emDia: 1, proximoEfeito: null, proximoSituacao: null, proximoPercentual: null, situacao: 'EM_DIA', ...r
+  emDia: 1, proximoEfeito: null, proximoSituacao: null, proximoPercentual: null, situacao: 'EM_DIA', fonteDiferente: 0, reservasDeEmenda: 0, ...r
 });
 
 describe('avisosDoReajusteDasAtas', () => {
@@ -19,16 +19,27 @@ describe('avisosDoReajusteDasAtas', () => {
     expect(avisosDoReajusteDasAtas(r, [arp('00032/2025', '200330')], HOJE)).toEqual([]);
   });
 
-  it('preço sem o reajuste: atenção, com link para a aba Reajuste e chave de resolvido', () => {
+  it('preço sem o reajuste: informar o preço do apostilamento, com link para a aba Reajuste e chave de resolvido', () => {
     const [a] = avisosDoReajusteDasAtas([resumo({ numeroAta: '00032/2025', situacao: 'PRECO_DESATUALIZADO', precoDesatualizado: 1, proximoEfeito: null })], [arp('00032/2025')], HOJE);
     expect(a).toMatchObject({
       category: 'REAJUSTE_ATA',
       severity: 'ATENCAO',
-      title: 'Preço da ata sem o reajuste',
+      title: 'Informar o preço do apostilamento',
       targetUrl: '/atas/detalhe/00032%2F2025-200331?aba=reajuste',
-      motivoDetalhe: { chave: 'preco-sem-reajuste', label: 'Ata: preço sem o reajuste' },
+      motivoDetalhe: { chave: 'preco-sem-reajuste', label: 'Ata: preço do apostilamento a informar' },
       avisoChave: 'REAJUSTE::ATA-00032/2025-200331::preco-sem-reajuste-2025-02-01'
     });
+  });
+
+  it('preço do apostilamento é urgente quando há reserva de emenda esperando (migration 247)', () => {
+    const [a] = avisosDoReajusteDasAtas([resumo({ numeroAta: '00032/2025', situacao: 'PRECO_DESATUALIZADO', precoDesatualizado: 1, reservasDeEmenda: 3 })], [arp('00032/2025')], HOJE);
+    expect(a).toMatchObject({ severity: 'URGENTE', badgeLabel: '3 reservas' });
+    expect(a.description).toContain('3 reservas de emenda esperam o preço');
+  });
+
+  it('preço da fonte diferente do informado: conferir', () => {
+    const [a] = avisosDoReajusteDasAtas([resumo({ numeroAta: '00032/2025', fonteDiferente: 1 })], [arp('00032/2025')], HOJE);
+    expect(a).toMatchObject({ severity: 'ATENCAO', title: 'Conferir o preço do apostilamento', motivoDetalhe: { chave: 'fonte-diferente', label: 'Ata: preço da fonte diferente do apostilamento' } });
   });
 
   it('reajuste devido é urgente e diz quando a data-base é só a sugestão do edital', () => {

@@ -170,7 +170,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               <CarteiraSortHeader label="Vigência" sortKey="vigencia" {...sortProps} />
               <CarteiraSortHeader label="Itens" sortKey="itens" {...sortProps} />
               <CarteiraSortHeader label="Consumo dos itens" sortKey="consumo" {...sortProps} />
-              <th style={carteiraTh} title="Interesse principal e fatia de cada Grupo de Trabalho Integrado no valor registrado dos participantes (quantidade × valor unitário de cada item)">GTI</th>
+              <th style={carteiraTh} title="GTI com a maior fatia e a fatia de cada Grupo de Trabalho Integrado no valor registrado dos participantes (quantidade × valor unitário de cada item)">Interesse principal</th>
               {colAlocacao && <th style={carteiraTh}>Alocação interna</th>}
               {colEmpenho && <th style={carteiraTh}>Empenho</th>}
               {colAtaAssinada && <th style={carteiraTh}>Qtd. assinada</th>}

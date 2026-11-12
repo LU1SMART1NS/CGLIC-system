@@ -238,8 +238,13 @@ describe('sincronizarReajusteAtas', () => {
           periodo_fim: '2025-09-01',
           indice: 'IPCA',
           sei_citado: '29255776',
-          sei_citado_conformidade: false
+          sei_citado_conformidade: false,
+          // Sem rodapé do SEI no texto; os valores em reais vão para o banco achar o preço novo (migration 258).
+          sei_documento: null,
+          valores_documento: [5.17]
         }],
+        // Apostilamento de reajuste não é termo de prorrogação (migration 222).
+        termos_prorrogacao: [],
         homologados: [{ numero_item: '00001', valor: 14695 }],
         homologados_completos: true
       }]

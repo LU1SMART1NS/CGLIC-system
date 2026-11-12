@@ -22,6 +22,8 @@ vi.mock('../../hooks/useContractsPortfolio', () => ({
     isLoadingScope: false
   }))
 }));
+// O recorte do gestor de fiscalização lê a Fiscalização; fora dele a leitura fica desligada.
+vi.mock('../../hooks/useFiscalizacao', () => ({ useContratosFiscalizacao: vi.fn(() => ({ data: undefined, isLoading: false, isError: false })) }));
 vi.mock('../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'admin' })) }));
 
 const empenho = (over: Partial<EmpenhoCarteiraRow>): EmpenhoCarteiraRow => ({

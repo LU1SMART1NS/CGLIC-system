@@ -1,4 +1,6 @@
 import React from 'react';
+import { AppDateInput } from '../../../design-system/components/FormFields';
+import { mascaraPercentual } from '../../../utils/mascaras';
 import { ActionButton, AppButton, AppInput, Modal, NoticeBar, useToast } from '../../../design-system';
 import { useAcoesReajuste } from '../../../hooks/useReajusteAtas';
 import type { CicloReajuste, ReajustePublicado } from '../../../services/reajusteAtasService';
@@ -14,6 +16,8 @@ interface Props {
   /** Ciclo a completar ou corrigir; sem ciclo, registra um reajuste que não está no PNCP. */
   ciclo: CicloReajuste | null;
   publicado: ReajustePublicado | null;
+  /** Reajustes já registrados na ata: um novo com os mesmos meses do índice é repetido. */
+  publicados?: ReajustePublicado[];
   versao: number | null;
   onFechar: () => void;
 }
@@ -21,7 +25,7 @@ interface Props {
 const mes = (iso: string | null | undefined) => (iso ? iso.slice(0, 7) : '');
 
 /** Percentual do apostilamento (PDF sem número legível, correção, ou reajuste fora do PNCP): gestor da ata ou coordenador. */
-export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numeroAta, uasg, ciclo, publicado, versao, onFechar }) => {
+export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numeroAta, uasg, ciclo, publicado, publicados = [], versao, onFechar }) => {
   const toast = useToast();
   const { informarPercentual } = useAcoesReajuste(numeroAta, uasg);
   const [valor, setValor] = React.useState('');
@@ -46,8 +50,14 @@ export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numero
     ? `${publicado.documentoTitulo}${publicado.documentoPublicadoEm ? `, publicado no PNCP em ${formatDateBR(publicado.documentoPublicadoEm)}` : ''}. Copie o percentual do documento.`
     : 'Reajuste que não está publicado no PNCP: informe o que foi apostilado.';
 
+  // Reajuste novo com os mesmos meses do índice de um já registrado: é o mesmo reajuste (o banco também recusa).
+  const repetido = !publicado && /^\d{4}-\d{2}$/.test(de) && /^\d{4}-\d{2}$/.test(ate)
+    ? publicados.find((p) => p.periodoInicio?.slice(0, 7) === de && p.periodoFim?.slice(0, 7) === ate) ?? null
+    : null;
+
   const gravar = async () => {
     setErro(null);
+    if (repetido) return;
     const p = Number(valor.replace(/\./g, '').replace(',', '.'));
     if (!(p > 0 && p < 100)) return setErro('Informe o percentual aplicado, por exemplo 4,44.');
     if (!/^\d{4}-\d{2}$/.test(de) || !/^\d{4}-\d{2}$/.test(ate) || ate < de) return setErro('Informe o primeiro e o último mês do índice usados no apostilamento.');
@@ -82,7 +92,7 @@ export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numero
       footer={
         <>
           <ActionButton action="cancelar" onClick={onFechar} disabled={informarPercentual.isPending} />
-          <AppButton variant="primary" onClick={gravar} disabled={informarPercentual.isPending} data-testid="informar-percentual-gravar">
+          <AppButton variant="primary" onClick={gravar} disabled={informarPercentual.isPending || Boolean(repetido)} data-testid="informar-percentual-gravar">
             {informarPercentual.isPending ? 'Gravando…' : 'Gravar percentual'}
           </AppButton>
         </>
@@ -99,21 +109,21 @@ export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numero
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
             Percentual aplicado
             <AppInput id="reajuste-percentual" inputMode="decimal" placeholder="4,44" value={valor} style={{ width: 140 }}
-              onChange={(e) => setValor(e.target.value.replace(/[^\d.,]/g, ''))} data-testid="informar-percentual-valor" />
+              onChange={(e) => setValor(mascaraPercentual(e.target.value))} data-testid="informar-percentual-valor" />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
             Início dos efeitos
-            <AppInput id="reajuste-efeito" type="date" value={efeito} style={{ width: 180 }} onChange={(e) => setEfeito(e.target.value)} data-testid="informar-percentual-efeito" />
+            <AppDateInput id="reajuste-efeito" value={efeito} style={{ width: 180 }} onValueChange={setEfeito} data-testid="informar-percentual-efeito" />
           </label>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
             Índice de
-            <AppInput id="reajuste-periodo-de" type="month" value={de} style={{ width: 180 }} onChange={(e) => setDe(e.target.value)} data-testid="informar-percentual-de" />
+            <AppDateInput mes id="reajuste-periodo-de" value={de} style={{ width: 180 }} onValueChange={setDe} data-testid="informar-percentual-de" />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
             até
-            <AppInput id="reajuste-periodo-ate" type="month" value={ate} style={{ width: 180 }} onChange={(e) => setAte(e.target.value)} data-testid="informar-percentual-ate" />
+            <AppDateInput mes id="reajuste-periodo-ate" value={ate} style={{ width: 180 }} onValueChange={setAte} data-testid="informar-percentual-ate" />
           </label>
         </div>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.82rem', fontWeight: 600 }}>
@@ -121,6 +131,15 @@ export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numero
           <AppInput id="reajuste-percentual-sei" inputMode="numeric" maxLength={10} placeholder="34985144" value={sei} style={{ width: 180 }}
             onChange={(e) => setSei(e.target.value.replace(/\D/g, ''))} data-testid="informar-percentual-sei" />
         </label>
+        {repetido && (
+          <NoticeBar tone="warning" testId="informar-percentual-repetido">
+            O reajuste destes meses do índice já está na ata
+            {repetido.origem === 'PNCP'
+              ? `, lido do PNCP (${repetido.documentoTitulo ?? 'documento publicado'}${repetido.seiDocumento ? `, SEI ${repetido.seiDocumento}` : ''})`
+              : `, informado pelo gestor${repetido.seiApostilamento ? ` (SEI ${repetido.seiApostilamento})` : ''}`}
+            {repetido.percentual != null ? `, com ${percentual(repetido.percentual)}` : ''}. Para mudar o percentual ou a data, feche esta janela e use Corrigir na linha dele.
+          </NoticeBar>
+        )}
         {erro && <NoticeBar tone="danger" testId="informar-percentual-erro">{erro}</NoticeBar>}
       </div>
     </Modal>

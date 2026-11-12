@@ -28,6 +28,7 @@ import { useSyncContractItemQuantity } from '../hooks/useSyncContractItemQuantit
 import { useEmpenhoDoItem } from '../hooks/useEmpenhoDoItem';
 import { useContratadoDoItem } from '../hooks/useContratadoDoItem';
 import { alocacoesPorContrato, contratadoPorNomeDaUnidade } from '../utils/contratadoPorUnidade';
+import { UNIDADE_DAS_EMENDAS } from '../utils/alocacaoEdicao';
 import { AjustarQuantidadeModal, type ContratoParaAjustar } from './item-balances/AjustarQuantidadeModal';
 import { UnidadesDoContratoModal, type ContratoParaDividir } from './item-balances/UnidadesDoContratoModal';
 import { QuantidadeContratadaCelula, UnidadesDoContratoCelula } from './item-balances/ContratadoCells';
@@ -80,13 +81,14 @@ import { useSyncItemSenasp } from '../hooks/useSyncItemSenasp';
 import { isUnidadeSenasp, quantidadeBaseSenasp, quantitativoSenasp } from '../utils/quantitativoSenasp';
 import { useAtaItemSaldos } from '../hooks/useAta';
 import { QuantitativosTab } from './item-balances/QuantitativosTab';
-import { registradoAcimaDoSaldo } from '../utils/registradoAcima';
+import { ataFoiProrrogada, registradoAcimaDoSaldo } from '../utils/registradoAcima';
 import { formatPncpAtaPdfUrl } from '../utils/pncpUtils';
 import { useInteresseGti } from './item-balances/InteresseGti';
 import { EXPLICACAO_GTI, InteresseGtiBotao, InteresseGtiNoTopo } from './gti/InteresseGti';
 import { QuantitativosOutroOrgaoTab } from './item-balances/QuantitativosOutroOrgaoTab';
 import { adesoesDaSenasp, papelDoItem } from '../utils/quantitativosOutroOrgao';
 import { useQuantitativosDoItem } from '../hooks/useQuantitativosDoItem';
+import { adesoesNoLimite, usadoNoLimite } from '../utils/remanejamentoNaoParticipante';
 import { AdesoesTab } from './item-balances/AdesoesTab';
 import { EmendasDoItemTab } from './item-balances/EmendasDoItemTab';
 import { formatNumber, formatDate, isGerenciadoraUasg, getContractPncpUrl } from './item-balances/itemBalanceUtils';
@@ -108,8 +110,6 @@ interface ItemBalancesProps {
 const ITEM_TABS: ItemTab[] = ['quantitativos', 'contratos', 'adesoes'];
 // Gestor de saldo não vê contratos: fica com os quantitativos (empenhado por unidade incluído) e as adesões.
 const SALDOS_ITEM_TABS: ItemTab[] = ['quantitativos', 'adesoes'];
-/** Unidade interna das emendas (unidade_das_emendas() no banco): com alocação a ela, o item ganha a aba Emendas. */
-const UNIDADE_DAS_EMENDAS = 'CAEP';
 /** Perfis que leem as emendas (emendas.view: migrations 155, 180 e 198, esta para o gestor de atas e contratos). */
 const LEEM_EMENDAS = new Set(['admin', 'gestor', 'gestor_emendas', 'gestor_saldos', 'leitor']);
 const EMPTY_ALLOCATIONS: InternalAllocation[] = [];
@@ -456,15 +456,21 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const totalUGQty = quantitativoSenasp(
     unidades,
     arp.codigoUnidadeGerenciadora,
-    // Sem os órgãos do item, o registrado vem da base da view, que já tem o desconto: devolve antes de descontar aqui.
-    saldoDoItem ? quantidadeBaseSenasp(saldoDoItem) + descontoRegistradoAcima : Number(item.quantidadeHomologadaItem) || 0
+    // Sem os órgãos do item, vale o registrado gravado na view; a base da view já é a cota (sem gerenciado, remanejado e
+    // desconto), e descontar de novo aqui contaria duas vezes.
+    saldoDoItem
+      ? (saldoDoItem.quantidade_registrada_senasp != null ? Number(saldoDoItem.quantidade_registrada_senasp) || 0 : quantidadeBaseSenasp(saldoDoItem) + descontoRegistradoAcima)
+      : Number(item.quantidadeHomologadaItem) || 0
   );
   // Com a ata assinada informada (migration 109), a base do saldo e o limite da alocação são a cota própria:
   // o registrado da SENASP menos o que ela gerencia para os órgãos participantes.
   const { data: quantitativos, isLoading: quantitativosLoading, consulta: quantitativosQuery } = useQuantitativosDoItem(canonicalItemKey);
   // Só na ata da SENASP: na ata de outro órgão (migration 114) a base continua o registrado (ou o aprovado na adesão).
   const cotaPropriaInformada = !ataDeOutroOrgao(arp) && quantitativos.informado;
-  const baseSaldo = (cotaPropriaInformada ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty) - descontoRegistradoAcima;
+  // O remanejado da cota SENASP a não participantes (migration 219) sai da cota até o Compras.gov.br mostrar a queda
+  // (o banco já desconta: saida_nao_participante é só a parte que a fonte ainda não reflete).
+  const saidaNaoParticipante = ataDeOutroOrgao(arp) ? 0 : quantitativos.saidaNaoParticipante;
+  const baseSaldo = (cotaPropriaInformada ? totalUGQty - quantitativos.gerenciadoParticipantes : totalUGQty) - saidaNaoParticipante - descontoRegistradoAcima;
   // Ata da SENASP sem a ata assinada e com outros órgãos registrados: o limite da alocação é provisório (migration 116,
   // só aviso). Enquanto os quantitativos carregam não avisa, para não piscar.
   const outrosOrgaosRegistrados = unidades.filter((u) => !isUnidadeSenasp(u, arp.codigoUnidadeGerenciadora) && (Number(u.quantidadeRegistrada) || 0) > 0).length;
@@ -508,7 +514,13 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const totalRegistrado = unidades.reduce((acc, curr) => acc + curr.quantidadeRegistrada, 0);
   const gerenciadoraUnit = unidades.find(u => u.tipoUnidade === 'GERENCIADORA' || isGerenciadoraUasg(u.codigoUnidade));
 
-  const totalAdesaoAprovada = adesoes.reduce((acc, a) => acc + (Number(a.quantidadeAprovadaAdesao) || 0), 0);
+  // Limite de adesão usado (migration 219): adesões que contam + remanejamentos a não participantes. Adesão que
+  // apareceu depois de um remanejamento para a mesma UASG fica a conferir e não conta até o gestor decidir.
+  const adesoesDoLimite = React.useMemo(
+    () => adesoesNoLimite(adesoes, quantitativos.remanejamentosNaoParticipante, quantitativos.adesoesConferidas),
+    [adesoes, quantitativos.remanejamentosNaoParticipante, quantitativos.adesoesConferidas]
+  );
+  const totalAdesaoAprovada = usadoNoLimite(adesoesDoLimite, quantitativos.remanejamentosNaoParticipante).total;
 
   // Fórmula Oficial do Saldo: Saldo = QuantidadeRegistrada - ∑ Empenhos
 
@@ -813,12 +825,18 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               quantitativos={quantitativos}
               registradoAcima={registradoAcima}
               pdfDaAta={formatPncpAtaPdfUrl(arp.numeroControlePncpAta)}
+              numeroAta={arp.numeroAtaRegistroPreco}
+              uasgAta={arp.codigoUnidadeGerenciadora}
+              ataProrrogada={ataFoiProrrogada(arp.dataVigenciaInicial, arp.dataVigenciaFinal)}
               pregaoItem={`${arp.numeroCompra ? `Pregão ${arp.numeroCompra}${arp.anoCompra ? `/${arp.anoCompra}` : ''} · ` : ''}item ${Number(item.numeroItem) || item.numeroItem}`}
               podeInformar={canEditData && !quantitativosNaoCarregaram}
               podeRemanejar={canManageAllocations && !quantitativosNaoCarregaram}
               alocado={alocacoesComErro ? null : totalAllocatedSum}
               totalUnidadesInternas={allocations.length}
               unidadesInternas={unidadesInternasDoItem}
+              unidadesAlocadas={alocacoesComErro ? undefined : allocationRows}
+              adesoes={adesoes}
+              limiteAdesao={totalLimiteAdesao}
             />
           ) : (
             <QuantitativosOutroOrgaoTab
@@ -1232,6 +1250,10 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
             item={item}
             totalAdesaoAprovada={totalAdesaoAprovada}
             limiteAdesao={totalLimiteAdesao}
+            itemKey={canonicalItemKey}
+            quantitativos={quantitativos}
+            adesoesNoLimite={adesoesDoLimite}
+            podeDecidir={canManageAllocations && !quantitativosNaoCarregaram}
           />
         )}
       </Instrument360TabPanel>

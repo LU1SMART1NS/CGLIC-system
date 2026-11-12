@@ -1,13 +1,17 @@
 import React from 'react';
-import { AppButton, DataTable, EmptyState, MetricStrip, NoticeBar, SectionHeader, StatusBadge, type Column } from '../../../design-system';
+import { ActionButton, AppButton, ConfirmDialog, DataTable, EmptyState, MetricStrip, NoticeBar, SectionHeader, StatusBadge, useToast, type Column } from '../../../design-system';
+import { useAcoesReajuste } from '../../../hooks/useReajusteAtas';
+import { ehConflitoEdicao, MENSAGEM_CONFLITO_EDICAO } from '../../../utils/conflitoEdicao';
 import type { ArpItemRecord } from '../../../types';
-import type { CicloReajuste, ItemReajuste, ReajusteDaAta } from '../../../services/reajusteAtasService';
+import type { CicloReajuste, ItemReajuste, ReajusteDaAta, ReajustePublicado } from '../../../services/reajusteAtasService';
 import { formatCurrency, formatCurrencyCompact, formatNumber } from '../../../utils/format';
 import { formatDateBR } from '../../../services/temporalEngineService';
 import { ReajusteLinhaDoTempo } from './ReajusteLinhaDoTempo';
 import { InformarTermoModal } from './InformarTermoModal';
 import { InformarPercentualModal } from './InformarPercentualModal';
+import { InformarPrecoApostilamentoModal } from './InformarPrecoApostilamentoModal';
 import {
+  acrescimoEmCentavos,
   avisoDaAba,
   dataBaseNaTela,
   diasAte,
@@ -17,6 +21,7 @@ import {
   percentual,
   proximoCiclo,
   publicadoDoCiclo,
+  resumoSemPendencia,
   ROTULO_SITUACAO_CICLO,
   ROTULO_SITUACAO_ITEM,
   totaisDaAta,
@@ -49,6 +54,11 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
   const [termoAberto, setTermoAberto] = React.useState(false);
   const [percentualDe, setPercentualDe] = React.useState<{ ciclo: CicloReajuste | null } | null>(null);
   const [mesesAbertos, setMesesAbertos] = React.useState<Set<number>>(new Set());
+  const [precoAberto, setPrecoAberto] = React.useState(false);
+  const [itensAbertos, setItensAbertos] = React.useState(false);
+  const [excluirDe, setExcluirDe] = React.useState<{ ciclo: CicloReajuste; reajuste: ReajustePublicado } | null>(null);
+  const { excluirReajuste } = useAcoesReajuste(numeroAta, uasg);
+  const toast = useToast();
 
   if (isLoading && !dados.parametros) {
     return <div style={{ padding: '1rem', color: 'var(--text-secondary)' }}>Carregando o reajuste da ata…</div>;
@@ -62,14 +72,15 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
     );
   }
 
-  const { parametros, ciclos, itens, publicados } = dados;
+  const { parametros, ciclos, itens, publicados, apostilados } = dados;
   const ataId = dados.ataId;
   const origem = origemDaBase(parametros);
   const ultimo = ultimoReajuste(ciclos);
   const prox = proximoCiclo(ciclos);
   const aviso = avisoDaAba(dados, saldos);
   const totais = totaisDaAta(itens, saldos);
-  const cicloSemPercentual = ciclos.find((c) => c.situacao === 'PUBLICADO_SEM_PERCENTUAL') ?? null;
+  const resumo = resumoSemPendencia(dados, saldos);
+  const cicloSemPercentual =ciclos.find((c) => c.situacao === 'PUBLICADO_SEM_PERCENTUAL') ?? null;
 
   const seloDaBase =
     origem === 'INFORMADO' ? <StatusBadge label={`Informado · SEI ${parametros.termoSei}`} variant="success" size="sm" dot={false} />
@@ -81,65 +92,62 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
   const abrirPercentual = (ciclo: CicloReajuste | null) => (podeEditar ? setPercentualDe({ ciclo }) : undefined);
 
   const descricao = (numeroItem: string) => itensDaAta.find((i) => Number(i.numeroItem) === Number(numeroItem));
+  // Preço do apostilamento (migration 247): os itens com o preço antigo e os já informados, para corrigir.
+  const apostiladoDe = (numeroItem: string) => apostilados.find((a) => Number(a.numeroItem) === Number(numeroItem));
+  const itensDoPreco = itens.filter((i) => i.situacao === 'PRECO_DESATUALIZADO' || apostiladoDe(i.numeroItem));
+  const ultimoPublicado = [...publicados].filter((p) => p.percentual != null).sort((a, b) => b.efeitoInicio.localeCompare(a.efeitoInicio))[0] ?? null;
 
   const colunasItens: Column<ItemReajuste>[] = [
     { key: 'item', header: 'Item', priority: 'primary', render: (i) => String(Number(i.numeroItem) || i.numeroItem), sortValue: (i) => Number(i.numeroItem) },
     {
       key: 'descricao',
       header: 'Descrição e fornecedor',
-      minWidth: '220px',
+      minWidth: '200px',
       render: (i) => {
         const d = descricao(i.numeroItem);
         return (
-          <div style={{ maxWidth: 340 }}>
+          <div style={{ maxWidth: 300, whiteSpace: 'normal' }}>
             <div>{d?.descricaoItem ? (d.descricaoItem.length > 90 ? `${d.descricaoItem.slice(0, 90)}…` : d.descricaoItem) : '—'}</div>
             {d?.nomeRazaoSocialFornecedor && <div style={sub}>{d.nomeRazaoSocialFornecedor}</div>}
           </div>
         );
       }
     },
-    { key: 'situacao', header: 'Situação', render: (i) => <StatusBadge label={ROTULO_SITUACAO_ITEM[i.situacao]} variant={VARIANTE_SITUACAO_ITEM[i.situacao]} size="sm" /> },
     {
-      key: 'homologado',
-      header: 'Homologado',
-      align: 'right',
-      nowrap: true,
-      render: (i) => (
-        <>
-          {formatCurrency(i.precoHomologado)}
-          {!i.homologadoLido && <div style={sub} title="O PNCP não trouxe o resultado do item: a conta usa o preço atual.">preço atual</div>}
-        </>
-      )
+      key: 'situacao',
+      header: 'Situação',
+      // "Na prorrogação, se houver" encurtado como na legenda da linha do tempo: a coluna Próximo reajuste traz a data.
+      render: (i) => <StatusBadge label={i.situacao === 'SE_PRORROGAR' ? 'Se prorrogar' : ROTULO_SITUACAO_ITEM[i.situacao]} variant={VARIANTE_SITUACAO_ITEM[i.situacao]} size="sm" />
     },
     {
-      key: 'atual',
-      header: 'Preço atual',
+      key: 'preco',
+      header: 'Preço',
       align: 'right',
       nowrap: true,
-      render: (i) => (
-        <>
-          {formatCurrency(i.precoAtual)}
-          <div style={sub}>{i.percentualNoPreco && i.percentualNoPreco > 0.005 ? `+${percentual(i.percentualNoPreco)} já aplicado` : 'sem reajuste'}</div>
-        </>
-      )
-    },
-    {
-      key: 'devido',
-      header: 'Devido hoje',
-      align: 'right',
-      nowrap: true,
-      render: (i) =>
-        i.precoDevido - i.precoAtual > 0.005 ? (
+      render: (i) => {
+        const ap = apostiladoDe(i.numeroItem);
+        const aplicado = i.percentualNoPreco && i.percentualNoPreco > 0.005 ? `+${percentual(i.percentualNoPreco)} já aplicado` : 'sem reajuste';
+        return (
           <>
-            <strong>{formatCurrency(i.precoDevido)}</strong>
-            <div style={sub}>+{percentual((i.precoDevido / Math.max(i.precoAtual, 0.0001) - 1) * 100)} sobre o atual</div>
+            {formatCurrency(i.precoAtual)}
+            <div style={sub} title={!i.homologadoLido ? 'O PNCP não trouxe o resultado do item: a conta usa o preço atual.' : undefined}>
+              {i.homologadoLido ? `homologado ${formatCurrency(i.precoHomologado)}` : 'homologado não lido'}
+            </div>
+            <div style={sub}>{aplicado}</div>
+            {acrescimoEmCentavos(i.precoDevido, i.precoAtual) > 0 && (
+              <div style={{ color: 'var(--color-danger-text)', fontWeight: 600, fontSize: '0.75rem' }} data-testid={`reajuste-devido-${Number(i.numeroItem)}`}>
+                <div>devido hoje</div>
+                {formatCurrency(i.precoDevido)} (+{percentual((i.precoDevido / Math.max(i.precoAtual, 0.0001) - 1) * 100)})
+              </div>
+            )}
+            {ap && (
+              <div style={sub} title={ap.informadoPorNome ? `Informado por ${ap.informadoPorNome}` : undefined}>
+                do apostilamento · SEI {ap.seiApostilamento}
+              </div>
+            )}
           </>
-        ) : (
-          <>
-            {formatCurrency(i.precoDevido)}
-            <div style={sub}>igual ao atual</div>
-          </>
-        )
+        );
+      }
     },
     {
       key: 'proximo',
@@ -149,38 +157,28 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
         i.proximoEfeito ? (
           <>
             {formatDateBR(i.proximoEfeito)}
-            <div style={sub}>
-              {percentual(i.proximoPercentual)}
-              {i.proximoMesesEstimados ? ' · estimado' : ''}
-              {i.proximoSituacao === 'SE_PRORROGAR' ? ' · se prorrogar' : ''}
-            </div>
+            <div style={sub}>{percentual(i.proximoPercentual)}{i.proximoMesesEstimados ? ' estimado' : ''}</div>
+            {i.proximoSituacao === 'SE_PRORROGAR' && <div style={sub}>se prorrogar</div>}
+            {i.precoProjetado != null && <div style={sub}>vai a {formatCurrency(i.precoProjetado)}</div>}
           </>
         ) : (
           <span style={sub}>nenhum na vigência</span>
         ),
       sortValue: (i) => i.proximoEfeito ?? ''
     },
-    { key: 'projetado', header: 'Preço projetado', align: 'right', nowrap: true, render: (i) => (i.precoProjetado != null ? formatCurrency(i.precoProjetado) : '—') },
-    {
-      key: 'saldo',
-      header: 'Saldo',
-      align: 'right',
-      render: (i) => formatNumber(impactoDoItem(i, saldos).saldo),
-      sortValue: (i) => impactoDoItem(i, saldos).saldo,
-      sortFirstDir: 'desc'
-    },
     {
       key: 'impacto',
-      header: 'Impacto no saldo',
+      header: 'Impacto',
       align: 'right',
       nowrap: true,
       render: (i) => {
         const imp = impactoDoItem(i, saldos);
-        if (!imp.devido && !imp.proximo) return '—';
         return (
           <>
             {imp.devido > 0 && (<><strong>{formatCurrencyCompact(imp.devido)}</strong><div style={sub}>a aplicar</div></>)}
             {imp.proximo > 0 && (<><div>{formatCurrencyCompact(imp.proximo)}</div><div style={sub}>no próximo</div></>)}
+            {!imp.devido && !imp.proximo && <div>—</div>}
+            <div style={sub}>saldo {formatNumber(imp.saldo)}</div>
           </>
         );
       },
@@ -251,6 +249,8 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
         action={
           podeEditar && aviso.acao === 'INFORMAR_PERCENTUAL' && cicloSemPercentual ? (
             <AppButton variant="primary" size="sm" onClick={() => abrirPercentual(cicloSemPercentual)} data-testid="reajuste-aviso-percentual">Informar percentual</AppButton>
+          ) : podeEditar && aviso.acao === 'INFORMAR_PRECO' && itensDoPreco.length > 0 ? (
+            <AppButton variant="primary" size="sm" onClick={() => setPrecoAberto(true)} data-testid="reajuste-aviso-preco">Informar preço do apostilamento</AppButton>
           ) : podeEditar && aviso.acao === 'INFORMAR_TERMO' ? (
             <AppButton variant="primary" size="sm" onClick={() => setTermoAberto(true)} data-testid="reajuste-aviso-termo">Informar termo</AppButton>
           ) : undefined
@@ -322,17 +322,22 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
                               {pub.documentoTitulo ? (pub.documentoTitulo.length > 70 ? `${pub.documentoTitulo.slice(0, 70)}…` : pub.documentoTitulo) : pub.origem === 'INFORMADO' ? 'Informado pelo gestor' : 'Documento do PNCP'}
                               <div style={sub}>
                                 {pub.documentoPublicadoEm ? `publicado em ${formatDateBR(pub.documentoPublicadoEm)}` : ''}
-                                {pub.seiApostilamento && (
+                                {(pub.seiApostilamento ?? pub.seiDocumento) && (
                                   <>
                                     {pub.documentoPublicadoEm ? ' · ' : ''}
-                                    <NumeroSeiEtiqueta numero={pub.seiApostilamento} testId="reajuste-apostilamento-sei" />
+                                    <NumeroSeiEtiqueta numero={(pub.seiApostilamento ?? pub.seiDocumento) as string} testId="reajuste-apostilamento-sei" />
                                   </>
                                 )}
                               </div>
                               {podeEditar && (
-                                <AppButton variant="outline" size="xs" onClick={() => abrirPercentual(c)} data-testid={`reajuste-corrigir-${c.ciclo}`}>
-                                  {c.situacao === 'PUBLICADO_SEM_PERCENTUAL' ? 'Informar percentual' : 'Corrigir'}
-                                </AppButton>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                                  <AppButton variant="outline" size="xs" onClick={() => abrirPercentual(c)} data-testid={`reajuste-corrigir-${c.ciclo}`}>
+                                    {c.situacao === 'PUBLICADO_SEM_PERCENTUAL' ? 'Informar percentual' : 'Corrigir'}
+                                  </AppButton>
+                                  {pub.origem === 'INFORMADO' && (
+                                    <ActionButton action="excluir" size="xs" onClick={() => setExcluirDe({ ciclo: c, reajuste: pub })} data-testid={`reajuste-excluir-${c.ciclo}`} />
+                                  )}
+                                </div>
                               )}
                             </>
                           ) : c.situacao === 'DEVIDO' ? 'Sem apostilamento' : '—'}
@@ -364,19 +369,29 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
       <section>
         <SectionHeader
           title="Projeção por item"
-          subtitle="Impacto sobre o saldo ainda não contratado da cota da SENASP."
+          subtitle={resumo ? undefined : 'Impacto sobre o saldo ainda não contratado da cota da SENASP.'}
           countBadge={totais.devido + totais.proximo > 0 ? `${totais.devido > 0 ? `${formatCurrencyCompact(totais.devido)} a aplicar` : ''}${totais.devido > 0 && totais.proximo > 0 ? ' · ' : ''}${totais.proximo > 0 ? `${formatCurrencyCompact(totais.proximo)} no próximo` : ''}` : undefined}
         />
-        <DataTable
-          columns={colunasItens}
-          data={itens}
-          keyExtractor={(i) => i.numeroItem}
-          mobileLayout="scroll"
-          minTableWidth="1100px"
-          stickyFirstColumn
-          emptyMessage="Nenhum item nesta ata."
-          testId="reajuste-itens"
-        />
+        {resumo && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: itensAbertos ? '0.75rem' : 0 }} data-testid="reajuste-itens-resumo">
+            <span>{resumo}</span>
+            <AppButton variant="link" size="xs" onClick={() => setItensAbertos((v) => !v)} aria-expanded={itensAbertos} data-testid="reajuste-ver-itens">
+              {itensAbertos ? 'Esconder os itens' : itens.length === 1 ? 'Ver o item' : `Ver os ${itens.length} itens`}
+            </AppButton>
+          </div>
+        )}
+        {(!resumo || itensAbertos) && (
+          <DataTable
+            columns={colunasItens}
+            data={itens}
+            keyExtractor={(i) => i.numeroItem}
+            mobileLayout="scroll"
+            minTableWidth="860px"
+            stickyFirstColumn
+            emptyMessage="Nenhum item nesta ata."
+            testId="reajuste-itens"
+          />
+        )}
       </section>
 
       {podeEditar && (
@@ -397,8 +412,49 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
             uasg={uasg}
             ciclo={percentualDe?.ciclo ?? null}
             publicado={percentualDe?.ciclo ? publicadoDoCiclo(percentualDe.ciclo, publicados) : null}
+            publicados={publicados}
             versao={parametros.versao}
             onFechar={() => setPercentualDe(null)}
+          />
+          <ConfirmDialog
+            isOpen={Boolean(excluirDe)}
+            title="Excluir reajuste informado"
+            tone="danger"
+            confirmLabel="Excluir reajuste"
+            isLoading={excluirReajuste.isPending}
+            message={excluirDe ? (
+              <>
+                O {excluirDe.ciclo.ciclo}º reajuste ({excluirDe.reajuste.percentual != null ? percentual(excluirDe.reajuste.percentual) : 'sem percentual'}
+                {excluirDe.reajuste.seiApostilamento ? `, SEI ${excluirDe.reajuste.seiApostilamento}` : ''}) sai da ata e a projeção é refeita.
+                Só o reajuste informado pelo gestor pode ser excluído; o lido do PNCP continua.
+              </>
+            ) : null}
+            onCancel={() => setExcluirDe(null)}
+            onConfirm={async () => {
+              if (!excluirDe) return;
+              try {
+                await excluirReajuste.mutateAsync({ ataId, reajusteId: excluirDe.reajuste.id, versao: parametros.versao });
+                toast.success('Reajuste excluído. A projeção foi refeita.');
+                setExcluirDe(null);
+              } catch (err) {
+                toast.error(ehConflitoEdicao(err) ? MENSAGEM_CONFLITO_EDICAO : (err as Error)?.message || 'Não foi possível excluir o reajuste.');
+              }
+            }}
+          />
+          <InformarPrecoApostilamentoModal
+            aberto={precoAberto}
+            ataId={ataId}
+            numeroAta={numeroAta}
+            uasg={uasg}
+            itens={itensDoPreco}
+            apostilados={apostilados}
+            publicado={ultimoPublicado}
+            descricao={(n) => {
+              const d = descricao(n)?.descricaoItem ?? '';
+              return d.length > 60 ? `${d.slice(0, 60)}…` : d;
+            }}
+            versao={parametros.versao}
+            onFechar={() => setPrecoAberto(false)}
           />
         </>
       )}

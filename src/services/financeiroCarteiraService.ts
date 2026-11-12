@@ -202,6 +202,11 @@ export interface EmpenhoCarteiraRow {
   restosAPagar?: RestosAPagarEmpenho | null;
   /** Contratos a que o empenho está vinculado (quase sempre um). */
   contractKeys: string[];
+  /**
+   * Nota que o Contratos.gov.br não lista em contrato nenhum: a Carteira a mostra só pelo contrato do pedido de emenda
+   * (origem EMENDA, migration 255). Falta incluí-la no contrato lá (fila Vínculos › Notas fora do contrato).
+   */
+  faltaIncluirNaFonte?: boolean;
   /** Plano interno e natureza de despesa (migration 87; vazios até a sincronização reler o contrato). */
   planoInterno?: string | null;
   naturezaDespesa?: string | null;
@@ -286,14 +291,17 @@ const centavos = (v: number) => Math.round(v * 100) / 100;
  */
 export function montarEmpenhosCarteira(
   empenhos: EmpenhoResumoDb[],
-  vinculos: Array<{ empenho_id: string; contract_key: string }>,
+  vinculos: Array<{ empenho_id: string; contract_key: string; origem?: string | null }>,
   faturaEmpenhos: FaturaEmpenhoDb[],
   faturas: Array<Pick<FaturaCarteira, 'idFatura' | 'paga' | 'cancelada'> & { valorLiquido?: number }>,
   contratosConsultados: Set<string>,
   saldosTesouro: Map<string, SaldoTesouroEmpenho> = new Map()
 ): EmpenhoCarteiraRow[] {
   const contratosDoEmpenho = new Map<string, string[]>();
+  // Só vínculos EMENDA: a fonte não lista a nota em contrato nenhum.
+  const soPeloPedido = new Map<string, boolean>();
   for (const v of vinculos) {
+    soPeloPedido.set(v.empenho_id, (soPeloPedido.get(v.empenho_id) ?? true) && v.origem === 'EMENDA');
     const lista = contratosDoEmpenho.get(v.empenho_id) ?? [];
     if (!lista.includes(v.contract_key)) lista.push(v.contract_key);
     contratosDoEmpenho.set(v.empenho_id, lista);
@@ -347,7 +355,8 @@ export function montarEmpenhosCarteira(
       liquidadoAPagar: tesouro ? centavos(tesouro.liquidadoAPagar) : null,
       tesouroAtualizadoEm: tesouro?.atualizadoEm ?? null,
       restosAPagar: tesouro?.restosAPagar ?? null,
-      contractKeys: [...contractKeys].sort()
+      contractKeys: [...contractKeys].sort(),
+      faltaIncluirNaFonte: soPeloPedido.get(e.empenho_id) === true
     });
   }
   return rows;
@@ -408,7 +417,7 @@ export async function fetchEmpenhosCarteira(faturas: FaturaCarteira[]): Promise<
     ),
     // Ordem pela chave única: por empenho_id (uma NE em vários contratos) ou só por id_fatura (uma fatura com várias
     // NEs) as páginas empatavam e podiam repetir ou pular linhas.
-    lerTudo<{ empenho_id: string; contract_key: string }>('contrato_empenhos', 'empenho_id, contract_key', 'id'),
+    lerTudo<{ empenho_id: string; contract_key: string; origem: string | null }>('contrato_empenhos', 'empenho_id, contract_key, origem', 'id'),
     lerTudo<FaturaEmpenhoDb>('fatura_empenhos', 'id_fatura, id_empenho_gov, valor', ['id_fatura', 'id_empenho_gov']),
     lerTudo<{ contract_key: string }>('contrato_faturas_sincronizacao', 'contract_key', 'contract_key'),
     lerTudo<{ id: string; plano_interno: string | null; natureza_despesa: string | null }>('empenhos', 'id, plano_interno, natureza_despesa', 'id'),

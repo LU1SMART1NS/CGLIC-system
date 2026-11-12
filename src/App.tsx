@@ -1,7 +1,7 @@
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
-import { SelectionProvider, useSelection } from './context/SelectionContext';
+import { SelectionProvider } from './context/SelectionContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { rotaInicialDoPerfil } from './config/navigation';
 import { ToastProvider, ConfirmProvider } from './design-system';
@@ -17,17 +17,19 @@ import { temSenhaPendente } from './utils/senhaPendente';
 import { lazyComRecarga } from './utils/recargaAposPublicacao';
 import { FalhaTelaBoundary } from './components/layout/FalhaTelaBoundary';
 
-// Cada tela vira um pacote próprio, baixado só quando a rota é aberta. O ExportExcelModal leva o exceljs
-// junto e só é baixado quando o modal abre. A tela de login fica no pacote principal (é a primeira de quem ainda não entrou).
+// Cada tela vira um pacote próprio, baixado só quando a rota é aberta. A tela de login fica no pacote principal (é a primeira de quem ainda não entrou).
 // Se o pacote sumiu numa publicação nova, lazyComRecarga recarrega a página uma vez.
 const GestaoInstrumentosRoute = lazyComRecarga(() => import('./routes/GestaoInstrumentosRoute').then((m) => ({ default: m.GestaoInstrumentosRoute })));
 const ArpSearchRoute = lazyComRecarga(() => import('./routes/ArpSearchRoute').then((m) => ({ default: m.ArpSearchRoute })));
+const AtasAMontarLista = lazyComRecarga(() => import('./components/atas/montar/AtasAMontarLista').then((m) => ({ default: m.AtasAMontarLista })));
+const AtaAMontarPage = lazyComRecarga(() => import('./components/atas/montar/AtaAMontarPage').then((m) => ({ default: m.AtaAMontarPage })));
 const ItemBalancesRoute = lazyComRecarga(() => import('./routes/ItemBalancesRoute').then((m) => ({ default: m.ItemBalancesRoute })));
 const ItensRoute = lazyComRecarga(() => import('./routes/ItensRoute').then((m) => ({ default: m.ItensRoute })));
 const DistribuicaoEquipeRoute = lazyComRecarga(() => import('./routes/DistribuicaoEquipeRoute').then((m) => ({ default: m.DistribuicaoEquipeRoute })));
 const ContratosAtaPage = lazyComRecarga(() => import('./components/vinculacao/ContratosAtaPage').then((m) => ({ default: m.ContratosAtaPage })));
 const EmpenhosItensPage = lazyComRecarga(() => import('./components/vinculacao/EmpenhosItensPage').then((m) => ({ default: m.EmpenhosItensPage })));
-const EmpenhosContratoPage = lazyComRecarga(() => import('./components/vinculacao/EmpenhosContratoPage').then((m) => ({ default: m.EmpenhosContratoPage })));
+const EmpenhosAoContratoPage = lazyComRecarga(() => import('./components/vinculacao/EmpenhosAoContratoPage').then((m) => ({ default: m.EmpenhosAoContratoPage })));
+const NotasForaDoContratoRedirect = lazyComRecarga(() => import('./components/vinculacao/EmpenhosAoContratoPage').then((m) => ({ default: m.NotasForaDoContratoRedirect })));
 const ItensUnidadesPage = lazyComRecarga(() => import('./components/alocacao/ItensUnidadesPage').then((m) => ({ default: m.ItensUnidadesPage })));
 const ContractsRoute = lazyComRecarga(() => import('./routes/ContractsRoute').then((m) => ({ default: m.ContractsRoute })));
 const Contract360Route = lazyComRecarga(() => import('./routes/Contract360Route').then((m) => ({ default: m.Contract360Route })));
@@ -43,13 +45,33 @@ const DefinirSenhaRoute = lazyComRecarga(() => import('./routes/DefinirSenhaRout
 const RedefinirSenhaRoute = lazyComRecarga(() => import('./routes/RedefinirSenhaRoute').then((m) => ({ default: m.RedefinirSenhaRoute })));
 const AlertRulesRoute = lazyComRecarga(() => import('./routes/AlertRulesRoute').then((m) => ({ default: m.AlertRulesRoute })));
 const HolidaysRoute = lazyComRecarga(() => import('./routes/HolidaysRoute').then((m) => ({ default: m.HolidaysRoute })));
+const FiscalizacaoInicioPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoInicioPage').then((m) => ({ default: m.FiscalizacaoInicioPage })));
+const FiscalizacaoEntregasPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoEntregasPage').then((m) => ({ default: m.FiscalizacaoEntregasPage })));
+const FiscalizacaoContratosPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoContratosPage').then((m) => ({ default: m.FiscalizacaoContratosPage })));
+const FiscalizacaoBeneficiariosPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoBeneficiariosPage').then((m) => ({ default: m.FiscalizacaoBeneficiariosPage })));
+const FiscalizacaoBeneficiario360Page = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoBeneficiario360Page').then((m) => ({ default: m.FiscalizacaoBeneficiario360Page })));
+const FiscalizacaoProgramasPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoProgramasPage').then((m) => ({ default: m.FiscalizacaoProgramasPage })));
+const FiscalizacaoPrograma360Page = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoPrograma360Page').then((m) => ({ default: m.FiscalizacaoPrograma360Page })));
+const AjustesProgramasPage = lazyComRecarga(() => import('./components/fiscalizacao/AjustesProgramasPage').then((m) => ({ default: m.AjustesProgramasPage })));
+const FiscalizacaoDistribuicaoPage = lazyComRecarga(() => import('./components/fiscalizacao/FiscalizacaoDistribuicaoPage').then((m) => ({ default: m.FiscalizacaoDistribuicaoPage })));
 const EmendasInicioPage = lazyComRecarga(() => import('./components/emendas/EmendasInicioPage').then((m) => ({ default: m.EmendasInicioPage })));
 const EmendasPedidosPage = lazyComRecarga(() => import('./components/emendas/EmendasPedidosPage').then((m) => ({ default: m.EmendasPedidosPage })));
 const EmendasItensEKitsPage = lazyComRecarga(() => import('./components/emendas/EmendasItensEKitsPage').then((m) => ({ default: m.EmendasItensEKitsPage })));
 const EmendasBeneficiariosPage = lazyComRecarga(() => import('./components/emendas/EmendasBeneficiariosPage').then((m) => ({ default: m.EmendasBeneficiariosPage })));
+const EmendasGruposBeneficiariosPage = lazyComRecarga(() => import('./components/emendas/EmendasGruposBeneficiariosPage').then((m) => ({ default: m.EmendasGruposBeneficiariosPage })));
 const EmendasAsparPage = lazyComRecarga(() => import('./components/emendas/EmendasAsparPage').then((m) => ({ default: m.EmendasAsparPage })));
+const Pedido360Page = lazyComRecarga(() => import('./components/emendas/pedido360/Pedido360Page').then((m) => ({ default: m.Pedido360Page })));
+const EmendasParlamentaresPage = lazyComRecarga(() => import('./components/emendas/parlamentares/EmendasParlamentaresPage').then((m) => ({ default: m.EmendasParlamentaresPage })));
+const Parlamentar360Page = lazyComRecarga(() => import('./components/emendas/parlamentares/Parlamentar360Page').then((m) => ({ default: m.Parlamentar360Page })));
+const EmendasListaPage = lazyComRecarga(() => import('./components/emendas/emendas360/EmendasListaPage').then((m) => ({ default: m.EmendasListaPage })));
+const Emenda360Page = lazyComRecarga(() => import('./components/emendas/emendas360/Emenda360Page').then((m) => ({ default: m.Emenda360Page })));
 const GruposUasgsRoute = lazyComRecarga(() => import('./routes/GruposUasgsRoute').then((m) => ({ default: m.GruposUasgsRoute })));
-const ExportExcelModal = lazyComRecarga(() => import('./components/modals/ExportExcelModal').then((m) => ({ default: m.ExportExcelModal })));
+
+/** Redireciona um endereço antigo para o novo mantendo a busca (?prazo=…, ?fase=…). */
+const RedirecionaComBusca: React.FC<{ para: string }> = ({ para }) => {
+  const { search } = useLocation();
+  return <Navigate to={`${para}${search}`} replace />;
+};
 
 const AuthRedirectHandler: React.FC = () => {
   const navigate = useNavigate();
@@ -186,8 +208,6 @@ const ProtectedLayout: React.FC<{
 };
 
 const AppContent: React.FC = () => {
-  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
-  const { selectedArp, globalArps, globalItemsByAta } = useSelection();
   const { pathname } = useLocation();
   const isPublicAuthRoute = ['/login', '/definir-senha', '/redefinir-senha'].includes(pathname);
 
@@ -206,9 +226,7 @@ const AppContent: React.FC = () => {
           <Route
             element={
               <ProtectedLayout>
-                <AppShell
-                  onOpenExportModal={() => setIsExportModalOpen(true)}
-                />
+                <AppShell />
               </ProtectedLayout>
             }
           >
@@ -269,16 +287,25 @@ const AppContent: React.FC = () => {
               path="/vinculacao/empenhos-contrato"
               element={
                 <RequireRole allowedRoles={['admin', 'gestor']}>
-                  <EmpenhosContratoPage />
+                  <EmpenhosAoContratoPage />
                 </RequireRole>
               }
             />
+            <Route path="/vinculacao/notas-fora-do-contrato" element={<NotasForaDoContratoRedirect />} />
             <Route path="/vinculacao/itens-unidades" element={<Navigate to="/alocacao" replace />} />
             <Route
               path="/alocacao"
               element={
                 <RequireRole allowedRoles={['admin', 'gestor_saldos']}>
                   <ItensUnidadesPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/configuracoes/programas"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao']}>
+                  <AjustesProgramasPage />
                 </RequireRole>
               }
             />
@@ -292,6 +319,23 @@ const AppContent: React.FC = () => {
             />
             <Route path="/atas/modelos" element={<LegacyRouteRedirect to="/configuracoes/modelos?tipo=atas" />} />
             <Route path="/contratos/modelos" element={<LegacyRouteRedirect to="/configuracoes/modelos?tipo=contratos" />} />
+            {/* Ata a montar (migration 238): quem monta a ata é o gestor da ata ou o coordenador (D8). */}
+            <Route
+              path="/atas/montar"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor']}>
+                  <AtasAMontarLista />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/atas/montar/:ano/:sequencial/:fornecedor"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor']}>
+                  <AtaAMontarPage />
+                </RequireRole>
+              }
+            />
             <Route
               path="/atas/detalhe/:ataKey"
               element={
@@ -311,7 +355,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/contratos"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']}>
                   <ContractsRoute />
                 </RequireRole>
               }
@@ -319,7 +363,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/contratos/:contractKey"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']}>
                   <Contract360Route />
                 </RequireRole>
               }
@@ -328,7 +372,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/pagamentos"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']}>
                   <PaymentsRoute />
                 </RequireRole>
               }
@@ -336,7 +380,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/pagamentos/previsao"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']}>
                   <PrevisaoRoute />
                 </RequireRole>
               }
@@ -346,7 +390,7 @@ const AppContent: React.FC = () => {
             <Route
               path="/empenhos"
               element={
-                <RequireRole allowedRoles={['admin', 'gestor', 'leitor']}>
+                <RequireRole allowedRoles={['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']}>
                   <FinancialExecutionRoute />
                 </RequireRole>
               }
@@ -417,6 +461,57 @@ const AppContent: React.FC = () => {
                 </RequireRole>
               }
             />
+            {/* Emendas (aba) e Emenda 360 (protótipo aprovado em 27/10/2026): substituem Pedidos › Por emenda. */}
+            <Route
+              path="/emendas/emendas"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasListaPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/emendas/emendas/:ano/:numero"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <Emenda360Page />
+                </RequireRole>
+              }
+            />
+            {/* Parlamentares (aba) e Parlamentar 360 (protótipo aprovado em 27/10/2026): substituem Pedidos › Por parlamentar. */}
+            <Route
+              path="/emendas/parlamentares"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasParlamentaresPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/emendas/parlamentares/:autorId"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <Parlamentar360Page />
+                </RequireRole>
+              }
+            />
+            {/* Pedido 360 (protótipo aprovado em 27/10/2026): pelo número no parlamentar e no ano (1/2026); sem número, pelo identificador interno. */}
+            <Route
+              path="/emendas/parlamentares/:autorId/pedidos/:ano/:ordem"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <Pedido360Page />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/emendas/pedidos/id/:id"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <Pedido360Page />
+                </RequireRole>
+              }
+            />
             <Route
               path="/emendas/itens"
               element={
@@ -425,13 +520,22 @@ const AppContent: React.FC = () => {
                 </RequireRole>
               }
             />
-            {/* Kits virou a visão Por kit de Itens e kits */}
+            {/* Kits virou a visão Por kit de Emendas › Itens */}
             <Route path="/emendas/kits" element={<Navigate to="/emendas/itens?ver=kit" replace />} />
             <Route
               path="/emendas/beneficiarios"
               element={
                 <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
                   <EmendasBeneficiariosPage />
+                </RequireRole>
+              }
+            />
+            {/* Grupo de cada beneficiário (migration 218): base da coluna Captação principal; a consulta só lê. */}
+            <Route
+              path="/emendas/grupos-beneficiarios"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_emendas', 'leitor']}>
+                  <EmendasGruposBeneficiariosPage />
                 </RequireRole>
               }
             />
@@ -444,26 +548,81 @@ const AppContent: React.FC = () => {
                 </RequireRole>
               }
             />
-            {/* As abas Autores e Por autor saíram do menu: viraram Pedidos › Ver por autor (com "Mostrar" para quem não tem pedido). */}
-            <Route path="/emendas/autores" element={<Navigate to="/emendas/pedidos?ver=autor" replace />} />
-            <Route path="/emendas/por-autor" element={<Navigate to="/emendas/pedidos?ver=autor" replace />} />
+            {/* Fiscalização de contratos pela SFC/CGLIC (migration 259): Painel no Início e Distribuição do coordenador. */}
+            <Route
+              path="/fiscalizacao/inicio"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoInicioPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/programas"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoProgramasPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/programas/:id"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoPrograma360Page />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/contratos"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoContratosPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/beneficiarios"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoBeneficiariosPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/beneficiarios/:chave"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoBeneficiario360Page />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/fiscalizacao/itens"
+              element={
+                <RequireRole allowedRoles={['admin', 'gestor_fiscalizacao', 'leitor']}>
+                  <FiscalizacaoEntregasPage />
+                </RequireRole>
+              }
+            />
+            {/* A antiga aba Entregas virou a aba Itens (11/11/2026): o endereço antigo leva para a nova, com os filtros. */}
+            <Route path="/fiscalizacao/entregas" element={<RedirecionaComBusca para="/fiscalizacao/itens" />} />
+            <Route
+              path="/fiscalizacao/distribuicao"
+              element={
+                <RequireRole allowedRoles={['admin']}>
+                  <FiscalizacaoDistribuicaoPage />
+                </RequireRole>
+              }
+            />
+            {/* As abas Autores e Por autor viraram a aba Parlamentares (com "Mostrar" para quem não tem pedido). */}
+            <Route path="/emendas/autores" element={<Navigate to="/emendas/parlamentares" replace />} />
+            <Route path="/emendas/por-autor" element={<Navigate to="/emendas/parlamentares" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </Suspense>
       </FalhaTelaBoundary>
-
-      {isExportModalOpen && (
-        <Suspense fallback={null}>
-          <ExportExcelModal
-            isOpen={isExportModalOpen}
-            onClose={() => setIsExportModalOpen(false)}
-            atas={globalArps}
-            itemsByAta={globalItemsByAta}
-            selectedAta={selectedArp}
-          />
-        </Suspense>
-      )}
 
       {!isPublicAuthRoute && <AppFooter />}
     </div>

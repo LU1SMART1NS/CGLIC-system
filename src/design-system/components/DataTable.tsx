@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { colors, shapes, spacing, breakpoints } from '../tokens';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { CarteiraSortButton } from '../../components/carteira/CarteiraSortHeader';
+import { CarteiraSortButton, CarteiraSortMenu } from '../../components/carteira/CarteiraSortHeader';
 import { sortRows, type SortDir, type SortValue } from '../../components/carteira/useCarteiraSort';
 import { abrirAoClicarNaLinha } from '../../components/carteira/CarteiraRowLink';
 import { ActionButton } from './ActionButton';
@@ -28,6 +28,11 @@ export interface Column<T> {
   sortValue?: (item: T) => SortValue;
   /** Sentido do primeiro clique (padrão: crescente; use `desc` para números em que o maior importa). */
   sortFirstDir?: SortDir;
+  /**
+   * Coluna que junta vários valores (ex.: Empenhado · Pago · Sobra): o cabeçalho abre a lista de por qual deles ordenar.
+   * Cada opção tem a própria chave de ordenação (a mesma do `onSort`/URL); com ela, `sortValue` da coluna é ignorado.
+   */
+  sortOptions?: { key: string; label: string; sortValue?: (item: T) => SortValue; sortFirstDir?: SortDir }[];
 }
 
 export interface DataTableProps<T> {
@@ -80,6 +85,31 @@ export interface DataTableProps<T> {
 
 const hideClass = (col: { hideBelow?: 'sm' | 'md' }) =>
   col.hideBelow ? `ds-table__hide-${col.hideBelow}` : undefined;
+
+// Chave de ordenação → valor: a da coluna simples ou a de uma opção de coluna juntada.
+function sortValueDe<T>(columns: Column<T>[], key: string): ((item: T) => SortValue) | undefined {
+  for (const c of columns) {
+    const opcao = c.sortOptions?.find((o) => o.key === key);
+    if (opcao) return opcao.sortValue;
+    if (!c.sortOptions && c.key === key) return c.sortValue;
+  }
+  return undefined;
+}
+
+function primeiroSentidoDe<T>(columns: Column<T>[], key: string): SortDir {
+  for (const c of columns) {
+    const opcao = c.sortOptions?.find((o) => o.key === key);
+    if (opcao) return opcao.sortFirstDir ?? 'asc';
+    if (!c.sortOptions && c.key === key) return c.sortFirstDir ?? 'asc';
+  }
+  return 'asc';
+}
+
+function ariaSortDe<T>(col: Column<T>, sort: { key: string; dir: SortDir } | null): React.AriaAttributes['aria-sort'] {
+  const chaves = col.sortOptions ? col.sortOptions.map((o) => o.key) : col.sortValue ? [col.key] : [];
+  if (chaves.length === 0) return undefined;
+  return sort && chaves.includes(sort.key) ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+}
 
 export function DataTable<T>({
   columns,
@@ -153,13 +183,13 @@ export function DataTable<T>({
   // Ordenação estável: sem escolha (ou no terceiro clique) vale a ordem em que `data` chegou.
   const rows = useMemo(() => {
     if (onSort) return data;
-    const col = sortInterno ? columns.find((c) => c.key === sortInterno.key) : undefined;
-    return sortInterno && col?.sortValue ? sortRows(data, { value: col.sortValue }, sortInterno.dir) : data;
+    const valor = sortInterno ? sortValueDe(columns, sortInterno.key) : undefined;
+    return sortInterno && valor ? sortRows(data, { value: valor }, sortInterno.dir) : data;
   }, [data, columns, sortInterno, onSort]);
 
   const toggleSort = (key: string) =>
     onSort ? onSort(key) : setSort((atual) => {
-      const first = columns.find((c) => c.key === key)?.sortFirstDir ?? 'asc';
+      const first = primeiroSentidoDe(columns, key);
       if (!atual || atual.key !== key) return { key, dir: first };
       return atual.dir === first ? { key, dir: first === 'asc' ? 'desc' : 'asc' } : null;
     });
@@ -271,10 +301,19 @@ export function DataTable<T>({
               <th
                 key={col.key}
                 className={hideClass(col)}
-                aria-sort={col.sortValue ? (sort?.key === col.key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
+                aria-sort={ariaSortDe(col, sort)}
                 style={{ textAlign: col.align || 'left', width: col.width, minWidth: col.minWidth, whiteSpace: col.nowrap ? 'nowrap' : undefined }}
               >
-                {col.sortValue ? (
+                {col.sortOptions ? (
+                  <CarteiraSortMenu
+                    label={col.header}
+                    options={col.sortOptions}
+                    activeKey={sort?.key ?? null}
+                    activeDir={sort?.dir ?? null}
+                    onSort={toggleSort}
+                    testId={`sort-menu-${col.key}`}
+                  />
+                ) : col.sortValue ? (
                   <CarteiraSortButton
                     label={col.header}
                     sortKey={col.key}

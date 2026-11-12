@@ -46,12 +46,27 @@ export interface ExtratoDaCota {
   recebido: FluxoDaCota[];
   /** Entre participantes: não mexe na cota. */
   entre: FluxoDaCota[];
+  /** Remanejado da cota própria para não participantes (migration 219). */
+  paraNaoParticipantes: number;
+  /**
+   * Acima da ata assinada dos órgãos sem lastro: parte do registrado acima do homologado (migration 142). Não saiu da
+   * SENASP (o registrado dela não caiu), então não mexe na cota.
+   */
+  semLastro: Array<{ uasg: string; quantidade: number }>;
   cota: number;
-  /** O extrato bate com a conta do banco (registrado − gerenciado). Não bate quando as somas não fecham. */
+  /** O extrato bate com a conta do banco (registrado − gerenciado − desconto). Não bate quando as somas não fecham. */
   confere: boolean;
 }
 
-export function extratoDaCotaPropria(q: QuantitativosDoItem): ExtratoDaCota {
+/** Registrado acima do homologado com o aviso aberto (utils/registradoAcima): o excedente e a parte da SENASP. */
+export interface ExcedenteDoItem {
+  excedente: number;
+  excedenteSenasp: number;
+  desconto: number;
+  resolvido: boolean;
+}
+
+export function extratoDaCotaPropria(q: QuantitativosDoItem, registradoAcima?: ExcedenteDoItem | null): ExtratoDaCota {
   const acima = new Map<string, number>();
   for (const o of q.orgaos) {
     if (o.ehSenasp) continue;
@@ -89,10 +104,25 @@ export function extratoDaCotaPropria(q: QuantitativosDoItem): ExtratoDaCota {
     if (def > 0) fluxo(o.uasg, def, destinoSugerido(q.orgaos, o.uasg), true);
   }
 
+  // Registrado acima do homologado: o excedente que não está na SENASP está nos órgãos e não tem lastro; não saiu da
+  // cota (00062/2024 item 3: PR +10 e GO +1 com a SENASP ainda em 106 registrados).
+  const semLastro: Array<{ uasg: string; quantidade: number }> = [];
+  let restoSemLastro = registradoAcima && !registradoAcima.resolvido ? Math.max(registradoAcima.excedente - registradoAcima.excedenteSenasp, 0) : 0;
+  for (const [uasg, v] of [...acima.entries()].sort((a, b) => b[1] - a[1])) {
+    if (restoSemLastro <= 0) break;
+    const tira = Math.min(v, restoSemLastro);
+    if (tira <= 0) continue;
+    acima.set(uasg, v - tira);
+    semLastro.push({ uasg, quantidade: tira });
+    restoSemLastro -= tira;
+  }
   const cedido = [...acima.entries()].filter(([, v]) => v > 0).map(([uasg, quantidade]) => ({ uasg, quantidade }));
   const soma = (l: Array<{ quantidade: number }>) => l.reduce((s, x) => s + x.quantidade, 0);
-  const cota = q.assinadaSenasp - soma(cedido) + soma(recebido);
-  return { assinadaSenasp: q.assinadaSenasp, cedido, recebido, entre, cota, confere: Math.abs(cota - q.cotaPropria) < 0.0001 };
+  // Todo o remanejado pela SENASP, pendente ou já no Compras.gov.br: o extrato parte da ata assinada, que não muda.
+  const paraNaoParticipantes = q.orgaos.filter((o) => o.ehSenasp).reduce((s, o) => s + o.remanejadoNaoParticipante, 0);
+  const cota = q.assinadaSenasp - soma(cedido) + soma(recebido) - paraNaoParticipantes;
+  const doBanco = q.cotaPropria - (registradoAcima?.desconto ?? 0);
+  return { assinadaSenasp: q.assinadaSenasp, cedido, recebido, entre, paraNaoParticipantes, semLastro, cota, confere: Math.abs(cota - doBanco) < 0.0001 };
 }
 
 export type EstadoContratado =

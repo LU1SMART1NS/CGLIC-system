@@ -3,13 +3,14 @@ import { Modal } from '../../design-system/components/Modal';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { NoticeBar } from '../../design-system/components/NoticeBar';
-import { AppInput, AppSelect, AppTextarea } from '../../design-system/components/FormFields';
+import { AppInput, AppSelect, AppTextarea, AppDateInput } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { hojeEmBrasilia, useSalvarEmendaSiop } from '../../hooks/useEmendas';
 import { casaBusca } from '../../utils/emendasBeneficiarios';
 import { autorPeloCodigo, lerNumeroDaEmenda, numeroDaEmenda } from '../../utils/emendasSemPedido';
 import { dataBR } from '../../utils/emendasKits';
-import { nomeESigla, type AutorEmenda, type BeneficiarioEmenda, type EmendaSiop, type Gnd, type PedidoEmenda } from '../../services/emendasService';
+import { lerValorBR, mascaraValorBR } from '../../utils/mascaras';
+import type { AutorEmenda, EmendaPainelSemParlamentar, EmendaSiop, Gnd, PedidoEmenda } from '../../services/emendasService';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
 
 const TIPO: Record<AutorEmenda['tipo'], string> = { DEPUTADO: 'Deputado', SENADOR: 'Senador', BANCADA: 'Bancada' };
@@ -22,28 +23,30 @@ interface Props {
   emendas: EmendaSiop[];
   pedidos: PedidoEmenda[];
   autores: AutorEmenda[];
-  beneficiarios: BeneficiarioEmenda[];
+  /** Emenda do painel do SIOP sem parlamentar no cadastro (migration 252): nº, ano, valor e GND já vêm do painel. */
+  doPainel?: EmendaPainelSemParlamentar | null;
   onClose: () => void;
 }
 
 /**
- * Registrar a emenda vista no SIOP (migration 205). O parlamentar vem pelo código do autor (os 4 primeiros dígitos do
- * nº), aprendido com as emendas e os pedidos que já têm o nº; código novo, a CAEP escolhe uma vez.
+ * Emenda registrada (migration 205). O servidor registra sozinho as do painel do SIOP (migration 252); aqui a CAEP
+ * altera uma registrada ou escolhe o parlamentar da que o servidor não achou. O parlamentar vem pelo código do autor
+ * (os 4 primeiros dígitos do nº), aprendido com as emendas e os pedidos que já têm o nº; código novo, a CAEP escolhe uma vez.
  */
-export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, autores, beneficiarios, onClose }) => {
+export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, autores, doPainel = null, onClose }) => {
   const salvar = useSalvarEmendaSiop();
   const toast = useToast();
   const hoje = hojeEmBrasilia();
   const anoDeHoje = Number(hoje.slice(0, 4));
-  const [numero, setNumero] = useState(emenda ? `${emenda.ano} ${numeroDaEmenda(emenda.numero)}` : '');
-  const [ano, setAno] = useState(emenda?.ano ?? anoDeHoje);
+  const inicio = emenda ?? doPainel;
+  const [numero, setNumero] = useState(inicio ? `${inicio.ano} ${numeroDaEmenda(inicio.numero)}` : '');
+  const [ano, setAno] = useState(inicio?.ano ?? anoDeHoje);
   const [autorEscolhido, setAutorEscolhido] = useState(emenda?.autorId ?? '');
   const [buscaAutor, setBuscaAutor] = useState('');
-  const [valor, setValor] = useState(emenda ? emReais(emenda.valor) : '');
-  const [gnd, setGnd] = useState<Gnd>(emenda?.gnd ?? 'GND-4');
+  const [valor, setValor] = useState(inicio?.valor != null ? emReais(inicio.valor) : '');
+  // Valor e GND podem ficar para a conferência com o SIOP (migration 243): a CAEP registra pelo nº e ano.
+  const [gnd, setGnd] = useState<Gnd | ''>(inicio ? inicio.gnd ?? '' : 'GND-4');
   const [vistaEm, setVistaEm] = useState(emenda?.vistaEm ?? hoje);
-  const [beneficiarioId, setBeneficiarioId] = useState(emenda?.beneficiarioId ?? '');
-  const [objeto, setObjeto] = useState(emenda?.objeto ?? '');
   const [observacao, setObservacao] = useState(emenda?.observacao ?? '');
   const [tentou, setTentou] = useState(false);
 
@@ -63,13 +66,13 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
     ? pedidos.find((p) => p.etapa !== 'CANCELADO' && p.siopEmenda === lido.numero && (p.siopEmendaAno ?? lido.ano) === lido.ano && (!emenda || p.emendaId !== emenda.id))
     : undefined;
   const jaRegistrada = lido ? emendas.find((e) => e.numero === lido.numero && e.ano === lido.ano && e.id !== emenda?.id) : undefined;
-  const valorLido = valor.trim() ? Number(valor.replace(/[^\d,]/g, '').replace(',', '.')) : null;
-  const beneficiariosOrdenados = useMemo(() => [...beneficiarios].filter((b) => b.ativo || b.id === beneficiarioId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')), [beneficiarios, beneficiarioId]);
+  const valorLido = lerValorBR(valor);
 
   const faltas: string[] = [];
   if (!lido) faltas.push('o nº da emenda');
   if (!autorId) faltas.push('o parlamentar');
-  if (!valorLido || valorLido <= 0) faltas.push('o valor');
+  const valorInvalido = valor.trim() !== '' && (!valorLido || valorLido <= 0);
+  if (valorInvalido) faltas.push('um valor maior que zero');
   if (!vistaEm) faltas.push('a data');
 
   const enviar = async (ev: React.FormEvent) => {
@@ -83,10 +86,11 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
         numero: lido.numero,
         ano: lido.ano,
         autorId,
-        valor: valorLido!,
-        gnd,
-        beneficiarioId: beneficiarioId || null,
-        objeto: objeto.trim() || null,
+        valor: valor.trim() ? valorLido : null,
+        gnd: gnd || null,
+        // Beneficiário e objeto saíram da tela (03/11/2026: são do pedido); a emenda antiga guarda o que já tinha.
+        beneficiarioId: emenda?.beneficiarioId ?? null,
+        objeto: emenda?.objeto ?? null,
         vistaEm,
         observacao: observacao.trim() || null
       });
@@ -104,8 +108,12 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
       dismissible={!salvar.isPending}
       size="lg"
       testId="emendas-emenda-siop-modal"
-      title={emenda ? `Emenda ${numeroDaEmenda(emenda.numero)} / ${emenda.ano}` : 'Registrar emenda do SIOP'}
-      subtitle="Copie do SIOP o nº, o valor e o GND. O parlamentar vem pelo código do autor."
+      title={inicio ? `Emenda ${numeroDaEmenda(inicio.numero)} / ${inicio.ano}` : 'Registrar emenda'}
+      subtitle={
+        doPainel && !emenda
+          ? 'Emenda do painel do SIOP sem parlamentar no cadastro: escolha o parlamentar uma vez.'
+          : 'Enquanto a emenda não tem pedido, o valor e o GND acompanham o painel do SIOP. O parlamentar vem pelo código do autor.'
+      }
       footer={
         <>
           <ActionButton action="cancelar" type="button" onClick={onClose} disabled={salvar.isPending} />
@@ -142,18 +150,20 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
           )}
           <AppInput
             label="Valor no SIOP"
+            hint="Opcional: confirmado na conferência"
             placeholder="1.200.000,00"
             inputMode="decimal"
             value={valor}
-            onChange={(e) => setValor(e.target.value)}
-            error={tentou && (!valorLido || valorLido <= 0) ? 'Informe o valor.' : undefined}
+            onChange={(e) => setValor(mascaraValorBR(e.target.value, valor))}
+            error={tentou && valorInvalido ? 'Valor maior que zero, ou deixe em branco.' : undefined}
             data-testid="emendas-emenda-siop-valor"
           />
-          <AppSelect label="GND" value={gnd} onChange={(e) => setGnd(e.target.value as Gnd)} data-testid="emendas-emenda-siop-gnd">
+          <AppSelect label="GND" value={gnd} onChange={(e) => setGnd(e.target.value as Gnd | '')} data-testid="emendas-emenda-siop-gnd">
+            <option value="">A ler no SIOP</option>
             <option value="GND-4">GND-4 · Investimento</option>
             <option value="GND-3">GND-3 · Custeio</option>
           </AppSelect>
-          <AppInput label="Vista no SIOP em" type="date" max={hoje} value={vistaEm} onChange={(e) => setVistaEm(e.target.value)} data-testid="emendas-emenda-siop-vista" />
+          <AppDateInput label="Vista no SIOP em" max={hoje} value={vistaEm} onValueChange={setVistaEm} data-testid="emendas-emenda-siop-vista" />
         </div>
 
         {pedidoDoNumero && (
@@ -199,6 +209,12 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
                 error={tentou && !autorId ? 'Escolha o parlamentar.' : undefined}
                 data-testid="emendas-emenda-siop-busca-autor"
               />
+              {doPainel?.autor && (
+                <span style={carteiraDetalhe} data-testid="emendas-emenda-siop-autor-painel">
+                  No painel do SIOP: <b>{doPainel.autor}</b>
+                  {[doPainel.tipoAutor, doPainel.uf].filter(Boolean).map((x) => ` · ${x}`).join('')}
+                </span>
+              )}
               {lido && !sugerido && <span style={carteiraDetalhe}>O código {lido.numero.slice(0, 4)} ainda não apareceu em nenhuma emenda ou pedido: escolha o parlamentar uma vez.</span>}
               {autoresEncontrados.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 8, overflow: 'hidden' }}>
@@ -223,22 +239,6 @@ export const EmendaSiopModal: React.FC<Props> = ({ emenda, emendas, pedidos, aut
           )}
         </div>
 
-        <AppSelect
-          label="Beneficiário indicado no SIOP"
-          hint="Se o SIOP trouxer. Ajuda a pôr a ASPAR do órgão dele em primeiro."
-          value={beneficiarioId}
-          onChange={(e) => setBeneficiarioId(e.target.value)}
-          data-testid="emendas-emenda-siop-beneficiario"
-        >
-          <option value="">Não informado</option>
-          {beneficiariosOrdenados.map((b) => (
-            <option key={b.id} value={b.id}>
-              {nomeESigla(b)}
-              {b.entregaUf ? ` (${b.entregaUf})` : ''}
-            </option>
-          ))}
-        </AppSelect>
-        <AppTextarea label="Objeto no SIOP" hint="Texto livre, como está lá." rows={2} value={objeto} onChange={(e) => setObjeto(e.target.value)} data-testid="emendas-emenda-siop-objeto" />
         <AppTextarea label="Observação" rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} data-testid="emendas-emenda-siop-observacao" />
         {!emenda && (
           <NoticeBar tone="info" testId="emendas-emenda-siop-aviso">

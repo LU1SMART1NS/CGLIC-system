@@ -1,4 +1,5 @@
 import React from 'react';
+import { dataBRparaISO, isoParaBR, mascaraDataBR, mascaraMesBR, mesBRparaISO } from '../../utils/mascaras';
 
 interface FieldShellProps {
   id: string;
@@ -103,3 +104,70 @@ export const AppTextarea = React.forwardRef<HTMLTextAreaElement, CommonProps & R
   }
 );
 AppTextarea.displayName = 'AppTextarea';
+
+type AppDateInputProps = CommonProps &
+  Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange' | 'min' | 'max'> & {
+    /** aaaa-mm-dd (ou aaaa-mm com `mes`); '' enquanto a data estiver incompleta ou não existir. */
+    value: string;
+    onValueChange: (iso: string) => void;
+    min?: string;
+    max?: string;
+    /** Só mês e ano (mm/aaaa). */
+    mes?: boolean;
+  };
+
+/**
+ * Data digitada dd/mm/aaaa (ou mm/aaaa) no lugar do calendário do navegador, que em alguns ambientes não deixa
+ * escolher o dia. Recebe e devolve ISO, como o `type="date"`; data inexistente ou fora de min/max aparece no campo.
+ */
+export const AppDateInput: React.FC<AppDateInputProps> = ({ value, onValueChange, min, max, mes = false, label, hint, error, containerClassName, id, className, ...rest }) => {
+  const auto = React.useId();
+  const fieldId = id ?? auto;
+  const ref = React.useRef<HTMLInputElement>(null);
+  const [texto, setTexto] = React.useState(() => isoParaBR(value));
+  const [emitido, setEmitido] = React.useState(value);
+  // Valor trocado por fora (limpar o formulário, data sugerida): o campo mostra o novo.
+  if (value !== emitido) {
+    setEmitido(value);
+    setTexto(isoParaBR(value));
+  }
+  const iso = mes ? mesBRparaISO(texto) : dataBRparaISO(texto);
+  const completo = texto.replace(/\D/g, '').length === (mes ? 6 : 8);
+  const erroDaData =
+    completo && !iso
+      ? mes ? 'Mês inválido.' : 'Data inválida.'
+      : iso && min && iso < min
+        ? `A partir de ${isoParaBR(min)}.`
+        : iso && max && iso > max
+          ? `Até ${isoParaBR(max)}.`
+          : undefined;
+  React.useEffect(() => {
+    ref.current?.setCustomValidity(erroDaData ?? '');
+  }, [erroDaData]);
+  const erro = error ?? erroDaData;
+  return (
+    <FieldShell id={fieldId} label={label} hint={hint} error={erro} className={containerClassName}>
+      <input
+        ref={ref}
+        id={fieldId}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder={mes ? 'mm/aaaa' : 'dd/mm/aaaa'}
+        maxLength={mes ? 7 : 10}
+        className={`ds-field__control${className ? ` ${className}` : ''}`}
+        aria-invalid={erro ? true : undefined}
+        aria-describedby={describedBy(fieldId, hint, erro)}
+        {...rest}
+        value={texto}
+        onChange={(e) => {
+          const novo = mes ? mascaraMesBR(e.target.value) : mascaraDataBR(e.target.value);
+          const novoIso = mes ? mesBRparaISO(novo) : dataBRparaISO(novo);
+          setTexto(novo);
+          setEmitido(novoIso);
+          onValueChange(novoIso);
+        }}
+      />
+    </FieldShell>
+  );
+};

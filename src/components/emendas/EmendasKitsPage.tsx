@@ -13,16 +13,18 @@ import { carteiraDetalhe, carteiraIdentificacao, carteiraNumero, carteiraSubtitl
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useToast } from '../../design-system/components/Toast';
-import { hojeEmBrasilia, useItensCaep, useKitsEmendas, usePodeGerirEmendas, useReservadoPorItem, useSalvarKit } from '../../hooks/useEmendas';
+import { useConfirmDialog } from '../../design-system';
+import { hojeEmBrasilia, useItensCaep, useKitsEmendas, usePodeGerirEmendas, useExcluirKit, useReservadoPorItem, useSalvarKit } from '../../hooks/useEmendas';
 import { formatNumber } from '../../utils/format';
-import { avisoIndicacaoDias, calcularKit, corteIndicacaoDias, ROTULO_SITUACAO_KIT, type CalculoDoKit, type ComponenteDoKit, type SituacaoKit } from '../../utils/emendasKits';
+import { avisoIndicacaoDias, corteIndicacaoDias, ROTULO_SITUACAO_KIT, type ComponenteDoKit, type SituacaoKit } from '../../utils/emendasKits';
 import type { KitEmenda } from '../../services/emendasService';
 import { KitModal } from './KitModal';
-import { ItemDaAta, ValorPrevisto, VigenciaDaAta } from './emendasPartes';
+import { montarLinhasKitsCaep, saldoDoItemParaKits, type LinhaKitCaep } from '../../utils/emendasItensSaldo';
+import { ItemDaAta, PrecoDaEmenda, VigenciaDaAta } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 
 type Segmento = 'todos' | SituacaoKit;
-type Linha = KitEmenda & { calculo: CalculoDoKit };
+type Linha = LinhaKitCaep;
 
 const VARIANTE: Record<SituacaoKit, StatusBadgeVariant> = { disponivel: 'success', vence: 'warning', indisponivel: 'danger', desativado: 'neutral' };
 const vazio = <span style={{ ...carteiraDetalhe, marginTop: 0 }}>—</span>;
@@ -83,22 +85,26 @@ const ComposicaoDoKit: React.FC<{ linha: Linha; onAbrirItem?: (itemKey: string) 
 };
 
 interface Props {
-  /** Seletor Por item · Por kit da aba Itens e kits, no cabeçalho. */
+  /** Seletor Por item · Por kit da aba Itens de Emendas, no cabeçalho. */
   seletor?: React.ReactNode;
   /** Kit que já chega aberto (vindo de um item). */
   abrir?: string | null;
   onAbrirItem?: (itemKey: string) => void;
+  /** Botão Exportar da aba Itens (itens e kits com saldo), ao lado de Atualizar. */
+  exportar?: React.ReactNode;
 }
 
 /**
- * Itens e kits › Por kit (migration 155): conjunto de itens montado pela CAEP com o que ela tem alocado. A situação é
+ * Emendas › Itens › Por kit (migration 155): conjunto de itens montado pela CAEP com o que ela tem alocado. A situação é
  * calculada todo dia pelas atas e pelo saldo; quem desativa é só a CAEP.
  */
-export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }) => {
+export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem, exportar }) => {
   const { data: kits = [], isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = useKitsEmendas();
   const { data: itens = [], isLoading: carregandoItens, refetch: recarregarItens } = useItensCaep();
   const podeGerir = usePodeGerirEmendas();
   const salvar = useSalvarKit();
+  const excluir = useExcluirKit();
+  const confirm = useConfirmDialog();
   const toast = useToast();
   const hoje = hojeEmBrasilia();
   const [segmento, setSegmento] = useState<Segmento>('todos');
@@ -113,12 +119,10 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
       return novo;
     });
 
-  const porChave = useMemo(() => new Map(itens.map((i) => [i.itemKey, i])), [itens]);
   const { data: reservado } = useReservadoPorItem();
-  // Saldo do item para os kits = alocado à CAEP − reservado nos pedidos.
-  const saldoDoItem = useMemo(() => (i: { itemKey: string; alocado: number }) => i.alocado - (reservado?.get(i.itemKey) ?? 0), [reservado]);
+  const saldoDoItem = useMemo(() => saldoDoItemParaKits(reservado), [reservado]);
   const { precos } = usePrecosParaEmenda();
-  const linhas: Linha[] = useMemo(() => kits.map((k) => ({ ...k, calculo: calcularKit(k, porChave, hoje, saldoDoItem, precos) })), [kits, porChave, hoje, saldoDoItem, precos]);
+  const linhas: Linha[] = useMemo(() => montarLinhasKitsCaep(kits, itens, hoje, reservado, precos), [kits, itens, hoje, reservado, precos]);
 
   const contagem = useMemo(() => {
     const c: Record<Segmento, number> = { todos: linhas.length, disponivel: 0, vence: 0, indisponivel: 0, desativado: 0 };
@@ -155,6 +159,18 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
     }
   };
 
+  // Só o kit que nenhum pedido usa; o de pedido só se desativa (migration 253).
+  const excluirKit = async (k: KitEmenda) => {
+    const ok = await confirm({ title: 'Excluir kit', message: `Excluir ${k.nome}? Nenhum pedido usa este kit. A exclusão não pode ser desfeita.`, confirmLabel: 'Excluir', tone: 'danger' });
+    if (!ok) return;
+    try {
+      await excluir.mutateAsync(k);
+      toast.success(`${k.nome} excluído.`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
   const colunas: Column<Linha>[] = [
     {
       key: 'nome',
@@ -181,7 +197,7 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
           }
         ]
       : []),
-    { key: 'valor', header: 'Valor por kit', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <ValorPrevisto previsto={l.calculo.valorPorKit} hoje={l.calculo.valorPorKitHoje} nota="Previsto para a emenda, com o reajuste das atas (o mesmo do quadro do parlamentar)" /> },
+    { key: 'valor', header: 'Valor por kit', align: 'right', nowrap: true, sortValue: ORDEM.valor.value, sortFirstDir: 'desc', render: (l) => <PrecoDaEmenda valor={l.calculo.valorPorKit} /> },
     {
       key: 'possiveis',
       header: 'Kits possíveis',
@@ -208,13 +224,14 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
   return (
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
-        title="Itens e kits"
+        title="Itens"
         subtitle="Conjuntos de itens que a CAEP oferece aos parlamentares, e quantos ainda cabem no saldo."
-        hint={`O kit não guarda quantidade: pedir N kits tira de cada item N vezes a quantidade por kit. Vence em breve = alguma ata do kit acaba em até ${avisoIndicacaoDias()} dias; Indisponível = ata encerrada, a menos de ${corteIndicacaoDias()} dias do fim ou sem saldo (prazos em Ajustes › Regras de Alertas).`}
+        hint={`O kit não guarda quantidade: pedir N kits tira de cada item N vezes a quantidade por kit. Vence em breve = alguma ata do kit acaba em até ${avisoIndicacaoDias()} dias; Indisponível = ata encerrada, a menos de ${corteIndicacaoDias()} dias do fim, item perto do reajuste da ata ou sem saldo (prazos em Ajustes › Regras de Alertas).`}
         icon={<PackageOpen size={26} color="var(--primary)" aria-hidden="true" />}
         viewToggle={seletor}
         actions={
           <>
+            {exportar}
             {podeGerir && <ActionButton action="novo" label="Novo kit" onClick={() => setEditando('novo')} disabled={carregandoItens} data-testid="emendas-kits-novo" />}
             <HeaderRefreshAction
               onRefresh={() => Promise.all([refetch(), recarregarItens()])}
@@ -284,9 +301,12 @@ export const EmendasKitsPage: React.FC<Props> = ({ seletor, abrir, onAbrirItem }
                       iconOnly
                       label={`${l.ativo ? 'Desativar' : 'Reativar'} ${l.nome}`}
                       onClick={() => void alternarAtivo(l)}
-                      disabled={salvar.isPending}
+                      disabled={salvar.isPending || excluir.isPending}
                       data-testid={`emendas-kits-ativo-${l.id}`}
                     />
+                    {l.pedidos === 0 && (
+                      <ActionButton action="excluir" iconOnly label={`Excluir ${l.nome}`} onClick={() => void excluirKit(l)} disabled={salvar.isPending || excluir.isPending} data-testid={`emendas-kits-excluir-${l.id}`} />
+                    )}
                   </div>
                 )
               : undefined

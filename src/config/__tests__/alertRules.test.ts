@@ -116,14 +116,23 @@ describe('parametrização das regras', () => {
     expect(errors['vigencia.faixaCriticoAteDias']).toMatch(/inteiro/);
   });
 
-  it('emendas: padrão 60/35, o corte vem antes do aviso e Ajustes sobrepõe', () => {
+  it('emendas: padrão 90/60 (29/10/2026), o corte vem antes do aviso e Ajustes sobrepõe', () => {
     const base = getAlertRuleValues();
-    expect(base['emendas.avisoIndicacaoAntesDias']).toBe(60);
-    expect(base['emendas.corteIndicacaoAntesDias']).toBe(35);
-    expect(validateAlertRuleValues({ ...base, 'emendas.corteIndicacaoAntesDias': 60 })['emendas.avisoIndicacaoAntesDias']).toMatch(/antes do corte/);
+    expect(base['emendas.avisoIndicacaoAntesDias']).toBe(90);
+    expect(base['emendas.corteIndicacaoAntesDias']).toBe(60);
+    expect(validateAlertRuleValues({ ...base, 'emendas.corteIndicacaoAntesDias': 90 })['emendas.avisoIndicacaoAntesDias']).toMatch(/antes do corte/);
     applyAlertRuleOverrides({ 'emendas.corteIndicacaoAntesDias': 40 });
     expect(getAlertRuleValues()['emendas.corteIndicacaoAntesDias']).toBe(40);
     applyAlertRuleOverrides({});
+  });
+
+  it('emendas: reajuste da ata 60 dias, tempo até o contrato 45, minuta 5 dias úteis; o tempo não passa do corte', () => {
+    const base = getAlertRuleValues();
+    expect(base['emendas.corteReajusteAntesDias']).toBe(60);
+    expect(base['emendas.tramiteAteContratoDias']).toBe(45);
+    expect(base['emendas.validadeMinutaDiasUteis']).toBe(5);
+    expect(base).not.toHaveProperty('emendas.folgaReajustePct');
+    expect(validateAlertRuleValues({ ...base, 'emendas.tramiteAteContratoDias': 61 })['emendas.tramiteAteContratoDias']).toMatch(/não pode passar do corte/);
   });
 });
 

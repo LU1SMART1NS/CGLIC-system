@@ -8,7 +8,10 @@ import { ContagensDaCarteira } from '../vinculacao/ContagensDaCarteira';
 import { useContagemFinanceiro } from '../financeiro/useContagemFinanceiro';
 import { useContagemGruposUasgs } from '../admin/useContagemGruposUasgs';
 import { useContagemEmendas } from '../emendas/useContagemEmendas';
+import { useContagemGruposBeneficiarios } from '../emendas/useContagemGruposBeneficiarios';
+import { useContagemAtasAMontar } from '../atas/montar/useContagemAtasAMontar';
 import { pendenciasDoMenu, type PendenciaDaArea } from './pendenciasDoMenu';
+import { useContagemEmendasAContratar } from '../emendas/useContagemEmendasAContratar';
 
 interface SidebarProps {
   /** 'rail' = trilha de ícones à esquerda (desktop); 'bottom' = barra inferior (celular). */
@@ -43,7 +46,8 @@ const lastVisitByArea = new Map<string, string>();
 export function areaTarget(area: NavItem): string | undefined {
   const last = lastVisitByArea.get(area.id);
   if (last && area.children?.some((child) => child.route === last.split('?')[0])) return last;
-  return area.children?.[0]?.route ?? area.route;
+  const entrada = area.entradaId ? area.children?.find((child) => child.id === area.entradaId) : undefined;
+  return (entrada ?? area.children?.[0])?.route ?? area.route;
 }
 
 export function rememberAreaVisit(areas: NavItem[], pathname: string, search: string): void {
@@ -80,7 +84,7 @@ const AreaItem: React.FC<{ area: NavItem; pathname: string; pendencia?: Pendenci
         {contagem ? (
           <span
             className={`app-rail-count${pendencia?.vermelho ? ' app-rail-count--urgente' : ''}`}
-            aria-label={`${contagem} ${contagem === 1 ? 'pendência' : 'pendências'}${pendencia?.vermelho ? ', com prazo vencido ou erro' : ''}`}
+            aria-label={`${contagem} ${contagem === 1 ? 'pendência' : 'pendências'}${pendencia?.vermelho ? `, ${pendencia.motivoVermelho ?? 'com prazo vencido ou erro'}` : ''}`}
             data-testid={`rail-count-${area.id}`}
           >
             {contagem > 999 ? '999+' : contagem}
@@ -102,8 +106,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
   const financeiro = useContagemFinanceiro();
   const extras = useContagensExtras();
   const gruposUasgs = useContagemGruposUasgs();
+  const gruposBeneficiarios = useContagemGruposBeneficiarios();
   const emendas = useContagemEmendas();
-  const pendencias = useMemo(() => pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, emendas }), [empenhos, financeiro, extras, gruposUasgs, emendas]);
+  const atasAMontar = useContagemAtasAMontar();
+  const emendasAContratar = useContagemEmendasAContratar();
+  const pendencias = useMemo(
+    () => pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar, emendasAContratar }),
+    [empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar, emendasAContratar]
+  );
 
   // Registra antes de montar os links, para o da área atual já apontar para a página aberta (idempotente).
   rememberAreaVisit(areas, pathname, search);

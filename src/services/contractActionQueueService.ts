@@ -49,6 +49,7 @@ const SEVERITY_RANK: Record<SeverityLevel, number> = { CRITICA: 1, URGENTE: 2, A
 const KIND_BY_CATEGORY: Partial<Record<DashboardAttentionItem['category'], ContractActionKind>> = {
   TAREFA_ATRASADA: 'TAREFA',
   TAREFA_PROXIMA: 'TAREFA',
+  COBRAR_RESPOSTA: 'TAREFA',
   PAGAMENTO_CRITICO: 'PAGAMENTO',
   REAJUSTE_RADAR: 'REAJUSTE',
   FONTE_A_CONFERIR: 'FONTE'

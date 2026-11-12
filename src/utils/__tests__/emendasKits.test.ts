@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { calcularKit, sugestoesDeTroca, diasEntre, buscarItensCaep } from '../emendasKits';
+import { calcularKit, sugestoesDeTroca, diasEntre, buscarItensCaep, nomeDaLinhaDoPedido, nomeNaLista, NOME_NA_LISTA } from '../emendasKits';
 import type { ItemCaep } from '../../services/emendasService';
+import type { PrecoDoItem } from '../../services/emendasQuadroService';
 
 const item = (k: string, extra: Partial<ItemCaep> = {}): ItemCaep => ({
   itemKey: k,
@@ -26,10 +27,10 @@ describe('calcularKit', () => {
     expect(r.itemLimitante?.itemKey).toBe('b');
   });
 
-  it('ata vencendo em até 60 dias: vence em breve, com a data', () => {
-    const r = calcularKit({ ativo: true, itens: [{ itemKey: 'a', quantidade: 1 }, { itemKey: 'l', quantidade: 1 }] }, mapa(item('a'), item('l', { numeroAta: '00061/2024', vigenciaFinal: '2026-12-19' })), HOJE);
+  it('ata vencendo em até 90 dias: vence em breve, com a data', () => {
+    const r = calcularKit({ ativo: true, itens: [{ itemKey: 'a', quantidade: 1 }, { itemKey: 'l', quantidade: 1 }] }, mapa(item('a'), item('l', { numeroAta: '00061/2024', vigenciaFinal: '2027-01-08' })), HOJE);
     expect(r.situacao).toBe('vence');
-    expect(r.motivo).toContain('19/12/2026, daqui a 57 dias');
+    expect(r.motivo).toContain('08/01/2027, daqui a 77 dias');
   });
 
   it('ata encerrada: indisponível inteiro, zero kits', () => {
@@ -92,18 +93,63 @@ describe('buscarItensCaep', () => {
 });
 
 describe('prazo de indicação (migration 162)', () => {
-  it('a menos de 35 dias do fim da ata o kit fica indisponível; entre 35 e 60, vence em breve com a data limite', async () => {
+  it('a menos de 60 dias do fim da ata o kit fica indisponível; entre 60 e 90, vence em breve com a data limite', async () => {
     const { EMENDAS_RULES } = await import('../../config/alertRules');
     const kit = { ativo: true, itens: [{ itemKey: 'a', quantidade: 1 }] };
-    const r30 = calcularKit(kit, mapa(item('a', { numeroAta: '00061/2024', vigenciaFinal: '2026-11-22' })), HOJE);
-    expect(r30).toMatchObject({ situacao: 'indisponivel', kitsPossiveis: 0 });
-    expect(r30.motivo).toContain('passou do prazo de indicação (35 dias');
-    const r40 = calcularKit(kit, mapa(item('a', { numeroAta: '00061/2024', vigenciaFinal: '2026-12-02' })), HOJE);
-    expect(r40.situacao).toBe('vence');
-    expect(r40.motivo).toContain('Indicação só até 28/10/2026');
+    const r50 = calcularKit(kit, mapa(item('a', { numeroAta: '00061/2024', vigenciaFinal: '2026-12-12' })), HOJE);
+    expect(r50).toMatchObject({ situacao: 'indisponivel', kitsPossiveis: 0 });
+    expect(r50.motivo).toContain('passou do prazo de indicação (60 dias');
+    const r70 = calcularKit(kit, mapa(item('a', { numeroAta: '00061/2024', vigenciaFinal: '2027-01-01' })), HOJE);
+    expect(r70.situacao).toBe('vence');
+    expect(r70.motivo).toContain('Indicação só até 02/11/2026');
     // Ajustes muda o corte na hora
-    EMENDAS_RULES.corteIndicacaoAntesDias = 45;
-    expect(calcularKit(kit, mapa(item('a', { vigenciaFinal: '2026-12-02' })), HOJE).situacao).toBe('indisponivel');
-    EMENDAS_RULES.corteIndicacaoAntesDias = 35;
+    EMENDAS_RULES.corteIndicacaoAntesDias = 75;
+    expect(calcularKit(kit, mapa(item('a', { vigenciaFinal: '2027-01-01' })), HOJE).situacao).toBe('indisponivel');
+    EMENDAS_RULES.corteIndicacaoAntesDias = 60;
+  });
+
+  it('item a menos de 60 dias do reajuste da ata, ou com o reajuste devido, deixa o kit indisponível (migration 246)', () => {
+    const kit = { ativo: true, itens: [{ itemKey: 'a', quantidade: 1 }] };
+    const preco = (extra: Partial<PrecoDoItem>) => new Map<string, PrecoDoItem>([['a', { itemKey: 'a', precoAtual: 100, dataReajuste: null, origem: null, devido: false, precoDevido: null, ...extra }]]);
+    const perto = calcularKit(kit, mapa(item('a')), HOJE, undefined, preco({ dataReajuste: '2026-12-01', origem: 'REAJUSTE' }));
+    expect(perto).toMatchObject({ situacao: 'indisponivel', kitsPossiveis: 0 });
+    expect(perto.motivo).toContain('reajuste em 01/12/2026');
+    const devido = calcularKit(kit, mapa(item('a')), HOJE, undefined, preco({ devido: true, origem: 'DEVIDO', precoDevido: 105 }));
+    expect(devido.situacao).toBe('indisponivel');
+    expect(devido.motivo).toContain('aguarda o apostilamento');
+    expect(calcularKit(kit, mapa(item('a')), HOJE, undefined, preco({ dataReajuste: '2027-03-01', origem: 'REAJUSTE' })).situacao).toBe('disponivel');
+  });
+});
+
+describe('nomeDaLinhaDoPedido: o item pelo nome da ata assinada nas listas de pedidos (27/10/2026)', () => {
+  const itens = new Map<string, ItemCaep>([
+    ['x1', item('x1', { descricao: 'Arma de fogo - empunhável - médio calibre, tipo pistola semiautomática', nomeCurto: 'Pistola 9 mm' })],
+    ['x2', item('x2', { descricao: 'Arma de fogo - empunhável - médio calibre, tipo pistola semiautomática', nomeCurto: '  ' })]
+  ]);
+  it('usa o nome da ata assinada inteiro, sem cortar', () => {
+    expect(nomeDaLinhaDoPedido({ tipo: 'ITEM', quantidade: 3, itemKey: 'x1', kitNome: null }, itens, 5)).toBe('3 Pistola 9 mm');
+  });
+  it('sem o nome da ata assinada, o começo da descrição do catálogo', () => {
+    expect(nomeDaLinhaDoPedido({ tipo: 'ITEM', quantidade: 2, itemKey: 'x2', kitNome: null }, itens, 20)).toMatch(/^2 Arma de fogo.*…$/);
+  });
+  it('o kit pelo nome do kit', () => {
+    expect(nomeDaLinhaDoPedido({ tipo: 'KIT', quantidade: 1, itemKey: null, kitNome: 'Kit perícia' }, itens)).toBe('1 Kit perícia');
+  });
+});
+
+describe('nomeNaLista: nome da ata em até 40 letras nas listas (D11, 30/10/2026)', () => {
+  it('nome curto fica inteiro; o longo corta no fim de uma palavra, sem pontuação solta, com "…"', () => {
+    expect(nomeNaLista('Nobreaks 1500 VA')).toBe('Nobreaks 1500 VA');
+    const lanterna = 'Lanterna dedicada para armas longas com acionador remoto e botão traseiro, com conexão para trilhos Picatinny';
+    expect(nomeNaLista(lanterna)).toBe('Lanterna dedicada para armas longas com…');
+    expect(nomeNaLista('Aeronaves Teleguiadas Tipo: Aeronave Remotamente Pilotada (Drone), Quantidade Motores: 4')).toBe('Aeronaves Teleguiadas Tipo: Aeronave…');
+    expect(nomeNaLista(lanterna).length).toBeLessThanOrEqual(NOME_NA_LISTA + 1);
+  });
+
+  it('nomeDaLinhaDoPedido corta o nome da ata', () => {
+    const longo = 'Bota de Combate a Incêndio Estrutural-Coturno Combate Incêndio Material: Couro , Material Sola: Borracha';
+    const itens = new Map([['x', { itemKey: 'x', descricao: 'COTURNO', nomeCurto: longo } as never]]);
+    const linha = { tipo: 'ITEM' as const, quantidade: 2, itemKey: 'x', kitNome: null };
+    expect(nomeDaLinhaDoPedido(linha, itens)).toBe('2 Bota de Combate a Incêndio…');
   });
 });

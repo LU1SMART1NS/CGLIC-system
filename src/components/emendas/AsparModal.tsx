@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { mascaraTelefone } from '../../utils/mascaras';
 import { Modal } from '../../design-system/components/Modal';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { AppInput } from '../../design-system/components/FormFields';
@@ -66,7 +67,7 @@ export const AsparModal: React.FC<Props> = ({ uf, orgao, atual, onClose }) => {
       <form id="emendas-aspar-form" onSubmit={enviar} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.75rem' }}>
         <AppInput label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} error={tentou && !nome.trim() ? 'Informe o nome.' : undefined} data-testid="emendas-aspar-nome" />
         <AppInput label="Cargo" value={cargo} onChange={(e) => setCargo(e.target.value)} data-testid="emendas-aspar-cargo" />
-        <AppInput label="Telefone" inputMode="tel" placeholder="(61) 99999-0000" value={telefone} onChange={(e) => setTelefone(e.target.value)} error={tentou && telefoneRuim ? 'DDD e 8 ou 9 dígitos.' : undefined} hint="Celular abre o WhatsApp no cartão." data-testid="emendas-aspar-telefone" />
+        <AppInput label="Telefone" inputMode="tel" placeholder="(61) 99999-0000" value={telefone} onChange={(e) => setTelefone(mascaraTelefone(e.target.value))} error={tentou && telefoneRuim ? 'DDD e 8 ou 9 dígitos.' : undefined} hint="Celular abre o WhatsApp no cartão." data-testid="emendas-aspar-telefone" />
         <AppInput label="E-mail institucional" type="email" value={email} onChange={(e) => setEmail(e.target.value)} error={tentou && emailRuim ? 'E-mail inválido.' : undefined} data-testid="emendas-aspar-email" />
       </form>
     </Modal>

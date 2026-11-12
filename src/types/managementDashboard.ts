@@ -49,6 +49,8 @@ export interface ManagementDashboardDeadlinesSummary {
 export type DashboardAttentionCategory =
   | 'TAREFA_ATRASADA'
   | 'TAREFA_PROXIMA'
+  /** Orientar com pedido enviado e a resposta esperada já vencida (migration 225): cobrar quem deve responder. */
+  | 'COBRAR_RESPOSTA'
   | 'PAGAMENTO_CRITICO'
   /** Expectativa de pagamento: previsão mensal a enviar, nota mensal que não chegou, entrega prevista sem nota. */
   | 'PAGAMENTO_PREVISTO'

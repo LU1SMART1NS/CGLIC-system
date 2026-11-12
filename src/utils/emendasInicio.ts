@@ -20,6 +20,10 @@ import {
   type TipoAviso
 } from './emendasPedidos';
 import type { CredorNoPedido } from './emendasConferenciaNota';
+import type { PrecoDoItem } from '../services/emendasQuadroService';
+
+/** Nome da ata acima disto entra no aviso para a CAEP revisar (nas listas o nome já aparece cortado em 40 letras). */
+export const NOME_LONGO = 80;
 
 export interface PedidoComAviso {
   pedido: PedidoEmenda;
@@ -56,6 +60,8 @@ export interface ResumoInicioEmendas {
   livrePertoDoFim: ItemLivrePertoDoFim[];
   /** Itens com alocação para a CAEP em ata vigente e sem o nome da ata assinada: a CAEP cadastra antes de oferecer ao parlamentar. */
   semNomeCurto: ItemCaep[];
+  /** Itens com o nome da ata acima de NOME_LONGO letras (aparecem cortados nas listas). */
+  nomeLongo: ItemCaep[];
 }
 
 /** Item da linha a que o aviso de ata se refere: o que tem a ata mais perto do fim. */
@@ -94,14 +100,15 @@ export function avisosDosPedidosParaOMenu(
   hoje: string,
   notas: Map<string, NotaDaLinha>,
   empenho?: Map<string, ConferenciaEmpenho[]>,
-  credor?: Map<string, CredorNoPedido[]>
+  credor?: Map<string, CredorNoPedido[]>,
+  precos?: Map<string, PrecoDoItem>
 ): { comAviso: number; urgentes: number } {
   const itens = new Map(itensLista.map((i) => [i.itemKey, i]));
   let comAviso = 0;
   let urgentes = 0;
   for (const p of pedidos) {
     if (p.etapa === 'CANCELADO') continue;
-    const avisos = avisosDoPedido(p, itens, hoje, notas, empenho?.get(p.id), credor?.get(p.id));
+    const avisos = avisosDoPedido(p, itens, hoje, notas, empenho?.get(p.id), credor?.get(p.id), precos);
     if (avisos.length === 0) continue;
     comAviso++;
     if (avisos.some(avisoGrave)) urgentes++;
@@ -116,7 +123,8 @@ export function resumoInicioEmendas(
   notas: Map<string, NotaDaLinha>,
   hoje: string,
   empenho?: Map<string, ConferenciaEmpenho[]>,
-  credor?: Map<string, CredorNoPedido[]>
+  credor?: Map<string, CredorNoPedido[]>,
+  precos?: Map<string, PrecoDoItem>
 ): ResumoInicioEmendas {
   const itens = new Map(itensLista.map((i) => [i.itemKey, i]));
   const porTipo = Object.fromEntries(TIPOS_AVISO.map((t) => [t, 0])) as Record<TipoAviso, number>;
@@ -139,7 +147,7 @@ export function resumoInicioEmendas(
         if (notaDaLinha(l, notas)) linhasComNota++;
       }
     }
-    const avisos = avisosDoPedido(p, itens, hoje, notas, empenho?.get(p.id), credor?.get(p.id));
+    const avisos = avisosDoPedido(p, itens, hoje, notas, empenho?.get(p.id), credor?.get(p.id), precos);
     if (avisos.length === 0) continue;
     for (const t of new Set(avisos.map((a) => a.tipo))) porTipo[t]++;
     if (avisos.some(avisoGrave)) graves++;
@@ -166,9 +174,11 @@ export function resumoInicioEmendas(
     livrePertoDoFim.push({ item: i, livre: sobra, diasParaVencer: dias, indicarAte: limiteDaIndicacao(i.vigenciaFinal), passouDoCorte: passouDoCorte(dias) });
   }
   livrePertoDoFim.sort((a, b) => a.diasParaVencer - b.diasParaVencer || b.livre - a.livre);
-  const semNomeCurto = vigentes
-    .filter((i) => i.alocado > 0 && !i.nomeCurto?.trim())
-    .sort((a, b) => (a.vigenciaFinal ?? '9999-12-31').localeCompare(b.vigenciaFinal ?? '9999-12-31') || a.descricao.localeCompare(b.descricao, 'pt-BR'));
+  const peloFim = (a: ItemCaep, b: ItemCaep) => (a.vigenciaFinal ?? '9999-12-31').localeCompare(b.vigenciaFinal ?? '9999-12-31') || a.descricao.localeCompare(b.descricao, 'pt-BR');
+  const semNomeCurto = vigentes.filter((i) => i.alocado > 0 && !i.nomeCurto?.trim()).sort(peloFim);
+  // D12 da revisão das tabelas (30/10/2026): nome da ata com a descrição técnica inteira; a CAEP decide se encurta,
+  // porque o mesmo nome sai no quadro do ofício.
+  const nomeLongo = vigentes.filter((i) => i.alocado > 0 && (i.nomeCurto?.trim().length ?? 0) > NOME_LONGO).sort(peloFim);
 
   return {
     pedidosComAviso,
@@ -184,7 +194,8 @@ export function resumoInicioEmendas(
     reservado,
     livre,
     livrePertoDoFim,
-    semNomeCurto
+    semNomeCurto,
+    nomeLongo
   };
 }
 
@@ -204,6 +215,8 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
       return 'cobrar o ofício do parlamentar';
     case 'divergencia':
       return 'fazer a nova minuta';
+    case 'devolvidoCcga':
+      return 'reenviar à CCGA ou anular';
     case 'semAutorizacao':
       return 'informar a solicitação ou a assinatura de cada item';
     case 'empenhoAMais':
@@ -213,9 +226,21 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
     case 'semEnvioCgofi':
       return 'registrar o envio à CGOFI';
     case 'notaEmitida':
-      return 'registrar o empenho';
+      return 'cobrar a CGOFI ou cancelar o item';
     case 'credorDiferente':
       return 'conferir a nota e o item';
+    case 'pedidoParado':
+      return 'cobrar o próximo passo';
+    case 'reajusteAntesDoContrato':
+      return 'anular os itens da ata e voltar à minuta';
+    case 'reajusteFora':
+      return 'trocar ou retirar o item';
+    case 'prazoDoOficio':
+      return 'gerar nova minuta';
+    case 'reajusteProximo':
+      return a.texto.includes('Envie a minuta') ? 'enviar a minuta logo' : 'cobrar a assinatura do contrato';
+    case 'semBeneficiario':
+      return 'informar o beneficiário dos itens';
     case 'semNota':
     default:
       return 'procurar a nota pelo contrato';

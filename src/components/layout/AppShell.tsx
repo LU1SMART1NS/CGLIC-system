@@ -10,19 +10,14 @@ import { useVoltarAoTopoAoTrocarDePagina } from '../../hooks/useVoltarAoTopoAoTr
 import { FalhaTelaBoundary } from './FalhaTelaBoundary';
 
 export interface AppShellContextValue {
-  onOpenExportModal: () => void;
   onOpenDepartmentsModal?: () => void;
 }
 
 interface AppShellProps {
-  onOpenExportModal: () => void;
   onOpenDepartmentsModal?: () => void;
 }
 
-export const AppShell: React.FC<AppShellProps> = ({
-  onOpenExportModal,
-  onOpenDepartmentsModal
-}) => {
+export const AppShell: React.FC<AppShellProps> = ({ onOpenDepartmentsModal }) => {
   useVoltarAoTopoAoTrocarDePagina();
   const { pathname } = useLocation();
 
@@ -61,10 +56,7 @@ export const AppShell: React.FC<AppShellProps> = ({
     };
   }, [isMobile]);
 
-  const contextValue: AppShellContextValue = {
-    onOpenExportModal,
-    onOpenDepartmentsModal
-  };
+  const contextValue: AppShellContextValue = { onOpenDepartmentsModal };
 
   return (
     <div style={{ display: 'flex', minHeight: '100dvh', background: '#f8fafc' }}>
@@ -80,7 +72,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           // Sem filete cinza: a linha verde do gov.br já separa o cabeçalho, e um 1px claro aparecia entre ela e a barra azul fixa.
           borderBottom: 'none'
         }}>
-          <Header onOpenExportModal={onOpenExportModal} />
+          <Header />
           {/* Barra azul fina logo abaixo do cabeçalho enquanto o sistema lê ou grava dados (padrão Google/Jira). */}
           <BarraCarregamento />
         </div>

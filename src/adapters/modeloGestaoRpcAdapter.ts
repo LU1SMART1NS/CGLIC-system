@@ -3,8 +3,9 @@ import type { AcaoGestor, PrazoAncora } from '../types';
 import { mapPostgresErrorToAppError } from './rpcErrorAdapter';
 
 /**
- * RPCs do modelo de gestão da CCGA (migrations 210 e 215), iguais para Atas e Contratos:
- * as duas marcas do orientar, o ajuste da data, os dados do módulo e a regra do modelo.
+ * RPCs do modelo de gestão da CCGA (migrations 210, 215 e 225), iguais para Atas e Contratos:
+ * as duas marcas do orientar, o ajuste da data, os dados do módulo, a regra do modelo,
+ * a dispensa do módulo, a pergunta da etapa e a tarefa do pregão.
  */
 export type TipoInstrumento = 'contrato' | 'ata';
 
@@ -71,6 +72,36 @@ export function atualizarModuloRpc(tipo: TipoInstrumento, input: AtualizarModulo
     p_ancora: input.ancora || null,
     p_processo_sei: input.processoSei?.trim() || null,
     p_variante: input.variante?.trim() || null
+  });
+}
+
+/** Dispensa o módulo com justificativa (migration 225): as tarefas abertas ficam "não se aplica". */
+export function dispensarModuloRpc(tipo: TipoInstrumento, input: { moduloId: string; justificativa: string }) {
+  return chamar(`dispensar_modulo_${tipo}`, { p_modulo_id: input.moduloId.trim(), p_justificativa: input.justificativa.trim() });
+}
+
+/** Responde a pergunta que decide a etapa: "não" deixa as outras tarefas da etapa como não se aplica. */
+export function responderPerguntaEtapaRpc(tipo: TipoInstrumento, input: { taskId: string; aplica: boolean }) {
+  return chamar(`responder_pergunta_etapa_${tipo}`, { p_task_id: input.taskId.trim(), p_aplica: input.aplica });
+}
+
+export interface TarefaDoPregao {
+  taskId: string;
+  ataKey: string;
+  numeroAta: string;
+}
+
+/** A mesma tarefa aberta nas outras atas do pregão (tarefa do pregão). */
+export async function tarefasDoPregaoRpc(taskId: string): Promise<TarefaDoPregao[]> {
+  const rows = await chamar<Array<{ task_id: string; ata_key: string; numero_ata: string }>>('tarefas_do_pregao_ata', { p_task_id: taskId.trim() });
+  return (Array.isArray(rows) ? rows : []).map((r) => ({ taskId: r.task_id, ataKey: r.ata_key, numeroAta: r.numero_ata }));
+}
+
+/** Conclui a tarefa e a mesma tarefa nas outras atas do pregão, com o mesmo número SEI. */
+export function concluirTarefaPregaoRpc(input: { taskId: string; sei?: string | null }) {
+  return chamar<{ success: boolean; outras_atas: string[]; puladas: string[] }>('concluir_tarefa_pregao_ata', {
+    p_task_id: input.taskId.trim(),
+    p_sei: input.sei?.trim() || null
   });
 }
 

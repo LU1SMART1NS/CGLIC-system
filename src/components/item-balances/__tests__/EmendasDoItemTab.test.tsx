@@ -17,7 +17,7 @@ const pedido = (id: string, autorId: string, etapa: PedidoEmenda['etapa'], quant
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: '08027.000215/2026-81', oficioEm: null, divergencia: null, devolvidoEm: null,
   siopEmenda: null, siopEmendaAno: null, siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null,
   cgofiDocumentoSei: null, empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null, canceladoMotivo: null, versao: 1,
-  atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: []
+  atualizadoPorNome: null, atualizadoEm: null, linhas: [linha(`${id}-l`, quantidade)], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNome: null, anulacoes: [], emendaId: null, outrasEmendas: []
 });
 const autor: AutorEmenda = { id: 'B:MG', nome: 'Bancada MG', tipo: 'BANCADA', nomeCivil: null, partido: null, uf: 'MG', emExercicio: true, legislatura: 57, lidoEm: null };
 
@@ -46,7 +46,7 @@ describe('Item 360 › Emendas (decisão de 24/10/2026)', () => {
     // 38 + 14 reservados (o cancelado não conta); saldo 244.
     expect(html).toContain('>52<');
     expect(html).toContain('>244<');
-    expect(html).toContain('Indicar até 21/11/2026');
+    expect(html).toContain('Indicar até 27/10/2026');
     expect(html).toContain('item360-emendas-tabela');
     expect(html).toContain('Bancada MG');
     expect(html).toContain('Processo 08027.000215/2026-81');

@@ -19,7 +19,15 @@ const idle = (mutate: any) => ({ mutate, isPending: false, error: null });
 const perfil = vi.hoisted(() => ({ role: 'gestor' }));
 vi.mock('../../../hooks/useModeloGestao', () => {
   const parado = () => ({ mutate: () => undefined, isPending: false, error: null });
-  return { useMarcarPedidoTarefa: parado, useRegistrarRespostaTarefa: parado, useAjustarPrazoTarefa: parado, useAtualizarModulo: parado };
+  return {
+    useMarcarPedidoTarefa: parado,
+    useRegistrarRespostaTarefa: parado,
+    useAjustarPrazoTarefa: parado,
+    useAtualizarModulo: parado,
+    useDispensarModulo: parado,
+    useResponderPerguntaEtapa: parado,
+    useConcluirTarefaPregao: parado
+  };
 });
 vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ role: perfil.role }) }));
 vi.mock('../../../hooks/useUpdateContractTask', () => ({ useUpdateContractTask: () => idle(mocks.updateMutate) }));

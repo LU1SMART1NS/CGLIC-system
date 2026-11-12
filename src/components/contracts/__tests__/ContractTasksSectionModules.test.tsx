@@ -8,7 +8,15 @@ const { idle } = vi.hoisted(() => ({ idle: () => ({ mutate: () => {}, isPending:
 
 vi.mock('../../../hooks/useModeloGestao', () => {
   const parado = () => ({ mutate: () => undefined, isPending: false, error: null });
-  return { useMarcarPedidoTarefa: parado, useRegistrarRespostaTarefa: parado, useAjustarPrazoTarefa: parado, useAtualizarModulo: parado };
+  return {
+    useMarcarPedidoTarefa: parado,
+    useRegistrarRespostaTarefa: parado,
+    useAjustarPrazoTarefa: parado,
+    useAtualizarModulo: parado,
+    useDispensarModulo: parado,
+    useResponderPerguntaEtapa: parado,
+    useConcluirTarefaPregao: parado
+  };
 });
 vi.mock('../../../hooks/useUpdateContractTask', () => ({ useUpdateContractTask: idle }));
 vi.mock('../../../hooks/useApplyContractTaskTemplate', () => ({ useApplyContractTaskTemplate: idle }));

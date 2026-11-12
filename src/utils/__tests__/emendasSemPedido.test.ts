@@ -6,7 +6,8 @@ import {
   lerNumeroDaEmenda,
   numeroDaEmenda,
   orgaoDoBeneficiario,
-  orgaosNaOrdem
+  orgaosNaOrdem,
+  reservasParaLigar
 } from '../emendasSemPedido';
 import type { ContatoDaEmenda, EmendaSiop, PedidoEmenda } from '../../services/emendasService';
 
@@ -20,7 +21,7 @@ const pedido = (extra: Partial<PedidoEmenda>): PedidoEmenda => ({
   minutaEm: null, minutaDocumentoSei: null, oficioNumero: null, oficioDocumentoSei: null, oficioProcessoSei: null, oficioEm: null, divergencia: null, devolvidoEm: null, siopEmenda: null, siopEmendaAno: null,
   siopValor: null, siopGnd: null, conferidoEm: null, solicitadoEm: null, solicitadoDocumentoSei: null, autorizadoEm: null, autorizadoDocumentoSei: null, cgofiEm: null, cgofiDocumentoSei: null,
   empenhadoEm: null, empenhadoDocumentosSei: [], contratacaoEm: null, contratacaoDocumentosSei: [], canceladoEm: null,
-  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNumero: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
+  canceladoMotivo: null, versao: 1, atualizadoPorNome: null, atualizadoEm: null, linhas: [], devolucoes: [], documentos: [], pedidoOrigemId: null, pedidoOrigemNome: null, anulacoes: [], emendaId: null, outrasEmendas: [], ...extra
 });
 const contato = (emendaId: string, contatoEm: string): ContatoDaEmenda => ({
   id: 'c' + Math.random(), emendaId, contatoEm, comQuem: 'Assessoria', meio: 'WHATSAPP', resumo: 'combinado', criadoPorNome: null, criadoEm: `${contatoEm}T12:00:00Z`
@@ -88,6 +89,9 @@ describe('Emendas sem pedido', () => {
     expect(kiko.pedidos.map((p) => p.numero)).toEqual([9, 8]);
     expect(kiko.valor).toBe(900_000);
     expect(lista.find((l) => l.chave === 'pedido:2025:42680021')!.valor).toBe(300);
+    // Nº que só aparece sem o ano fica em "sem ano" (28/10/2026), e não no ano da reserva.
+    const sozinho = emendasNaLista([], [pedido({ numero: 10, siopEmenda: '43950006', siopEmendaAno: null, reservadoEm: '2026-03-01' })], [], HOJE);
+    expect(sozinho.map((l) => [l.chave, l.ano])).toEqual([['pedido:sem:43950006', null]]);
   });
 
   it('lê o nº como no SIOP', () => {
@@ -112,5 +116,23 @@ describe('Emendas sem pedido', () => {
     expect(orgaoDoBeneficiario({ nome: 'Polícia Militar do Distrito Federal', sigla: 'PMDF', razaoSocial: null })).toBe('PM');
     expect(orgaoDoBeneficiario({ nome: 'Guarda Municipal de Recife', sigla: null, razaoSocial: 'Município do Recife' })).toBeNull();
     expect(orgaosNaOrdem('PC')).toEqual(['PC', 'PM', 'BM', 'PCI', 'SSP']);
+  });
+
+  it('sugere a reserva do mesmo parlamentar sem nº da emenda; some depois de ligada', () => {
+    const e = emenda({ id: 'e1' });
+    const reserva = pedido({ id: 'r1' });
+    const outros = [
+      pedido({ id: 'outro-autor', autorId: 'S:2' }),
+      pedido({ id: 'com-numero', siopEmenda: '42680099', siopEmendaAno: 2026 }),
+      pedido({ id: 'de-outra-emenda', emendaId: 'e9' }),
+      pedido({ id: 'cancelada', etapa: 'CANCELADO' })
+    ];
+    const [l] = emendasNaLista([e], [reserva, ...outros], [], HOJE).filter((x) => x.chave === 'e1');
+    expect(reservasParaLigar(l, [reserva, ...outros]).map((p) => p.id)).toEqual(['r1']);
+
+    const ligada = { ...reserva, emendaId: 'e1' };
+    const [depois] = emendasNaLista([e], [ligada], [], HOJE);
+    expect(depois.situacao).toBe('COM_PEDIDO');
+    expect(reservasParaLigar(depois, [ligada])).toEqual([]);
   });
 });

@@ -58,6 +58,12 @@ export interface LeituraDoDocumento {
   citaReajusteSemLeitura: boolean;
   /** O documento aplica um reajuste ("reajustados pelo", "REAJUSTAR o valor"), mas o percentual não foi lido. */
   aplicaReajusteSemPercentual: boolean;
+  /** Número SEI do próprio documento ("Referência: Processo nº ... SEI nº 36938954"). */
+  seiDoDocumento: string | null;
+  /** Primeiro dia da prorrogação escrito no termo aditivo ("contado a partir do dia 17/09/2026 a 16/09/2027"). */
+  inicioDaProrrogacao: string | null;
+  /** Valores em reais escritos no documento (com centavos), para achar o preço novo de cada item na tabela. */
+  valores: number[];
 }
 
 const MESES: Record<string, number> = {
@@ -223,8 +229,49 @@ export function lerReajustesDoDocumento(textoBruto: string): LeituraDoDocumento 
     reajustes,
     dataAssinatura: assinatura ? dataValida(Number(assinatura[3]), Number(assinatura[2]), Number(assinatura[1])) : null,
     citaReajusteSemLeitura: reajustes.length === 0 && /\breajust(e|ar|ados?)\b/i.test(texto) && /\b(IPCA|ICTI|INPC|IST)\b/.test(texto),
-    aplicaReajusteSemPercentual: reajustes.length === 0 && aplica
+    aplicaReajusteSemPercentual: reajustes.length === 0 && aplica,
+    seiDoDocumento: lerSeiDoDocumento(texto),
+    inicioDaProrrogacao: lerInicioDaProrrogacao(texto),
+    valores: lerValoresEmReais(textoBruto)
   };
+}
+
+/**
+ * SEI do próprio documento, pelo rodapé do SEI ("Referência: Processo nº 08020.002712/2025-01 SEI nº 36938954").
+ * Sem o rodapé, o código verificador da autenticação (o número vem seguido de espaço; colado ao CRC, não vale).
+ * Medido em 06/11/2026: 103 de 103 termos com reajuste lidos do PNCP.
+ */
+export function lerSeiDoDocumento(textoBruto: string): string | null {
+  const texto = normalizarTexto(textoBruto);
+  const rodapes = [...texto.matchAll(/Refer[êe]ncia:\s*Processo\s*n[º°o.]*\s*[\d./-]+\s*SEI\s*n[º°o.]*\s*(\d{7,10})(?!\d)/gi)];
+  if (rodapes.length > 0) return rodapes[rodapes.length - 1][1];
+  const verificador = /c[óo]digo verificador\s*(\d{8})(?=\s|$)/i.exec(texto);
+  return verificador ? verificador[1] : null;
+}
+
+/** "prorrogação ... contado a partir do dia 17/09/2026" ou "pelo período de 25/3/2026 a 24/3/2027". */
+export function lerInicioDaProrrogacao(textoBruto: string): string | null {
+  const texto = normalizarTexto(textoBruto);
+  const m = /prorroga[^.]{0,250}?(?:a partir d[oe]\s*(?:dia\s*)?|per[íi]odo de\s*)(\d{1,2})\/(\d{1,2})\/(\d{4})/i.exec(texto);
+  return m ? dataValida(Number(m[3]), Number(m[2]), Number(m[1])) : null;
+}
+
+/**
+ * Valores em reais com centavos ("R$ 285.899,00", "167,1575"), arredondados ao centavo e sem repetição.
+ * A extração do PDF quebra a célula da tabela ("285.\n899,\n00"): pedaços separados depois de ponto ou vírgula
+ * são juntados. Números colados a outro número (sem espaço) ficam de fora, para não inventar um valor.
+ */
+export function lerValoresEmReais(textoBruto: string, limite = 400): number[] {
+  const texto = textoBruto
+    .replace(/([.,])[ \t\r\n]+(\d)/g, '$1$2')
+    .replace(/(\d)[ \t\r\n]+([.,]\d)/g, '$1$2');
+  const valores = new Set<number>();
+  for (const m of texto.matchAll(/(?<![\d.,])(\d{1,3}(?:\.\d{3})+|\d+),(\d{2,4})(?![\d,])/g)) {
+    const v = Math.round(Number(`${m[1].replace(/\./g, '')}.${m[2]}`) * 100) / 100;
+    if (v > 0) valores.add(v);
+    if (valores.size >= limite) break;
+  }
+  return [...valores];
 }
 
 const somarAnos = (iso: string, anos: number) => {
@@ -242,7 +289,7 @@ const menosDias = (iso: string, dias: number) => new Date(Date.parse(`${iso}T00:
  */
 export function resolverEfeito(
   r: Pick<ReajusteDoDocumento, 'efeitoInicio' | 'noNovoCiclo' | 'aPartirDaAssinatura'>,
-  ctx: { inicioVigencia: string; publicadoEm: string | null; dataAssinatura: string | null; tituloFalaDeAditivo: boolean }
+  ctx: { inicioVigencia: string; publicadoEm: string | null; dataAssinatura: string | null; tituloFalaDeAditivo: boolean; inicioDaProrrogacao?: string | null }
 ): string | null {
   if (r.efeitoInicio) return r.efeitoInicio;
   const referencia = ctx.publicadoEm ?? ctx.dataAssinatura;
@@ -252,9 +299,47 @@ export function resolverEfeito(
     const limite = menosDias(referencia, 90);
     for (let k = 0; k <= 4; k++) {
       const ciclo = somarAnos(ctx.inicioVigencia, k);
-      if (ciclo >= limite) return ciclo;
+      if (ciclo >= limite) {
+        // O termo escreve o primeiro dia da prorrogação (em geral, o dia seguinte ao aniversário): ele vale,
+        // desde que perto do aniversário (uma data de outro trecho do termo não muda o ciclo).
+        const p = ctx.inicioDaProrrogacao;
+        return p && Math.abs(Date.parse(`${p}T00:00:00Z`) - Date.parse(`${ciclo}T00:00:00Z`)) <= 60 * 86_400_000 ? p : ciclo;
+      }
     }
     return null;
   }
   return ctx.dataAssinatura ?? ctx.publicadoEm;
+}
+
+// ------------------------------------------------------------------------------
+// Termo aditivo de prorrogação: o que ele diz sobre o saldo (migration 222)
+// ------------------------------------------------------------------------------
+
+/**
+ * SALDO: o 2º ano usa só o saldo não contratado ("abrange apenas o saldo remanescente", "restabelece o saldo
+ * remanescente"; 84 de 99 termos da CGLIC lidos em 27/10/2026). RENOVA: o termo renova os quantitativos registrados.
+ * A_CONFERIR: é um termo de prorrogação, mas o texto não diz (ou não deu para ler).
+ */
+export type CoberturaDaProrrogacao = 'SALDO' | 'RENOVA' | 'A_CONFERIR';
+
+export interface TermoDeProrrogacao {
+  cobertura: CoberturaDaProrrogacao;
+  /** A frase do termo que diz isso (até 300 letras). */
+  trecho: string | null;
+}
+
+/** Lê um documento da ata; nulo quando ele não é um termo de prorrogação. */
+export function lerTermoDeProrrogacao(textoBruto: string, titulo = ''): TermoDeProrrogacao | null {
+  const texto = normalizarTexto(textoBruto);
+  const ehProrrogacao = /prorroga/i.test(texto) && (/termo\s+aditivo/i.test(texto) || /aditivo|prorroga/i.test(titulo));
+  if (!ehProrrogacao) return null;
+  const frase = (re: RegExp) => {
+    const m = texto.match(re);
+    return m ? m[0].trim().replace(/^(\d+\.)+\s*/, '').slice(0, 300) : null;
+  };
+  const renova = frase(/[^.;]*renova\w*\s+(?:d?os\s+)?quantitativ[^.;]*[.;]?|[^.;]*quantitativ\w*\s+(?:originalmente|inicialmente)\s+registrad[^.;]*[.;]?/i);
+  if (renova) return { cobertura: 'RENOVA', trecho: renova };
+  const saldo = frase(/[^.;]*saldo\s+remanescente[^.;]*[.;]?/i);
+  if (saldo) return { cobertura: 'SALDO', trecho: saldo };
+  return { cobertura: 'A_CONFERIR', trecho: null };
 }

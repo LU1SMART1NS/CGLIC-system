@@ -30,10 +30,11 @@ import {
 } from '../../utils/emendasPedidos';
 import type { BeneficiarioEmenda, ConferenciaEmpenho, ItemCaep, LinhaPedido, NotaDaLinha, PedidoEmenda } from '../../services/emendasService';
 import { chaveAvisoEmpenho, etiquetaDaConferencia, type EtiquetaConferencia } from '../../utils/emendasEmpenho';
-import type { PrecoPrevisto } from '../../services/emendasQuadroService';
-import { BeneficiarioDaLinha, LinhaDoPedido, SituacaoDaLinhaEtiqueta, ValorPrevisto } from './emendasPartes';
+import type { PrecoDoItem } from '../../services/emendasQuadroService';
+import { BeneficiarioDaLinha, LinhaDoPedido, SituacaoDaLinhaEtiqueta, PrecoDaEmenda } from './emendasPartes';
 import type { AcaoDaJanela, ContextoDaJanela } from './EtapaPedidoModal';
 import { podeMontarQuadros } from '../../utils/emendasAutorizacao';
+import { proximaAcaoDaJanela } from './proximaAcaoDaJanela';
 
 export type AoAgir = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) => void;
 
@@ -75,7 +76,7 @@ interface BlocosProps {
   itens: Map<string, ItemCaep>;
   beneficiarios: Map<string, BeneficiarioEmenda>;
   notas: Map<string, NotaDaLinha>;
-  precos?: Map<string, PrecoPrevisto>;
+  precos?: Map<string, PrecoDoItem>;
   podeGerir: boolean;
   podeVerContratos: boolean;
   hoje: string;
@@ -127,7 +128,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
   const colunas: Column<LinhaPedido>[] = [
     {
       key: 'linha',
-      header: 'Item ou kit',
+      header: 'Item',
       priority: 'primary',
       width: '38%',
       render: (l) => {
@@ -135,7 +136,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
         const s = situacaoDaLinha(p, l, notas);
         return (
           <>
-            <LinhaDoPedido linha={l} itens={itens} comLinks />
+            <LinhaDoPedido linha={l} itens={itens} comLinks semAta />
             {s.solicitacao && (p.documentos.filter((d) => d.etapa === 'AUTORIZACAO' && d.ataKey && itensDaLinha(l).some((x) => d.ataKey === x.itemKey.split('-').slice(0, 2).join('-'))).length > 1) && (
               <div style={carteiraDetalhe}>solicitação {s.solicitacao.numero}</div>
             )}
@@ -152,7 +153,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
     },
     { key: 'ben', header: 'Beneficiário', render: (l) => <BeneficiarioDaLinha linha={l} beneficiarios={beneficiarios} /> },
     { key: 'qtd', header: 'Qtd.', align: 'right', nowrap: true, render: (l) => <span style={carteiraNumero}>{formatNumber(l.quantidade)}</span> },
-    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => <ValorPrevisto previsto={valorDaLinha(l, itens, precos)} hoje={valorDaLinha(l, itens)} nota="Previsto para a emenda, com o reajuste das atas (o mesmo do quadro do parlamentar)" /> },
+    { key: 'valor', header: 'Valor', align: 'right', nowrap: true, render: (l) => <PrecoDaEmenda valor={valorDaLinha(l, itens, precos)} /> },
     {
       key: 'situacao',
       header: 'Situação',
@@ -169,11 +170,12 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }} data-testid={`emendas-pedido-atas-${p.id}`}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <CarteiraDetailLabel>
-          {grupos.length === 1 ? 'Itens do pedido' : `Itens por ata · ${grupos.length} ${grupos.some((g) => g.chave === 'KITS') ? 'grupos' : 'atas'}`}
-        </CarteiraDetailLabel>
-        {grupos.length > 1 && (
+      {/* Com uma ata só não há rótulo: o título da seção e o cabeçalho da ata já dizem o que é. */}
+      {grupos.length > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <CarteiraDetailLabel>
+            {grupos.length} {grupos.some((g) => g.chave === 'KITS') ? 'grupos' : 'atas'}
+          </CarteiraDetailLabel>
           <span style={{ ...carteiraDetalhe, display: 'inline-flex', gap: '0.4rem' }}>
             <AppButton size="xs" variant="link" onClick={() => todos(true)} data-testid={`emendas-pedido-abrir-atas-${p.id}`}>
               Abrir todas
@@ -183,8 +185,8 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
               Recolher todas
             </AppButton>
           </span>
-        )}
-      </div>
+        </div>
+      )}
       {grupos.map((g) => {
         const pend = pendenciasDoGrupo(p, g, notas, hoje);
         const estaAberto = aberto(g);
@@ -275,7 +277,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
                   data={g.linhas}
                   keyExtractor={(l) => l.id}
                   columns={colunas}
-                  className="emendas-tabela-topo"
+                  className="data-table-container--flush emendas-tabela-topo"
                   // Vindo do Item 360: a linha do item fica com o azul claro de seleção (não é aviso, então não é amarelo).
                   rowStyle={(l) => (temItem(l) ? { background: 'var(--primary-light)' } : undefined)}
                 />
@@ -288,35 +290,38 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
   );
 };
 
+/** O botão de uma pendência de "O que falta": a janela de hoje (próximo passo, solicitação da ata, envio ou alterar). */
+export const BotaoDaPendencia: React.FC<{ p: PedidoEmenda; t: TarefaDoPedido; onAcao: AoAgir; onAlterar: () => void }> = ({ p, t, onAcao, onAlterar }) => {
+  const b = t.botao;
+  if (!b) return null;
+  if (b.tipo === 'proxima') {
+    return (
+      <AppButton size="sm" onClick={() => onAcao(proximaAcaoDaJanela(p))} data-testid={`emendas-pedido-proximo-${p.id}`}>
+        {b.rotulo}
+      </AppButton>
+    );
+  }
+  if (b.tipo === 'solicitacao') {
+    return (
+      <AppButton size="sm" variant="outline" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: b.ataKey, numero: b.numero, troca: b.troca })} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
+        {b.rotulo}
+      </AppButton>
+    );
+  }
+  if (b.tipo === 'envio') {
+    return (
+      <AppButton size="sm" onClick={() => onAcao('CGOFI')} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
+        {b.rotulo}
+      </AppButton>
+    );
+  }
+  return <ActionButton action="editar" size="sm" label={b.rotulo} onClick={onAlterar} data-testid={`emendas-pedido-tarefa-${t.chave}`} />;
+};
+
 /** A lista "O que falta" do pedido: cada tarefa com o botão da janela de hoje, ou só o aviso. */
 export const OQueFalta: React.FC<{ p: PedidoEmenda; tarefas: TarefaDoPedido[]; onAcao: AoAgir; onAlterar: () => void }> = ({ p, tarefas, onAcao, onAlterar }) => {
   if (tarefas.length === 0) return null;
-  const botao = (t: TarefaDoPedido) => {
-    const b = t.botao;
-    if (!b) return null;
-    if (b.tipo === 'proxima') {
-      return (
-        <AppButton size="sm" onClick={() => onAcao(proximaAcaoDaJanela(p))} data-testid={`emendas-pedido-proximo-${p.id}`}>
-          {b.rotulo}
-        </AppButton>
-      );
-    }
-    if (b.tipo === 'solicitacao') {
-      return (
-        <AppButton size="sm" variant="outline" onClick={() => onAcao('SOLICITACAO_ATA', { ataKey: b.ataKey, numero: b.numero, troca: b.troca })} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
-          {b.rotulo}
-        </AppButton>
-      );
-    }
-    if (b.tipo === 'envio') {
-      return (
-        <AppButton size="sm" onClick={() => onAcao('CGOFI')} data-testid={`emendas-pedido-tarefa-${t.chave}`}>
-          {b.rotulo}
-        </AppButton>
-      );
-    }
-    return <ActionButton action="editar" size="sm" label={b.rotulo} onClick={onAlterar} data-testid={`emendas-pedido-tarefa-${t.chave}`} />;
-  };
+  const botao = (t: TarefaDoPedido) => <BotaoDaPendencia p={p} t={t} onAcao={onAcao} onAlterar={onAlterar} />;
   return (
     <div className="emendas-falta" data-testid={`emendas-pedido-falta-${p.id}`}>
       <div className="emendas-falta__topo">
@@ -432,25 +437,3 @@ export const RodadasDoPedido: React.FC<{ p: PedidoEmenda; notas: Map<string, Not
     </div>
   );
 };
-
-/** A ação da janela do próximo passo do pedido (as mesmas regras de proximaAcao). */
-function proximaAcaoDaJanela(p: PedidoEmenda): AcaoDaJanela {
-  switch (p.etapa) {
-    case 'RESERVADO':
-      return 'MINUTA';
-    case 'MINUTA':
-      return 'OFICIO';
-    case 'OFICIO':
-      return 'CONFERIDO';
-    case 'CONFERIDO':
-      return 'SOLICITADO';
-    case 'SOLICITADO':
-      return 'AUTORIZADO';
-    case 'AUTORIZADO':
-      return 'CGOFI';
-    case 'CGOFI':
-      return 'EMPENHADO';
-    default:
-      return 'CONTRATACAO';
-  }
-}

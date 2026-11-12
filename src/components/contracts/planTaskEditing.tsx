@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AppDateInput } from '../../design-system/components/FormFields';
 import { stripNumeracaoManual } from '../../utils/planNumbering';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { AppButton } from '../../design-system/components/AppButton';
@@ -130,7 +131,7 @@ export const AddTaskForm: React.FC<{
       </div>
       <div>
         <label className="form-label" htmlFor="new-task-prazo">Prazo limite (opcional)</label>
-        <input id="new-task-prazo" type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} className="form-input" />
+        <AppDateInput id="new-task-prazo" value={prazo} onValueChange={setPrazo} />
       </div>
       <div>
         <label className="form-label" htmlFor="new-task-obs">Observação (opcional)</label>
