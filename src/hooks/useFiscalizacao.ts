@@ -5,7 +5,6 @@ import { useUsers } from './useUsers';
 import { podeSerFiscal } from '../utils/fiscalizacao';
 import {
   definirFiscalizacaoContrato,
-  definirPrevistaEntregas,
   definirResponsavelEntregas,
   encerrarEntregas,
   dividirEntrega,
@@ -23,6 +22,9 @@ import {
   fetchContratosFiscalizacao,
   registrarProcessoFiscalizacao,
   registrarAutuacaoFiscalizacao,
+  registrarRecebimentoOrdem,
+  prorrogarPrazoEntregas,
+  definirPrazoDoContrato,
   type ContratoFiscalizacao,
   type DefinirFiscalizacaoInput,
   desfazerTransferenciaFiscal,
@@ -143,9 +145,17 @@ export const useVoltarEtapaEntrega = () => useMutacaoDeEntregas(voltarEtapaEntre
 export const useTrocarBeneficiarioEntrega = () => useMutacaoDeEntregas(trocarBeneficiarioEntrega);
 export const useRepartirEntregaEntreBeneficiarios = () => useMutacaoDeEntregas(repartirEntregaEntreBeneficiarios);
 export const useDividirEntrega = () => useMutacaoDeEntregas(dividirEntrega);
-export const useDefinirPrevistaEntregas = () => useMutacaoDeEntregas(definirPrevistaEntregas);
 export const useDefinirResponsavelEntregas = () => useMutacaoDeEntregas(definirResponsavelEntregas);
 export const useEncerrarEntregas = () => useMutacaoDeEntregas(encerrarEntregas);
+export const useRegistrarRecebimentoOrdem = () => useMutacaoDeEntregas(registrarRecebimentoOrdem);
+export const useProrrogarPrazoEntregas = () => useMutacaoDeEntregas(prorrogarPrazoEntregas);
+export function useDefinirPrazoDoContrato() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: definirPrazoDoContrato,
+    onSuccess: () => qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY })
+  });
+}
 
 /** Ausências de fiscal em curso (migration 261). */
 export function useTransferenciasFiscalizacao() {

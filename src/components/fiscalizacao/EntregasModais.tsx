@@ -6,7 +6,7 @@ import { AppDateInput, AppInput, AppSelect, AppTextarea } from '../../design-sys
 import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { useToast } from '../../design-system/components/Toast';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
-import { useDefinirPrevistaEntregas, useDefinirResponsavelEntregas, useDividirEntrega, useCorrigirEtapaEntregas, useEncerrarEntregas } from '../../hooks/useFiscalizacao';
+import { useDefinirResponsavelEntregas, useDividirEntrega, useCorrigirEtapaEntregas, useEncerrarEntregas } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao, EtapaEntrega, MotivoDoEncerramento, ResponsavelEntrega } from '../../services/fiscalizacaoService';
 import { MOTIVO_MINIMO, NOME_SFC, hojeEmBrasilia } from '../../utils/fiscalizacao';
 import { ETAPAS_ENTREGA, FASES_ENTREGA, bloqueioDaEtapa, etapaDef, nomeDoItem, rotuloDoBeneficiario, textoDoAviso } from '../../utils/fiscalizacaoEntregas';
@@ -145,40 +145,6 @@ export const DividirEntregaModal: React.FC<{ entrega: EntregaFiscalizacao; onClo
           As {quantidade.toLocaleString('pt-BR')} entregues viram um item à parte, para você mudar a etapa para Entregue. As {Math.max(0, entrega.quantidade - quantidade).toLocaleString('pt-BR')} restantes seguem na etapa de hoje.
         </span>
       </div>
-    </Modal>
-  );
-};
-
-export const PrevistaModal: React.FC<{ entregas: EntregaFiscalizacao[]; onClose: (feito: boolean) => void }> = ({ entregas, onClose }) => {
-  const toast = useToast();
-  const salvar = useDefinirPrevistaEntregas();
-  const iguais = new Set(entregas.map((e) => e.prevista ?? '')).size === 1;
-  const [data, setData] = useState(iguais ? entregas[0]?.prevista ?? '' : '');
-  return (
-    <Modal
-      isOpen
-      onClose={() => onClose(false)}
-      title={`Data prevista de ${plural(entregas.length, 'item', 'itens')}`}
-      subtitle={quem(entregas)}
-      size="sm"
-      dismissible={!salvar.isPending}
-      testId="fisc-prevista-modal"
-      footer={
-        <>
-          <ActionButton action="cancelar" onClick={() => onClose(false)} disabled={salvar.isPending} />
-          <ActionButton
-            action="salvar"
-            disabled={!data}
-            isLoading={salvar.isPending}
-            data-testid="fisc-prevista-salvar"
-            onClick={() =>
-              salvar.mutate({ ids: entregas.map((e) => e.id), prevista: data }, { onSuccess: () => { toast.success('Data prevista registrada'); onClose(true); }, onError: (err) => toast.error(`Não foi possível salvar: ${erroDe(err)}`) })
-            }
-          />
-        </>
-      }
-    >
-      <AppDateInput label="Prevista para" value={data} onValueChange={setData} hint="O prazo do item conta por esta data; sem ela, o item fica sem prazo." />
     </Modal>
   );
 };
