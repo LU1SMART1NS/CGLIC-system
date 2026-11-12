@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcularKit, sugestoesDeTroca, diasEntre, buscarItensCaep, nomeDaLinhaDoPedido, nomeNaLista, NOME_NA_LISTA } from '../emendasKits';
+import { calcularKit, sugestoesDeTroca, diasEntre, buscarItensCaep, casaBuscaPorPalavras, nomeDaLinhaDoPedido, nomeNaLista, NOME_NA_LISTA } from '../emendasKits';
 import type { ItemCaep } from '../../services/emendasService';
 import type { PrecoDoItem } from '../../services/emendasQuadroService';
 
@@ -85,6 +85,26 @@ describe('buscarItensCaep', () => {
     expect(chaves('31/2025')).toHaveLength(2);
     expect(chaves('00031')).toHaveLength(2);
     expect(chaves('31/2025 item 2')).toEqual(['2@00031/2025']);
+  });
+
+  it('acha pelo nome do quadro (o que o cartão mostra), mesmo com a descrição oficial diferente', () => {
+    const halteres = [
+      item('00094/2024-200331-00048', { numeroAta: '00094/2024', numeroItem: '00048', descricao: 'HALTER, MATERIAL: FERRO FUNDIDO, REVESTIMENTO: BORRACHA, PESO: 2 KG', nomeCurto: 'Dumbbel emborrachado 2kg' }),
+      item('00094/2024-200331-00032', { numeroAta: '00094/2024', numeroItem: '00032', descricao: 'BARRA MUSCULAÇÃO', nomeCurto: 'Barra para supino', fornecedor: 'ACADEMIA FORTE LTDA' })
+    ];
+    const achados = (t: string) => buscarItensCaep(halteres, t).map((i) => i.numeroItem);
+    expect(achados('dum')).toEqual(['00048']);
+    expect(achados('dumbbell')).toEqual(['00048']);
+    expect(achados('dumbel 2kg')).toEqual(['00048']);
+    expect(achados('halter')).toEqual(['00048']);
+    expect(achados('academia')).toEqual(['00032']);
+    expect(achados('94/2024 item 32')).toEqual(['00032']);
+  });
+
+  it('kits: todas as palavras em qualquer ordem, sem acento e sem letra dobrada', () => {
+    expect(casaBuscaPorPalavras('Kit Academia — Dumbbel emborrachado', 'dumbell academia')).toBe(true);
+    expect(casaBuscaPorPalavras('Kit Academia', 'academia esteira')).toBe(false);
+    expect(casaBuscaPorPalavras('Kit Academia', '  ')).toBe(true);
   });
 
   it('busca vazia devolve todos', () => {

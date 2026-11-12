@@ -11,7 +11,7 @@ import { useEmendasSiop, usePedidosEmendas, usePodeGerirEmendas, useSalvarPedido
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { descricaoItemEmFrase } from '../../utils/textCase';
-import { buscarItensCaep, calcularKit, curto, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta } from '../../utils/emendasKits';
+import { buscarItensCaep, calcularKit, casaBuscaPorPalavras, curto, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte, rotuloItemDaAta } from '../../utils/emendasKits';
 import { casaBusca, daUfDoParlamentar, textoDeBuscaDoBeneficiario } from '../../utils/emendasBeneficiarios';
 import { identificacaoDoPedido, itensDaLinha, numeroDaEmendaEmTexto, orgaoDoPedido, precoParaEmenda, valorDaLinha, VOLTA_AO_OFICIO } from '../../utils/emendasPedidos';
 import { emendaDoPedidoNoQuadro, nomeDoItem } from '../../utils/emendasQuadro';
@@ -269,8 +269,16 @@ export const PedidoModal: React.FC<Props> = ({ pedido, autores, itens, kits, ben
         .filter((x) => x.c.situacao !== 'indisponivel' || x.c.kitsPossiveis > 0 || linhas.some((l) => l.kitId === x.k.id)),
     [kits, porChave, hoje, saldoAntes, consumo, precos, linhas]
   );
-  const t = semAcento(busca.trim());
-  const kitsEncontrados = filtro === 'itens' ? [] : kitsOferecidos.filter((x) => !t || semAcento(x.k.nome).includes(t));
+  // Kit: busca no nome, na descrição e nos itens que ele leva (nome do quadro e descrição).
+  const kitsEncontrados =
+    filtro === 'itens'
+      ? []
+      : kitsOferecidos.filter((x) =>
+          casaBuscaPorPalavras(
+            [x.k.nome, x.k.descricao ?? '', ...x.k.itens.map((ik) => `${porChave.get(ik.itemKey)?.nomeCurto ?? ''} ${porChave.get(ik.itemKey)?.descricao ?? ''}`)].join(' '),
+            busca
+          )
+        );
   const itensEncontrados = filtro === 'kits' ? [] : buscarItensCaep(itens.filter((i) => !i.ataEncerrada), busca);
   // Ata a menos do corte do fim (migration 162): aparece na busca, mas não pode ser escolhida.
   const foraDoPrazo = (i: ItemCaep) => Boolean(i.vigenciaFinal) && passouDoCorte(diasEntre(hoje, i.vigenciaFinal!));

@@ -63,26 +63,63 @@ export function pendenciasDoContrato(c: ContratoFiscalizacao): PendenciaFiscaliz
 export interface CargaDoFiscal {
   userId: string;
   nome: string;
+  /** Perfil quando não é o de Gestor de Fiscalização (ex.: "Coordenador"): etiqueta no cartão. */
+  outroPerfil?: string;
   contratos: number;
   aAutuar: number;
   /** Contratos do fiscal sem portaria registrada. */
   semPortaria: number;
 }
 
+/** Servidor ativo que pode aparecer como fiscal; `perfil` vem da lista de usuários (gestor_fiscalizacao, coordenador…). */
+export interface ServidorFiscal {
+  id: string;
+  nome: string;
+  perfil?: string;
+}
+
+export const PERFIL_FISCAL = 'gestor_fiscalizacao';
+
+/** Pode receber contratos como fiscal: Gestor de Fiscalização ou Coordenador (o banco confere o mesmo). */
+export function podeSerFiscal(perfil: string | undefined): boolean {
+  return perfil === undefined || perfil === PERFIL_FISCAL || perfil === 'coordenador';
+}
+
+/**
+ * Quem aparece como fiscal nas telas: todo Gestor de Fiscalização (mesmo sem contrato, para o rodapé "Sem carteira")
+ * e qualquer outro servidor ativo que tenha contrato como fiscal — quem tem carteira aparece, seja qual for o perfil.
+ */
+export function fiscaisVisiveis<T extends ServidorFiscal>(servidores: T[], idsComTrabalho: ReadonlySet<string>): T[] {
+  return servidores.filter((s) => s.perfil === undefined || s.perfil === PERFIL_FISCAL || idsComTrabalho.has(s.id));
+}
+
+/** Ids dos fiscais com contrato da SFC/CGLIC (ou fiscalização mista). */
+export function idsDosFiscaisComContrato(contratos: ContratoFiscalizacao[]): Set<string> {
+  return new Set(contratos.filter((c) => comSfc(c) && c.fiscalUserId).map((c) => c.fiscalUserId as string));
+}
+
 /** Contratos por fiscal, com os que faltam autuar e os sem portaria. */
-export function cargaPorFiscal(contratos: ContratoFiscalizacao[], fiscais: Array<{ id: string; nome: string }>): CargaDoFiscal[] {
-  return fiscais
+export function cargaPorFiscal(contratos: ContratoFiscalizacao[], servidores: ServidorFiscal[], rotuloDoPerfil: (perfil: string) => string = rotuloPadraoDoPerfil): CargaDoFiscal[] {
+  return fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos))
     .map((f) => {
       const titular = contratos.filter((c) => comSfc(c) && c.fiscalUserId === f.id);
       return {
         userId: f.id,
         nome: f.nome,
+        ...(f.perfil && f.perfil !== PERFIL_FISCAL ? { outroPerfil: rotuloDoPerfil(f.perfil) } : {}),
         contratos: titular.length,
         aAutuar: titular.filter((c) => !c.processoSei).length,
         semPortaria: titular.filter((c) => !c.portariaSei).length
       };
     })
     .sort((a, b) => b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+function rotuloPadraoDoPerfil(perfil: string): string {
+  if (perfil === 'coordenador') return 'Coordenador';
+  if (perfil === 'gestor') return 'Gestor';
+  if (perfil === 'consulta') return 'Consulta';
+  return perfil;
 }
 
 /** "00055/2026" a partir da chave 200331-00055-2026 quando o número não veio. */

@@ -14,7 +14,7 @@ import { AdminListShell } from '../admin/shared/AdminListShell';
 import { colors } from '../../design-system/tokens';
 import { useContratosFiscalizacao, useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, cargaPorFiscal, deEmenda, numeroDoContrato, segmentoDoContrato, type SegmentoDistribuicao } from '../../utils/fiscalizacao';
+import { NOME_SFC, cargaPorFiscal, fiscaisVisiveis, idsDosFiscaisComContrato, deEmenda, numeroDoContrato, segmentoDoContrato, type SegmentoDistribuicao } from '../../utils/fiscalizacao';
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
 import { DefinirFiscalizacaoModal } from './FiscalizacaoModais';
 import { FiscaisEquipe } from './FiscaisEquipe';
@@ -32,7 +32,7 @@ const ABAS: Aba[] = ['EQUIPE', 'A_DEFINIR', 'SFC', 'MISTA', 'AREA', 'TODOS'];
  */
 export const FiscalizacaoDistribuicaoPage: React.FC = () => {
   const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useContratosFiscalizacao();
-  const { fiscais } = useFiscaisAtivos();
+  const { servidores } = useFiscaisAtivos();
   const transferencias = useTransferenciasFiscalizacao();
   const [params, setParams] = useSearchParams();
   const contratos = useMemo(() => data ?? [], [data]);
@@ -61,7 +61,8 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
   const ativos = Boolean(busca || fiscal || origem);
   const chave = useCallback((c: ContratoFiscalizacao) => c.contractKey, []);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(filtrados, chave, POR_PAGINA);
-  const carga = useMemo(() => cargaPorFiscal(contratos, fiscais), [contratos, fiscais]);
+  const carga = useMemo(() => cargaPorFiscal(contratos, servidores), [contratos, servidores]);
+  const fiscais = useMemo(() => fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos)), [servidores, contratos]);
 
 
   return (

@@ -8,6 +8,7 @@ import { chaveDoContrato } from '../utils/contractKeyUtils';
 import { escopoDoGestor, listarGestores, type EscopoDoGestor, type GestorDaCarteira } from '../utils/escopoDoGestor';
 import type { InstrumentoNoPainel } from '../components/instrumentos/painelResumo';
 import { getAtaSourceQueryOptions } from './useAta';
+import { outrosPerfisComCarteira, podeTerCarteira } from './useGestoresAtivos';
 import { getArpPrazo } from './useAtasPortfolio';
 import { getContractsDashboardQueryOptions } from './useContractsDashboard';
 import { getAllContractManagersQueryOptions } from './useAllContractManagers';
@@ -29,12 +30,11 @@ export function usePainelCarteira(enabled: boolean) {
 
   const assinatura = [...atasQ, ...contratosQ, ...gestoresQ].map((q) => q.dataUpdatedAt).join('|');
 
-  // Só entra na carteira quem é gestor de atas e contratos ativo. Coordenador, perfil consulta ou usuário inativado
-  // que ainda tenha atribuição antiga (ata/contrato encerrado) fica de fora — inclusive do rodapé "Sem carteira".
-  const idsGestoresAtivos = useMemo(
-    () => new Set((users || []).filter((u) => u.ativo && u.perfil === 'gestor').map((u) => u.id)),
-    [users]
-  );
+  // Entra na carteira quem é gestor ou coordenador ativo (o coordenador também pode ser gestor). Perfil consulta ou
+  // usuário inativado que ainda tenha atribuição antiga (ata/contrato encerrado) fica de fora — inclusive do rodapé
+  // "Sem carteira"; o coordenador sem nada vigente também não vai ao rodapé.
+  const idsGestoresAtivos = useMemo(() => new Set((users || []).filter(podeTerCarteira).map((u) => u.id)), [users]);
+  const outrosPerfis = useMemo(() => outrosPerfisComCarteira(users), [users]);
 
   const atas = useMemo<InstrumentoNoPainel[]>(
     () =>
@@ -61,12 +61,12 @@ export function usePainelCarteira(enabled: boolean) {
   const gestores = useMemo<Array<{ gestor: GestorDaCarteira; escopo: EscopoDoGestor }>>(() => {
     const contractManagers = gestoresQ.flatMap((q) => Object.values(q.data || {}));
     const atasM = Object.values(ataManagers || {});
-    return listarGestores(contractManagers, atasM, idsGestoresAtivos).map((gestor) => ({
+    return listarGestores(contractManagers, atasM, idsGestoresAtivos, outrosPerfis).map((gestor) => ({
       gestor,
       escopo: escopoDoGestor(gestor.userId, contractManagers, atasM, vinculos || [])
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assinatura, ataManagers, vinculos, idsGestoresAtivos]);
+  }, [assinatura, ataManagers, vinculos, idsGestoresAtivos, outrosPerfis]);
 
   const isLoading =
     enabled &&

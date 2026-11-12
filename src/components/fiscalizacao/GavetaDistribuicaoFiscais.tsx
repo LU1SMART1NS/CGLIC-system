@@ -58,7 +58,10 @@ export const GavetaDistribuicaoFiscais: React.FC<{
               data-testid="fisc-inicio-distribuicao-fiscal"
             >
               <span className="pn-gc-head">
-                <strong>{f.nome}</strong>
+                <strong>
+                  {f.nome}
+                  {f.outroPerfil && <span className="pn-gc-perfil" title={`Perfil ${f.outroPerfil}, também fiscal`}>{f.outroPerfil}</span>}
+                </strong>
                 <span className="pn-gc-ir" aria-hidden="true">›</span>
               </span>
               <span className="pn-gc-corpo">

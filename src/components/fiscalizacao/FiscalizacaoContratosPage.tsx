@@ -17,7 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useContratosFiscalizacao, useEntregasFiscalizacao, useFiscaisAtivos } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao, EntregaFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, dataBR, hojeEmBrasilia, rotaDoContrato } from '../../utils/fiscalizacao';
+import { NOME_SFC, dataBR, fiscaisVisiveis, hojeEmBrasilia, idsDosFiscaisComContrato, rotaDoContrato } from '../../utils/fiscalizacao';
 import { FASES_ENTREGA, foiEntregue } from '../../utils/fiscalizacaoEntregas';
 import { agrupar, chaveDeOrdem, diasAte, numero, pct, programasDe, qtdTexto, resumir, type Resumo } from '../../utils/fiscalizacaoResumo';
 const POR_PAGINA = 25;
@@ -88,7 +88,8 @@ export const FiscalizacaoContratosPage: React.FC = () => {
   const entregas = useMemo(() => entregasQ.data ?? [], [entregasQ.data]);
   const carregando = contratosQ.isLoading || entregasQ.isLoading;
   const falha = contratosQ.error ?? entregasQ.error;
-  const { fiscais } = useFiscaisAtivos();
+  const { servidores } = useFiscaisAtivos();
+  const fiscais = useMemo(() => fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos)), [servidores, contratos]);
   const hoje = hojeEmBrasilia();
   const ehFiscal = role === 'gestor_fiscalizacao';
   const [seg, setSeg] = useState<SegContrato>(ehFiscal ? 'VOCE' : 'TODOS');
