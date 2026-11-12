@@ -708,6 +708,15 @@ h1, h2, h3, h4 {
 /* Financeiro com prazo da CGLIC vencido ou fatura com erro no SIAFI. */
 .app-rail-count--urgente { background: var(--color-danger-solid, #e52207); color: #ffffff; }
 .app-rail-link[data-active='true'] .app-rail-icon { background: rgba(12, 50, 111, 0.1); color: var(--primary); }
+/* Subitens de uma área (Atas e Contratos › Alocação · Vínculos · Financeiro): só aparecem dentro da área, num bloco com a
+   área-mãe, menores e recuados. */
+.app-rail-group { display: flex; flex-direction: column; gap: 0.1rem; margin: 0 -0.15rem; padding: 0 0.15rem; border-radius: 12px; }
+.app-rail-group[data-aberto='true'] { padding-bottom: 0.3rem; background: #f4f6fa; }
+.app-rail-sub { position: relative; margin-left: 0.55rem; }
+.app-rail-sub::before { content: ''; position: absolute; left: -0.3rem; top: 0.35rem; bottom: 0.35rem; width: 2px; border-radius: 2px; background: #dbe2ec; }
+.app-rail-sub .app-rail-link { padding: 0.35rem 0.1rem; gap: 0.15rem; }
+.app-rail-sub .app-rail-icon { width: 34px; height: 24px; }
+.app-rail-sub .app-rail-count { top: 0.05rem; right: 0.1rem; }
 .app-bottom-nav {
   position: fixed;
   left: 0;

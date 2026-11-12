@@ -66,6 +66,8 @@ export interface NavItem {
   contagem?: 'atas-a-montar';
   /** A aba tem filtros próprios: não leva os filtros em comum da Carteira ao ser aberta. */
   filtrosProprios?: boolean;
+  /** Área que aparece no menu chave como subitem de outra (id da área-mãe), logo abaixo dela. */
+  parentId?: string;
   /** 'bottom' = área fica no pé do menu chave (ex.: Ajustes). */
   placement?: 'bottom';
 }
@@ -236,6 +238,7 @@ export const navigationConfig: NavItem[] = [
     label: 'Alocação',
     icon: Boxes,
     status: 'active',
+    parentId: 'carteira',
     children: [
       {
         id: 'alocacao-itens',
@@ -256,6 +259,7 @@ export const navigationConfig: NavItem[] = [
     label: 'Vínculos',
     icon: Link2,
     status: 'active',
+    parentId: 'carteira',
     children: [
       {
         id: 'vinculacao-contratos',
@@ -389,6 +393,7 @@ export const navigationConfig: NavItem[] = [
     label: 'Financeiro',
     icon: Landmark,
     status: 'active',
+    parentId: 'carteira',
     children: [
       {
         id: 'execucao-empenhos',
