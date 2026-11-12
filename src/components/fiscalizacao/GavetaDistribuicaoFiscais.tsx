@@ -21,7 +21,7 @@ export const GavetaDistribuicaoFiscais: React.FC<{
   const comCarteira = carga.filter((f) => f.contratos > 0);
   const semCarteira = carga.filter((f) => f.contratos === 0).map((f) => f.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const maior = Math.max(0, ...comCarteira.map((f) => f.contratos));
-  const pendencias = (f: CargaDoFiscal) => f.aAutuar + f.semPortaria;
+  const pendencias = (f: CargaDoFiscal) => f.aAutuar;
   const { media, porFiscal } = mediaDaEquipeFiscal(carga);
   // Régua comum: a maior ocupação (ou a média) ocupa quase toda a largura, como na Distribuição de Atas e Contratos.
   const escala = Math.max(0, ...[...porFiscal.values()].map((o) => o.ocupacao), media ?? 0) * 1.1;
@@ -72,7 +72,6 @@ export const GavetaDistribuicaoFiscais: React.FC<{
                   <span className="pn-gc-num">{formatNumber(f.contratos)}</span>
                   <span className="pn-gc-tags">
                     {f.aAutuar > 0 && <span className="pn-gc-tag pn-gc-tag--atencao">{formatNumber(f.aAutuar)} a autuar</span>}
-                    {f.semPortaria > 0 && <span className="pn-gc-tag pn-gc-tag--atencao">{formatNumber(f.semPortaria)} sem portaria</span>}
                   </span>
                 </span>
               </span>

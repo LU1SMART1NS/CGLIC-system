@@ -98,7 +98,7 @@ export interface DefinirFiscalizacaoInput {
   unidadeArea?: string | null;
 }
 
-/** Decisão do coordenador: quem fiscaliza, o fiscal da SFC/CGLIC e a portaria. */
+/** Decisão do coordenador: quem fiscaliza e o fiscal da SFC/CGLIC (a portaria saiu das telas em 12/11/2026). */
 export async function definirFiscalizacaoContrato(input: DefinirFiscalizacaoInput): Promise<void> {
   const { error } = await cliente().rpc('definir_fiscalizacao_contrato', {
     p_contract_key: input.contractKey,

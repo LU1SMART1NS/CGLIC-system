@@ -33,14 +33,14 @@ import { GavetaDistribuicaoFiscais } from './GavetaDistribuicaoFiscais';
 import { RegistrarProcessoModal } from './FiscalizacaoModais';
 
 const POR_PAGINA = 25;
-type Segmento = 'AUTUAR' | 'PORTARIA' | 'TODAS';
+type Segmento = 'AUTUAR' | 'TODAS';
 
 /**
  * Início › Painel da fiscalização (migration 259). O gestor de fiscalização vê os contratos em que é o fiscal e o que
  * falta em cada um; o coordenador e a consulta veem todos os contratos com a SFC/CGLIC e podem escolher um fiscal
  * (o Painel passa a ser o dele, como o filtro Gestor em Atas e Contratos). Mesma moldura dos outros Painéis
  * (PainelComFaixa, 11/11/2026): cartões e "Ver mais" encolhem numa faixa azul fixa, "Com você" só do coordenador, e as
- * abas das Pendências (A autuar · Sem portaria · Todos) grudam embaixo da faixa.
+ * abas das Pendências (A autuar · Todos) grudam embaixo da faixa.
  */
 export const FiscalizacaoInicioPage: React.FC = () => {
   const { user, role } = useAuth();
@@ -82,7 +82,6 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   const aDefinir = contratos.filter((c) => c.situacao === 'A_DEFINIR');
   const pendencias = useMemo(() => daSfc.flatMap(pendenciasDoContrato), [daSfc]);
   const aAutuar = pendencias.filter((p) => p.tipo === 'AUTUAR');
-  const semPortaria = pendencias.filter((p) => p.tipo === 'PORTARIA');
   const mistas = daSfc.filter((c) => c.situacao === 'MISTA').length;
   const minhasEntregas = useMemo(
     () => (entregasConsulta.data ?? []).filter((e) => e.responsavel === 'SFC' && (!escopo || e.fiscalUserId === escopo)),
@@ -107,9 +106,9 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   }
 
   // Sem escolha, abre na primeira aba com algo pendente.
-  const segmento: Segmento = segmentoEscolhido ?? (aAutuar.length ? 'AUTUAR' : semPortaria.length ? 'PORTARIA' : 'TODAS');
-  // Pendências: contratos do escopo com o que falta (processo a autuar, portaria); "Todas" lista todos os contratos.
-  const contaSeg = (sg: Segmento) => (sg === 'TODAS' ? daSfc.length : sg === 'AUTUAR' ? aAutuar.length : semPortaria.length);
+  const segmento: Segmento = segmentoEscolhido ?? (aAutuar.length ? 'AUTUAR' : 'TODAS');
+  // Pendências: contratos do escopo com o que falta (processo a autuar); "Todas" lista todos os contratos.
+  const contaSeg = (sg: Segmento) => (sg === 'TODAS' ? daSfc.length : aAutuar.length);
   const doSegmento = useMemo(
     () => (segmento === 'TODAS' ? daSfc : daSfc.filter((c) => pendenciasDoContrato(c).some((p) => p.tipo === segmento))),
     [daSfc, segmento]
@@ -166,7 +165,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
       <PageHeader
         title="Início"
         subtitle={fiscal ? 'Os contratos que você fiscaliza e o que falta em cada um.' : `Resumo da fiscalização dos contratos pela ${NOME_SFC} e o que exige sua atenção.`}
-        hint={`Contrato de emenda chega "A definir", com sugestão ${NOME_SFC}; o coordenador decide na Distribuição. Depois da decisão, o fiscal registra a autuação (NUP do processo de acompanhamento contratual) e a portaria. As pendências são do fiscal; na ausência, o coordenador passa os contratos a um colega pela transferência temporária.`}
+        hint={`Contrato de emenda chega "A definir", com sugestão ${NOME_SFC}; o coordenador decide na Distribuição. Depois da decisão, o fiscal registra o NUP. As pendências são do fiscal; na ausência, o coordenador passa os contratos a um colega pela transferência temporária.`}
         icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="fisc-inicio-atualizar" tooltipTitle="Recarregar a fiscalização" />}
       />
@@ -195,10 +194,9 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               unidade={daSfc.length === 1 ? 'contrato' : 'contratos'}
               linhas={[
                 { rotulo: 'Fiscalização mista', valor: String(mistas) },
-                { rotulo: 'A autuar (processo de acompanhamento)', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined },
-                { rotulo: 'Sem portaria registrada', valor: String(semPortaria.length), tom: semPortaria.length ? 'warning' : undefined }
+                { rotulo: 'A autuar', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined }
               ]}
-              onClick={() => irPara(aAutuar.length ? 'AUTUAR' : semPortaria.length ? 'PORTARIA' : 'TODAS')}
+              onClick={() => irPara(aAutuar.length ? 'AUTUAR' : 'TODAS')}
               testId="fisc-cartao-contratos"
             />
             <PainelCartao
@@ -254,7 +252,6 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               onSelect={irPara}
               segments={[
                 { id: 'AUTUAR', label: 'A autuar', count: contaSeg('AUTUAR'), dot: aAutuar.length ? 'var(--color-warning-solid)' : undefined },
-                { id: 'PORTARIA', label: 'Sem portaria', count: contaSeg('PORTARIA'), dot: semPortaria.length ? 'var(--color-warning-solid)' : undefined },
                 { id: 'TODAS', label: fiscal ? 'Meus contratos' : 'Todos os contratos', count: contaSeg('TODAS') }
               ]}
             />
@@ -265,7 +262,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               id="distribuicao"
               onFechar={() => alternarGaveta('distribuicao')}
               subtitulo="Clique num fiscal para ver o painel dele."
-              hint="Contratos com a SFC/CGLIC de cada fiscal e o que falta autuar ou registrar; “A definir” leva à Distribuição. Transferir e ausências ficam em Distribuição › Equipe."
+              hint="Contratos com a SFC/CGLIC de cada fiscal e o que falta autuar; “A definir” leva à Distribuição. Transferir e ausências ficam em Distribuição › Equipe."
             >
               <GavetaDistribuicaoFiscais
                 carga={carga}

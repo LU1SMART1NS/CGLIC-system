@@ -32,10 +32,10 @@ describe('fiscalização do contrato', () => {
 
   it('pendências só nos contratos com a SFC/CGLIC', () => {
     expect(pendenciasDoContrato(c({ situacao: 'AREA' }))).toEqual([]);
-    expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1' })).map((p) => p.tipo)).toEqual(['AUTUAR', 'PORTARIA']);
-    expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1', processoSei: '34472015', autuadoEm: '2026-02-05', processoNup: '08020.000017/2026-88', processoAutuadoEm: '2026-01-05', portariaSei: '34152364' }))).toEqual([]);
+    expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1' })).map((p) => p.tipo)).toEqual(['AUTUAR']);
+    expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1', processoSei: '34472015', autuadoEm: '2026-02-05', processoNup: '08020.000017/2026-88', processoAutuadoEm: '2026-01-05' }))).toEqual([]);
     // SEI do contrato sem o NUP do processo de acompanhamento continua a autuar (migration 294).
-    expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1', processoSei: '34472015', autuadoEm: '2026-02-05', portariaSei: '34152364' })).map((p) => p.tipo)).toEqual(['AUTUAR']);
+    expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1', processoSei: '34472015', autuadoEm: '2026-02-05' })).map((p) => p.tipo)).toEqual(['AUTUAR']);
   });
 
   it('é do fiscal', () => {
@@ -46,15 +46,15 @@ describe('fiscalização do contrato', () => {
     expect(ehDoFiscal(x, undefined)).toBe(false);
   });
 
-  it('carga por fiscal conta contratos, a autuar e sem portaria', () => {
+  it('carga por fiscal conta contratos e a autuar', () => {
     const lista = [
       c({ contractKey: 'a', situacao: 'SFC', fiscalUserId: 'u1' }),
       c({ contractKey: 'b', situacao: 'MISTA', fiscalUserId: 'u1', processoSei: '1234567', autuadoEm: '2026-01-01', processoNup: '08020.000259/2026-71', processoAutuadoEm: '2026-01-09' }),
       c({ contractKey: 'c', situacao: 'AREA', fiscalUserId: null })
     ];
     const carga = cargaPorFiscal(lista, [{ id: 'u2', nome: 'Bia' }, { id: 'u1', nome: 'Ana' }]);
-    expect(carga[0]).toEqual({ userId: 'u1', nome: 'Ana', contratos: 2, aAutuar: 1, semPortaria: 2 });
-    expect(carga[1]).toEqual({ userId: 'u2', nome: 'Bia', contratos: 0, aAutuar: 0, semPortaria: 0 });
+    expect(carga[0]).toEqual({ userId: 'u1', nome: 'Ana', contratos: 2, aAutuar: 1 });
+    expect(carga[1]).toEqual({ userId: 'u2', nome: 'Bia', contratos: 0, aAutuar: 0 });
   });
 
   it('quem tem contrato como fiscal aparece, seja qual for o perfil; sem contrato, só o Gestor de Fiscalização', () => {
@@ -75,7 +75,7 @@ describe('fiscalização do contrato', () => {
   });
 
   it('média da equipe de fiscais: coordenador com metade da capacidade, outro perfil fora', () => {
-    const f = (userId: string, contratos: number, outroPerfil?: string) => ({ userId, nome: userId, contratos, aAutuar: 0, semPortaria: 0, ...(outroPerfil ? { outroPerfil } : {}) });
+    const f = (userId: string, contratos: number, outroPerfil?: string) => ({ userId, nome: userId, contratos, aAutuar: 0, ...(outroPerfil ? { outroPerfil } : {}) });
     // Ocupações: a 60, b 40, c 20, coord 30÷0,5 = 60. Média 45. Eden (Gestor) fica fora.
     const { media, porFiscal } = mediaDaEquipeFiscal([f('a', 60), f('b', 40), f('c', 20), f('coord', 30, 'Coordenador'), f('eden', 8, 'Gestor'), f('zero', 0)]);
     expect(media).toBe(45);
