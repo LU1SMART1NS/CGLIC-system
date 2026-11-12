@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { contratadoDoOrgao, destinoSugerido, documentoSeiValido, extratoDaCotaPropria, maximoParaConfirmar, textoDaSituacao } from '../quantitativos';
+import { contratadoDoOrgao, destinoSugerido, mesmaOperacao, documentoSeiValido, extratoDaCotaPropria, maximoParaConfirmar, textoDaSituacao } from '../quantitativos';
 import { vazioDoItem, type OrgaoQuantitativo, type QuantitativosDoItem } from '../../services/quantitativosService';
 
 // Tablet, ata 00059/2025 item 1: registrado e datas reais; ata assinada de exemplo do protótipo (ensaio de 13/10/2026).
@@ -31,6 +31,20 @@ describe('destinoSugerido', () => {
     expect(destinoSugerido(ORGAOS, '927134')).toBe('926969');
     expect(destinoSugerido(ORGAOS, '926477')).toBeNull();
     expect(destinoSugerido(ORGAOS, '450955')).toBeNull();
+  });
+
+  it('remanejamento em lote (00058/2025 item 1): quem mudou um segundo depois também vai para o CBM/DF', () => {
+    const lote = [
+      org({ uasg: '200331', ehSenasp: true, situacao: 'SENASP', quantidadeAssinada: 164, quantidadeRegistrada: 298, mudou: true, atualizadoEm: '2026-10-26T10:30:07' }),
+      org({ uasg: '170394', situacao: 'REMANEJADO_A_MAIS', quantidadeAssinada: 20, quantidadeRegistrada: 1344, acima: 1324, mudou: true, atualizadoEm: '2026-09-23T00:32:01' }),
+      org({ uasg: '925794', situacao: 'REMANEJADO_A_MENOS', quantidadeAssinada: 240, quantidadeRegistrada: 1, falta: 239, resto: 239, mudou: true, atualizadoEm: '2026-09-23T00:32:01' }),
+      org({ uasg: '928441', situacao: 'REMANEJADO_A_MENOS', quantidadeAssinada: 151, quantidadeRegistrada: 1, falta: 150, resto: 150, mudou: true, atualizadoEm: '2026-09-23T00:32:02' }),
+      org({ uasg: '926016', situacao: 'REMANEJADO_A_MENOS', quantidadeAssinada: 180, quantidadeRegistrada: 0, falta: 180, resto: 180, mudou: true, atualizadoEm: '2026-10-26T10:30:07' })
+    ];
+    expect(destinoSugerido(lote, '925794')).toBe('170394');
+    expect(destinoSugerido(lote, '928441')).toBe('170394');
+    expect(destinoSugerido(lote, '926016')).toBeNull();
+    expect(mesmaOperacao('2026-09-23T00:32:01', '2026-09-23T00:33:02')).toBe(false);
   });
 });
 
@@ -90,7 +104,7 @@ describe('textoDaSituacao', () => {
     expect(t('453079')).toMatchObject({ rotulo: 'Gerenciado pela SENASP · 36', tom: 'info', detalhe: 'desde o registro da ata' });
     expect(t('926016').detalhe).toBe('órgão sem registro no Compras.gov');
     expect(t('450955')).toMatchObject({ rotulo: 'Remanejado · 30 a menos', detalhe: 'em 31/03/2026 · destino não registrado, conta como devolvido à SENASP' });
-    expect(t('927134').detalhe).toBe('em 24/03/2026 · para UASG 926969 (mesmo segundo)');
+    expect(t('927134').detalhe).toBe('em 24/03/2026 · para UASG 926969 (mesma operação)');
     expect(t('926969')).toMatchObject({ rotulo: 'Remanejado · 60 a mais', detalhe: 'em 24/03/2026 · 20 de UASG 927134 · 40 da cota da SENASP' });
     expect(t('200109').rotulo).toBe('Igual à ata assinada');
   });

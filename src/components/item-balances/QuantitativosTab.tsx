@@ -24,7 +24,7 @@ import type { OrgaoQuantitativo, QuantitativosDoItem, RemanejamentoNaoParticipan
 import {
   contratadoDoOrgao,
   extratoDaCotaPropria,
-  mudaramNoMesmoSegundo,
+  mudaramNaMesmaOperacao,
   SITUACOES_COM_ACAO,
   textoDaSituacao,
   type EstadoContratado
@@ -379,8 +379,8 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       partes.push(<p key="a" style={{ margin: 0 }}>{o.situacao === 'FORA_DA_ATA' ? 'O órgão está registrado no Compras.gov.br, mas não tem quantidade na ata assinada: confira os números informados. ' : ''}O que passa da ata assinada sem origem confirmada conta como remanejado da cota própria da SENASP. Se veio de outro órgão, confirme o remanejamento na linha dele escolhendo este órgão como destino.</p>);
     }
     if (o?.mudou && o.mudouEm) {
-      const par = mudaramNoMesmoSegundo(q.orgaos, o.uasg);
-      partes.push(<p key="m" style={{ margin: 0 }}>Última mudança do registrado no Compras.gov.br: {formatDataHoraBR(o.mudouEm)}. {par.length ? <>No mesmo segundo também mudou: <b>{par.map((x) => nomeDe(x.uasg)).join(', ')}</b>.</> : 'Nenhum outro órgão do item mudou no mesmo segundo.'}</p>);
+      const par = mudaramNaMesmaOperacao(q.orgaos, o.uasg);
+      partes.push(<p key="m" style={{ margin: 0 }}>Última mudança do registrado no Compras.gov.br: {formatDataHoraBR(o.mudouEm)}. {par.length ? <>Na mesma operação também mudou: <b>{par.map((x) => nomeDe(x.uasg)).join(', ')}</b>.</> : 'Nenhum outro órgão do item mudou na mesma operação.'}</p>);
     }
     const contin = q.continua.find((c) => c.uasg === l.uasg);
     if (contin) partes.push(<p key="c" style={{ margin: 0 }}><b>{contin.marcadoPorNome}</b> marcou em {formatDataHoraBR(contin.marcadoEm)} que {formatNumber(contin.quantidade)} continuam do órgão: “{contin.justificativa}”</p>);
@@ -473,7 +473,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
           )}
           {extrato.entre.length > 0 && (
             <div style={{ ...pequeno, marginTop: '0.35rem' }}>
-              Entre participantes, sem efeito na cota: {extrato.entre.map((e) => `${nomeDe(e.de)} para ${nomeDe(e.para ?? '')} ${formatNumber(e.quantidade)}${e.automatico ? ' (mesmo segundo)' : ' (confirmado)'}`).join(' · ')}.
+              Entre participantes, sem efeito na cota: {extrato.entre.map((e) => `${nomeDe(e.de)} para ${nomeDe(e.para ?? '')} ${formatNumber(e.quantidade)}${e.automatico ? ' (mesma operação)' : ' (confirmado)'}`).join(' · ')}.
             </div>
           )}
           <div style={{ ...pequeno, marginTop: '0.35rem' }}>

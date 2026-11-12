@@ -2,7 +2,7 @@ import React from 'react';
 import { ActionButton, AppButton, AppSelect, AppTextarea, Modal, NoticeBar, useToast } from '../../design-system';
 import { useAcoesQuantitativos } from '../../hooks/useQuantitativosDoItem';
 import type { OrgaoQuantitativo, QuantitativosDoItem } from '../../services/quantitativosService';
-import { maximoParaConfirmar, mudaramNoMesmoSegundo } from '../../utils/quantitativos';
+import { maximoParaConfirmar, mudaramNaMesmaOperacao } from '../../utils/quantitativos';
 import { formatNumber } from './itemBalanceUtils';
 import { QuantidadeComMaximo } from './QuantidadeComMaximo';
 
@@ -21,18 +21,18 @@ const texto: React.CSSProperties = { fontSize: '0.84rem', color: 'var(--text-sec
 
 /**
  * Confirmar remanejamento (órgão com quantidade gerenciada pela SENASP) ou informar o destino de um
- * remanejamento a menos — gestor de saldo ou coordenador. O destino sugerido é o órgão que mudou no mesmo
- * segundo no Compras.gov.br e está acima da ata assinada.
+ * remanejamento a menos — gestor de saldo ou coordenador. O destino sugerido é o órgão que mudou na mesma
+ * operação no Compras.gov.br (até 1 minuto) e está acima da ata assinada.
  */
 export const ConfirmarRemanejamentoModal: React.FC<BaseProps> = ({ itemKey, orgao, quantitativos, nomeDe, onFechar }) => {
   const toast = useToast();
   const { confirmar } = useAcoesQuantitativos(itemKey);
   const max = orgao ? maximoParaConfirmar(orgao) : 0;
   const informarDestino = orgao?.situacao === 'REMANEJADO_A_MENOS';
-  const mesmoSegundo = orgao ? mudaramNoMesmoSegundo(quantitativos.orgaos, orgao.uasg).filter((o) => !o.ehSenasp) : [];
+  const mesmaOperacao = orgao ? mudaramNaMesmaOperacao(quantitativos.orgaos, orgao.uasg).filter((o) => !o.ehSenasp) : [];
   const senasp = quantitativos.orgaos.find((o) => o.ehSenasp)?.uasg ?? '200331';
-  const acimaDaAta = quantitativos.orgaos.filter((o) => !o.ehSenasp && o.acima > 0 && o.uasg !== orgao?.uasg && !mesmoSegundo.includes(o));
-  const outros = quantitativos.orgaos.filter((o) => !o.ehSenasp && o.uasg !== orgao?.uasg && !mesmoSegundo.includes(o) && !acimaDaAta.includes(o));
+  const acimaDaAta = quantitativos.orgaos.filter((o) => !o.ehSenasp && o.acima > 0 && o.uasg !== orgao?.uasg && !mesmaOperacao.includes(o));
+  const outros = quantitativos.orgaos.filter((o) => !o.ehSenasp && o.uasg !== orgao?.uasg && !mesmaOperacao.includes(o) && !acimaDaAta.includes(o));
   const [quantidade, setQuantidade] = React.useState('');
   const [destino, setDestino] = React.useState('');
   const [justificativa, setJustificativa] = React.useState('');
@@ -41,7 +41,7 @@ export const ConfirmarRemanejamentoModal: React.FC<BaseProps> = ({ itemKey, orga
   React.useEffect(() => {
     if (!orgao) return;
     setQuantidade(String(maximoParaConfirmar(orgao)));
-    setDestino(mudaramNoMesmoSegundo(quantitativos.orgaos, orgao.uasg).find((o) => !o.ehSenasp && o.acima > 0)?.uasg ?? '');
+    setDestino(mudaramNaMesmaOperacao(quantitativos.orgaos, orgao.uasg).find((o) => !o.ehSenasp && o.acima > 0)?.uasg ?? '');
     setJustificativa('');
     setErro(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -104,7 +104,7 @@ export const ConfirmarRemanejamentoModal: React.FC<BaseProps> = ({ itemKey, orga
             Para onde foi a quantidade
             <AppSelect value={destino} onChange={(e) => setDestino(e.target.value)} data-testid="remanejamento-destino">
               <option value="">Escolha</option>
-              {mesmoSegundo.length > 0 && <optgroup label="Sugerido: mudou no mesmo segundo">{mesmoSegundo.map(opcao)}</optgroup>}
+              {mesmaOperacao.length > 0 && <optgroup label="Sugerido: mudou na mesma operação">{mesmaOperacao.map(opcao)}</optgroup>}
               <option value={senasp}>SENASP · o órgão abriu mão e a quantidade volta para a cota própria</option>
               {acimaDaAta.length > 0 && <optgroup label="Órgãos que receberam acima da ata assinada">{acimaDaAta.map(opcao)}</optgroup>}
               {outros.length > 0 && <optgroup label="Outros órgãos do item">{outros.map(opcao)}</optgroup>}
@@ -112,9 +112,9 @@ export const ConfirmarRemanejamentoModal: React.FC<BaseProps> = ({ itemKey, orga
             </AppSelect>
           </label>
           <p style={texto}>
-            {mesmoSegundo.length > 0
-              ? 'A sugestão vem da hora da última mudança no Compras.gov.br: os órgãos mudaram no mesmo segundo.'
-              : orgao.mudou ? 'Nenhum outro órgão do item mudou no mesmo segundo, então não há sugestão.' : 'O registrado deste órgão nunca mudou, então não há sugestão.'}
+            {mesmaOperacao.length > 0
+              ? 'A sugestão vem da hora da última mudança no Compras.gov.br: os órgãos mudaram na mesma operação (até 1 minuto de diferença).'
+              : orgao.mudou ? 'Nenhum outro órgão do item mudou na mesma operação, então não há sugestão.' : 'O registrado deste órgão nunca mudou, então não há sugestão.'}
           </p>
           <p style={texto}>
             {informarDestino ? '' : 'A quantidade deixa de ser gerenciada para este órgão. '}
