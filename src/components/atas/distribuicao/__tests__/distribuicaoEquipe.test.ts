@@ -266,18 +266,21 @@ describe('ocupação pelo nível do gestor', () => {
     expect(totais.mediaEquivalente).toBe(4);
   });
 
-  it('coordenador que também é gestor fica fora da média e da comparação', () => {
+  it('coordenador com metade da capacidade: cada instrumento pesa o dobro na média', () => {
     const ata = (n: string, gestorNome: string) => ({ numeroAta: n, gestorNome, faixa: 'REGULAR' as const, valor: 1, itens: 10 });
     const { linhas, totais } = buildDistribuicaoEquipe({
-      atas: [ata('00001/2025', 'Ana'), ata('00002/2025', 'Ana'), ata('00003/2025', 'Bruno'), ata('00004/2025', 'Bruno'), ata('00005/2025', 'Daniela')],
+      atas: [ata('00001/2025', 'Ana'), ata('00002/2025', 'Ana'), ata('00003/2025', 'Bruno'), ata('00004/2025', 'Bruno'), ata('00005/2025', 'Daniela'), ata('00006/2025', 'Daniela')],
       contratos: [],
       links: [],
       attentionItems: [],
-      foraDaMedia: new Set(['Daniela'])
+      capacidadeDoGestor: (nome) => (nome === 'Daniela' ? 0.5 : 1)
     });
-    expect(totais.gestores).toBe(2);
-    expect(linhas.find((l) => l.gestorNome === 'Daniela')?.relacaoEquipe).toBeNull();
-    expect(linhas.find((l) => l.gestorNome === 'Ana')?.relacaoEquipe).toBe('NA_MEDIA');
+    const por = (n: string) => linhas.find((l) => l.gestorNome === n)!;
+    // Mesma carga para os três; a da Daniela vale o dobro na ocupação.
+    expect(totais.gestores).toBe(3);
+    expect(por('Daniela').ocupacao).toBe(2 * por('Ana').ocupacao);
+    expect(por('Daniela').relacaoEquipe).toBe('ACIMA');
+    expect(por('Ana').relacaoEquipe).toBe('NA_MEDIA');
   });
 
   it('sem níveis, ocupação = carga', () => {

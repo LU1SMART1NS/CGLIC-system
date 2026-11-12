@@ -72,12 +72,16 @@ describe('fiscalização do contrato', () => {
     ]);
   });
 
-  it('média da equipe de fiscais pelos contratos, sem quem tem outro perfil', () => {
+  it('média da equipe de fiscais: coordenador com metade da capacidade, outro perfil fora', () => {
     const f = (userId: string, contratos: number, outroPerfil?: string) => ({ userId, nome: userId, contratos, aAutuar: 0, semPortaria: 0, ...(outroPerfil ? { outroPerfil } : {}) });
-    const { media, relacao } = mediaDaEquipeFiscal([f('a', 60), f('b', 40), f('c', 20), f('coord', 77, 'Coordenador'), f('zero', 0)]);
-    expect(media).toBe(40);
-    expect([...relacao]).toEqual([['a', 'ACIMA'], ['b', 'NA_MEDIA'], ['c', 'ABAIXO']]);
-    expect(mediaDaEquipeFiscal([f('a', 10), f('coord', 5, 'Coordenador')]).media).toBeNull();
+    // Ocupações: a 60, b 40, c 20, coord 30÷0,5 = 60. Média 45. Eden (Gestor) fica fora.
+    const { media, porFiscal } = mediaDaEquipeFiscal([f('a', 60), f('b', 40), f('c', 20), f('coord', 30, 'Coordenador'), f('eden', 8, 'Gestor'), f('zero', 0)]);
+    expect(media).toBe(45);
+    expect(porFiscal.get('coord')).toEqual({ ocupacao: 60, relacao: 'ACIMA' });
+    expect(porFiscal.get('b')?.relacao).toBe('NA_MEDIA');
+    expect(porFiscal.get('c')?.relacao).toBe('ABAIXO');
+    expect(porFiscal.get('eden')?.relacao).toBeNull();
+    expect(mediaDaEquipeFiscal([f('a', 10), f('eden', 5, 'Gestor')]).media).toBeNull();
   });
 
   it('pode receber contratos como fiscal: Gestor de Fiscalização e Coordenador', () => {

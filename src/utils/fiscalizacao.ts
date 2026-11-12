@@ -118,18 +118,36 @@ export function cargaPorFiscal(contratos: ContratoFiscalizacao[], servidores: Se
 export type RelacaoComEquipe = 'ACIMA' | 'NA_MEDIA' | 'ABAIXO';
 export const ROTULO_RELACAO_EQUIPE: Record<RelacaoComEquipe, string> = { ACIMA: 'Acima da média', NA_MEDIA: 'Na média', ABAIXO: 'Abaixo da média' };
 
+/** Mesma capacidade do coordenador na Distribuição de Atas e Contratos (nivelGestor.ts, CAPACIDADE_COORDENADOR). */
+export const CAPACIDADE_COORDENADOR_FISCAL = 0.5;
+
+export interface OcupacaoDoFiscal {
+  /** Contratos ÷ capacidade (Coordenador: metade). */
+  ocupacao: number;
+  /** `null` para quem fica fora da média (outro perfil que não Coordenador, ou equipe com menos de 2). */
+  relacao: RelacaoComEquipe | null;
+}
+
 /**
- * Média da equipe de fiscais, como na Distribuição de Atas e Contratos, mas pela quantidade de contratos (a fiscalização
- * não tem peso de complexidade nem nível). Entram os Gestores de Fiscalização com carteira; quem tem outro perfil
- * (coordenador, gestor) aparece, mas fica fora da média e da comparação. Com menos de 2 na conta, não há média.
+ * Média da equipe de fiscais, na mesma conta da Distribuição de Atas e Contratos: ocupação = contratos ÷ capacidade
+ * (a fiscalização não tem peso de complexidade nem nível). Gestor de Fiscalização vale 100%; Coordenador entra com
+ * metade (divide o tempo com a coordenação); outro perfil (ex.: Gestor) aparece mas fica fora da média. Faixa ±25%.
  */
-export function mediaDaEquipeFiscal(carga: CargaDoFiscal[]): { media: number | null; relacao: Map<string, RelacaoComEquipe> } {
-  const naConta = carga.filter((f) => f.contratos > 0 && !f.outroPerfil);
-  const relacao = new Map<string, RelacaoComEquipe>();
-  if (naConta.length < 2) return { media: null, relacao };
-  const media = naConta.reduce((s, f) => s + f.contratos, 0) / naConta.length;
-  for (const f of naConta) relacao.set(f.userId, f.contratos > media * 1.25 ? 'ACIMA' : f.contratos < media * 0.75 ? 'ABAIXO' : 'NA_MEDIA');
-  return { media, relacao };
+export function mediaDaEquipeFiscal(carga: CargaDoFiscal[]): { media: number | null; porFiscal: Map<string, OcupacaoDoFiscal> } {
+  const capacidade = (f: CargaDoFiscal) => (!f.outroPerfil ? 1 : f.outroPerfil === 'Coordenador' ? CAPACIDADE_COORDENADOR_FISCAL : null);
+  const porFiscal = new Map<string, OcupacaoDoFiscal>();
+  for (const f of carga) {
+    const c = capacidade(f);
+    porFiscal.set(f.userId, { ocupacao: c ? f.contratos / c : f.contratos, relacao: null });
+  }
+  const naConta = carga.filter((f) => f.contratos > 0 && capacidade(f) !== null);
+  if (naConta.length < 2) return { media: null, porFiscal };
+  const media = naConta.reduce((s, f) => s + (porFiscal.get(f.userId) as OcupacaoDoFiscal).ocupacao, 0) / naConta.length;
+  for (const f of naConta) {
+    const o = porFiscal.get(f.userId) as OcupacaoDoFiscal;
+    o.relacao = o.ocupacao > media * 1.25 ? 'ACIMA' : o.ocupacao < media * 0.75 ? 'ABAIXO' : 'NA_MEDIA';
+  }
+  return { media, porFiscal };
 }
 
 function rotuloPadraoDoPerfil(perfil: string): string {
