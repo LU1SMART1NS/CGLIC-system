@@ -169,7 +169,7 @@ export const RegistrarProcessoModal: React.FC<{ contrato: ContratoFiscalizacao; 
             Procure no SEI pelo número do contrato, {contrato.processoSei}: a autuação é o processo de Acompanhamento Contratual em que ele está.
           </span>
         )}
-        <AppInput label="Processo de acompanhamento (NUP)" value={nup} onChange={(ev) => setNup(mascaraProcessoSei(ev.target.value))} inputMode="numeric" placeholder="08020.000000/2026-00" hint="Tipo Gestão de Contratos: Acompanhamento Contratual." data-testid="fisc-processo-nup" />
+        <AppInput label="Nº do Processo SEI" value={nup} onChange={(ev) => setNup(mascaraProcessoSei(ev.target.value))} inputMode="numeric" placeholder="08020.000000/2026-00" hint="Processo de acompanhamento contratual (tipo Gestão de Contratos: Acompanhamento Contratual)." data-testid="fisc-processo-nup" />
         <AppDateInput label="Data da autuação" value={data} onValueChange={setData} max={hoje} hint="Andamento “Processo público gerado”." />
       </div>
     </Modal>

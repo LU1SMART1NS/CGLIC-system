@@ -91,7 +91,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
         <Campo rotulo="Fiscalização"><StatusBadge label={c.situacao === 'MISTA' ? 'Mista' : NOME_SFC} variant={c.situacao === 'MISTA' ? 'purple' : 'info'} size="sm" dot={false} /></Campo>
         <Campo rotulo="Fiscal">{c.fiscalNome ?? '—'}</Campo>
         <Campo rotulo="Portaria">{c.portariaSei ? <NumeroSeiEtiqueta numero={c.portariaSei} testId="fisc-mesa-portaria" /> : <span style={carteiraDetalhe}>não registrada</span>}</Campo>
-        <Campo rotulo="Processo (NUP)">
+        <Campo rotulo="Nº do Processo SEI">
           {c.processoNup ? (
             <>
               <NumeroSeiEtiqueta numero={c.processoNup} testId="fisc-mesa-processo" />

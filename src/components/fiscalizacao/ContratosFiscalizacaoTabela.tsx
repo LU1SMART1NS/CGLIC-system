@@ -151,7 +151,7 @@ export const ContratosFiscalizacaoTabela: React.FC<{
     ...(comOrigem ? [{ key: 'origem', header: 'Origem', minWidth: '160px', render: (c: ContratoFiscalizacao) => <CelulaOrigem c={c} /> }] : []),
     { key: 'situacao', header: 'Fiscalização', minWidth: '150px', render: (c) => <CelulaSituacao c={c} /> },
     { key: 'fiscal', header: 'Fiscal SFC/CGLIC', sortValue: (c) => c.fiscalNome, render: (c) => <CelulaFiscal c={c} /> },
-    { key: 'processo', header: 'Processo (NUP)', render: (c) => <CelulaProcesso c={c} /> },
+    { key: 'processo', header: 'Nº do Processo SEI', render: (c) => <CelulaProcesso c={c} /> },
     { key: 'vigencia', header: 'Vigência', nowrap: true, sortValue: (c) => c.vigenciaFim, render: (c) => <span style={carteiraValor}>{dataBR(c.vigenciaFim)}</span> }
   ];
   return (
