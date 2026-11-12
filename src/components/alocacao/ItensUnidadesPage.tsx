@@ -3,7 +3,7 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { EmptyState } from '../../design-system/components/EmptyState';
-import { ActionButton, AppButton, AvisoCarregando } from '../../design-system';
+import { ActionButton, AppButton, AvisoCarregando, NoticeBar } from '../../design-system';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useAtasPortfolio } from '../../hooks/useAtasPortfolio';
@@ -65,6 +65,8 @@ const SCHEMA: CarteiraFilterSchema<Filtros> = {
   ver: { param: 'ver', default: 'ATA', values: ['ATA', 'ITEM'] }
 };
 const VERDE = 'var(--color-success)';
+const TITULO_NEGATIVO =
+  'O registrado da SENASP no Compras.gov.br é menor que o que ela gerencia para os participantes. Confira o remanejamento na fonte; até lá a alocação só pode diminuir.';
 const AMARELO = 'var(--color-warning-solid)';
 const VERMELHO = 'var(--color-danger)';
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
@@ -104,6 +106,8 @@ interface GrupoAta {
   falta: number;
   nivel: NivelAtendimento;
   contagem: Record<NivelAtendimento, number>;
+  /** Itens com quantitativo SENASP negativo (conferir o remanejamento na fonte). */
+  negativos: number;
   /** A busca achou um item (e não a ata em si): a ata já abre mostrando o item. */
   achouItem: boolean;
 }
@@ -134,7 +138,7 @@ export const ItensUnidadesPage: React.FC = () => {
       : atasNaoCarregaram && rows.length === 0
         ? 'As atas não carregaram.'
         : null;
-  const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
+  const { filters, setFilter, setFilters, resetFilters } = useCarteiraFilters(SCHEMA);
   const [alocando, setAlocando] = useState<ItemParaAlocar | null>(null);
   // Divisão planejada na montagem da ata (migration 240): aparece no item ainda sem alocação.
   const divisoesPlanejadas = useDivisoesDasAtasMontadas();
@@ -143,8 +147,10 @@ export const ItensUnidadesPage: React.FC = () => {
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
   const [todosItens, setTodosItens] = useState<Record<string, boolean>>({});
 
-  // Itens com quantitativo SENASP conhecido: sem ele não há o que alocar.
-  const base = useMemo(() => rows.filter((r) => r.quantitativoSenasp > 0), [rows]);
+  // Itens com quantitativo SENASP conhecido: sem ele não há o que alocar. O negativo entra com aviso: vem da fonte
+  // (registrado da SENASP menor que o gerenciado para os participantes) e esconder o item escondia o problema.
+  const base = useMemo(() => rows.filter((r) => r.quantitativoSenasp !== 0), [rows]);
+  const negativos = useMemo(() => base.filter((r) => r.quantitativoSenasp < 0 && r.faixa !== 'EXPIRADO'), [base]);
   const nivelCounts = useMemo(() => {
     const n: Record<NivelAtendimento, number> = { SEM: 0, PARCIAL: 0, TOTAL: 0 };
     for (const r of base) if (filters.vigencia === TODOS || (filters.vigencia === 'HISTORICO' ? r.faixa === 'EXPIRADO' : r.faixa !== 'EXPIRADO')) n[r.nivelAlocacao]++;
@@ -198,8 +204,10 @@ export const ItensUnidadesPage: React.FC = () => {
       let alocado = 0;
       for (const r of itens) {
         contagem[r.nivelAlocacao]++;
-        senasp += r.quantitativoSenasp;
-        alocado += Math.min(r.alocado, r.quantitativoSenasp);
+        // Item com quantitativo negativo não entra na soma da ata (o aviso fica no item).
+        const senaspItem = Math.max(0, r.quantitativoSenasp);
+        senasp += senaspItem;
+        alocado += Math.min(r.alocado, senaspItem);
       }
       return {
         ataKey,
@@ -211,6 +219,7 @@ export const ItensUnidadesPage: React.FC = () => {
         senasp,
         alocado,
         falta: Math.max(0, senasp - alocado),
+        negativos: itens.filter((r) => r.quantitativoSenasp < 0).length,
         nivel: agregarNivel(itens.map((r) => r.nivelAlocacao)) ?? 'SEM',
         contagem,
         achouItem: !!busca && !ataCasaBusca(vis[0])
@@ -298,7 +307,16 @@ export const ItensUnidadesPage: React.FC = () => {
             {descricaoItemEmFrase(r.item.descricaoItem) || '—'}
           </div>
         </td>
-        <td data-label="Quantitativo SENASP" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatNumber(r.quantitativoSenasp)} un</td>
+        <td data-label="Quantitativo SENASP" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+          {r.quantitativoSenasp < 0 ? (
+            <span title={TITULO_NEGATIVO} data-testid={`alocacao-negativo-${r.key}`}>
+              <span style={{ color: 'var(--color-danger-text)', fontWeight: 700 }}>{formatNumber(r.quantitativoSenasp)} un</span>
+              <div style={{ ...subtle, color: 'var(--color-danger-text)' }}>negativo: conferir na fonte</div>
+            </span>
+          ) : (
+            <>{formatNumber(r.quantitativoSenasp)} un</>
+          )}
+        </td>
         <td data-label="Alocado" style={carteiraTd}>
           <AlocadoBar alocado={r.alocado} senasp={r.quantitativoSenasp} />
         </td>
@@ -441,6 +459,11 @@ export const ItensUnidadesPage: React.FC = () => {
                           </CarteiraIdLink>
                           <SeloPapelSenasp arp={arp} testId={`vinc-atas-papel-${g.ataKey}`} />
                         </div>
+                        {g.negativos > 0 && (
+                          <span title={TITULO_NEGATIVO} style={{ ...subtle, color: 'var(--color-danger-text)' }} data-testid={`vinc-atas-negativo-${g.ataKey}`}>
+                            {g.negativos === 1 ? '1 item' : `${g.negativos} itens`} com quantitativo SENASP negativo
+                          </span>
+                        )}
                         {g.fornecedor && (
                           <CarteiraCellFilter descricao={`fornecedor ${g.fornecedor}`} onFilter={() => setFilter('busca', g.fornecedor!)}>
                             <div title={g.fornecedor} style={carteiraFornecedor}>
@@ -565,6 +588,34 @@ export const ItensUnidadesPage: React.FC = () => {
       />
 
       <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da alocação" testIdPrefix="alocacao-fontes" />
+
+      {!isBusy && !motivoListaNaoCarregou && negativos.length > 0 && (
+        <NoticeBar
+          tone="warning"
+          testId="alocacao-negativos"
+          action={
+            <AppButton
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                const atas = [...new Set(negativos.map((r) => r.arp.numeroAtaRegistroPreco))];
+                setAbertas({});
+                setFilters({ nivel: TODOS, vigencia: 'VIGENTES', busca: atas.length === 1 ? atas[0] : '' });
+              }}
+            >
+              Ver {negativos.length === 1 ? 'o item' : 'os itens'}
+            </AppButton>
+          }
+        >
+          <strong>
+            {negativos.length === 1 ? '1 item' : `${formatNumber(negativos.length)} itens`} com quantitativo SENASP negativo
+          </strong>{' '}
+          ({[...new Set(negativos.map((r) => `ata ${r.arp.numeroAtaRegistroPreco} item ${Number(r.item.numeroItem)}`))].slice(0, 3).join(', ')}
+          {negativos.length > 3 ? '…' : ''}): o registrado da SENASP no Compras.gov.br é menor que o que ela gerencia para os participantes. Confira o
+          remanejamento na fonte; até lá a alocação só pode diminuir.
+        </NoticeBar>
+      )}
 
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando itens...">
