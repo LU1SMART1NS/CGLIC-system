@@ -296,6 +296,17 @@ export async function voltarEtapaEntrega(input: { id: string; motivo: string }):
   if (error) throw mapPostgresErrorToAppError(error);
 }
 
+/** Trocar o beneficiário de um item que não veio de emenda (migration 284): motivo e SEI ficam no histórico. */
+export async function trocarBeneficiarioEntrega(input: { id: string; beneficiarioId: string; motivo: string; documentoSei: string }): Promise<void> {
+  const { error } = await cliente().rpc('trocar_beneficiario_entrega', {
+    p_id: input.id,
+    p_beneficiario_id: input.beneficiarioId,
+    p_motivo: input.motivo.trim(),
+    p_documento_sei: input.documentoSei.replace(/\D/g, '')
+  });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
 export async function dividirEntrega(input: { id: string; quantidade: number }): Promise<void> {
   const { error } = await cliente().rpc('dividir_entrega', { p_id: input.id, p_quantidade: input.quantidade });
   if (error) throw mapPostgresErrorToAppError(error);
