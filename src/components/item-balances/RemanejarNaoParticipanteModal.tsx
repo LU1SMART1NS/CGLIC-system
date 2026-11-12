@@ -217,7 +217,7 @@ export const RemanejarNaoParticipanteModal: React.FC<Props> = (p) => {
           {folgas && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }} data-testid="remanejar-np-folga">
               <b style={{ fontSize: '0.88rem' }}>Onde dá para diminuir</b>
-              <span style={pequeno}>Preso é o contratado mais o reservado a parlamentares ainda sem contrato: essa parte não sai da unidade.</span>
+              <span style={pequeno}>Preso é o contratado mais o reservado a parlamentares ainda fora do contratado: essa parte não sai da unidade.</span>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>

@@ -62,6 +62,13 @@ describe('AllocationsTab', () => {
     expect(out).not.toContain('pendente');
   });
 
+  it('CAEP: o reservado a parlamentares sai do livre, inclusive o já em contrato sem unidade (caso 00108/2024 item 1)', () => {
+    const out = html({ rows: [{ id: 'c', unitName: 'CAEP', allocatedQty: 225, contratado: 0, empenhado: 0, vinculados: 0, reservado: 218, reservadoEmContratoSemUnidade: 129 }] });
+    expect(out).toContain('>7<');
+    expect(out).not.toContain('>225</span></span>');
+    expect(out).toContain('218 reservados (129 já em contrato)');
+  });
+
   it('a empenhar negativo (empenhado acima do alocado) aparece em vermelho', () => {
     const out = html({ rows: [{ id: 'a1', unitName: 'DSUSP', allocatedQty: 30, contratado: 10, empenhado: 25, vinculados: 0 }] });
     expect(out).toContain('-15');

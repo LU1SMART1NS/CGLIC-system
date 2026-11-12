@@ -68,7 +68,7 @@ export const CatalogoVazioAviso: React.FC = () => (
 /**
  * Janela "Alocação do item", a mesma na fila Itens às unidades e na aba Alocação interna do Item 360: lista as
  * unidades já alocadas com o contratado, o empenhado e (na CAEP) o reservado a parlamentares, edita a quantidade na
- * linha (mínimo = contratado + reservado ainda sem contrato), remove (só sem contrato, empenho vinculado nem reserva) e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
+ * linha (mínimo = contratado + reservado ainda fora do contratado), remove (só sem contrato, empenho vinculado nem reserva) e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
  */
 export const AlocarUnidadeModal: React.FC<AlocarUnidadeModalProps> = ({ item, ...rest }) =>
   item ? <JanelaAlocacao key={`${item.numeroAta}-${item.uasg}-${item.numeroItem}`} item={item} {...rest} /> : null;
@@ -314,7 +314,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                       <th style={thStyle}>Unidade interna</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Contratado</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Empenhado</th>
-                      {comReserva && <th style={{ ...thStyle, textAlign: 'right' }} title="Reservado a parlamentares que ainda não virou contrato no Contratos.gov.br (o que já virou está em Contratado)">Reservado</th>}
+                      {comReserva && <th style={{ ...thStyle, textAlign: 'right' }} title="Reservado a parlamentares que ainda não está em Contratado: o que não virou contrato e o de contrato ainda sem a unidade interna informada">Reservado</th>}
                       <th style={{ ...thStyle, textAlign: 'right' }}>Alocado</th>
                       <th style={thStyle} aria-label="Ações" />
                     </tr>
@@ -343,6 +343,15 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                           {comReserva && (
                             <td data-rotulo="Reservado" data-testid={`alocar-unidade-reservado-${l.unitName}`} style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>
                               {l.reservado ? formatNumber(l.reservado) : '—'}
+                              {(l.reservadoEmContratoSemUnidade ?? 0) > 0 && !l.removida && (
+                                <small
+                                  data-testid={`alocar-unidade-reservado-em-contrato-${l.unitName}`}
+                                  title="Já viraram contrato, mas o contrato ainda está sem a unidade interna. Saem do reservado e entram em Contratado quando a unidade for informada em Contratos e empenhos."
+                                  style={{ display: 'block', color: CINZA, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                                >
+                                  {formatNumber(l.reservadoEmContratoSemUnidade!)} já em contrato
+                                </small>
+                              )}
                             </td>
                           )}
                           <td data-rotulo="Alocado" style={{ ...td, textAlign: 'right' }}>
