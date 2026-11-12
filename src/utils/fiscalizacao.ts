@@ -18,6 +18,26 @@ export function segmentoDoContrato(c: Pick<ContratoFiscalizacao, 'situacao'>): E
   return c.situacao === 'AREA_PADRAO' ? 'AREA' : c.situacao;
 }
 
+/** A área requisitante fiscaliza o contrato, todo ou em parte? */
+export function comArea(c: Pick<ContratoFiscalizacao, 'situacao'>): boolean {
+  return c.situacao === 'AREA' || c.situacao === 'AREA_PADRAO' || c.situacao === 'MISTA';
+}
+
+/** Valor do filtro "Unidade" para contrato com a área requisitante e sem unidade indicada. */
+export const UNIDADE_A_INDICAR = '__a_indicar__';
+
+/** Unidade interna do contrato com a área requisitante: a indicada; sem indicação, a única da divisão do contrato. */
+export function unidadeDaArea(c: Pick<ContratoFiscalizacao, 'situacao' | 'unidadeArea' | 'unidadesDoContrato'>): string | null {
+  if (!comArea(c)) return null;
+  if (c.unidadeArea) return c.unidadeArea;
+  return c.unidadesDoContrato?.length === 1 ? c.unidadesDoContrato[0] : null;
+}
+
+/** A unidade veio da divisão do contrato (sugestão), não de uma decisão do coordenador? */
+export function unidadeSugerida(c: Pick<ContratoFiscalizacao, 'unidadeArea'>): boolean {
+  return !c.unidadeArea;
+}
+
 export function comSfc(c: Pick<ContratoFiscalizacao, 'situacao'>): boolean {
   return c.situacao === 'SFC' || c.situacao === 'MISTA';
 }
@@ -177,3 +197,25 @@ export function dataBR(iso: string | null | undefined): string {
 
 /** Contrato 360 aberto na aba Fiscalização. */
 export const rotaDoContrato = (c: Pick<ContratoFiscalizacao, 'contractKey'>) => `/contratos/${encodeURIComponent(c.contractKey)}?aba=fiscalizacao`;
+
+/** Carga de uma unidade interna como área requisitante (aba Equipe da Distribuição); sigla nula = unidade a indicar. */
+export interface CargaDaArea {
+  sigla: string | null;
+  toda: number;
+  mista: number;
+  /** Contratos em que a unidade veio da divisão do contrato, sem decisão do coordenador. */
+  pelaDivisao: number;
+}
+
+export function cargaPorArea(contratos: ContratoFiscalizacao[]): CargaDaArea[] {
+  const mapa = new Map<string | null, CargaDaArea>();
+  for (const c of contratos) {
+    if (!comArea(c)) continue;
+    const sigla = unidadeDaArea(c);
+    const a = mapa.get(sigla) ?? { sigla, toda: 0, mista: 0, pelaDivisao: 0 };
+    if (c.situacao === 'MISTA') a.mista += 1; else a.toda += 1;
+    if (sigla && unidadeSugerida(c)) a.pelaDivisao += 1;
+    mapa.set(sigla, a);
+  }
+  return [...mapa.values()].sort((x, y) => (x.sigla === null ? 1 : y.sigla === null ? -1 : y.toda + y.mista - (x.toda + x.mista)));
+}

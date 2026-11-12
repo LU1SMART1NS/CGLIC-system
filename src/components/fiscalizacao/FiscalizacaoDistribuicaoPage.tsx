@@ -14,7 +14,7 @@ import { AdminListShell } from '../admin/shared/AdminListShell';
 import { colors } from '../../design-system/tokens';
 import { useContratosFiscalizacao, useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, cargaPorFiscal, fiscaisVisiveis, idsDosFiscaisComContrato, deEmenda, numeroDoContrato, segmentoDoContrato, type SegmentoDistribuicao } from '../../utils/fiscalizacao';
+import { NOME_SFC, UNIDADE_A_INDICAR, cargaPorArea, comArea, unidadeDaArea, cargaPorFiscal, fiscaisVisiveis, idsDosFiscaisComContrato, deEmenda, numeroDoContrato, segmentoDoContrato, type SegmentoDistribuicao } from '../../utils/fiscalizacao';
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
 import { DefinirFiscalizacaoModal } from './FiscalizacaoModais';
 import { FiscaisEquipe } from './FiscaisEquipe';
@@ -43,25 +43,38 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
   const [busca, setBusca] = useState('');
   const [fiscal, setFiscal] = useState('');
   const [origem, setOrigem] = useState('');
+  const [unidade, setUnidade] = useState('');
   const [editando, setEditando] = useState<ContratoFiscalizacao | null>(null);
 
   const conta = (s: SegmentoDistribuicao) => contratos.filter((c) => s === 'TODOS' || segmentoDoContrato(c) === s).length;
   const doSeg = useMemo(() => contratos.filter((c) => seg === 'TODOS' || segmentoDoContrato(c) === seg), [contratos, seg]);
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
+    const naUnidade = (c: ContratoFiscalizacao) => !unidade || (comArea(c) && (unidade === UNIDADE_A_INDICAR ? !unidadeDaArea(c) : unidadeDaArea(c) === unidade));
     return doSeg
       .filter(
         (c) =>
           (!q || `${numeroDoContrato(c)} ${c.fornecedor ?? ''} ${c.emendas.join(' ')} ${c.fiscalNome ?? ''}`.toLowerCase().includes(q)) &&
           (!fiscal || c.fiscalUserId === fiscal) &&
-          (!origem || (origem === 'EMENDA' ? deEmenda(c) : !deEmenda(c)))
+          (!origem || (origem === 'EMENDA' ? deEmenda(c) : !deEmenda(c))) &&
+          naUnidade(c)
       )
       .sort((a, b) => (b.assinatura ?? '').localeCompare(a.assinatura ?? ''));
-  }, [doSeg, busca, fiscal, origem]);
-  const ativos = Boolean(busca || fiscal || origem);
+  }, [doSeg, busca, fiscal, origem, unidade]);
+  const ativos = Boolean(busca || fiscal || origem || unidade);
   const chave = useCallback((c: ContratoFiscalizacao) => c.contractKey, []);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(filtrados, chave, POR_PAGINA);
   const carga = useMemo(() => cargaPorFiscal(contratos, servidores), [contratos, servidores]);
+  const areas = useMemo(() => cargaPorArea(contratos), [contratos]);
+  const opcoesUnidade = useMemo(() => {
+    const comA = doSeg.filter(comArea);
+    const siglas = [...new Set(comA.map(unidadeDaArea).filter((u): u is string => Boolean(u)))].sort();
+    const semUnidade = comA.filter((c) => !unidadeDaArea(c)).length;
+    return [
+      ...siglas.map((u) => ({ value: u, label: u, count: comA.filter((c) => unidadeDaArea(c) === u).length })),
+      ...(semUnidade > 0 ? [{ value: UNIDADE_A_INDICAR, label: 'Unidade a indicar', count: semUnidade }] : [])
+    ];
+  }, [doSeg]);
   const fiscais = useMemo(() => fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos)), [servidores, contratos]);
 
 
@@ -80,7 +93,7 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
         active={aba}
         onSelect={(s) => setParams({ segmento: s }, { replace: true })}
         segments={[
-          { id: 'EQUIPE', label: 'Equipe', count: carga.length, title: 'Carga de cada fiscal' },
+          { id: 'EQUIPE', label: 'Equipe', count: carga.length + areas.filter((a) => a.sigla).length, title: 'Carga de cada fiscal e de cada unidade interna' },
           { id: 'A_DEFINIR', label: 'A definir', count: conta('A_DEFINIR'), dot: 'var(--color-warning-solid)' },
           { id: 'SFC', label: NOME_SFC, count: conta('SFC'), dot: 'var(--primary)' },
           { id: 'MISTA', label: 'Mista', count: conta('MISTA'), dot: colors.semantic.purple.solid },
@@ -89,7 +102,7 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
         ]}
       />
       {aba === 'EQUIPE' ? (
-        <FiscaisEquipe carga={carga} contratos={contratos} transferencias={transferencias.data ?? []} />
+        <FiscaisEquipe carga={carga} areas={areas} contratos={contratos} transferencias={transferencias.data ?? []} onDefinir={setEditando} />
       ) : (
       <>
       <CarteiraFilterBar
@@ -97,11 +110,12 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
         searchPlaceholder="Buscar por contrato, fornecedor, emenda ou fiscal..."
         onChangeBusca={setBusca}
         hasActiveFilters={ativos}
-        onResetFilters={() => { setBusca(''); setFiscal(''); setOrigem(''); }}
+        onResetFilters={() => { setBusca(''); setFiscal(''); setOrigem(''); setUnidade(''); }}
         counter={carteiraCounter(filtrados.length, doSeg.length, ativos, 'contrato', 'contratos')}
         testIdPrefix="fisc-dist"
       >
         <CarteiraFilterButton label="Origem" value={origem} emptyValue="" options={[{ value: 'EMENDA', label: 'Com emenda', count: doSeg.filter(deEmenda).length }, { value: 'SEM', label: 'Sem emenda', count: doSeg.filter((c) => !deEmenda(c)).length }]} onChange={setOrigem} testId="fisc-dist-filtro-origem" />
+        {opcoesUnidade.length > 0 && <CarteiraFilterButton label="Unidade" value={unidade} emptyValue="" options={opcoesUnidade} onChange={setUnidade} testId="fisc-dist-filtro-unidade" />}
         <CarteiraFilterButton label="Fiscal" value={fiscal} emptyValue="" options={fiscais.map((f) => ({ value: f.id, label: f.nome, count: doSeg.filter((c) => c.fiscalUserId === f.id).length }))} onChange={setFiscal} testId="fisc-dist-filtro-fiscal" />
       </CarteiraFilterBar>
       <AdminListShell

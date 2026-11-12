@@ -7,9 +7,10 @@ import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { useToast } from '../../design-system/components/Toast';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
 import { documentoSeiValido, mascaraDocumentoSei } from '../../utils/mascaras';
+import { useDepartments } from '../../hooks/useDepartments';
 import { useDefinirFiscalizacao, useDesfazerTransferenciaFiscal, useFiscaisAtivos, useRegistrarProcessoFiscalizacao, useTransferirContratosFiscal, useTransferirFiscalTemporaria } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao, DecisaoFiscalizacao, TransferenciaFiscal } from '../../services/fiscalizacaoService';
-import { MOTIVO_MINIMO, NOME_SFC, dataBR, decisaoPedeMotivo, decisaoSugerida, deEmenda, hojeEmBrasilia, numeroDoContrato, type CargaDoFiscal } from '../../utils/fiscalizacao';
+import { MOTIVO_MINIMO, NOME_SFC, dataBR, decisaoPedeMotivo, decisaoSugerida, deEmenda, hojeEmBrasilia, unidadeDaArea, numeroDoContrato, type CargaDoFiscal } from '../../utils/fiscalizacao';
 
 const seiValido = (s: string) => /^\d{7,10}$/.test(s.replace(/\D/g, ''));
 const erroDe = (err: unknown) => (err as { message?: string } | null)?.message || 'erro desconhecido';
@@ -23,19 +24,25 @@ export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao
   const [fiscal, setFiscal] = useState(contrato.fiscalUserId ?? '');
   const [portaria, setPortaria] = useState(contrato.portariaSei ?? '');
   const [motivo, setMotivo] = useState(contrato.motivo ?? '');
+  const departamentos = useDepartments();
+  const doContrato = contrato.unidadesDoContrato ?? [];
+  const [unidade, setUnidade] = useState(() => unidadeDaArea({ ...contrato, situacao: 'AREA' }) ?? '');
+  const comUnidade = decisao !== 'SFC';
+  const outrasUnidades = (departamentos.data ?? []).filter((d) => d.ativo && !doContrato.includes(d.sigla));
+  const faltaUnidade = comUnidade && !unidade;
   const pedeMotivo = decisaoPedeMotivo(contrato, decisao);
   const comFiscal = decisao !== 'AREA';
   const faltaMotivo = pedeMotivo && motivo.trim().length < MOTIVO_MINIMO;
   const faltaFiscal = comFiscal && !fiscal;
   const portariaRuim = comFiscal && portaria.trim() !== '' && !seiValido(portaria);
-  const bloqueado = faltaMotivo || faltaFiscal || portariaRuim;
+  const bloqueado = faltaMotivo || faltaFiscal || portariaRuim || faltaUnidade;
 
   const enviar = () =>
     salvar.mutate(
-      { contractKey: contrato.contractKey, fiscalizacao: decisao, fiscalUserId: fiscal || null, portariaSei: portaria || null, motivo: pedeMotivo || motivo ? motivo : null },
+      { contractKey: contrato.contractKey, fiscalizacao: decisao, fiscalUserId: fiscal || null, portariaSei: portaria || null, motivo: pedeMotivo || motivo ? motivo : null, unidadeArea: comUnidade ? unidade : null },
       {
         onSuccess: () => {
-          toast.success(`Contrato ${numeroDoContrato(contrato)}: ${decisao === 'AREA' ? 'com a área requisitante' : `${decisao === 'MISTA' ? 'fiscalização mista' : NOME_SFC} · ${fiscais.find((f) => f.id === fiscal)?.nome ?? ''}`}`);
+          toast.success(`Contrato ${numeroDoContrato(contrato)}: ${decisao === 'AREA' ? `com a área requisitante · ${unidade}` : `${decisao === 'MISTA' ? 'fiscalização mista' : NOME_SFC} · ${fiscais.find((f) => f.id === fiscal)?.nome ?? ''}`}`);
           onClose();
         },
         onError: (err) => toast.error(`Não foi possível salvar: ${erroDe(err)}`)
@@ -64,6 +71,25 @@ export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao
           <option value="MISTA">Mista: parte {NOME_SFC}, parte área requisitante</option>
           <option value="AREA">Toda pela área requisitante</option>
         </AppSelect>
+        {comUnidade && (
+          <AppSelect
+            label={decisao === 'AREA' ? 'Unidade interna que fiscaliza' : 'Unidade interna da parte da área requisitante'}
+            value={unidade}
+            onChange={(ev) => setUnidade(ev.target.value)}
+            hint={doContrato.length === 1 ? `Sugestão: o contrato é todo da ${doContrato[0]} na divisão por unidade.` : doContrato.length > 1 ? `O contrato se divide entre ${doContrato.join(', ')}: escolha a que fiscaliza.` : 'O contrato não está dividido por unidade: escolha a unidade.'}
+            data-testid="fisc-definir-unidade"
+          >
+            <option value="">Escolher…</option>
+            {doContrato.length > 0 && (
+              <optgroup label="Do contrato">
+                {doContrato.map((u) => <option key={u} value={u}>{u}</option>)}
+              </optgroup>
+            )}
+            <optgroup label={doContrato.length > 0 ? 'Outras unidades' : 'Unidades internas'}>
+              {outrasUnidades.map((d) => <option key={d.sigla} value={d.sigla}>{d.sigla} · {d.nomeCompleto}</option>)}
+            </optgroup>
+          </AppSelect>
+        )}
         {comFiscal && (
           <>
             <AppSelect label={`Fiscal ${NOME_SFC}`} value={fiscal} onChange={(ev) => setFiscal(ev.target.value)} data-testid="fisc-definir-fiscal">

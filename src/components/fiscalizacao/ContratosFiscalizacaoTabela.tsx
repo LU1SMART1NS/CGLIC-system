@@ -9,7 +9,7 @@ import { contratoEhNovo } from '../carteira/carteiraNovidade';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { SELECIONADA_BG } from '../atas/distribuicao/DistribuicaoSelecao';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
-import { ROTULO_SITUACAO, dataBR, numeroDoContrato, rotaDoContrato } from '../../utils/fiscalizacao';
+import { NOME_SFC, ROTULO_SITUACAO, comArea, dataBR, numeroDoContrato, rotaDoContrato, unidadeDaArea, unidadeSugerida } from '../../utils/fiscalizacao';
 
 const VARIANTE: Record<ContratoFiscalizacao['situacao'], StatusBadgeVariant> = { A_DEFINIR: 'warning', SFC: 'info', MISTA: 'purple', AREA: 'neutral', AREA_PADRAO: 'neutral' };
 
@@ -58,14 +58,37 @@ export const CelulaOrigem: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) =>
     </>
   );
 
-export const CelulaSituacao: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) => (
-  <>
-    <StatusBadge label={ROTULO_SITUACAO[c.situacao]} variant={VARIANTE[c.situacao]} size="sm" dot={false} />
-    {c.situacao === 'AREA_PADRAO' && <div style={carteiraDetalhe}>padrão: contrato sem emenda</div>}
-    {c.situacao === 'A_DEFINIR' && <div style={carteiraDetalhe}>de emenda: sugestão SFC/CGLIC</div>}
-    {c.motivo && <div style={carteiraDetalhe} title={c.motivo}>{c.motivo.length > 60 ? `${c.motivo.slice(0, 60)}…` : c.motivo}</div>}
-  </>
-);
+/** Unidade interna da área requisitante, embaixo da situação: indicada, da divisão do contrato ou a indicar. */
+/**
+ * Contrato só com a área requisitante: a sigla da unidade no lugar da etiqueta (a origem já diz se é de emenda).
+ * Sem unidade, a etiqueta "Unidade a indicar". A sugestão pela divisão do contrato fica no title.
+ */
+const CelulaDaArea: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) => {
+  const u = unidadeDaArea(c);
+  return (
+    <div data-testid={`fisc-unidade-${c.contractKey}`}>
+      {u ? (
+        <span style={carteiraValor} title={unidadeSugerida(c) ? 'Unidade pela divisão do contrato por unidade interna' : undefined}>{u}</span>
+      ) : (
+        <StatusBadge label="Unidade a indicar" variant="warning" size="sm" dot={false} />
+      )}
+    </div>
+  );
+};
+
+export const CelulaSituacao: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) => {
+  const motivo = c.motivo && <div style={carteiraDetalhe} title={c.motivo}>{c.motivo.length > 60 ? `${c.motivo.slice(0, 60)}…` : c.motivo}</div>;
+  if (comArea(c) && c.situacao !== 'MISTA') return <><CelulaDaArea c={c} />{motivo}</>;
+  const parte = c.situacao === 'MISTA' ? unidadeDaArea(c) : null;
+  return (
+    <>
+      <StatusBadge label={ROTULO_SITUACAO[c.situacao]} variant={VARIANTE[c.situacao]} size="sm" dot={false} />
+      {c.situacao === 'MISTA' && <div style={carteiraDetalhe}>{parte ? `parte com a ${parte}` : 'parte da área: unidade a indicar'}</div>}
+      {c.situacao === 'A_DEFINIR' && <div style={carteiraDetalhe}>sugestão {NOME_SFC}</div>}
+      {motivo}
+    </>
+  );
+};
 
 export const CelulaFiscal: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) =>
   c.fiscalNome ? (
@@ -99,7 +122,7 @@ export const ContratosFiscalizacaoTabela: React.FC<{
   comOrigem?: boolean;
   rowActions?: (c: ContratoFiscalizacao) => React.ReactNode;
   selecao?: SelecaoDeContratos;
-}> = ({ contratos, testId, comOrigem = true, rowActions, selecao }) => {
+}> = ({ contratos, testId, comOrigem = false, rowActions, selecao }) => {
   const navigate = useNavigateWithOrigin();
   const colunas: Column<ContratoFiscalizacao>[] = [
     ...(selecao
