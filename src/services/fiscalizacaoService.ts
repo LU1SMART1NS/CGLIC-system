@@ -1,3 +1,4 @@
+import type { ContagemPrazo, InicioPrazo, RegraDoPrazo } from '../utils/fiscalizacaoPrazo';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 import { lerTodasAsPaginas } from './lerTodasAsPaginas';
@@ -41,6 +42,8 @@ export interface ContratoFiscalizacao {
   unidadeArea?: string | null;
   /** Unidades internas do contrato pela divisão do contratado (ou pela alocação dos itens): sugestão na janela. */
   unidadesDoContrato?: string[];
+  /** Regra completa do prazo (migration 294): dias, contagem, a partir de quando, e de onde veio (TR da ata). */
+  prazoEntrega?: RegraDoPrazo | null;
 }
 
 function cliente() {
@@ -70,6 +73,7 @@ export function linhaParaContrato(r: any): ContratoFiscalizacao {
     processoAutuadoEm: r.processo_autuado_em || null,
     definidoPorNome: r.definido_por_nome || null,
     definidoEm: r.definido_em || null,
+    prazoEntrega: r.prazo_entrega ?? null,
     atas: Array.isArray(r.atas) ? r.atas.filter(Boolean) : [],
     unidadeArea: r.unidade_area || null,
     unidadesDoContrato: Array.isArray(r.unidades_do_contrato) ? r.unidades_do_contrato.filter(Boolean) : []
@@ -168,6 +172,25 @@ export interface EntregaFiscalizacao {
   etapa: EtapaEntrega;
   etapaEm: string | null;
   prevista: string | null;
+  /**
+   * De onde veio a data prevista (migration 294): ORDEM = recebimento da Ordem + prazo em dias; PRORROGACAO =
+   * prorrogação registrada (a data anterior fica em previstaAnterior); PLANILHA = carga da SFC/CGLIC; MANUAL = antes da regra.
+   */
+  previstaOrigem?: 'ORDEM' | 'ASSINATURA' | 'EXERCITO' | 'PRORROGACAO' | 'PLANILHA' | 'MANUAL' | null;
+  /** A partir de quando o prazo do contrato conta (da regra do contrato). */
+  prazoInicio?: InicioPrazo | null;
+  /** Dias corridos ou úteis (da regra do contrato). */
+  prazoContagem?: ContagemPrazo | null;
+  /** Dias devolvidos ao fornecedor pela espera no Exército. */
+  diasSuspensos?: number | null;
+  /** Data em que o fornecedor recebeu (assinou ou deu ciência da) Ordem de Fornecimento. */
+  ordemRecebidaEm?: string | null;
+  /** Prazo de entrega em dias corridos usado na conta. */
+  prazoDias?: number | null;
+  /** Data prevista antes da última prorrogação. */
+  previstaAnterior?: string | null;
+  /** Data prevista pela Ordem, antes de qualquer prorrogação. */
+  previstaOriginal?: string | null;
   entregueEm: string | null;
   divididaDe: string | null;
   /** Programa da carga (Projeto Pegasus, BNDES · Fogo Zero), até o cadastro de programas. */
@@ -230,6 +253,14 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
     etapa: r.etapa,
     etapaEm: r.etapa_em || null,
     prevista: r.prevista || null,
+    previstaOrigem: r.prevista_origem || null,
+    prazoInicio: r.prazo_inicio || null,
+    prazoContagem: r.prazo_contagem || null,
+    diasSuspensos: r.dias_suspensos == null ? null : Number(r.dias_suspensos),
+    ordemRecebidaEm: r.ordem_recebida_em || null,
+    prazoDias: r.prazo_dias == null ? null : Number(r.prazo_dias),
+    previstaAnterior: r.prevista_anterior || null,
+    previstaOriginal: r.prevista_original || null,
     entregueEm: r.entregue_em || null,
     divididaDe: r.dividida_de || null,
     programaTexto: r.programa_texto || null,
@@ -253,7 +284,7 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
 
 export interface MovimentoEntrega {
   id: string;
-  tipo: 'CRIADA' | 'ETAPA' | 'VOLTA' | 'DESFEITO' | 'CORRECAO' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM' | 'BENEFICIARIO';
+  tipo: 'CRIADA' | 'ETAPA' | 'VOLTA' | 'DESFEITO' | 'CORRECAO' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM' | 'BENEFICIARIO' | 'RECEBIMENTO' | 'PRORROGACAO' | 'SUSPENSAO';
   etapa: EtapaEntrega | null;
   data: string | null;
   documentoSei: string | null;
@@ -353,8 +384,29 @@ export async function dividirEntrega(input: { id: string; quantidade: number }):
   if (error) throw mapPostgresErrorToAppError(error);
 }
 
-export async function definirPrevistaEntregas(input: { ids: string[]; prevista: string | null }): Promise<void> {
-  const { error } = await cliente().rpc('definir_prevista_entregas', { p_ids: input.ids, p_prevista: input.prevista });
+/**
+ * Recebimento da Ordem de Fornecimento (migration 294): a data em que o fornecedor recebeu a Ordem e o prazo
+ * em dias corridos; o servidor calcula a data prevista de cada item (recebimento + prazo, fim de semana passa à segunda).
+ */
+export async function registrarRecebimentoOrdem(input: { ids: string[]; recebidaEm: string; prazoDias: number }): Promise<void> {
+  const { error } = await cliente().rpc('registrar_recebimento_ordem', { p_ids: input.ids, p_recebida_em: input.recebidaEm, p_prazo_dias: input.prazoDias });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Prorrogação do prazo de entrega (migration 294): nova data, motivo e SEI da decisão; a data anterior fica guardada. */
+export async function prorrogarPrazoEntregas(input: { ids: string[]; novaData: string; motivo: string; documentoSei: string }): Promise<void> {
+  const { error } = await cliente().rpc('prorrogar_prazo_entregas', {
+    p_ids: input.ids,
+    p_nova_data: input.novaData,
+    p_motivo: input.motivo.trim(),
+    p_documento_sei: input.documentoSei.replace(/\D/g, '')
+  });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Prazo de entrega do contrato (migration 294), em dias corridos do recebimento da Ordem. */
+export async function definirPrazoDoContrato(input: { contractKey: string; dias: number | null; contagem?: ContagemPrazo; inicio?: InicioPrazo; motivo?: string }): Promise<void> {
+  const { error } = await cliente().rpc('definir_prazo_entrega_contrato', { p_contract_key: input.contractKey, p_dias: input.dias, p_contagem: input.contagem ?? 'CORRIDOS', p_inicio: input.inicio ?? 'OF_RECEBIMENTO', p_motivo: input.motivo ?? null });
   if (error) throw mapPostgresErrorToAppError(error);
 }
 

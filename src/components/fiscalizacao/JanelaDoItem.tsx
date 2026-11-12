@@ -16,7 +16,10 @@ import { IdentificacaoDoContrato } from './ContratosFiscalizacaoTabela';
 import { CarteiraIdLink } from '../carteira/CarteiraRowLink';
 import { buildAtaItemPath } from '../../hooks/useAta';
 import { CelulaPrazo, HistoricoDaEntrega } from './EntregasTabela';
-import { CorrigirEtapaModal, DividirEntregaModal, PrevistaModal, ResponsavelModal } from './EntregasModais';
+import { CorrigirEtapaModal, DividirEntregaModal, ResponsavelModal } from './EntregasModais';
+import { ProrrogarPrazoModal, RecebimentoDaOrdemModal } from './PrazoModais';
+import { origemDaPrevista, semRecebimentoDaOrdem } from '../../utils/fiscalizacaoPrazo';
+import { EM_EXECUCAO } from '../../utils/fiscalizacaoMesa';
 import { AvancarEtapaModal, VoltarEtapaItemModal } from './EtapaModais';
 import { RowActionsMenu } from '../../design-system/components/RowActionsMenu';
 import { proximasEtapas, rotuloDoAvanco } from '../../utils/fiscalizacaoPassos';
@@ -26,7 +29,7 @@ import { TrocarBeneficiarioModal } from './TrocarBeneficiarioModal';
 import { RepartirEntreBeneficiariosModal } from './RepartirEntreBeneficiariosModal';
 import { LigarBeneficiarioModal } from './LigarBeneficiarioModal';
 
-type Acao = 'avancar' | 'voltar' | 'corrigir' | 'parcial' | 'prevista' | 'responsavel' | 'beneficiario' | 'repartir';
+type Acao = 'avancar' | 'voltar' | 'corrigir' | 'parcial' | 'recebimento' | 'prorrogar' | 'responsavel' | 'beneficiario' | 'repartir';
 
 const Campo: React.FC<{ rotulo: string; largo?: boolean; children: React.ReactNode }> = ({ rotulo, largo, children }) => (
   <div style={{ minWidth: 0, gridColumn: largo ? '1 / -1' : undefined }}>
@@ -53,6 +56,8 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
   // Item de emenda: o beneficiário é o da linha do pedido (troca no Pedido 360).
   const podeTrocarBeneficiario = podeAgir && e.origem !== 'EMENDA';
   const avanco = rotuloDoAvanco(proximasEtapas(e));
+  const emExecucao = EM_EXECUCAO.has(e.etapa) && !e.entregueEm;
+  const origem = origemDaPrevista(e);
   const k = ataEItemDaChave(e.itemKey);
   // O link só aparece quando o contrato já tem item da ata para escolher (sem ata, a mesa aponta para a Vinculação).
   const itensDaAta = useItensDaAtaDoContrato(podeAgir && !e.itemKey ? e.contractKey : null);
@@ -64,7 +69,8 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
   if (acao === 'voltar') return <VoltarEtapaItemModal entrega={e} onClose={fechar} />;
   if (acao === 'corrigir') return <CorrigirEtapaModal entregas={[e]} onClose={fechar} />;
   if (acao === 'parcial') return <DividirEntregaModal entrega={e} onClose={fechar} />;
-  if (acao === 'prevista') return <PrevistaModal entregas={[e]} onClose={fechar} />;
+  if (acao === 'recebimento') return <RecebimentoDaOrdemModal entregas={[e]} onClose={fechar} />;
+  if (acao === 'prorrogar') return <ProrrogarPrazoModal entregas={[e]} onClose={fechar} />;
   if (acao === 'responsavel') return <ResponsavelModal entregas={[e]} onClose={fechar} />;
   if (acao === 'beneficiario') return <TrocarBeneficiarioModal entrega={e} onClose={fechar} />;
   if (acao === 'repartir') return <RepartirEntreBeneficiariosModal entrega={e} onClose={fechar} />;
@@ -84,6 +90,8 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
                 label="Mais ações do item"
                 testId="fisc-janela-mais"
                 actions={[
+                  ...(!area && emExecucao && e.prevista ? [{ label: 'Prorrogar o prazo', onClick: () => setAcao('prorrogar') }] : []),
+                  ...(!area && emExecucao && e.prevista && semRecebimentoDaOrdem(e) ? [{ label: 'Informar o recebimento da Ordem', onClick: () => setAcao('recebimento') }] : []),
                   ...(!area ? [{ label: 'Voltar etapa', onClick: () => setAcao('voltar') }] : []),
                   ...(!area && role === 'admin' ? [{ label: 'Corrigir a etapa', onClick: () => setAcao('corrigir') }] : []),
                   ...(podeTrocarBeneficiario ? [{ label: 'Trocar beneficiário', onClick: () => setAcao('beneficiario') }] : []),
@@ -93,7 +101,7 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
             )}
             <span style={{ flex: 1 }} />
             {!area && <AppButton variant="outline" size="sm" disabled={e.quantidade < 2} onClick={() => setAcao('parcial')} data-testid="fisc-janela-parcial">Entrega parcial</AppButton>}
-            {!area && <AppButton variant="outline" size="sm" onClick={() => setAcao('prevista')} data-testid="fisc-janela-prevista">Data prevista</AppButton>}
+            {!area && emExecucao && !e.prevista && <AppButton variant="outline" size="sm" onClick={() => setAcao('recebimento')} data-testid="fisc-janela-recebimento">Recebimento da Ordem</AppButton>}
             {e.fiscalizacao === 'MISTA' && <AppButton variant="outline" size="sm" onClick={() => setAcao('responsavel')} data-testid="fisc-janela-responsavel">Quem fiscaliza</AppButton>}
             {!area && avanco && <AppButton variant="primary" size="sm" onClick={() => setAcao('avancar')} data-testid="fisc-janela-avancar">{avanco}</AppButton>}
           </>
@@ -109,6 +117,12 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem 1rem', alignItems: 'baseline' }}>
               <span style={{ ...carteiraDetalhe, marginTop: 0 }}>{e.etapaEm ? `nesta etapa desde ${dataBR(e.etapaEm)}` : ''}</span>
               <span style={{ marginLeft: 'auto', textAlign: 'right' }}><CelulaPrazo e={e} /></span>
+            </div>
+          )}
+          {!area && !e.entregueEm && (
+            <div style={{ ...carteiraDetalhe, marginTop: 0, textAlign: 'right' }} data-testid="fisc-janela-origem-prazo">
+              {origem ?? (EM_EXECUCAO.has(e.etapa) ? 'sem prazo: falta o recebimento da Ordem pelo fornecedor' : 'o prazo começa quando o fornecedor recebe a Ordem')}
+              {e.previstaOrigem === 'PRORROGACAO' && e.previstaOriginal && e.previstaOriginal !== e.previstaAnterior && ` · pela Ordem: ${dataBR(e.previstaOriginal)}`}
             </div>
           )}
         </div>
