@@ -95,7 +95,7 @@ export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ cont
               </Campo>
             )}
             {comSfc(contrato) && (
-              <Campo rotulo="Nº do Processo SEI">
+              <Campo rotulo="Processo SEI">
                 {contrato.processoNup ? (
                   <>
                     <NumeroSeiEtiqueta numero={contrato.processoNup} testId="fisc-contrato-processo-sei" />
