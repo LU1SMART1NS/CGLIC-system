@@ -5,6 +5,7 @@ import { AppDateInput, AppInput, AppSelect } from '../../../design-system/compon
 import { CarteiraSegmentTabs } from '../../carteira/CarteiraSegmentTabs';
 import { carteiraTableShell, carteiraTd, carteiraTh } from '../../carteira/carteiraStyles';
 import { useUsers } from '../../../hooks/useUsers';
+import { podeTerCarteira } from '../../../hooks/useGestoresAtivos';
 import { useTransferenciasTemporarias, useTransferirCarteira } from '../../../hooks/useTransferenciasTemporarias';
 import { ROTULO_MOTIVO_AUSENCIA, type MotivoAusencia } from '../../../services/transferenciaTemporariaService';
 import type { ArpItemContractLinkPair } from '../../../services/arpContractLinkService';
@@ -42,11 +43,11 @@ export const TransferirTemporariamenteModal: React.FC<TransferirTemporariamenteM
   const [padrao, setPadrao] = React.useState('');
   const [porItem, setPorItem] = React.useState<Record<string, string>>({});
 
-  // Quem pode assumir: gestores ativos, menos quem sai e quem também está ausente.
+  // Quem pode assumir: gestores e coordenadores ativos, menos quem sai e quem também está ausente.
   const candidatos = React.useMemo(
     () =>
       users
-        .filter((u) => u.ativo && u.perfil === 'gestor' && u.id !== ausente.userId && !ausenciaDe(transferencias, u.id))
+        .filter((u) => podeTerCarteira(u) && u.id !== ausente.userId && !ausenciaDe(transferencias, u.id))
         .sort((a, b) => a.nome.localeCompare(b.nome)),
     [users, transferencias, ausente.userId]
   );

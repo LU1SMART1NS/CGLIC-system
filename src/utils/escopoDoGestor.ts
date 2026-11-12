@@ -40,18 +40,21 @@ export function escopoDoGestor(
 export interface GestorDaCarteira {
   userId: string;
   nome: string;
+  /** Perfil quando não é o de gestor (ex.: "Coordenador"): etiqueta no cartão; sem carteira, nem entra no rodapé. */
+  outroPerfil?: string;
 }
 
 /**
  * Gestores com alguma ata ou contrato atribuído (só os ligados a um usuário do sistema), em ordem alfabética.
  * Quando `idsPermitidos` é informado, só entram os usuários desse conjunto — use-o para manter fora da lista quem
- * não é gestor de atas e contratos ativo (coordenador, perfil consulta ou usuário inativado que ainda tem
- * atribuição antiga em ata_managers/contract_managers).
+ * não pode ter carteira (perfil consulta ou usuário inativado que ainda tem atribuição antiga em
+ * ata_managers/contract_managers). `outrosPerfis` marca quem tem carteira com outro perfil (coordenador).
  */
 export function listarGestores(
   contractManagers: Iterable<Pick<ContractManager, 'gestorNome' | 'gestorUserId'> | undefined>,
   ataManagers: Iterable<Pick<AtaManager, 'gestorNome' | 'gestorUserId'> | undefined>,
-  idsPermitidos?: ReadonlySet<string>
+  idsPermitidos?: ReadonlySet<string>,
+  outrosPerfis?: ReadonlyMap<string, string>
 ): GestorDaCarteira[] {
   const porId = new Map<string, string>();
   for (const m of [...contractManagers, ...ataManagers]) {
@@ -59,5 +62,10 @@ export function listarGestores(
     if (idsPermitidos && !idsPermitidos.has(m.gestorUserId)) continue;
     porId.set(m.gestorUserId, m.gestorNome);
   }
-  return [...porId].map(([userId, nome]) => ({ userId, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  return [...porId]
+    .map(([userId, nome]) => {
+      const outroPerfil = outrosPerfis?.get(userId);
+      return outroPerfil ? { userId, nome, outroPerfil } : { userId, nome };
+    })
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
