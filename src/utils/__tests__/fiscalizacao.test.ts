@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { linhaParaContrato } from '../../services/fiscalizacaoService';
-import { cargaPorFiscal, podeSerFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato } from '../fiscalizacao';
+import { cargaPorFiscal, mediaDaEquipeFiscal, podeSerFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato } from '../fiscalizacao';
 
 const base: ContratoFiscalizacao = {
   contractKey: '200331-00055-2026', uasg: '200331', numero: '00055/2026', fornecedor: 'CONDOR', objeto: null, assinatura: '2026-01-29', vigenciaFim: '2027-01-29',
@@ -70,6 +70,14 @@ describe('fiscalização do contrato', () => {
       ['Hugo', 'Coordenador', 1],
       ['Ana', null, 0]
     ]);
+  });
+
+  it('média da equipe de fiscais pelos contratos, sem quem tem outro perfil', () => {
+    const f = (userId: string, contratos: number, outroPerfil?: string) => ({ userId, nome: userId, contratos, aAutuar: 0, semPortaria: 0, ...(outroPerfil ? { outroPerfil } : {}) });
+    const { media, relacao } = mediaDaEquipeFiscal([f('a', 60), f('b', 40), f('c', 20), f('coord', 77, 'Coordenador'), f('zero', 0)]);
+    expect(media).toBe(40);
+    expect([...relacao]).toEqual([['a', 'ACIMA'], ['b', 'NA_MEDIA'], ['c', 'ABAIXO']]);
+    expect(mediaDaEquipeFiscal([f('a', 10), f('coord', 5, 'Coordenador')]).media).toBeNull();
   });
 
   it('pode receber contratos como fiscal: Gestor de Fiscalização e Coordenador', () => {

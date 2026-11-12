@@ -39,7 +39,8 @@ export const OcupacaoBarra: React.FC<{ l: DistribuicaoLinha; escala: number; med
             <div key={n} style={{ flex: l.complexidade[n] * PESO_COMPLEXIDADE[n], background: COR_COMPLEXIDADE[n] }} />
           ))}
         </div>
-        {media !== null && escala > 0 && (
+        {/* Tracejado só em quem é comparado à equipe (o coordenador que também é gestor fica fora da média). */}
+        {media !== null && l.relacaoEquipe !== null && escala > 0 && (
           <span style={{ position: 'absolute', top: '-3px', bottom: '-3px', left: `${Math.min(media / escala, 1) * 100}%`, borderLeft: '2px dashed #64748b' }} />
         )}
       </div>

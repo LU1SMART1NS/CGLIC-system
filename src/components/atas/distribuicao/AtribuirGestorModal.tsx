@@ -93,7 +93,8 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
   const { opcoes, sugestao } = React.useMemo(() => avaliarCandidatos(lote, candidatos, linhas), [lote, candidatos, linhas]);
   // Média de ocupação da equipe (gestores com carteira) e uma régua comum para todas as barras.
   const media = React.useMemo(() => {
-    const gestores = linhas.filter((l) => l.gestorNome !== null);
+    // Só quem é comparado à equipe (fica de fora o coordenador que também é gestor).
+    const gestores = linhas.filter((l) => l.gestorNome !== null && l.relacaoEquipe !== null);
     return gestores.length >= 2 ? gestores.reduce((s, l) => s + l.ocupacao, 0) / gestores.length : null;
   }, [linhas]);
   const escala = Math.max(0, media ?? 0, ...opcoes.map((o) => o.ocupacaoDepois)) * 1.1;

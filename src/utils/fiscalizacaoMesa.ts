@@ -2,6 +2,7 @@ import type { EntregaFiscalizacao, EtapaEntrega } from '../services/fiscalizacao
 import { NOME_SFC, dataBR } from './fiscalizacao';
 import { itemConcluido, prazoDaEntrega, rotuloDoBeneficiario, textoDoAviso } from './fiscalizacaoEntregas';
 import { gruposALigar } from './fiscalizacaoLigacao';
+import { gruposSemCadastro } from './fiscalizacaoBeneficiarioLigacao';
 
 /* Regras da mesa do Contrato 360 › Fiscalização (Com você · Com outros) e de "com quem está o item", usadas também nas abas Contratos e Itens. */
 
@@ -86,4 +87,13 @@ export function linhaDeLigacao(es: EntregaFiscalizacao[], temItensDaAta: boolean
   const nomes = gs.length === 1 ? `"${gs[0].texto}"` : `${gs.length} nomes escritos na planilha`;
   if (!temItensDaAta) return { chave: 'ligar', tom: 'espera', quem: 'Vinculação', titulo: `Ligar o contrato à ata · ${itens(n)} da planilha esperam`, detalhe: `${nomes} · depois os itens se ligam pelo nome`, acoes: [] };
   return { chave: 'ligar', tom: 'eu', titulo: `Ligar ao item da ata · ${itens(n)} da planilha`, detalhe: `${nomes} · uma escolha por nome`, acoes: [{ rotulo: 'Ligar ao item da ata', principal: true, faz: ligar }] };
+}
+
+/** Itens da planilha com o beneficiário escrito à mão (migration 272): um passo só, com quantos itens e quantos nomes. */
+export function linhaDeCadastro(es: EntregaFiscalizacao[], ligar: () => void): Linha | null {
+  const gs = gruposSemCadastro(es);
+  if (!gs.length) return null;
+  const n = gs.reduce((t, g) => t + g.es.length, 0);
+  const nomes = gs.length === 1 ? `"${gs[0].texto}"` : `${gs.length} nomes escritos na planilha`;
+  return { chave: 'cadastro', tom: 'eu', titulo: `Ligar ao cadastro de beneficiários · ${itens(n)} da planilha`, detalhe: `${nomes} · sem endereço de entrega até ligar`, acoes: [{ rotulo: 'Ligar ao cadastro', principal: true, faz: ligar }] };
 }

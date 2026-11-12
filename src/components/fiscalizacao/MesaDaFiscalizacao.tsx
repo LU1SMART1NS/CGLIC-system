@@ -12,10 +12,11 @@ import { NOME_SFC, ehDoFiscal } from '../../utils/fiscalizacao';
 import { nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario } from '../../utils/fiscalizacaoEntregas';
 import { EncerrarEntregasModal, PrevistaModal } from './EntregasModais';
 import { AvancarEtapaModal } from './EtapaModais';
-import { comQuemEstaOItem, itens, linhaDeLigacao, linhasDoContrato, type Linha } from '../../utils/fiscalizacaoMesa';
+import { comQuemEstaOItem, itens, linhaDeCadastro, linhaDeLigacao, linhasDoContrato, type Linha } from '../../utils/fiscalizacaoMesa';
 import { FiltroPendencia, MaisSemPendencia, SecaoDaMesa, type LinhaDeTrabalho } from '../mesa/MesaDeTrabalho';
 import { blocoDaMesa as bloco } from '../mesa/mesaEstilos';
 import { LigarItemDaAtaModal } from './LigarItemDaAtaModal';
+import { LigarBeneficiarioModal } from './LigarBeneficiarioModal';
 import { DefinirFiscalizacaoModal, RegistrarProcessoModal } from './FiscalizacaoModais';
 import { JanelaDoItem } from './JanelaDoItem';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -23,7 +24,7 @@ import { DataTable } from '../../design-system/components/DataTable';
 import { CelulaItem, CelulaSituacaoDoItem } from './EntregasTabela';
 import { ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
 
-type Janela = { tipo: 'etapa' | 'prevista' | 'encerrar'; itens: EntregaFiscalizacao[]; inicial?: EtapaEntrega } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'quem' } | { tipo: 'ligar' } | null;
+type Janela = { tipo: 'etapa' | 'prevista' | 'encerrar'; itens: EntregaFiscalizacao[]; inicial?: EtapaEntrega } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'quem' } | { tipo: 'ligar' } | { tipo: 'cadastro' } | null;
 
 const chaveDoGrupo = (g: EntregaFiscalizacao[]) => g[0].beneficiarioId ?? `planilha:${g[0].beneficiarioTexto}`;
 /** Acima disto, a lista abre só nos beneficiários com pendência (como o Andamento do Pedido 360). */
@@ -60,6 +61,9 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
     // Itens da planilha sem item da ata (migration 268): com o fiscal quando o contrato já tem itens de ata; senão, espera a Vinculação.
     const linha = linhaDeLigacao(es, Boolean(c?.atas?.length), () => setJanela({ tipo: 'ligar' }));
     if (linha) (linha.tom === 'espera' ? r.comOutros : r.comVoce).unshift(linha);
+    // Beneficiário escrito à mão na planilha (migration 272): ligar ao cadastro.
+    const cadastro = linhaDeCadastro(es, () => setJanela({ tipo: 'cadastro' }));
+    if (cadastro) r.comVoce.unshift(cadastro);
     return r;
   }, [es, c]);
   const grupos = useMemo(() => {
@@ -179,6 +183,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
       {janela?.tipo === 'item' && <JanelaDoItem e={janela.item} onClose={fechar} noContrato />}
       {janela?.tipo === 'processo' && <RegistrarProcessoModal contrato={c} onClose={fechar} />}
       {janela?.tipo === 'ligar' && <LigarItemDaAtaModal contractKey={c.contractKey} contratoNumero={c.numero} onClose={fechar} />}
+      {janela?.tipo === 'cadastro' && <LigarBeneficiarioModal contractKey={c.contractKey} onClose={fechar} />}
       {janela?.tipo === 'quem' && <DefinirFiscalizacaoModal contrato={c} onClose={fechar} />}
     </div>
   );

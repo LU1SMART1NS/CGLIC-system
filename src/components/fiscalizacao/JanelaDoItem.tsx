@@ -23,6 +23,7 @@ import { proximasEtapas, rotuloDoAvanco } from '../../utils/fiscalizacaoPassos';
 import { ReguaDoItem } from './ReguaDoItem';
 import { LigarItemDaAtaModal } from './LigarItemDaAtaModal';
 import { TrocarBeneficiarioModal } from './TrocarBeneficiarioModal';
+import { LigarBeneficiarioModal } from './LigarBeneficiarioModal';
 
 type Acao = 'avancar' | 'voltar' | 'corrigir' | 'parcial' | 'prevista' | 'responsavel' | 'beneficiario';
 
@@ -43,6 +44,7 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
   const navigate = useNavigateWithOrigin();
   const [acao, setAcao] = useState<Acao | null>(null);
   const [ligando, setLigando] = useState(false);
+  const [cadastrando, setCadastrando] = useState(false);
   const podeAgir = role === 'admin' || (role === 'gestor_fiscalizacao' && e.fiscalUserId === user?.id);
   const b = rotuloDoBeneficiario(e);
   const endereco = enderecoDeEntrega(e);
@@ -55,6 +57,7 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
   const itensDaAta = useItensDaAtaDoContrato(podeAgir && !e.itemKey ? e.contractKey : null);
   const podeLigar = podeAgir && !e.itemKey && (itensDaAta.data?.length ?? 0) > 0;
   const fechar = () => { setAcao(null); onClose(); };
+  if (cadastrando) return <LigarBeneficiarioModal foco={e.id} onClose={fechar} />;
   if (ligando) return <LigarItemDaAtaModal contractKey={e.contractKey} contratoNumero={e.contratoNumero} foco={e.id} onClose={fechar} />;
   if (acao === 'avancar') return <AvancarEtapaModal entregas={[e]} onClose={fechar} />;
   if (acao === 'voltar') return <VoltarEtapaItemModal entrega={e} onClose={fechar} />;
@@ -159,7 +162,14 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
                 <div style={carteiraDetalhe}>{endereco.rua ? `${endereco.detalhe} · ` : ''}do cadastro do beneficiário</div>
               </div>
             ) : (
-              <span style={carteiraDetalhe}>beneficiário sem cadastro: ligue ao cadastro para ver o endereço</span>
+              <div>
+                <span style={carteiraDetalhe}>beneficiário escrito na planilha, sem cadastro: o endereço vem do cadastro</span>
+                {podeAgir && e.beneficiarioTexto && (
+                  <div>
+                    <AppButton size="xs" variant="link" onClick={() => setCadastrando(true)} data-testid="fisc-janela-cadastro">Ligar ao cadastro</AppButton>
+                  </div>
+                )}
+              </div>
             )}
           </Campo>
         </div>

@@ -266,6 +266,20 @@ describe('ocupação pelo nível do gestor', () => {
     expect(totais.mediaEquivalente).toBe(4);
   });
 
+  it('coordenador que também é gestor fica fora da média e da comparação', () => {
+    const ata = (n: string, gestorNome: string) => ({ numeroAta: n, gestorNome, faixa: 'REGULAR' as const, valor: 1, itens: 10 });
+    const { linhas, totais } = buildDistribuicaoEquipe({
+      atas: [ata('00001/2025', 'Ana'), ata('00002/2025', 'Ana'), ata('00003/2025', 'Bruno'), ata('00004/2025', 'Bruno'), ata('00005/2025', 'Daniela')],
+      contratos: [],
+      links: [],
+      attentionItems: [],
+      foraDaMedia: new Set(['Daniela'])
+    });
+    expect(totais.gestores).toBe(2);
+    expect(linhas.find((l) => l.gestorNome === 'Daniela')?.relacaoEquipe).toBeNull();
+    expect(linhas.find((l) => l.gestorNome === 'Ana')?.relacaoEquipe).toBe('NA_MEDIA');
+  });
+
   it('sem níveis, ocupação = carga', () => {
     const { linhas } = buildDistribuicaoEquipe({
       atas: [{ numeroAta: '00001/2025', gestorNome: 'Ana', faixa: 'REGULAR', valor: 1, itens: 10 }],

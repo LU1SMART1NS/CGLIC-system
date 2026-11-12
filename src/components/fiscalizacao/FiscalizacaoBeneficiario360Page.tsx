@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { MapPin } from 'lucide-react';
 import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
@@ -10,13 +10,16 @@ import { Instrument360Head } from '../instrument360/Instrument360Head';
 import { Instrument360Hero } from '../instrument360/Instrument360Hero';
 import { HealthTile, HealthTileGrid } from '../instrument360/HealthStripParts';
 import { JanelaDoItem } from './JanelaDoItem';
+import { LigarBeneficiarioModal } from './LigarBeneficiarioModal';
+import { AppButton } from '../../design-system/components/AppButton';
+import { useAuth } from '../../context/AuthContext';
 import { CarteiraDetailLabel } from '../carteira/CarteiraDetailLabel';
 import { useBackTarget } from '../../hooks/useDetailOrigin';
 import { useContratosFiscalizacao, useEntregasFiscalizacao } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC } from '../../utils/fiscalizacao';
 import { foiEntregue } from '../../utils/fiscalizacaoEntregas';
-import { agrupar, chaveDoBeneficiario, contratosDe, numero, pct, programasDe, qtdTexto, resumir, semCadastro, enderecoDeEntrega } from '../../utils/fiscalizacaoResumo';
+import { agrupar, chaveDoBeneficiario, contratosDe, numero, pct, programasDe, qtdTexto, resumir, semCadastro, enderecoDeEntrega, rotaDoBeneficiario } from '../../utils/fiscalizacaoResumo';
 import { ItensPorContrato, type GrupoDeItens } from './FiscalizacaoCelulas';
 
 // ── Beneficiário 360: o que ele recebe, por contrato ─────────────────────────────────────────────
@@ -31,6 +34,10 @@ export const FiscalizacaoBeneficiario360Page: React.FC = () => {
   const todos = useMemo(() => entregas.filter((e) => chaveDoBeneficiario(e) === chave), [entregas, chave]);
   const [seg, setSeg] = useState<SegItens>('A_ENTREGAR');
   const [aberto, setAberto] = useState<EntregaFiscalizacao | null>(null);
+  const [ligando, setLigando] = useState(false);
+  const { role } = useAuth();
+  const navigate = useNavigate();
+  const podeLigar = role === 'admin' || role === 'gestor_fiscalizacao';
   if (isLoading) return <Instrument360Page><InstrumentPageState kind="loading" title="Carregando o beneficiário" /></Instrument360Page>;
   if (isError) return <Instrument360Page><InstrumentPageState kind="error" title="Não foi possível carregar o beneficiário" message={error?.message} onRetry={() => void refetch()} backLabel={back.label} onBack={back.back} /></Instrument360Page>;
   if (todos.length === 0) return <Instrument360Page><InstrumentPageState kind="notFound" title="Beneficiário sem itens na Fiscalização" message="O endereço não corresponde a nenhum beneficiário com itens acompanhados pela SFC/CGLIC." backLabel={back.label} onBack={back.back} /></Instrument360Page>;
@@ -62,8 +69,8 @@ export const FiscalizacaoBeneficiario360Page: React.FC = () => {
           subtitle={sem ? `nome escrito à mão na planilha da ${NOME_SFC}` : e0.beneficiarioRazao ?? undefined}
           notice={
             sem ? (
-              <NoticeBar tone="warning" testId="fisc-benef-360-sem-cadastro">
-                Sem cadastro: os itens deste nome não somam com os do mesmo órgão escrito de outro jeito, e o endereço de entrega não aparece. A ligação ao cadastro é feita em Ajustes › Beneficiários.
+              <NoticeBar tone="warning" testId="fisc-benef-360-sem-cadastro" action={podeLigar ? <AppButton size="xs" variant="link" onClick={() => setLigando(true)} data-testid="fisc-benef-360-ligar">Ligar ao cadastro</AppButton> : undefined}>
+                Sem cadastro: os itens deste nome não somam com os do mesmo órgão escrito de outro jeito, e o endereço de entrega não aparece.
               </NoticeBar>
             ) : undefined
           }
@@ -111,6 +118,7 @@ export const FiscalizacaoBeneficiario360Page: React.FC = () => {
         <ItensPorContrato grupos={grupos} abrir={setAberto} testId="fisc-benef-360-itens" />
       </div>
       {aberto && <JanelaDoItem e={aberto} onClose={() => setAberto(null)} />}
+      {ligando && <LigarBeneficiarioModal foco={todos[0]?.id} onClose={() => setLigando(false)} onLigado={(id) => navigate(rotaDoBeneficiario(id), { replace: true })} />}
     </Instrument360Page>
   );
 };
