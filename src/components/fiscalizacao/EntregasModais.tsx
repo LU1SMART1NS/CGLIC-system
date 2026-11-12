@@ -6,10 +6,10 @@ import { AppDateInput, AppInput, AppSelect, AppTextarea } from '../../design-sys
 import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { useToast } from '../../design-system/components/Toast';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
-import { useDefinirPrevistaEntregas, useDefinirResponsavelEntregas, useDividirEntrega, useCorrigirEtapaEntregas } from '../../hooks/useFiscalizacao';
-import type { EntregaFiscalizacao, EtapaEntrega, ResponsavelEntrega } from '../../services/fiscalizacaoService';
+import { useDefinirPrevistaEntregas, useDefinirResponsavelEntregas, useDividirEntrega, useCorrigirEtapaEntregas, useEncerrarEntregas } from '../../hooks/useFiscalizacao';
+import type { EntregaFiscalizacao, EtapaEntrega, MotivoDoEncerramento, ResponsavelEntrega } from '../../services/fiscalizacaoService';
 import { MOTIVO_MINIMO, NOME_SFC, hojeEmBrasilia } from '../../utils/fiscalizacao';
-import { ETAPAS_ENTREGA, FASES_ENTREGA, bloqueioDaEtapa, etapaDef, nomeDoItem, rotuloDoBeneficiario } from '../../utils/fiscalizacaoEntregas';
+import { ETAPAS_ENTREGA, FASES_ENTREGA, bloqueioDaEtapa, etapaDef, nomeDoItem, rotuloDoBeneficiario, textoDoAviso } from '../../utils/fiscalizacaoEntregas';
 
 const erroDe = (err: unknown) => (err as { message?: string } | null)?.message || 'erro desconhecido';
 const seiValido = (s: string) => /^\d{7,10}$/.test(s);
@@ -224,6 +224,78 @@ export const ResponsavelModal: React.FC<{ entregas: EntregaFiscalizacao[]; onClo
         </AppSelect>
         <AppTextarea label="Motivo" value={motivo} onChange={(ev) => setMotivo(ev.target.value)} rows={2} placeholder="ex.: a Força Nacional recebe e fiscaliza as próprias viaturas" hint="Fica no histórico de cada item." data-testid="fisc-responsavel-motivo" />
         <span style={{ ...carteiraDetalhe, marginTop: 0 }}>Para passar só parte de um item, use Entrega parcial antes.</span>
+      </div>
+    </Modal>
+  );
+};
+
+const MOTIVOS_ENCERRAMENTO: { id: MotivoDoEncerramento; nome: string }[] = [
+  { id: 'ITEM_CANCELADO', nome: 'Empenho anulado: o item foi cancelado no pedido' },
+  { id: 'OUTRO_CONTRATO', nome: 'A nota do item passou a outro contrato' },
+  { id: 'OUTRO', nome: 'Outro motivo' }
+];
+
+/**
+ * Encerrar entregas (migration 274): o Gestor de Fiscalização do contrato ou o coordenador, quando o item mudou no
+ * pedido de emenda depois da entrega. A entrega sai das listas de trabalho; o motivo fica no histórico.
+ */
+export const EncerrarEntregasModal: React.FC<{ entregas: EntregaFiscalizacao[]; onClose: (feito: boolean) => void }> = ({ entregas, onClose }) => {
+  const toast = useToast();
+  const salvar = useEncerrarEntregas();
+  const aviso = entregas.find((e) => e.aviso)?.aviso ?? null;
+  const [motivo, setMotivo] = useState<MotivoDoEncerramento>(aviso?.tipo ?? 'OUTRO');
+  const [sei, setSei] = useState(aviso?.tipo === 'ITEM_CANCELADO' ? aviso.sei ?? '' : '');
+  const [observacao, setObservacao] = useState('');
+  const seiOk = !sei.trim() || seiValido(sei.replace(/\D/g, ''));
+  const ok = seiOk && (motivo !== 'OUTRO' || observacao.trim().length >= MOTIVO_MINIMO);
+  const n = entregas.length;
+  return (
+    <Modal
+      isOpen
+      onClose={() => onClose(false)}
+      title={n === 1 ? 'Encerrar a entrega' : `Encerrar ${n} entregas`}
+      subtitle={quem(entregas)}
+      size="md"
+      dismissible={!salvar.isPending}
+      testId="fisc-encerrar-modal"
+      footer={
+        <>
+          <ActionButton action="cancelar" onClick={() => onClose(false)} disabled={salvar.isPending} />
+          <AppButton
+            variant="primary"
+            disabled={!ok}
+            isLoading={salvar.isPending}
+            data-testid="fisc-encerrar-salvar"
+            onClick={() =>
+              salvar.mutate(
+                { ids: entregas.map((e) => e.id), motivo, documentoSei: sei.replace(/\D/g, '') || null, observacao: observacao.trim() || null },
+                { onSuccess: () => { toast.success(n === 1 ? 'Entrega encerrada' : `${n} entregas encerradas`); onClose(true); }, onError: (err) => toast.error(`Não foi possível encerrar: ${erroDe(err)}`) }
+              )
+            }
+          >
+            {n === 1 ? 'Encerrar entrega' : 'Encerrar entregas'}
+          </AppButton>
+        </>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+        {aviso && <NoticeBar tone="warning" testId="fisc-encerrar-aviso">{textoDoAviso(aviso)}.</NoticeBar>}
+        <div style={carteiraDetalhe}>
+          {plural(n, 'item', 'itens')}: {[...new Set(entregas.map((e) => nomeDoItem(e)))].slice(0, 3).join(' · ')}. A entrega sai das listas de trabalho e o motivo fica no histórico.
+        </div>
+        <AppSelect label="Motivo" value={motivo} onChange={(ev) => setMotivo(ev.target.value as MotivoDoEncerramento)} data-testid="fisc-encerrar-motivo">
+          {MOTIVOS_ENCERRAMENTO.map((m) => (
+            <option key={m.id} value={m.id}>{m.nome}</option>
+          ))}
+        </AppSelect>
+        <AppInput label="Documento SEI (opcional)" value={sei} onChange={(ev) => setSei(ev.target.value)} inputMode="numeric" error={seiOk ? undefined : 'De 7 a 10 dígitos.'} data-testid="fisc-encerrar-sei" />
+        <AppTextarea
+          label={motivo === 'OUTRO' ? 'Por que a entrega foi encerrada *' : 'Observação (opcional)'}
+          value={observacao}
+          onChange={(ev) => setObservacao(ev.target.value)}
+          rows={3}
+          data-testid="fisc-encerrar-observacao"
+        />
       </div>
     </Modal>
   );

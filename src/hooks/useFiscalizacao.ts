@@ -6,6 +6,7 @@ import {
   definirFiscalizacaoContrato,
   definirPrevistaEntregas,
   definirResponsavelEntregas,
+  encerrarEntregas,
   dividirEntrega,
   fetchEntregasDoPedido,
   fetchEntregasFiscalizacao,
@@ -126,6 +127,7 @@ export const useVoltarEtapaEntrega = () => useMutacaoDeEntregas(voltarEtapaEntre
 export const useDividirEntrega = () => useMutacaoDeEntregas(dividirEntrega);
 export const useDefinirPrevistaEntregas = () => useMutacaoDeEntregas(definirPrevistaEntregas);
 export const useDefinirResponsavelEntregas = () => useMutacaoDeEntregas(definirResponsavelEntregas);
+export const useEncerrarEntregas = () => useMutacaoDeEntregas(encerrarEntregas);
 
 /** Ausências de fiscal em curso (migration 261). */
 export function useTransferenciasFiscalizacao() {

@@ -8,7 +8,7 @@ import { carteiraIdentificacao, carteiraDetalhe, carteiraNumero, carteiraValor }
 import { useMovimentosDaEntrega } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, dataBR } from '../../utils/fiscalizacao';
-import { ataEItemDaChave, etapaDef, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
+import { ataEItemDaChave, etapaDef, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, textoDoAviso, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
 import { IdentificacaoDoContrato } from './ContratosFiscalizacaoTabela';
 import { NomeComSigla } from '../emendas/emendasPartes';
 import { chaveDeOrdem, ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
@@ -26,6 +26,13 @@ export const CelulaEtapa: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
     );
   }
   const d = etapaDef(e.etapa);
+  if (e.aviso)
+    return (
+      <>
+        <StatusBadge label={e.aviso.tipo === 'ITEM_CANCELADO' ? 'empenho anulado' : 'nota em outro contrato'} variant="danger" size="sm" dot={false} />
+        <div style={carteiraDetalhe}>{textoDoAviso(e.aviso)}</div>
+      </>
+    );
   return (
     <>
       <StatusBadge label={d.nome} variant={e.etapa === 'CONTROLADO' ? 'danger' : VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
