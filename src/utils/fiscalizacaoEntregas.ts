@@ -56,7 +56,11 @@ export const foiEntregue = (e: Pick<EntregaFiscalizacao, 'etapa'>) => ordemDaEta
 
 export type TomPrazo = 'danger' | 'warning' | 'success' | 'neutral';
 
-/** Prazo da entrega pela data prevista (P4): vencida, vence em 30 dias, no prazo, entregue (com ou sem atraso). */
+/**
+ * Prazo da entrega pela data prevista (P4): vencida, vence em 30 dias, no prazo, entregue (com ou sem atraso).
+ * Aguardando o Exército, o prazo do fornecedor fica suspenso: a espera é da autorização da DFPC, não dele. O item não
+ * conta como vencido nem como a vencer enquanto espera.
+ */
 export function prazoDaEntrega(e: Pick<EntregaFiscalizacao, 'etapa' | 'prevista' | 'entregueEm' | 'responsavel'>, hoje: string = hojeEmBrasilia()): { texto: string; tom: TomPrazo; dias: number | null } {
   if (e.responsavel === 'AREA') return { texto: 'Sem acompanhamento', tom: 'neutral', dias: null };
   const dias = (a: string, b: string) => Math.round((Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`)) / 864e5);
@@ -64,6 +68,7 @@ export function prazoDaEntrega(e: Pick<EntregaFiscalizacao, 'etapa' | 'prevista'
     if (e.entregueEm && e.prevista && e.entregueEm > e.prevista) return { texto: `Entregue com ${dias(e.entregueEm, e.prevista)} dias de atraso`, tom: 'warning', dias: null };
     return { texto: 'Entregue', tom: 'success', dias: null };
   }
+  if (e.etapa === 'CONTROLADO') return { texto: 'Prazo suspenso', tom: 'neutral', dias: null };
   if (!e.prevista) return { texto: 'Sem data prevista', tom: 'neutral', dias: null };
   const d = dias(e.prevista, hoje);
   if (d < 0) return { texto: `Vencida há ${-d} ${d === -1 ? 'dia' : 'dias'}`, tom: 'danger', dias: d };
