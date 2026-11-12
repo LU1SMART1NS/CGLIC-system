@@ -307,6 +307,20 @@ export async function trocarBeneficiarioEntrega(input: { id: string; beneficiari
   if (error) throw mapPostgresErrorToAppError(error);
 }
 
+/**
+ * Repartir um item entre beneficiários: a 1ª parte fica no item de hoje, as outras viram itens novos (mesma etapa,
+ * prevista e programa). A soma tem que fechar com a quantidade do item; motivo e SEI no histórico de cada parte.
+ */
+export async function repartirEntregaEntreBeneficiarios(input: { id: string; partes: { beneficiarioId: string; quantidade: number }[]; motivo: string; documentoSei: string }): Promise<void> {
+  const { error } = await cliente().rpc('dividir_entrega_entre_beneficiarios', {
+    p_id: input.id,
+    p_partes: input.partes.map((p) => ({ beneficiario_id: p.beneficiarioId, quantidade: p.quantidade })),
+    p_motivo: input.motivo.trim(),
+    p_documento_sei: input.documentoSei.replace(/\D/g, '')
+  });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
 export async function dividirEntrega(input: { id: string; quantidade: number }): Promise<void> {
   const { error } = await cliente().rpc('dividir_entrega', { p_id: input.id, p_quantidade: input.quantidade });
   if (error) throw mapPostgresErrorToAppError(error);

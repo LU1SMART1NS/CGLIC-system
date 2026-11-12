@@ -23,9 +23,10 @@ import { proximasEtapas, rotuloDoAvanco } from '../../utils/fiscalizacaoPassos';
 import { ReguaDoItem } from './ReguaDoItem';
 import { LigarItemDaAtaModal } from './LigarItemDaAtaModal';
 import { TrocarBeneficiarioModal } from './TrocarBeneficiarioModal';
+import { RepartirEntreBeneficiariosModal } from './RepartirEntreBeneficiariosModal';
 import { LigarBeneficiarioModal } from './LigarBeneficiarioModal';
 
-type Acao = 'avancar' | 'voltar' | 'corrigir' | 'parcial' | 'prevista' | 'responsavel' | 'beneficiario';
+type Acao = 'avancar' | 'voltar' | 'corrigir' | 'parcial' | 'prevista' | 'responsavel' | 'beneficiario' | 'repartir';
 
 const Campo: React.FC<{ rotulo: string; largo?: boolean; children: React.ReactNode }> = ({ rotulo, largo, children }) => (
   <div style={{ minWidth: 0, gridColumn: largo ? '1 / -1' : undefined }}>
@@ -66,6 +67,7 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
   if (acao === 'prevista') return <PrevistaModal entregas={[e]} onClose={fechar} />;
   if (acao === 'responsavel') return <ResponsavelModal entregas={[e]} onClose={fechar} />;
   if (acao === 'beneficiario') return <TrocarBeneficiarioModal entrega={e} onClose={fechar} />;
+  if (acao === 'repartir') return <RepartirEntreBeneficiariosModal entrega={e} onClose={fechar} />;
   return (
     <Modal
       isOpen
@@ -84,7 +86,8 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
                 actions={[
                   ...(!area ? [{ label: 'Voltar etapa', onClick: () => setAcao('voltar') }] : []),
                   ...(!area && role === 'admin' ? [{ label: 'Corrigir a etapa', onClick: () => setAcao('corrigir') }] : []),
-                  ...(podeTrocarBeneficiario ? [{ label: 'Trocar beneficiário', onClick: () => setAcao('beneficiario') }] : [])
+                  ...(podeTrocarBeneficiario ? [{ label: 'Trocar beneficiário', onClick: () => setAcao('beneficiario') }] : []),
+                  ...(podeTrocarBeneficiario && e.quantidade >= 2 ? [{ label: 'Repartir entre beneficiários', onClick: () => setAcao('repartir') }] : [])
                 ]}
               />
             )}

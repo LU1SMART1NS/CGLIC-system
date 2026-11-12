@@ -16,6 +16,7 @@ import {
   corrigirEtapaEntregas,
   voltarEtapaEntrega,
   trocarBeneficiarioEntrega,
+  repartirEntregaEntreBeneficiarios,
   type EntregaDaLinha,
   type EntregaFiscalizacao,
   type MovimentoEntrega,
@@ -131,6 +132,7 @@ export const useMudarEtapaEntregas = () => useMutacaoDeEntregas(mudarEtapaEntreg
 export const useCorrigirEtapaEntregas = () => useMutacaoDeEntregas(corrigirEtapaEntregas);
 export const useVoltarEtapaEntrega = () => useMutacaoDeEntregas(voltarEtapaEntrega);
 export const useTrocarBeneficiarioEntrega = () => useMutacaoDeEntregas(trocarBeneficiarioEntrega);
+export const useRepartirEntregaEntreBeneficiarios = () => useMutacaoDeEntregas(repartirEntregaEntreBeneficiarios);
 export const useDividirEntrega = () => useMutacaoDeEntregas(dividirEntrega);
 export const useDefinirPrevistaEntregas = () => useMutacaoDeEntregas(definirPrevistaEntregas);
 export const useDefinirResponsavelEntregas = () => useMutacaoDeEntregas(definirResponsavelEntregas);
