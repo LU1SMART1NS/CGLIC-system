@@ -24,7 +24,7 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useContratosFiscalizacao, useEntregasFiscalizacao } from '../../hooks/useFiscalizacao';
 import { prazoDaEntrega } from '../../utils/fiscalizacaoEntregas';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, cargaPorFiscal, fiscaisVisiveis, idsDosFiscaisComContrato, comSfc, dataBR, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato } from '../../utils/fiscalizacao';
+import { NOME_SFC, autuado, cargaPorFiscal, fiscaisVisiveis, idsDosFiscaisComContrato, comSfc, dataBR, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato } from '../../utils/fiscalizacao';
 import { useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
 import { contratosFinalizados } from '../../utils/fiscalizacaoResumo';
 
@@ -123,7 +123,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   }, [doSegmento, busca]);
   const filtrosAtivos = Boolean(busca);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(filtrados, (c: ContratoFiscalizacao) => c.contractKey, POR_PAGINA);
-  const podeAutuar = (c: ContratoFiscalizacao) => !c.processoSei && (coordenador || (fiscal && ehDoFiscal(c, user?.id)));
+  const podeAutuar = (c: ContratoFiscalizacao) => !autuado(c) && (coordenador || (fiscal && ehDoFiscal(c, user?.id)));
   // Como em Atas e Contratos: cartão e aba levam à lista com a faixa encolhida.
   const irPara = (sg: Segmento) => {
     setSegmento(sg);
@@ -166,7 +166,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
       <PageHeader
         title="Início"
         subtitle={fiscal ? 'Os contratos que você fiscaliza e o que falta em cada um.' : `Resumo da fiscalização dos contratos pela ${NOME_SFC} e o que exige sua atenção.`}
-        hint={`Contrato de emenda chega "A definir", com sugestão ${NOME_SFC}; o coordenador decide na Distribuição. Depois da decisão, o fiscal autua (registra o número SEI do contrato) e registra a portaria. As pendências são do fiscal; na ausência, o coordenador passa os contratos a um colega pela transferência temporária.`}
+        hint={`Contrato de emenda chega "A definir", com sugestão ${NOME_SFC}; o coordenador decide na Distribuição. Depois da decisão, o fiscal registra a autuação (NUP do processo de acompanhamento contratual) e a portaria. As pendências são do fiscal; na ausência, o coordenador passa os contratos a um colega pela transferência temporária.`}
         icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="fisc-inicio-atualizar" tooltipTitle="Recarregar a fiscalização" />}
       />
@@ -195,7 +195,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               unidade={daSfc.length === 1 ? 'contrato' : 'contratos'}
               linhas={[
                 { rotulo: 'Fiscalização mista', valor: String(mistas) },
-                { rotulo: 'A autuar (SEI do contrato)', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined },
+                { rotulo: 'A autuar (processo de acompanhamento)', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined },
                 { rotulo: 'Sem portaria registrada', valor: String(semPortaria.length), tom: semPortaria.length ? 'warning' : undefined }
               ]}
               onClick={() => irPara(aAutuar.length ? 'AUTUAR' : semPortaria.length ? 'PORTARIA' : 'TODAS')}

@@ -6,9 +6,9 @@ import { AppDateInput, AppInput, AppSelect, AppTextarea } from '../../design-sys
 import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { useToast } from '../../design-system/components/Toast';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
-import { documentoSeiValido, mascaraDocumentoSei } from '../../utils/mascaras';
+import { documentoSeiValido, mascaraDocumentoSei, mascaraProcessoSei, processoSeiValido } from '../../utils/mascaras';
 import { useDepartments } from '../../hooks/useDepartments';
-import { useDefinirFiscalizacao, useDesfazerTransferenciaFiscal, useFiscaisAtivos, useRegistrarProcessoFiscalizacao, useTransferirContratosFiscal, useTransferirFiscalTemporaria } from '../../hooks/useFiscalizacao';
+import { useDefinirFiscalizacao, useDesfazerTransferenciaFiscal, useFiscaisAtivos, useRegistrarAutuacaoFiscalizacao, useRegistrarProcessoFiscalizacao, useTransferirContratosFiscal, useTransferirFiscalTemporaria } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao, DecisaoFiscalizacao, TransferenciaFiscal } from '../../services/fiscalizacaoService';
 import { MOTIVO_MINIMO, NOME_SFC, dataBR, decisaoPedeMotivo, decisaoSugerida, deEmenda, hojeEmBrasilia, unidadeDaArea, numeroDoContrato, type CargaDoFiscal } from '../../utils/fiscalizacao';
 
@@ -123,8 +123,61 @@ export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao
   );
 };
 
-/** Fiscal ou coordenador: autuação pelo número SEI do contrato (documento) e a data do contrato (migration 266). */
+/**
+ * Fiscal ou coordenador: autuação = NUP do processo de acompanhamento contratual no SEI e a data da autuação
+ * (andamento "Processo público gerado"; migration 294). O número SEI do contrato ajuda a achar o processo.
+ */
 export const RegistrarProcessoModal: React.FC<{ contrato: ContratoFiscalizacao; onClose: () => void }> = ({ contrato, onClose }) => {
+  const toast = useToast();
+  const registrar = useRegistrarAutuacaoFiscalizacao();
+  const [nup, setNup] = useState(() => mascaraProcessoSei(contrato.processoNup ?? ''));
+  const [data, setData] = useState(() => contrato.processoAutuadoEm ?? hojeEmBrasilia());
+  const hoje = hojeEmBrasilia();
+  const ok = processoSeiValido(nup) && Boolean(data) && data <= hoje;
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={contrato.processoNup ? 'Corrigir a autuação' : 'Registrar a autuação'}
+      subtitle={`Contrato ${numeroDoContrato(contrato)} · ${contrato.fornecedor ?? ''}`}
+      size="sm"
+      dismissible={!registrar.isPending}
+      testId="fisc-processo-modal"
+      footer={
+        <>
+          <ActionButton action="cancelar" onClick={onClose} disabled={registrar.isPending} />
+          <AppButton
+            variant="primary"
+            disabled={!ok}
+            isLoading={registrar.isPending}
+            data-testid="fisc-processo-salvar"
+            onClick={() =>
+              registrar.mutate(
+                { contractKey: contrato.contractKey, processoNup: nup, autuadoEm: data },
+                { onSuccess: () => { toast.success(`Autuação do contrato ${numeroDoContrato(contrato)} registrada`); onClose(); }, onError: (err) => toast.error(`Não foi possível registrar: ${erroDe(err)}`) }
+              )
+            }
+          >
+            Registrar
+          </AppButton>
+        </>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+        {contrato.processoSei && (
+          <span style={{ ...carteiraDetalhe, marginTop: 0 }} data-testid="fisc-processo-sei-do-contrato">
+            Procure no SEI pelo número do contrato, {contrato.processoSei}: a autuação é o processo de Acompanhamento Contratual em que ele está.
+          </span>
+        )}
+        <AppInput label="Processo SEI" value={nup} onChange={(ev) => setNup(mascaraProcessoSei(ev.target.value))} inputMode="numeric" placeholder="08020.000000/2026-00" hint="Processo de acompanhamento contratual (tipo Gestão de Contratos: Acompanhamento Contratual)." data-testid="fisc-processo-nup" />
+        <AppDateInput label="Data da autuação" value={data} onValueChange={setData} max={hoje} hint="Andamento “Processo público gerado”." />
+      </div>
+    </Modal>
+  );
+};
+
+/** Fiscal ou coordenador: número SEI do contrato (documento) e a data do contrato (migration 266). */
+export const RegistrarSeiDoContratoModal: React.FC<{ contrato: ContratoFiscalizacao; onClose: () => void }> = ({ contrato, onClose }) => {
   const toast = useToast();
   const registrar = useRegistrarProcessoFiscalizacao();
   const [sei, setSei] = useState(contrato.processoSei ?? '');
@@ -161,7 +214,7 @@ export const RegistrarProcessoModal: React.FC<{ contrato: ContratoFiscalizacao; 
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-        <AppInput label="Número SEI do contrato" value={sei} onChange={(ev) => setSei(mascaraDocumentoSei(ev.target.value))} inputMode="numeric" placeholder="ex.: 25410220" hint="Número do documento do contrato no SEI: é ele que vale para a autuação." data-testid="fisc-processo-sei" />
+        <AppInput label="Número SEI do contrato" value={sei} onChange={(ev) => setSei(mascaraDocumentoSei(ev.target.value))} inputMode="numeric" placeholder="ex.: 25410220" hint="Número do documento do contrato no SEI: ajuda a achar o processo de acompanhamento." data-testid="fisc-processo-sei" />
         <AppDateInput label="Data do contrato" value={data} onValueChange={setData} max={hoje} />
       </div>
     </Modal>

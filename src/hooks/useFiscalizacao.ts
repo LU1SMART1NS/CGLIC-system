@@ -22,6 +22,7 @@ import {
   type MovimentoEntrega,
   fetchContratosFiscalizacao,
   registrarProcessoFiscalizacao,
+  registrarAutuacaoFiscalizacao,
   type ContratoFiscalizacao,
   type DefinirFiscalizacaoInput,
   desfazerTransferenciaFiscal,
@@ -97,6 +98,14 @@ export function useRegistrarProcessoFiscalizacao() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { contractKey: string; processoSei: string; autuadoEm: string }) => registrarProcessoFiscalizacao(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY })
+  });
+}
+
+export function useRegistrarAutuacaoFiscalizacao() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { contractKey: string; processoNup: string; autuadoEm: string }) => registrarAutuacaoFiscalizacao(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY })
   });
 }

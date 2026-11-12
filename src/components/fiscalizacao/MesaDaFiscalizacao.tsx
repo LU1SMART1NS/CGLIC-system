@@ -8,7 +8,7 @@ import { carteiraDetalhe, carteiraNumero } from '../carteira/carteiraStyles';
 import { useAuth } from '../../context/AuthContext';
 import { useEntregasFiscalizacao, useFiscalizacaoDoContrato } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao, EtapaEntrega } from '../../services/fiscalizacaoService';
-import { NOME_SFC, ehDoFiscal } from '../../utils/fiscalizacao';
+import { NOME_SFC, autuado, dataBR, ehDoFiscal } from '../../utils/fiscalizacao';
 import { nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario } from '../../utils/fiscalizacaoEntregas';
 import { EncerrarEntregasModal, PrevistaModal } from './EntregasModais';
 import { AvancarEtapaModal } from './EtapaModais';
@@ -17,14 +17,14 @@ import { FiltroPendencia, MaisSemPendencia, SecaoDaMesa, type LinhaDeTrabalho } 
 import { blocoDaMesa as bloco } from '../mesa/mesaEstilos';
 import { LigarItemDaAtaModal } from './LigarItemDaAtaModal';
 import { LigarBeneficiarioModal } from './LigarBeneficiarioModal';
-import { DefinirFiscalizacaoModal, RegistrarProcessoModal } from './FiscalizacaoModais';
+import { DefinirFiscalizacaoModal, RegistrarProcessoModal, RegistrarSeiDoContratoModal } from './FiscalizacaoModais';
 import { JanelaDoItem } from './JanelaDoItem';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { DataTable } from '../../design-system/components/DataTable';
 import { CelulaItem, CelulaSituacaoDoItem } from './EntregasTabela';
 import { ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
 
-type Janela = { tipo: 'etapa' | 'prevista' | 'encerrar'; itens: EntregaFiscalizacao[]; inicial?: EtapaEntrega } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'quem' } | { tipo: 'ligar' } | { tipo: 'cadastro' } | null;
+type Janela = { tipo: 'etapa' | 'prevista' | 'encerrar'; itens: EntregaFiscalizacao[]; inicial?: EtapaEntrega } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'sei' } | { tipo: 'quem' } | { tipo: 'ligar' } | { tipo: 'cadastro' } | null;
 
 const chaveDoGrupo = (g: EntregaFiscalizacao[]) => g[0].beneficiarioId ?? `planilha:${g[0].beneficiarioTexto}`;
 /** Acima disto, a lista abre só nos beneficiários com pendência (como o Andamento do Pedido 360). */
@@ -57,7 +57,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
   const coordenador = role === 'admin';
   const podeAgir = Boolean(c && (coordenador || (role === 'gestor_fiscalizacao' && ehDoFiscal(c, user?.id))));
   const { comVoce, comOutros } = useMemo(() => {
-    const r = linhasDoContrato(es, Boolean(c && !c.processoSei), (tipo, l, inicial) => setJanela({ tipo, itens: l, inicial }), () => setJanela({ tipo: 'processo' }));
+    const r = linhasDoContrato(es, Boolean(c && !autuado(c)), (tipo, l, inicial) => setJanela({ tipo, itens: l, inicial }), () => setJanela({ tipo: 'processo' }));
     // Itens da planilha sem item da ata (migration 268): com o fiscal quando o contrato já tem itens de ata; senão, espera a Vinculação.
     const linha = linhaDeLigacao(es, Boolean(c?.atas?.length), () => setJanela({ tipo: 'ligar' }));
     if (linha) (linha.tom === 'espera' ? r.comOutros : r.comVoce).unshift(linha);
@@ -91,7 +91,17 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
         <Campo rotulo="Fiscalização"><StatusBadge label={c.situacao === 'MISTA' ? 'Mista' : NOME_SFC} variant={c.situacao === 'MISTA' ? 'purple' : 'info'} size="sm" dot={false} /></Campo>
         <Campo rotulo="Fiscal">{c.fiscalNome ?? '—'}</Campo>
         <Campo rotulo="Portaria">{c.portariaSei ? <NumeroSeiEtiqueta numero={c.portariaSei} testId="fisc-mesa-portaria" /> : <span style={carteiraDetalhe}>não registrada</span>}</Campo>
-        <Campo rotulo="SEI do contrato">{c.processoSei ? <NumeroSeiEtiqueta numero={c.processoSei} testId="fisc-mesa-processo" /> : <span style={{ color: 'var(--color-warning-text)' }}>a autuar</span>}</Campo>
+        <Campo rotulo="Processo SEI">
+          {c.processoNup ? (
+            <>
+              <NumeroSeiEtiqueta numero={c.processoNup} testId="fisc-mesa-processo" />
+              <div style={carteiraDetalhe}>autuado em {dataBR(c.processoAutuadoEm)}</div>
+            </>
+          ) : (
+            <span style={{ color: 'var(--color-warning-text)' }}>a autuar</span>
+          )}
+        </Campo>
+        <Campo rotulo="SEI do contrato">{c.processoSei ? <NumeroSeiEtiqueta numero={c.processoSei} testId="fisc-mesa-sei-contrato" /> : <span style={carteiraDetalhe}>não registrado</span>}</Campo>
         <Campo rotulo="Origem">{c.emendas.length ? `${c.emendas.length === 1 ? 'Emenda' : 'Emendas'} ${c.emendas.slice(0, 3).join(', ')}${c.emendas.length > 3 ? ` +${c.emendas.length - 3}` : ''}` : 'Sem emenda'}</Campo>
         <span style={{ flex: 1 }} />
         {podeAgir && (
@@ -100,7 +110,8 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
             testId="fisc-mesa-mais"
             actions={[
               ...(coordenador ? [{ label: 'Alterar quem fiscaliza', onClick: () => setJanela({ tipo: 'quem' }) }] : []),
-              ...(c.processoSei ? [{ label: 'Corrigir o SEI do contrato', onClick: () => setJanela({ tipo: 'processo' }) }] : [])
+              ...(autuado(c) ? [{ label: 'Corrigir a autuação', onClick: () => setJanela({ tipo: 'processo' }) }] : []),
+              { label: c.processoSei ? 'Corrigir o SEI do contrato' : 'Registrar o SEI do contrato', onClick: () => setJanela({ tipo: 'sei' }) }
             ]}
           />
         )}
@@ -182,6 +193,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
       {janela?.tipo === 'encerrar' && <EncerrarEntregasModal entregas={janela.itens} onClose={fechar} />}
       {janela?.tipo === 'item' && <JanelaDoItem e={janela.item} onClose={fechar} noContrato />}
       {janela?.tipo === 'processo' && <RegistrarProcessoModal contrato={c} onClose={fechar} />}
+      {janela?.tipo === 'sei' && <RegistrarSeiDoContratoModal contrato={c} onClose={fechar} />}
       {janela?.tipo === 'ligar' && <LigarItemDaAtaModal contractKey={c.contractKey} contratoNumero={c.numero} onClose={fechar} />}
       {janela?.tipo === 'cadastro' && <LigarBeneficiarioModal contractKey={c.contractKey} onClose={fechar} />}
       {janela?.tipo === 'quem' && <DefinirFiscalizacaoModal contrato={c} onClose={fechar} />}

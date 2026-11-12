@@ -33,7 +33,9 @@ describe('fiscalização do contrato', () => {
   it('pendências só nos contratos com a SFC/CGLIC', () => {
     expect(pendenciasDoContrato(c({ situacao: 'AREA' }))).toEqual([]);
     expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1' })).map((p) => p.tipo)).toEqual(['AUTUAR', 'PORTARIA']);
-    expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1', processoSei: '34472015', autuadoEm: '2026-02-05', portariaSei: '34152364' }))).toEqual([]);
+    expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1', processoSei: '34472015', autuadoEm: '2026-02-05', processoNup: '08020.000017/2026-88', processoAutuadoEm: '2026-01-05', portariaSei: '34152364' }))).toEqual([]);
+    // SEI do contrato sem o NUP do processo de acompanhamento continua a autuar (migration 294).
+    expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1', processoSei: '34472015', autuadoEm: '2026-02-05', portariaSei: '34152364' })).map((p) => p.tipo)).toEqual(['AUTUAR']);
   });
 
   it('é do fiscal', () => {
@@ -47,7 +49,7 @@ describe('fiscalização do contrato', () => {
   it('carga por fiscal conta contratos, a autuar e sem portaria', () => {
     const lista = [
       c({ contractKey: 'a', situacao: 'SFC', fiscalUserId: 'u1' }),
-      c({ contractKey: 'b', situacao: 'MISTA', fiscalUserId: 'u1', processoSei: '1234567', autuadoEm: '2026-01-01' }),
+      c({ contractKey: 'b', situacao: 'MISTA', fiscalUserId: 'u1', processoSei: '1234567', autuadoEm: '2026-01-01', processoNup: '08020.000259/2026-71', processoAutuadoEm: '2026-01-09' }),
       c({ contractKey: 'c', situacao: 'AREA', fiscalUserId: null })
     ];
     const carga = cargaPorFiscal(lista, [{ id: 'u2', nome: 'Bia' }, { id: 'u1', nome: 'Ana' }]);
@@ -104,6 +106,9 @@ describe('fiscalização do contrato', () => {
     expect(x.emendas).toEqual(['1']);
     expect(x.fiscalNome).toBe('Ana');
     expect(x.processoSei).toBeNull();
+    expect(x.processoNup).toBeNull();
+    const y = linhaParaContrato({ contract_key: 'k', uasg: '200331', situacao: 'SFC', processo_sei: '34509566', processo_nup: '08020.000017/2026-88', processo_autuado_em: '2026-01-05' });
+    expect([y.processoSei, y.processoNup, y.processoAutuadoEm]).toEqual(['34509566', '08020.000017/2026-88', '2026-01-05']);
   });
 });
 

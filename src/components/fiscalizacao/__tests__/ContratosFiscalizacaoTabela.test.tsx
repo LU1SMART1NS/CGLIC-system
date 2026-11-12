@@ -21,7 +21,7 @@ describe('colunas da tabela da Distribuição por aba', () => {
   it('Todos: mostra todas as colunas', () => {
     const html = tabela({});
     expect(html).toContain('>Fiscalização<');
-    for (const h of ['Fiscal SFC/CGLIC', 'SEI do contrato', 'Vigência']) expect(html).toContain(h);
+    for (const h of ['Fiscal SFC/CGLIC', 'Processo SEI', 'Vigência']) expect(html).toContain(h);
   });
 
   it('SFC/CGLIC: sem a coluna Fiscalização e o motivo sob o fiscal', () => {
@@ -36,7 +36,7 @@ describe('colunas da tabela da Distribuição por aba', () => {
     expect(html).toContain('Unidade da área');
     expect(html).toContain('CAEP');
     expect(html).not.toContain('Fiscal SFC/CGLIC');
-    expect(html).not.toContain('SEI do contrato');
+    expect(html).not.toContain('Processo SEI');
   });
 
   it('A definir: origem no lugar da situação, com o motivo', () => {

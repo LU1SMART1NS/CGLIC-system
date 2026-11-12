@@ -65,6 +65,11 @@ export function ehDoFiscal(c: Pick<ContratoFiscalizacao, 'fiscalUserId'>, userId
   return Boolean(userId) && c.fiscalUserId === userId;
 }
 
+/** Autuado = tem o NUP do processo de acompanhamento contratual (migration 294); o SEI do contrato não basta. */
+export function autuado(c: Pick<ContratoFiscalizacao, 'processoNup'>): boolean {
+  return Boolean(c.processoNup);
+}
+
 /** O que falta no contrato com a SFC/CGLIC nesta entrega: portaria e autuação do processo. */
 export interface PendenciaFiscalizacao {
   chave: string;
@@ -75,7 +80,7 @@ export interface PendenciaFiscalizacao {
 export function pendenciasDoContrato(c: ContratoFiscalizacao): PendenciaFiscalizacao[] {
   if (!comSfc(c)) return [];
   const p: PendenciaFiscalizacao[] = [];
-  if (!c.processoSei) p.push({ chave: `${c.contractKey}:AUTUAR`, tipo: 'AUTUAR', contrato: c });
+  if (!autuado(c)) p.push({ chave: `${c.contractKey}:AUTUAR`, tipo: 'AUTUAR', contrato: c });
   if (!c.portariaSei) p.push({ chave: `${c.contractKey}:PORTARIA`, tipo: 'PORTARIA', contrato: c });
   return p;
 }
@@ -128,7 +133,7 @@ export function cargaPorFiscal(contratos: ContratoFiscalizacao[], servidores: Se
         nome: f.nome,
         ...(f.perfil && f.perfil !== PERFIL_FISCAL ? { outroPerfil: rotuloDoPerfil(f.perfil) } : {}),
         contratos: titular.length,
-        aAutuar: titular.filter((c) => !c.processoSei).length,
+        aAutuar: titular.filter((c) => !autuado(c)).length,
         semPortaria: titular.filter((c) => !c.portariaSei).length
       };
     })
