@@ -1,6 +1,7 @@
 import React from 'react';
 import { formatNumber } from '../../utils/format';
-import { ROTULO_RELACAO_EQUIPE, mediaDaEquipeFiscal, type CargaDoFiscal } from '../../utils/fiscalizacao';
+import { mediaDaEquipeFiscal, type CargaDoFiscal } from '../../utils/fiscalizacao';
+import { BarraDeOcupacao } from '../atas/distribuicao/OcupacaoBarra';
 
 const plural = (n: number, um: string, varios: string) => `${formatNumber(n)} ${n === 1 ? um : varios}`;
 
@@ -21,9 +22,9 @@ export const GavetaDistribuicaoFiscais: React.FC<{
   const semCarteira = carga.filter((f) => f.contratos === 0).map((f) => f.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const maior = Math.max(0, ...comCarteira.map((f) => f.contratos));
   const pendencias = (f: CargaDoFiscal) => f.aAutuar + f.semPortaria;
-  const { media, relacao } = mediaDaEquipeFiscal(carga);
-  // Régua comum: a maior carteira (ou a média) ocupa quase toda a largura, como na Distribuição de Atas e Contratos.
-  const escala = Math.max(maior, media ?? 0) * 1.1;
+  const { media, porFiscal } = mediaDaEquipeFiscal(carga);
+  // Régua comum: a maior ocupação (ou a média) ocupa quase toda a largura, como na Distribuição de Atas e Contratos.
+  const escala = Math.max(0, ...[...porFiscal.values()].map((o) => o.ocupacao), media ?? 0) * 1.1;
   const fiscais = [...comCarteira].sort((a, b) => pendencias(b) - pendencias(a) || b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));
 
   if (carga.length === 0 && aDefinir === 0) {
@@ -50,8 +51,7 @@ export const GavetaDistribuicaoFiscais: React.FC<{
           </button>
         )}
         {fiscais.map((f) => {
-          const pct = escala > 0 ? Math.round((100 * f.contratos) / escala) : 0;
-          const rel = relacao.get(f.userId);
+          const o = porFiscal.get(f.userId) ?? { ocupacao: f.contratos, relacao: null };
           return (
             <button
               key={f.userId}
@@ -76,16 +76,21 @@ export const GavetaDistribuicaoFiscais: React.FC<{
                   </span>
                 </span>
               </span>
-              <span className="pn-gc-carga" title={rel ? 'A barra mostra os contratos do fiscal. O tracejado é a média da equipe.' : undefined}>
-                {rel && <span className={`pn-gc-relacao${rel === 'ACIMA' ? ' pn-gc-relacao--acima' : ''}`} data-testid="fisc-inicio-distribuicao-relacao">{ROTULO_RELACAO_EQUIPE[rel]}</span>}
-                <span className="pn-gc-barra pn-gc-barra--media" aria-hidden="true">
-                  <span style={{ width: `${Math.max(2, pct)}%` }} />
-                  {rel && media !== null && <i style={{ left: `${Math.min(100, (100 * media) / escala)}%` }} />}
-                </span>
-                <span className="pn-gc-carga-texto">
-                  {plural(f.contratos, 'contrato', 'contratos')}
-                  {f.contratos === maior && maior > 0 && fiscais.length > 1 ? ' · maior carteira' : ''}
-                </span>
+              <span className="pn-gc-carga">
+                <BarraDeOcupacao
+                  ocupacao={o.ocupacao}
+                  relacao={o.relacao}
+                  escala={escala}
+                  media={media}
+                  rodape={`${plural(f.contratos, 'contrato', 'contratos')}${f.contratos === maior && maior > 0 && fiscais.length > 1 ? ' · maior carteira' : ''}`}
+                  title={
+                    f.outroPerfil === 'Coordenador'
+                      ? 'A barra mostra a ocupação: o coordenador entra na média com metade da capacidade (cada contrato pesa o dobro). O tracejado é a média da equipe.'
+                      : 'A barra mostra a ocupação (contratos do fiscal). O tracejado é a média da equipe.'
+                  }
+                  testId="fisc-inicio-distribuicao-relacao"
+                  minWidth="0"
+                />
               </span>
             </button>
           );

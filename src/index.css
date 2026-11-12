@@ -1052,11 +1052,6 @@ html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que est
 .pn-gc-carga { display: flex; flex-direction: column; gap: 3px; }
 .pn-gc-barra { display: block; height: 5px; border-radius: 3px; background: #f1f5f9; overflow: hidden; }
 .pn-gc-barra > span { display: block; height: 100%; background: var(--color-info-solid); }
-.pn-gc-barra--media { position: relative; overflow: visible; }
-.pn-gc-barra--media > span { border-radius: 3px; }
-.pn-gc-barra--media > i { position: absolute; top: -3px; bottom: -3px; border-left: 2px dashed #64748b; }
-.pn-gc-relacao { font-size: 0.78rem; font-weight: 800; color: #475569; }
-.pn-gc-relacao--acima { color: var(--color-danger-text); }
 .pn-gc-carga-texto { font-size: 0.75rem; color: var(--text-muted); }
 .pn-gc-sem-carteira { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
 

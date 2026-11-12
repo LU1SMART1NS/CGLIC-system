@@ -121,7 +121,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
     const q = busca.trim().toLowerCase();
     return q ? carga.filter((f) => f.nome.toLowerCase().includes(q)) : carga;
   }, [carga, busca]);
-  const { relacao } = useMemo(() => mediaDaEquipeFiscal(carga), [carga]);
+  const { porFiscal } = useMemo(() => mediaDaEquipeFiscal(carga), [carga]);
   const doFiscal = (userId: string) => contratos.filter((c) => comSfc(c) && c.fiscalUserId === userId);
 
   return (
@@ -181,7 +181,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
                           {f.outroPerfil && <div className="pn-gc-perfil">{f.outroPerfil} · também fiscal</div>}
                         </td>
                         <td data-label="Carteira" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                          <CarteiraCell f={f} ausencia={ausencia} recebidas={transferencias.filter((t) => t.destinoUserId === f.userId)} relacao={relacao.get(f.userId)} />
+                          <CarteiraCell f={f} ausencia={ausencia} recebidas={transferencias.filter((t) => t.destinoUserId === f.userId)} relacao={porFiscal.get(f.userId)?.relacao ?? undefined} />
                         </td>
                         <td data-label="Pressão agora" style={carteiraTd}>
                           <PressaoCell f={f} />

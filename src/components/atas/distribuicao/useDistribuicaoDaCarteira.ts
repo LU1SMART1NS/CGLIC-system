@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useUsers } from '../../../hooks/useUsers';
 import { getArpPrazo } from '../../../hooks/useAtasPortfolio';
 import { formatContractNumber } from '../../../utils/contractNumber';
 import type { ComplexidadeAjuste } from '../../../services/complexidadeAjusteService';
@@ -28,9 +27,6 @@ export function useDistribuicaoDaCarteira({
   ajustes,
   capacidadeDoGestor
 }: Carteira & { ajustes?: Record<string, ComplexidadeAjuste>; capacidadeDoGestor?: (gestorNome: string) => number }) {
-  // Coordenador com carteira aparece, mas fica fora da média da equipe e da comparação com ela.
-  const { data: usuarios } = useUsers();
-  const coordenadores = useMemo(() => new Set((usuarios ?? []).filter((u) => u.ativo && u.perfil === 'coordenador').map((u) => u.nome)), [usuarios]);
   return useMemo(
     () =>
       buildDistribuicaoEquipe({
@@ -59,9 +55,8 @@ export function useDistribuicaoDaCarteira({
         links,
         attentionItems: contratos.attentionItems,
         ajustes,
-        capacidadeDoGestor,
-        foraDaMedia: coordenadores
+        capacidadeDoGestor
       }),
-    [coordenadores, atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes, capacidadeDoGestor]
+    [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes, capacidadeDoGestor]
   );
 }
