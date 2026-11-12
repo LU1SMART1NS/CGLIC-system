@@ -150,6 +150,6 @@ export function organizarCartoesDistribuicao(linhas: ResumoDoGestor[]): CartoesD
   return {
     semGestor: sem && carga(sem) > 0 ? sem : null,
     gestores,
-    semCarteira: comGestor.filter((l) => carga(l) === 0).map((l) => l.gestor.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    semCarteira: comGestor.filter((l) => carga(l) === 0 && !l.gestor.outroPerfil).map((l) => l.gestor.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'))
   };
 }

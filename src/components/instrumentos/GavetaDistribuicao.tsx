@@ -109,6 +109,7 @@ export const GavetaDistribuicao: React.FC<{
               <strong>
                 {g.criticas > 0 && <span className="pn-gc-ponto" aria-hidden="true" />}
                 {g.gestor.nome}
+                {g.gestor.outroPerfil && <span className="pn-gc-perfil" title={`Perfil ${g.gestor.outroPerfil}, também gestor`}>{g.gestor.outroPerfil}</span>}
               </strong>
               {g.criticas > 0 ? (
                 <span className="pn-gc-criticas">{plural(g.criticas, 'crítica', 'críticas')}</span>

@@ -172,6 +172,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
                         </td>
                         <td style={{ ...carteiraTd, minWidth: '160px' }}>
                           <span style={{ fontWeight: 800 }}>{f.nome}</span>
+                          {f.outroPerfil && <span className="pn-gc-perfil" style={{ marginLeft: 6 }} title={`Perfil ${f.outroPerfil}, também fiscal`}>{f.outroPerfil}</span>}
                         </td>
                         <td data-label="Carteira" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                           <CarteiraCell f={f} ausencia={ausencia} recebidas={transferencias.filter((t) => t.destinoUserId === f.userId)} />

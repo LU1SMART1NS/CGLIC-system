@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { useUsers } from './useUsers';
+import { podeSerFiscal } from '../utils/fiscalizacao';
 import {
   definirFiscalizacaoContrato,
   definirPrevistaEntregas,
@@ -64,18 +65,21 @@ export function useFiscalizacaoDoContrato(contractKey: string | null | undefined
   return { consulta, contrato };
 }
 
-/** Servidores ativos com o perfil Gestor de Fiscalização (os que podem ser fiscal). */
+/**
+ * Servidores ativos para a Fiscalização. `fiscais`: quem pode receber contratos (Gestor de Fiscalização e Coordenador —
+ * o banco aceita os mesmos). `servidores`: todos os ativos, com o perfil, para mostrar quem já tem contrato como fiscal
+ * mesmo com outro perfil (fiscaisVisiveis / cargaPorFiscal).
+ */
 export function useFiscaisAtivos() {
   const usuarios = useUsers();
-  const fiscais = useMemo(
-    () =>
-      (usuarios.data ?? [])
-        .filter((u) => u.ativo && u.perfil === 'gestor_fiscalizacao')
-        .map((u) => ({ id: u.id, nome: u.nome }))
-        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
-    [usuarios.data]
-  );
-  return { fiscais, consulta: usuarios };
+  const { fiscais, servidores } = useMemo(() => {
+    const ativos = (usuarios.data ?? [])
+      .filter((u) => u.ativo)
+      .map((u) => ({ id: u.id, nome: u.nome, perfil: u.perfil as string }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    return { servidores: ativos, fiscais: ativos.filter((u) => podeSerFiscal(u.perfil)) };
+  }, [usuarios.data]);
+  return { fiscais, servidores, consulta: usuarios };
 }
 
 export function useDefinirFiscalizacao() {

@@ -1046,6 +1046,7 @@ html, body { overflow-anchor: none; } /* o encolhimento muda a altura do que est
 .pn-gc-tag--critico { color: var(--color-danger-text); font-weight: 700; }
 .pn-gdist { display: flex; flex-direction: column; gap: 8px; }
 .pn-gc-head strong { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.pn-gc-perfil { flex: none; padding: 0 6px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); background: var(--bg-page); border: 1px solid var(--border-color); }
 .pn-gc-ponto { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--color-danger); }
 .pn-gc-criticas { flex: none; padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; color: var(--color-danger-text-strong); background: var(--color-danger-bg-strong); }
 .pn-gc-carga { display: flex; flex-direction: column; gap: 3px; }
