@@ -115,6 +115,23 @@ export function cargaPorFiscal(contratos: ContratoFiscalizacao[], servidores: Se
     .sort((a, b) => b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
+export type RelacaoComEquipe = 'ACIMA' | 'NA_MEDIA' | 'ABAIXO';
+export const ROTULO_RELACAO_EQUIPE: Record<RelacaoComEquipe, string> = { ACIMA: 'Acima da média', NA_MEDIA: 'Na média', ABAIXO: 'Abaixo da média' };
+
+/**
+ * Média da equipe de fiscais, como na Distribuição de Atas e Contratos, mas pela quantidade de contratos (a fiscalização
+ * não tem peso de complexidade nem nível). Entram os Gestores de Fiscalização com carteira; quem tem outro perfil
+ * (coordenador, gestor) aparece, mas fica fora da média e da comparação. Com menos de 2 na conta, não há média.
+ */
+export function mediaDaEquipeFiscal(carga: CargaDoFiscal[]): { media: number | null; relacao: Map<string, RelacaoComEquipe> } {
+  const naConta = carga.filter((f) => f.contratos > 0 && !f.outroPerfil);
+  const relacao = new Map<string, RelacaoComEquipe>();
+  if (naConta.length < 2) return { media: null, relacao };
+  const media = naConta.reduce((s, f) => s + f.contratos, 0) / naConta.length;
+  for (const f of naConta) relacao.set(f.userId, f.contratos > media * 1.25 ? 'ACIMA' : f.contratos < media * 0.75 ? 'ABAIXO' : 'NA_MEDIA');
+  return { media, relacao };
+}
+
 function rotuloPadraoDoPerfil(perfil: string): string {
   if (perfil === 'coordenador') return 'Coordenador';
   if (perfil === 'gestor') return 'Gestor';

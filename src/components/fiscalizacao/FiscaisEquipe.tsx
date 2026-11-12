@@ -5,7 +5,7 @@ import { CARTEIRA_EXPANDED_CELL_STYLE } from '../carteira/CarteiraDetailLabel';
 import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import type { ContratoFiscalizacao, TransferenciaFiscal } from '../../services/fiscalizacaoService';
-import { comSfc, dataBR, hojeEmBrasilia, type CargaDoFiscal } from '../../utils/fiscalizacao';
+import { ROTULO_RELACAO_EQUIPE, comSfc, mediaDaEquipeFiscal, dataBR, hojeEmBrasilia, type CargaDoFiscal, type RelacaoComEquipe } from '../../utils/fiscalizacao';
 import { DesfazerTransferenciaFiscalModal, TransferirFiscalModal, TransferirFiscalTemporariamenteModal } from './FiscalizacaoModais';
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
 import { ArrowLeftRight } from 'lucide-react';
@@ -15,9 +15,14 @@ import { useSelecaoFila } from '../atas/distribuicao/DistribuicaoSelecao';
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 /** Carteira do fiscal: contratos e a ausência (saiu ou recebeu de colega). */
-const CarteiraCell: React.FC<{ f: CargaDoFiscal; ausencia: TransferenciaFiscal | null; recebidas: TransferenciaFiscal[] }> = ({ f, ausencia, recebidas }) => (
+const CarteiraCell: React.FC<{ f: CargaDoFiscal; ausencia: TransferenciaFiscal | null; recebidas: TransferenciaFiscal[]; relacao?: RelacaoComEquipe }> = ({ f, ausencia, recebidas, relacao }) => (
   <div>
     <span style={{ fontWeight: 700 }}>{plural(f.contratos, 'contrato', 'contratos')}</span>
+    {relacao && (
+      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: relacao === 'ACIMA' ? 'var(--color-danger-text)' : '#475569' }} data-testid={`fisc-equipe-relacao-${f.userId}`}>
+        {ROTULO_RELACAO_EQUIPE[relacao]}
+      </div>
+    )}
     {ausencia && (
       <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-warning-text)' }} data-testid={`fisc-equipe-ausente-${f.userId}`}>
         {ausencia.retornoPrevisto <= hojeEmBrasilia() ? `retorno em ${dataBR(ausencia.retornoPrevisto)}: devolver os contratos` : `ausente até ${dataBR(ausencia.retornoPrevisto)}`} · com {ausencia.destinoNome}
@@ -116,6 +121,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
     const q = busca.trim().toLowerCase();
     return q ? carga.filter((f) => f.nome.toLowerCase().includes(q)) : carga;
   }, [carga, busca]);
+  const { relacao } = useMemo(() => mediaDaEquipeFiscal(carga), [carga]);
   const doFiscal = (userId: string) => contratos.filter((c) => comSfc(c) && c.fiscalUserId === userId);
 
   return (
@@ -172,10 +178,10 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
                         </td>
                         <td style={{ ...carteiraTd, minWidth: '160px' }}>
                           <span style={{ fontWeight: 800 }}>{f.nome}</span>
-                          {f.outroPerfil && <span className="pn-gc-perfil" style={{ marginLeft: 6 }} title={`Perfil ${f.outroPerfil}, também fiscal`}>{f.outroPerfil}</span>}
+                          {f.outroPerfil && <div className="pn-gc-perfil">{f.outroPerfil} · também fiscal</div>}
                         </td>
                         <td data-label="Carteira" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                          <CarteiraCell f={f} ausencia={ausencia} recebidas={transferencias.filter((t) => t.destinoUserId === f.userId)} />
+                          <CarteiraCell f={f} ausencia={ausencia} recebidas={transferencias.filter((t) => t.destinoUserId === f.userId)} relacao={relacao.get(f.userId)} />
                         </td>
                         <td data-label="Pressão agora" style={carteiraTd}>
                           <PressaoCell f={f} />
