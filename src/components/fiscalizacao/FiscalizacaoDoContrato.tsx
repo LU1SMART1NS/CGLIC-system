@@ -23,7 +23,7 @@ const Campo: React.FC<{ rotulo: string; children: React.ReactNode }> = ({ rotulo
   </div>
 );
 
-/** Contrato 360 › Fiscalização: quem fiscaliza, fiscal da SFC/CGLIC e Processo SEI (migration 259). */
+/** Contrato 360 › Fiscalização: quem fiscaliza, fiscal da SFC/CGLIC e NUP do processo (migration 259). */
 export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ contractKey }) => {
   const { user, role } = useAuth();
   const { consulta, contrato } = useFiscalizacaoDoContrato(contractKey);
@@ -80,7 +80,7 @@ export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ cont
             </NoticeBar>
           )}
           {podeAutuar && !autuado(contrato) && (
-            <NoticeBar tone="info" testId="fisc-contrato-autuar">Falta registrar a autuação: o Processo SEI de acompanhamento contratual.</NoticeBar>
+            <NoticeBar tone="info" testId="fisc-contrato-autuar">Falta registrar a autuação: o NUP do processo de acompanhamento contratual.</NoticeBar>
           )}
           <div style={grade}>
             <Campo rotulo="Fiscalização"><CelulaSituacao c={contrato} /></Campo>

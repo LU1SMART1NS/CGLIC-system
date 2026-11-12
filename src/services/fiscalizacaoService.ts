@@ -31,7 +31,7 @@ export interface ContratoFiscalizacao {
   processoSei: string | null;
   /** Data do contrato registrada com o número SEI do contrato. */
   autuadoEm: string | null;
-  /** Processo SEI de acompanhamento contratual: é a autuação (migration 294). Sem ele, o contrato está "a autuar". */
+  /** NUP do processo de acompanhamento contratual: é a autuação (migration 294). Sem ele, o contrato está "a autuar". */
   processoNup?: string | null;
   /** AAAA-MM-DD: data da autuação do processo de acompanhamento. */
   processoAutuadoEm?: string | null;
@@ -117,7 +117,7 @@ export async function registrarProcessoFiscalizacao(input: { contractKey: string
   if (error) throw mapPostgresErrorToAppError(error);
 }
 
-/** Autuação: Processo SEI de acompanhamento e a data da autuação (fiscal ou coordenador; migration 294). */
+/** Autuação: NUP do processo de acompanhamento e a data da autuação (fiscal ou coordenador; migration 294). */
 export async function registrarAutuacaoFiscalizacao(input: { contractKey: string; processoNup: string; autuadoEm: string }): Promise<void> {
   const { error } = await cliente().rpc('registrar_autuacao_fiscalizacao', {
     p_contract_key: input.contractKey,

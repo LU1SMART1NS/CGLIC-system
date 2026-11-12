@@ -65,12 +65,12 @@ export function ehDoFiscal(c: Pick<ContratoFiscalizacao, 'fiscalUserId'>, userId
   return Boolean(userId) && c.fiscalUserId === userId;
 }
 
-/** Autuado = tem o Processo SEI de acompanhamento contratual (migration 294); o SEI do contrato não basta. */
+/** Autuado = tem o NUP do processo de acompanhamento contratual (migration 294); o SEI do contrato não basta. */
 export function autuado(c: Pick<ContratoFiscalizacao, 'processoNup'>): boolean {
   return Boolean(c.processoNup);
 }
 
-/** O que falta no contrato com a SFC/CGLIC: a autuação do Processo SEI (a portaria saiu em 12/11/2026). */
+/** O que falta no contrato com a SFC/CGLIC: a autuação pelo NUP do processo (a portaria saiu em 12/11/2026). */
 export interface PendenciaFiscalizacao {
   chave: string;
   tipo: 'AUTUAR';

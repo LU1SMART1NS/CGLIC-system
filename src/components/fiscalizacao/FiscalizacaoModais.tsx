@@ -120,7 +120,7 @@ export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao
 };
 
 /**
- * Fiscal ou coordenador: autuação = Processo SEI de acompanhamento contratual e a data da autuação
+ * Fiscal ou coordenador: autuação = NUP do processo de acompanhamento contratual no SEI e a data da autuação
  * (andamento "Processo público gerado"; migration 294). O número SEI do contrato ajuda a achar o processo.
  */
 export const RegistrarProcessoModal: React.FC<{ contrato: ContratoFiscalizacao; onClose: () => void }> = ({ contrato, onClose }) => {
@@ -285,7 +285,7 @@ export const TransferirFiscalModal: React.FC<{
           ))}
         </AppSelect>
         <NoticeBar tone="info">
-          {nomeDestino || 'Quem receber'} passa a ser o fiscal desses contratos. O Processo SEI fica como está.
+          {nomeDestino || 'Quem receber'} passa a ser o fiscal desses contratos. O NUP do processo fica como está.
         </NoticeBar>
       </div>
     </Modal>

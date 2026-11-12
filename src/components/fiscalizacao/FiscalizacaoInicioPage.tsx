@@ -165,7 +165,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
       <PageHeader
         title="Início"
         subtitle={fiscal ? 'Os contratos que você fiscaliza e o que falta em cada um.' : `Resumo da fiscalização dos contratos pela ${NOME_SFC} e o que exige sua atenção.`}
-        hint={`Contrato de emenda chega "A definir", com sugestão ${NOME_SFC}; o coordenador decide na Distribuição. Depois da decisão, o fiscal registra a autuação (Processo SEI de acompanhamento contratual). As pendências são do fiscal; na ausência, o coordenador passa os contratos a um colega pela transferência temporária.`}
+        hint={`Contrato de emenda chega "A definir", com sugestão ${NOME_SFC}; o coordenador decide na Distribuição. Depois da decisão, o fiscal registra a autuação (NUP do processo de acompanhamento contratual). As pendências são do fiscal; na ausência, o coordenador passa os contratos a um colega pela transferência temporária.`}
         icon={<LayoutDashboard size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={() => refetch()} isRefreshing={isFetching} lastUpdated={dataUpdatedAt || null} dataTestId="fisc-inicio-atualizar" tooltipTitle="Recarregar a fiscalização" />}
       />
@@ -194,7 +194,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               unidade={daSfc.length === 1 ? 'contrato' : 'contratos'}
               linhas={[
                 { rotulo: 'Fiscalização mista', valor: String(mistas) },
-                { rotulo: 'A autuar (Processo SEI)', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined }
+                { rotulo: 'A autuar (NUP do processo)', valor: String(aAutuar.length), tom: aAutuar.length ? 'warning' : undefined }
               ]}
               onClick={() => irPara(aAutuar.length ? 'AUTUAR' : 'TODAS')}
               testId="fisc-cartao-contratos"

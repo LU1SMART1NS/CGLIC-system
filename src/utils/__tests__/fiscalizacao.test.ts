@@ -34,7 +34,7 @@ describe('fiscalização do contrato', () => {
     expect(pendenciasDoContrato(c({ situacao: 'AREA' }))).toEqual([]);
     expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1' })).map((p) => p.tipo)).toEqual(['AUTUAR']);
     expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1', processoSei: '34472015', autuadoEm: '2026-02-05', processoNup: '08020.000017/2026-88', processoAutuadoEm: '2026-01-05' }))).toEqual([]);
-    // SEI do contrato sem o Processo SEI de acompanhamento continua a autuar (migration 294).
+    // SEI do contrato sem o NUP do processo de acompanhamento continua a autuar (migration 294).
     expect(pendenciasDoContrato(c({ situacao: 'SFC', fiscalUserId: 'u1', processoSei: '34472015', autuadoEm: '2026-02-05' })).map((p) => p.tipo)).toEqual(['AUTUAR']);
   });
 
