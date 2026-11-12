@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { linhaParaContrato } from '../../services/fiscalizacaoService';
-import { cargaPorFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato } from '../fiscalizacao';
+import { cargaPorFiscal, mediaDaEquipeFiscal, podeSerFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato } from '../fiscalizacao';
 
 const base: ContratoFiscalizacao = {
   contractKey: '200331-00055-2026', uasg: '200331', numero: '00055/2026', fornecedor: 'CONDOR', objeto: null, assinatura: '2026-01-29', vigenciaFim: '2027-01-29',
@@ -53,6 +53,38 @@ describe('fiscalização do contrato', () => {
     const carga = cargaPorFiscal(lista, [{ id: 'u2', nome: 'Bia' }, { id: 'u1', nome: 'Ana' }]);
     expect(carga[0]).toEqual({ userId: 'u1', nome: 'Ana', contratos: 2, aAutuar: 1, semPortaria: 2 });
     expect(carga[1]).toEqual({ userId: 'u2', nome: 'Bia', contratos: 0, aAutuar: 0, semPortaria: 0 });
+  });
+
+  it('quem tem contrato como fiscal aparece, seja qual for o perfil; sem contrato, só o Gestor de Fiscalização', () => {
+    const lista = [c({ contractKey: 'a', situacao: 'SFC', fiscalUserId: 'coord' }), c({ contractKey: 'b', situacao: 'SFC', fiscalUserId: 'gest' })];
+    const servidores = [
+      { id: 'fisc', nome: 'Ana', perfil: 'gestor_fiscalizacao' },
+      { id: 'coord', nome: 'Hugo', perfil: 'coordenador' },
+      { id: 'coord2', nome: 'Dani', perfil: 'coordenador' },
+      { id: 'gest', nome: 'Edu', perfil: 'gestor' },
+      { id: 'cons', nome: 'Lia', perfil: 'consulta' }
+    ];
+    const carga = cargaPorFiscal(lista, servidores);
+    expect(carga.map((f) => [f.nome, f.outroPerfil ?? null, f.contratos])).toEqual([
+      ['Edu', 'Gestor', 1],
+      ['Hugo', 'Coordenador', 1],
+      ['Ana', null, 0]
+    ]);
+  });
+
+  it('média da equipe de fiscais pelos contratos, sem quem tem outro perfil', () => {
+    const f = (userId: string, contratos: number, outroPerfil?: string) => ({ userId, nome: userId, contratos, aAutuar: 0, semPortaria: 0, ...(outroPerfil ? { outroPerfil } : {}) });
+    const { media, relacao } = mediaDaEquipeFiscal([f('a', 60), f('b', 40), f('c', 20), f('coord', 77, 'Coordenador'), f('zero', 0)]);
+    expect(media).toBe(40);
+    expect([...relacao]).toEqual([['a', 'ACIMA'], ['b', 'NA_MEDIA'], ['c', 'ABAIXO']]);
+    expect(mediaDaEquipeFiscal([f('a', 10), f('coord', 5, 'Coordenador')]).media).toBeNull();
+  });
+
+  it('pode receber contratos como fiscal: Gestor de Fiscalização e Coordenador', () => {
+    expect(podeSerFiscal('gestor_fiscalizacao')).toBe(true);
+    expect(podeSerFiscal('coordenador')).toBe(true);
+    expect(podeSerFiscal('gestor')).toBe(false);
+    expect(podeSerFiscal('consulta')).toBe(false);
   });
 
   it('número do contrato pela chave quando a fonte não traz', () => {

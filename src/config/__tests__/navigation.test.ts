@@ -14,12 +14,12 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
         'carteira',
         'alocacao',
         'vinculacao',
-        'execucao-financeira',
         'emendas',
         'fiscalizacao',
+        'execucao-financeira',
         'configuracoes'
       ]);
-      expect(navigationConfig.map((item) => item.label)).toEqual(['Início', 'Atas e Contratos', 'Alocação', 'Vínculos', 'Financeiro', 'Emendas', 'Fiscalização', 'Ajustes']);
+      expect(navigationConfig.map((item) => item.label)).toEqual(['Início', 'Atas e Contratos', 'Alocação', 'Vínculos', 'Emendas', 'Fiscalização', 'Financeiro', 'Ajustes']);
       expect(navigationConfig.find((i) => i.id === 'configuracoes')?.placement).toBe('bottom');
       expect(navigationConfig.every((i) => (i.children?.length ?? 0) > 0)).toBe(true);
     });
@@ -422,7 +422,7 @@ describe('Navigation Config & Breadcrumbs — Fase 9-C2 Shell & Navegação', ()
       const areas = visible.map((i) => i.id);
       expect(areas).not.toContain('vinculacao');
       expect(areas).not.toContain('alocacao');
-      expect(areas).toEqual(['visao-geral', 'carteira', 'execucao-financeira', 'emendas', 'fiscalizacao', 'configuracoes']);
+      expect(areas).toEqual(['visao-geral', 'carteira', 'emendas', 'fiscalizacao', 'execucao-financeira', 'configuracoes']);
 
       expect(labels).not.toContain('Modelos de Gestão');
       // Ajustes aparece para o leitor só com as consultas dos grupos das UASGs, das unidades internas e dos beneficiários (e dos grupos deles)

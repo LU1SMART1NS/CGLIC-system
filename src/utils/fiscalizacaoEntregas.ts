@@ -1,5 +1,12 @@
-import type { EntregaFiscalizacao, EtapaEntrega } from '../services/fiscalizacaoService';
-import { hojeEmBrasilia } from './fiscalizacao';
+import type { AvisoDaEntrega, EntregaFiscalizacao, EtapaEntrega } from '../services/fiscalizacaoService';
+import { dataBR, hojeEmBrasilia } from './fiscalizacao';
+
+/** O que mudou no pedido de emenda depois da entrega (migration 274), em uma frase. */
+export function textoDoAviso(a: AvisoDaEntrega): string {
+  if (a.tipo === 'OUTRO_CONTRATO') return `A nota deste item passou ao contrato ${a.contrato}`;
+  const quando = [a.data ? `em ${dataBR(a.data)}` : null, a.sei ? `SEI ${a.sei}` : null].filter(Boolean).join(' · ');
+  return `Empenho anulado no pedido${quando ? ` ${quando}` : ''}: o item foi cancelado`;
+}
 
 /** Fases e etapas da entrega (protótipo aprovado em 10/11/2026; migration 260). */
 export type FaseEntrega = 'PREPARACAO' | 'EXECUCAO' | 'RECEBIMENTO' | 'PAGAMENTO' | 'FINALIZADO';

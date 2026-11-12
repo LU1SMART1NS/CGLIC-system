@@ -1,6 +1,6 @@
-import type { EntregaFiscalizacao } from '../services/fiscalizacaoService';
+import type { EntregaFiscalizacao, EtapaEntrega } from '../services/fiscalizacaoService';
 import { NOME_SFC, dataBR } from './fiscalizacao';
-import { itemConcluido, prazoDaEntrega, rotuloDoBeneficiario } from './fiscalizacaoEntregas';
+import { itemConcluido, prazoDaEntrega, rotuloDoBeneficiario, textoDoAviso } from './fiscalizacaoEntregas';
 import { gruposALigar } from './fiscalizacaoLigacao';
 import { gruposSemCadastro } from './fiscalizacaoBeneficiarioLigacao';
 
@@ -18,18 +18,25 @@ const quem = (es: EntregaFiscalizacao[]) => {
 const menorData = (es: EntregaFiscalizacao[]) => es.map((e) => e.prevista).filter((d): d is string => Boolean(d)).sort()[0] ?? null;
 export const EM_EXECUCAO = new Set(['ORDEM', 'PRODUCAO', 'TRANSITO', 'RETIRADA']);
 
-type Abrir = (tipo: 'etapa' | 'prevista', itens: EntregaFiscalizacao[]) => void;
+type Abrir = (tipo: 'etapa' | 'prevista' | 'encerrar', itens: EntregaFiscalizacao[], inicial?: EtapaEntrega) => void;
 
 /** O que fazer agora no contrato, juntando os itens que estão no mesmo passo (o status anda em bloco). */
 export function linhasDoContrato(es: EntregaFiscalizacao[], semProcesso: boolean, abrir: Abrir, processo: () => void): { comVoce: Linha[]; comOutros: Linha[] } {
-  const sfc = es.filter((e) => e.responsavel === 'SFC');
+  // Item que mudou no pedido de emenda (migration 274): só o aviso e o encerramento; os outros passos não o contam.
+  const sfc = es.filter((e) => e.responsavel === 'SFC' && !e.aviso);
+  const comAviso = es.filter((e) => e.responsavel === 'SFC' && e.aviso);
   const de = (f: (e: EntregaFiscalizacao) => boolean) => sfc.filter(f);
   const mudar = (rotulo: string, x: EntregaFiscalizacao[]) => ({ rotulo, principal: true, faz: () => abrir('etapa', x) });
   const comVoce: Linha[] = [];
   const comOutros: Linha[] = [];
+  const encerrar = (x: EntregaFiscalizacao[]) => ({ rotulo: x.length === 1 ? 'Encerrar entrega' : 'Encerrar entregas', principal: true, faz: () => abrir('encerrar', x) });
+  const cancelados = comAviso.filter((e) => e.aviso?.tipo === 'ITEM_CANCELADO');
+  if (cancelados.length) comVoce.push({ chave: 'anulado', tom: 'vencido', titulo: `Empenho anulado · ${itens(cancelados.length)} cancelado${cancelados.length === 1 ? '' : 's'} no pedido`, detalhe: `${quem(cancelados)} · ${textoDoAviso(cancelados[0].aviso!)}`, acoes: [encerrar(cancelados)] });
+  const outroContrato = comAviso.filter((e) => e.aviso?.tipo === 'OUTRO_CONTRATO');
+  if (outroContrato.length) comVoce.push({ chave: 'outro-contrato', tom: 'eu', titulo: `A nota passou a outro contrato · ${itens(outroContrato.length)}`, detalhe: `${quem(outroContrato)} · ${textoDoAviso(outroContrato[0].aviso!)}`, acoes: [encerrar(outroContrato)] });
   if (semProcesso) comVoce.push({ chave: 'processo', tom: 'eu', titulo: 'Registrar o SEI do contrato', detalhe: 'Número SEI do contrato e data do contrato: vale para a autuação.', acoes: [{ rotulo: 'Registrar SEI', principal: true, faz: processo }] });
   const vencidos = de((e) => EM_EXECUCAO.has(e.etapa) && prazoDaEntrega(e).tom === 'danger');
-  if (vencidos.length) comVoce.push({ chave: 'cobrar', tom: 'vencido', titulo: `Cobrar o fornecedor · ${itens(vencidos.length)} atrasado${vencidos.length === 1 ? "" : "s"}`, detalhe: quem(vencidos), prazo: dataBR(menorData(vencidos)), vencido: true, limite: menorData(vencidos), acoes: [{ rotulo: 'Nova data prevista', faz: () => abrir('prevista', vencidos) }, mudar('Mudar etapa', vencidos)] });
+  if (vencidos.length) comVoce.push({ chave: 'cobrar', tom: 'vencido', titulo: `Cobrar o fornecedor · ${itens(vencidos.length)} atrasado${vencidos.length === 1 ? "" : "s"}`, detalhe: quem(vencidos), prazo: dataBR(menorData(vencidos)), vencido: true, limite: menorData(vencidos), acoes: [{ rotulo: 'Nova data prevista', faz: () => abrir('prevista', vencidos) }, mudar('Registrar o andamento', vencidos)] });
   const ordem = de((e) => e.etapa === 'INFO_ENVIADA');
   if (ordem.length) comVoce.push({ chave: 'ordem', tom: 'eu', titulo: `Emitir a Ordem de Fornecimento · ${itens(ordem.length)}`, detalhe: `${quem(ordem)} · as informações já chegaram`, acoes: [mudar('Registrar a Ordem', ordem)] });
   const semData = de((e) => EM_EXECUCAO.has(e.etapa) && !e.prevista);
@@ -46,11 +53,11 @@ export function linhasDoContrato(es: EntregaFiscalizacao[], semProcesso: boolean
     if (x.length) comVoce.push({ chave, tom: 'eu', titulo: `${titulo} · ${itens(x.length)}`, detalhe: quem(x), acoes: [mudar(botao, x)] });
   }
   const info = de((e) => e.etapa === 'INFO_PEDIDA');
-  if (info.length) comOutros.push({ chave: 'info', tom: 'espera', quem: 'CAEP', titulo: `Enviar as informações · ${itens(info.length)}`, detalhe: quem(info), acoes: [] });
+  if (info.length) comOutros.push({ chave: 'info', tom: 'espera', quem: 'CAEP', titulo: `Enviar as informações · ${itens(info.length)}`, detalhe: quem(info), acoes: [{ rotulo: 'Registrar as informações', faz: () => abrir('etapa', info) }] });
   const exercito = de((e) => e.etapa === 'CONTROLADO');
-  if (exercito.length) comOutros.push({ chave: 'exercito', tom: 'espera', quem: 'Exército (DFPC)', titulo: `Autorizar os controlados · ${itens(exercito.length)}`, detalhe: `${quem(exercito)} · a DFPC pede o termo de doação`, acoes: [] });
+  if (exercito.length) comOutros.push({ chave: 'exercito', tom: 'espera', quem: 'Exército (DFPC)', titulo: `Autorizar os controlados · ${itens(exercito.length)}`, detalhe: `${quem(exercito)} · a DFPC pede o termo de doação`, acoes: [{ rotulo: 'Registrar a autorização', faz: () => abrir('etapa', exercito) }] });
   const fornecedor = de((e) => EM_EXECUCAO.has(e.etapa) && prazoDaEntrega(e).tom !== 'danger' && Boolean(e.prevista));
-  if (fornecedor.length) comOutros.push({ chave: 'fornecedor', tom: 'espera', quem: 'Fornecedor', titulo: `Entregar · ${itens(fornecedor.length)}`, detalhe: quem(fornecedor), prazo: dataBR(menorData(fornecedor)), limite: menorData(fornecedor), acoes: [] });
+  if (fornecedor.length) comOutros.push({ chave: 'fornecedor', tom: 'espera', quem: 'Fornecedor', titulo: `Entregar · ${itens(fornecedor.length)}`, detalhe: quem(fornecedor), prazo: dataBR(menorData(fornecedor)), limite: menorData(fornecedor), acoes: [{ rotulo: 'Registrar a entrega', faz: () => abrir('etapa', fornecedor, 'ENTREGUE') }] });
   const pagar = de((e) => e.etapa === 'PAGAMENTO' && !e.pagoEm);
   if (pagar.length) comOutros.push({ chave: 'pagar', tom: 'espera', quem: 'Financeiro', titulo: `Pagar a nota · ${itens(pagar.length)}`, detalhe: quem(pagar), acoes: [] });
   const area = es.filter((e) => e.responsavel === 'AREA');
@@ -61,6 +68,7 @@ export function linhasDoContrato(es: EntregaFiscalizacao[], semProcesso: boolean
 /** Com quem está o item (a mesma regra da mesa do contrato): o passo é do fiscal, de outros, ou acabou. */
 export function comQuemEstaOItem(e: EntregaFiscalizacao): 'VOCE' | 'OUTROS' | 'FIM' {
   if (e.responsavel === 'AREA') return 'OUTROS';
+  if (e.aviso) return 'VOCE';
   if (itemConcluido(e)) return 'FIM';
   if (e.etapa === 'INFO_PEDIDA' || e.etapa === 'CONTROLADO') return 'OUTROS';
   if (EM_EXECUCAO.has(e.etapa)) return !e.prevista || prazoDaEntrega(e).tom === 'danger' ? 'VOCE' : 'OUTROS';

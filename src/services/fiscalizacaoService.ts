@@ -160,7 +160,19 @@ export interface EntregaFiscalizacao {
   entregaComplemento?: string | null;
   entregaBairro?: string | null;
   entregaCep?: string | null;
+  /**
+   * A linha do pedido de emenda mudou depois da entrega (migration 274): item cancelado (anulação do empenho, com a
+   * data e o SEI quando há registro) ou nota em outro contrato. O Gestor de Fiscalização decide se encerra.
+   */
+  aviso?: AvisoDaEntrega | null;
+  /** Entrega encerrada (só vem quando a leitura pede as encerradas). */
+  encerradaEm?: string | null;
 }
+
+export type AvisoDaEntrega =
+  | { tipo: 'ITEM_CANCELADO'; data: string | null; sei: string | null }
+  | { tipo: 'OUTRO_CONTRATO'; contrato: string };
+export type MotivoDoEncerramento = 'ITEM_CANCELADO' | 'OUTRO_CONTRATO' | 'OUTRO';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function linhaParaEntrega(r: any): EntregaFiscalizacao {
@@ -206,13 +218,15 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
     entregaNumero: r.entrega_numero || null,
     entregaComplemento: r.entrega_complemento || null,
     entregaBairro: r.entrega_bairro || null,
-    entregaCep: r.entrega_cep || null
+    entregaCep: r.entrega_cep || null,
+    aviso: r.aviso?.tipo ? (r.aviso as AvisoDaEntrega) : null,
+    encerradaEm: r.encerrada_em || null
   };
 }
 
 export interface MovimentoEntrega {
   id: string;
-  tipo: 'CRIADA' | 'ETAPA' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM' | 'BENEFICIARIO';
+  tipo: 'CRIADA' | 'ETAPA' | 'VOLTA' | 'DESFEITO' | 'CORRECAO' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM' | 'BENEFICIARIO';
   etapa: EtapaEntrega | null;
   data: string | null;
   documentoSei: string | null;
@@ -264,6 +278,24 @@ export async function mudarEtapaEntregas(input: { ids: string[]; etapa: EtapaEnt
   if (error) throw mapPostgresErrorToAppError(error);
 }
 
+/** Corrigir a etapa (só o coordenador, migration 273): pula ou volta várias etapas, com motivo. */
+export async function corrigirEtapaEntregas(input: { ids: string[]; etapa: EtapaEntrega; data: string; documentoSei: string | null; motivo: string }): Promise<void> {
+  const { error } = await cliente().rpc('corrigir_etapa_entregas', {
+    p_ids: input.ids,
+    p_etapa: input.etapa,
+    p_data: input.data,
+    p_documento_sei: (input.documentoSei || '').replace(/\D/g, '') || null,
+    p_motivo: input.motivo.trim()
+  });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Voltar etapa (migration 273): desfaz o último passo do item, com motivo. */
+export async function voltarEtapaEntrega(input: { id: string; motivo: string }): Promise<void> {
+  const { error } = await cliente().rpc('voltar_etapa_entrega', { p_id: input.id, p_motivo: input.motivo.trim() });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
 export async function dividirEntrega(input: { id: string; quantidade: number }): Promise<void> {
   const { error } = await cliente().rpc('dividir_entrega', { p_id: input.id, p_quantidade: input.quantidade });
   if (error) throw mapPostgresErrorToAppError(error);
@@ -271,6 +303,17 @@ export async function dividirEntrega(input: { id: string; quantidade: number }):
 
 export async function definirPrevistaEntregas(input: { ids: string[]; prevista: string | null }): Promise<void> {
   const { error } = await cliente().rpc('definir_prevista_entregas', { p_ids: input.ids, p_prevista: input.prevista });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Encerra entregas (migration 274): saem das listas de trabalho e o motivo fica no histórico. */
+export async function encerrarEntregas(input: { ids: string[]; motivo: MotivoDoEncerramento; documentoSei: string | null; observacao: string | null }): Promise<void> {
+  const { error } = await cliente().rpc('encerrar_entregas', {
+    p_ids: input.ids,
+    p_motivo: input.motivo,
+    p_documento_sei: input.documentoSei,
+    p_observacao: input.observacao
+  });
   if (error) throw mapPostgresErrorToAppError(error);
 }
 

@@ -116,6 +116,7 @@ export const GavetaDistribuicao: React.FC<{
                 <span className="pn-gc-ir" aria-hidden="true">›</span>
               )}
             </span>
+            {g.gestor.outroPerfil && <span className="pn-gc-perfil">{g.gestor.outroPerfil} · também gestor</span>}
             <span className="pn-gc-corpo">
               <Lado rotulo="Atas" lado={g.atas} comCriticas={false} />
               <Lado rotulo="Contratos" lado={g.contratos} comCriticas={false} />

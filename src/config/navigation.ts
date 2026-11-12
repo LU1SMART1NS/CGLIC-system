@@ -81,9 +81,9 @@ export interface NavItem {
  *   são filtros dessas abas, não páginas.
  * - Alocação: Itens às unidades (quanto de cada item vai para cada unidade interna)
  * - Vínculos: Contratos à ata · Empenhos ao contrato (citadas em fatura · sem contrato) · Empenhos aos itens (na ordem do caminho: ata → contrato → empenho → item)
- * - Financeiro: Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
  * - Emendas: Parlamentares (/emendas/parlamentares) · Emendas (/emendas/emendas) · Pedidos (/emendas/pedidos) · Itens
  *   (/emendas/itens: Por item · Por kit). Cada linha abre a tela 360 (Pedido, Parlamentar, Emenda), como na Carteira.
+ * - Financeiro (última área antes de Ajustes): Empenhos (/empenhos) · Pagamentos (/pagamentos; a previsão do mês fica em /pagamentos/previsao)
  * - Ajustes (no pé do menu), em três grupos: Gestão (Modelos de Gestão · Regras de Alertas ·
  *   Feriados · Unidades Internas), Emendas (Beneficiários) e Acesso (Usuários e Servidores · Perfis e Permissões)
  */
@@ -287,34 +287,6 @@ export const navigationConfig: NavItem[] = [
     ]
   },
   {
-    id: 'execucao-financeira',
-    label: 'Financeiro',
-    icon: Landmark,
-    status: 'active',
-    children: [
-      {
-        id: 'execucao-empenhos',
-        label: 'Empenhos',
-        icon: FileSpreadsheet,
-        route: '/empenhos',
-        status: 'active',
-        matchPrefixes: ['/empenhos'],
-        // Gestor de saldo fica fora do Financeiro: o empenhado que ele usa já aparece no Item e na Alocação.
-        // O gestor de fiscalização consulta (sem gravar), como a consulta: acompanha o pagamento dos contratos que fiscaliza.
-        allowedRoles: ['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']
-      },
-      {
-        id: 'execucao-pagamentos',
-        label: 'Pagamentos',
-        icon: Receipt,
-        status: 'active',
-        route: '/pagamentos',
-        matchPrefixes: ['/pagamentos'],
-        allowedRoles: ['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']
-      }
-    ]
-  },
-  {
     // Emendas parlamentares (migration 155): só o gestor de emendas (CAEP) e o coordenador alteram; a consulta lê.
     id: 'emendas',
     label: 'Emendas',
@@ -409,6 +381,34 @@ export const navigationConfig: NavItem[] = [
         status: 'active',
         matchPrefixes: ['/fiscalizacao/itens', '/fiscalizacao/entregas'],
         allowedRoles: ['admin', 'gestor_fiscalizacao', 'leitor']
+      }
+    ]
+  },
+  {
+    id: 'execucao-financeira',
+    label: 'Financeiro',
+    icon: Landmark,
+    status: 'active',
+    children: [
+      {
+        id: 'execucao-empenhos',
+        label: 'Empenhos',
+        icon: FileSpreadsheet,
+        route: '/empenhos',
+        status: 'active',
+        matchPrefixes: ['/empenhos'],
+        // Gestor de saldo fica fora do Financeiro: o empenhado que ele usa já aparece no Item e na Alocação.
+        // O gestor de fiscalização consulta (sem gravar), como a consulta: acompanha o pagamento dos contratos que fiscaliza.
+        allowedRoles: ['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']
+      },
+      {
+        id: 'execucao-pagamentos',
+        label: 'Pagamentos',
+        icon: Receipt,
+        status: 'active',
+        route: '/pagamentos',
+        matchPrefixes: ['/pagamentos'],
+        allowedRoles: ['admin', 'gestor', 'leitor', 'gestor_fiscalizacao']
       }
     ]
   },

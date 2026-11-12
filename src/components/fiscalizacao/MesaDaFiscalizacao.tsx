@@ -7,10 +7,11 @@ import { CarteiraDetailLabel } from '../carteira/CarteiraDetailLabel';
 import { carteiraDetalhe, carteiraNumero } from '../carteira/carteiraStyles';
 import { useAuth } from '../../context/AuthContext';
 import { useEntregasFiscalizacao, useFiscalizacaoDoContrato } from '../../hooks/useFiscalizacao';
-import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
+import type { EntregaFiscalizacao, EtapaEntrega } from '../../services/fiscalizacaoService';
 import { NOME_SFC, ehDoFiscal } from '../../utils/fiscalizacao';
 import { nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario } from '../../utils/fiscalizacaoEntregas';
-import { MudarEtapaModal, PrevistaModal } from './EntregasModais';
+import { EncerrarEntregasModal, PrevistaModal } from './EntregasModais';
+import { AvancarEtapaModal } from './EtapaModais';
 import { comQuemEstaOItem, itens, linhaDeCadastro, linhaDeLigacao, linhasDoContrato, type Linha } from '../../utils/fiscalizacaoMesa';
 import { FiltroPendencia, MaisSemPendencia, SecaoDaMesa, type LinhaDeTrabalho } from '../mesa/MesaDeTrabalho';
 import { blocoDaMesa as bloco } from '../mesa/mesaEstilos';
@@ -23,7 +24,7 @@ import { DataTable } from '../../design-system/components/DataTable';
 import { CelulaItem, CelulaSituacaoDoItem } from './EntregasTabela';
 import { ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
 
-type Janela = { tipo: 'etapa' | 'prevista'; itens: EntregaFiscalizacao[] } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'quem' } | { tipo: 'ligar' } | { tipo: 'cadastro' } | null;
+type Janela = { tipo: 'etapa' | 'prevista' | 'encerrar'; itens: EntregaFiscalizacao[]; inicial?: EtapaEntrega } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'quem' } | { tipo: 'ligar' } | { tipo: 'cadastro' } | null;
 
 const chaveDoGrupo = (g: EntregaFiscalizacao[]) => g[0].beneficiarioId ?? `planilha:${g[0].beneficiarioTexto}`;
 /** Acima disto, a lista abre só nos beneficiários com pendência (como o Andamento do Pedido 360). */
@@ -56,7 +57,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
   const coordenador = role === 'admin';
   const podeAgir = Boolean(c && (coordenador || (role === 'gestor_fiscalizacao' && ehDoFiscal(c, user?.id))));
   const { comVoce, comOutros } = useMemo(() => {
-    const r = linhasDoContrato(es, Boolean(c && !c.processoSei), (tipo, l) => setJanela({ tipo, itens: l }), () => setJanela({ tipo: 'processo' }));
+    const r = linhasDoContrato(es, Boolean(c && !c.processoSei), (tipo, l, inicial) => setJanela({ tipo, itens: l, inicial }), () => setJanela({ tipo: 'processo' }));
     // Itens da planilha sem item da ata (migration 268): com o fiscal quando o contrato já tem itens de ata; senão, espera a Vinculação.
     const linha = linhaDeLigacao(es, Boolean(c?.atas?.length), () => setJanela({ tipo: 'ligar' }));
     if (linha) (linha.tom === 'espera' ? r.comOutros : r.comVoce).unshift(linha);
@@ -107,7 +108,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
 
       <SecaoDaMesa titulo={`Com ${podeAgir ? 'você' : 'o fiscal'}`} linhas={comVoce.map(paraTela)} testId="fisc-mesa-com-voce" linhaTestId={linhaTestId} destaque vazio={`Nada com ${podeAgir ? 'você' : 'o fiscal'} agora.`} semBotoes={!podeAgir} />
 
-      <SecaoDaMesa titulo="Com outros" linhas={comOutros.map(paraTela)} testId="fisc-mesa-com-outros" linhaTestId={linhaTestId} semBotoes />
+      <SecaoDaMesa titulo="Com outros" linhas={comOutros.map(paraTela)} testId="fisc-mesa-com-outros" linhaTestId={linhaTestId} semBotoes={!podeAgir} />
 
       <section style={bloco} data-testid="fisc-mesa-itens">
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem 1rem' }}>
@@ -176,8 +177,9 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
         </div>
       </section>
 
-      {janela?.tipo === 'etapa' && <MudarEtapaModal entregas={janela.itens} onClose={fechar} />}
+      {janela?.tipo === 'etapa' && <AvancarEtapaModal entregas={janela.itens} inicial={janela.inicial} onClose={fechar} />}
       {janela?.tipo === 'prevista' && <PrevistaModal entregas={janela.itens} onClose={fechar} />}
+      {janela?.tipo === 'encerrar' && <EncerrarEntregasModal entregas={janela.itens} onClose={fechar} />}
       {janela?.tipo === 'item' && <JanelaDoItem e={janela.item} onClose={fechar} noContrato />}
       {janela?.tipo === 'processo' && <RegistrarProcessoModal contrato={c} onClose={fechar} />}
       {janela?.tipo === 'ligar' && <LigarItemDaAtaModal contractKey={c.contractKey} contratoNumero={c.numero} onClose={fechar} />}

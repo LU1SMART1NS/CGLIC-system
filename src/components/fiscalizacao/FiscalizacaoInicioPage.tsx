@@ -24,7 +24,7 @@ import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useContratosFiscalizacao, useEntregasFiscalizacao } from '../../hooks/useFiscalizacao';
 import { prazoDaEntrega } from '../../utils/fiscalizacaoEntregas';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, cargaPorFiscal, comSfc, dataBR, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato } from '../../utils/fiscalizacao';
+import { NOME_SFC, cargaPorFiscal, fiscaisVisiveis, idsDosFiscaisComContrato, comSfc, dataBR, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato } from '../../utils/fiscalizacao';
 import { useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
 import { contratosFinalizados } from '../../utils/fiscalizacaoResumo';
 
@@ -50,7 +50,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   const [autuando, setAutuando] = useState<ContratoFiscalizacao | null>(null);
   const [segmentoEscolhido, setSegmento] = useState<Segmento | null>(null);
   const [busca, setBusca] = useState('');
-  const { fiscais } = useFiscaisAtivos();
+  const { servidores } = useFiscaisAtivos();
   const [params, setParams] = useSearchParams();
   const dockRef = useRef<HTMLDivElement>(null);
   const transferencias = useTransferenciasFiscalizacao();
@@ -63,7 +63,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
 
   // Escopo: o fiscal vê os dele; o coordenador e a consulta escolhem um fiscal no filtro do topo (?fiscal=).
   const fiscalEscolhido = fiscal ? '' : params.get('fiscal') ?? TODOS_OS_GESTORES;
-  const nomeEscolhido = fiscais.find((f) => f.id === fiscalEscolhido)?.nome ?? '';
+  const nomeEscolhido = servidores.find((f) => f.id === fiscalEscolhido)?.nome ?? '';
   const escopo = fiscal ? user?.id ?? null : fiscalEscolhido || null;
   const mudarEndereco = useCallback(
     (mudancas: Record<string, string | null>) =>
@@ -144,7 +144,8 @@ export const FiscalizacaoInicioPage: React.FC = () => {
     rolarParaGaveta.current = false;
     scrollToDock(dockRef.current);
   }, [gavetaAberta]);
-  const carga = useMemo(() => cargaPorFiscal(contratos, fiscais), [contratos, fiscais]);
+  const carga = useMemo(() => cargaPorFiscal(contratos, servidores), [contratos, servidores]);
+  const fiscaisDoFiltro = useMemo(() => fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos)), [servidores, contratos]);
   const ausentes = transferencias.data ?? [];
   const botoesGavetas: PainelBotaoGaveta[] = gavetasDisponiveis.map((id) => ({
     id,
@@ -171,7 +172,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
       />
       {!fiscal && (
         <PainelFiltros
-          gestor={{ rotulo: 'Fiscal', valor: fiscalEscolhido, opcoes: fiscais.map((f) => ({ value: f.id, label: f.nome })), onChange: (id) => mudarEndereco({ fiscal: id || null, gaveta: null }) }}
+          gestor={{ rotulo: 'Fiscal', valor: fiscalEscolhido, opcoes: fiscaisDoFiltro.map((f) => ({ value: f.id, label: f.nome })), onChange: (id) => mudarEndereco({ fiscal: id || null, gaveta: null }) }}
           onLimpar={() => mudarEndereco({ fiscal: null })}
         />
       )}

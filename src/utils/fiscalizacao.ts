@@ -63,26 +63,80 @@ export function pendenciasDoContrato(c: ContratoFiscalizacao): PendenciaFiscaliz
 export interface CargaDoFiscal {
   userId: string;
   nome: string;
+  /** Perfil quando não é o de Gestor de Fiscalização (ex.: "Coordenador"): etiqueta no cartão. */
+  outroPerfil?: string;
   contratos: number;
   aAutuar: number;
   /** Contratos do fiscal sem portaria registrada. */
   semPortaria: number;
 }
 
+/** Servidor ativo que pode aparecer como fiscal; `perfil` vem da lista de usuários (gestor_fiscalizacao, coordenador…). */
+export interface ServidorFiscal {
+  id: string;
+  nome: string;
+  perfil?: string;
+}
+
+export const PERFIL_FISCAL = 'gestor_fiscalizacao';
+
+/** Pode receber contratos como fiscal: Gestor de Fiscalização ou Coordenador (o banco confere o mesmo). */
+export function podeSerFiscal(perfil: string | undefined): boolean {
+  return perfil === undefined || perfil === PERFIL_FISCAL || perfil === 'coordenador';
+}
+
+/**
+ * Quem aparece como fiscal nas telas: todo Gestor de Fiscalização (mesmo sem contrato, para o rodapé "Sem carteira")
+ * e qualquer outro servidor ativo que tenha contrato como fiscal — quem tem carteira aparece, seja qual for o perfil.
+ */
+export function fiscaisVisiveis<T extends ServidorFiscal>(servidores: T[], idsComTrabalho: ReadonlySet<string>): T[] {
+  return servidores.filter((s) => s.perfil === undefined || s.perfil === PERFIL_FISCAL || idsComTrabalho.has(s.id));
+}
+
+/** Ids dos fiscais com contrato da SFC/CGLIC (ou fiscalização mista). */
+export function idsDosFiscaisComContrato(contratos: ContratoFiscalizacao[]): Set<string> {
+  return new Set(contratos.filter((c) => comSfc(c) && c.fiscalUserId).map((c) => c.fiscalUserId as string));
+}
+
 /** Contratos por fiscal, com os que faltam autuar e os sem portaria. */
-export function cargaPorFiscal(contratos: ContratoFiscalizacao[], fiscais: Array<{ id: string; nome: string }>): CargaDoFiscal[] {
-  return fiscais
+export function cargaPorFiscal(contratos: ContratoFiscalizacao[], servidores: ServidorFiscal[], rotuloDoPerfil: (perfil: string) => string = rotuloPadraoDoPerfil): CargaDoFiscal[] {
+  return fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos))
     .map((f) => {
       const titular = contratos.filter((c) => comSfc(c) && c.fiscalUserId === f.id);
       return {
         userId: f.id,
         nome: f.nome,
+        ...(f.perfil && f.perfil !== PERFIL_FISCAL ? { outroPerfil: rotuloDoPerfil(f.perfil) } : {}),
         contratos: titular.length,
         aAutuar: titular.filter((c) => !c.processoSei).length,
         semPortaria: titular.filter((c) => !c.portariaSei).length
       };
     })
     .sort((a, b) => b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+export type RelacaoComEquipe = 'ACIMA' | 'NA_MEDIA' | 'ABAIXO';
+export const ROTULO_RELACAO_EQUIPE: Record<RelacaoComEquipe, string> = { ACIMA: 'Acima da média', NA_MEDIA: 'Na média', ABAIXO: 'Abaixo da média' };
+
+/**
+ * Média da equipe de fiscais, como na Distribuição de Atas e Contratos, mas pela quantidade de contratos (a fiscalização
+ * não tem peso de complexidade nem nível). Entram os Gestores de Fiscalização com carteira; quem tem outro perfil
+ * (coordenador, gestor) aparece, mas fica fora da média e da comparação. Com menos de 2 na conta, não há média.
+ */
+export function mediaDaEquipeFiscal(carga: CargaDoFiscal[]): { media: number | null; relacao: Map<string, RelacaoComEquipe> } {
+  const naConta = carga.filter((f) => f.contratos > 0 && !f.outroPerfil);
+  const relacao = new Map<string, RelacaoComEquipe>();
+  if (naConta.length < 2) return { media: null, relacao };
+  const media = naConta.reduce((s, f) => s + f.contratos, 0) / naConta.length;
+  for (const f of naConta) relacao.set(f.userId, f.contratos > media * 1.25 ? 'ACIMA' : f.contratos < media * 0.75 ? 'ABAIXO' : 'NA_MEDIA');
+  return { media, relacao };
+}
+
+function rotuloPadraoDoPerfil(perfil: string): string {
+  if (perfil === 'coordenador') return 'Coordenador';
+  if (perfil === 'gestor') return 'Gestor';
+  if (perfil === 'consulta') return 'Consulta';
+  return perfil;
 }
 
 /** "00055/2026" a partir da chave 200331-00055-2026 quando o número não veio. */
