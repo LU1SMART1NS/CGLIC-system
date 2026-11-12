@@ -33,7 +33,9 @@ export const CelulaEntregaResumo: React.FC<{ es: EntregaFiscalizacao[]; r: Resum
       {tudo ? (
         <div style={{ ...carteiraDetalhe, color: 'var(--color-success-text)', fontWeight: 700 }}>tudo entregue</div>
       ) : r.vencidas ? (
-        <div style={{ ...carteiraDetalhe, color: 'var(--color-danger-text)', fontWeight: 700 }}>{r.vencidas === 1 ? '1 item com prazo vencido' : `${r.vencidas} itens com prazo vencido`}{r.noExercito ? ` (${r.noExercito} no Exército)` : ''}</div>
+        <div style={{ ...carteiraDetalhe, color: 'var(--color-danger-text)', fontWeight: 700 }}>{r.vencidas === 1 ? '1 item com prazo vencido' : `${r.vencidas} itens com prazo vencido`}</div>
+      ) : r.noExercito ? (
+        <div style={carteiraDetalhe}>{r.noExercito === 1 ? '1 item no Exército' : `${r.noExercito} itens no Exército`} · prazo suspenso</div>
       ) : (
         <div style={carteiraDetalhe}>{r.proxima ? r.proxima.texto.toLowerCase() : 'sem data prevista'}</div>
       )}

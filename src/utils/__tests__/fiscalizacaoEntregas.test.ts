@@ -32,6 +32,11 @@ describe('prazo pela data prevista', () => {
     expect(prazoDaEntrega(e({ etapa: 'TRD', prevista: '2026-02-28', entregueEm: '2026-02-20' }), hoje).tom).toBe('success');
     expect(prazoDaEntrega(e({ responsavel: 'AREA', prevista: '2026-01-01' }), hoje).texto).toBe('Sem acompanhamento');
   });
+  it('aguardando o Exército: prazo suspenso, nem vencido nem a vencer', () => {
+    expect(prazoDaEntrega(e({ etapa: 'CONTROLADO', prevista: '2026-01-01' }), hoje)).toEqual({ texto: 'Prazo suspenso', tom: 'neutral', dias: null });
+    expect(prazoDaEntrega(e({ etapa: 'CONTROLADO', prevista: '2026-11-12' }), hoje).tom).toBe('neutral');
+    expect(prazoDaEntrega(e({ etapa: 'CONTROLADO', prevista: null }), hoje).texto).toBe('Prazo suspenso');
+  });
 });
 
 describe('regras da mudança de etapa (as mesmas da RPC)', () => {
