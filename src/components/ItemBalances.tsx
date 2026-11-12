@@ -28,7 +28,8 @@ import { useSyncContractItemQuantity } from '../hooks/useSyncContractItemQuantit
 import { useEmpenhoDoItem } from '../hooks/useEmpenhoDoItem';
 import { useContratadoDoItem } from '../hooks/useContratadoDoItem';
 import { alocacoesPorContrato, contratadoPorNomeDaUnidade } from '../utils/contratadoPorUnidade';
-import { UNIDADE_DAS_EMENDAS } from '../utils/alocacaoEdicao';
+import { UNIDADE_DAS_EMENDAS, normUnidade, reservaForaDoContratado } from '../utils/alocacaoEdicao';
+import { useReservaDoItem } from '../hooks/useReservaDoItem';
 import { AjustarQuantidadeModal, type ContratoParaAjustar } from './item-balances/AjustarQuantidadeModal';
 import { UnidadesDoContratoModal, type ContratoParaDividir } from './item-balances/UnidadesDoContratoModal';
 import { QuantidadeContratadaCelula, UnidadesDoContratoCelula } from './item-balances/ContratadoCells';
@@ -574,19 +575,27 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     [allocations, empenhoDoItem, empenhoLinks, unidadesPorContrato]
   );
   const contratadoPorUnidade = useMemo(() => contratadoPorNomeDaUnidade(contratadoDoItem.unidades), [contratadoDoItem.unidades]);
+  // Reserva a parlamentares (só com a CAEP no item): na CAEP, o que ainda não está no contratado sai do livre.
+  const reservaDoItem = useReservaDoItem(canonicalItemKey, { enabled: temCaep });
   const allocationRows: AllocationRow[] = React.useMemo(
     () => allocations.map((a) => {
       const exec = allocationExecution.porAlocacao.get(a.id);
+      const contratado = contratadoPorUnidade.get(a.unitName.trim().toLowerCase()) ?? 0;
+      const reserva =
+        reservaDoItem.data && normUnidade(a.unitName) === normUnidade(UNIDADE_DAS_EMENDAS)
+          ? reservaForaDoContratado(reservaDoItem.data, contratado)
+          : null;
       return {
         id: a.id,
         unitName: a.unitName,
         allocatedQty: a.allocatedQty,
-        contratado: contratadoPorUnidade.get(a.unitName.trim().toLowerCase()) ?? 0,
+        contratado,
         empenhado: exec?.empenhado ?? 0,
-        vinculados: exec?.vinculados ?? 0
+        vinculados: exec?.vinculados ?? 0,
+        ...(reserva ? { reservado: reserva.reservado, reservadoEmContratoSemUnidade: reserva.emContratoSemUnidade } : {})
       };
     }),
-    [allocations, allocationExecution, contratadoPorUnidade]
+    [allocations, allocationExecution, contratadoPorUnidade, reservaDoItem.data]
   );
   const contratadoSemUnidade = useMemo(() => {
     const comFalta = contratadoDoItem.contratos.filter((c) => c.quantidadeSemUnidade > 0);
