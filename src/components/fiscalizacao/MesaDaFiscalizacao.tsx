@@ -156,12 +156,12 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
                       testId={`fisc-mesa-tabela-${k}`}
                       data={g}
                       keyExtractor={(e) => e.id}
-                      className="data-table-container--flush emendas-tabela-topo"
+                      className="data-table-container--flush emendas-tabela-topo tabela-colunas-fixas"
                       rowOpen={(e) => () => setJanela({ tipo: 'item', item: e })}
                       columns={[
-                        { key: 'item', header: 'Item', minWidth: '260px', priority: 'primary', sortValue: (e) => nomeDoItem(e), render: (e) => <CelulaItem e={e} comOrigem={!umaEmenda} /> },
-                        { key: 'qtd', header: 'Qtd.', align: 'right', nowrap: true, sortValue: (e) => e.quantidade, sortFirstDir: 'desc', render: (e) => <span style={carteiraNumero}>{e.quantidade.toLocaleString('pt-BR')}</span> },
-                        { key: 'etapa', header: 'Etapa', minWidth: '230px', sortValue: (e) => ordemDaSituacao(e), render: (e) => <CelulaSituacaoDoItem e={e} /> }
+                        { key: 'item', header: 'Item', minWidth: '260px', width: '60%', priority: 'primary', sortValue: (e) => nomeDoItem(e), render: (e) => <CelulaItem e={e} comOrigem={!umaEmenda} /> },
+                        { key: 'qtd', header: 'Qtd.', align: 'right', nowrap: true, width: '10%', sortValue: (e) => e.quantidade, sortFirstDir: 'desc', render: (e) => <span style={carteiraNumero}>{e.quantidade.toLocaleString('pt-BR')}</span> },
+                        { key: 'etapa', header: 'Etapa', minWidth: '230px', width: '30%', sortValue: (e) => ordemDaSituacao(e), render: (e) => <CelulaSituacaoDoItem e={e} /> }
                       ]}
                     />
                   </div>

@@ -1989,6 +1989,9 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
 .conferencia-oficio__devolver { flex: 1 1 320px; display: flex; flex-direction: column; gap: 0.25rem; }
 .emendas-bloco-ata__sit { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; }
 .emendas-bloco-ata__corpo { display: flex; flex-direction: column; }
+/* Blocos empilhados (um por contrato ou beneficiário): largura fixa por coluna, para as colunas ficarem alinhadas de um bloco ao outro. */
+.tabela-colunas-fixas .ds-table { table-layout: fixed; }
+.tabela-colunas-fixas .ds-table td { overflow-wrap: anywhere; }
 .emendas-bloco-ata__sols { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; padding: 0.4rem 0.7rem; border-top: 1px solid #e2e8f0; font-size: 0.78rem; color: #475569; }
 .emendas-bloco-ata__sol { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.4rem; }
 .emendas-falta { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; }
