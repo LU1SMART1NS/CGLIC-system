@@ -87,6 +87,8 @@ export const CelulaSituacaoDoItem: React.FC<{ e: EntregaFiscalizacao }> = ({ e }
             {atraso > 0 && <span style={{ color: COR_DO_PRAZO.warning }}> · {atraso} {atraso === 1 ? 'dia' : 'dias'} de atraso</span>}
             {e.pagoEm && <> · pago em {dataBR(e.pagoEm)}</>}
           </>
+        ) : e.etapa === 'CONTROLADO' ? (
+          <>prazo suspenso{e.etapaEm ? ` · no Exército desde ${dataBR(e.etapaEm)}` : ''}</>
         ) : e.prevista ? (
           <>
             <span style={{ color: COR_DO_PRAZO[p.tom], fontWeight: p.tom === 'danger' || p.tom === 'warning' ? 700 : 400 }}>{p.texto}</span> · prevista {dataBR(e.prevista)}
