@@ -38,5 +38,10 @@ describe('janela Repartir entre beneficiários', () => {
     expect(html).toContain('Soma 21 de 21');
     expect(html).toContain('Aguardando informações');
     expect(html).toMatch(/data-testid="fisc-repartir-salvar"[^>]*disabled|disabled[^>]*data-testid="fisc-repartir-salvar"/);
+    // A linha de hoje tem o × que só zera a quantidade (não tira a linha), ativo enquanto há unidades.
+    const zerar = html.match(/<button[^>]*data-testid="fisc-repartir-zerar-0"[^>]*>/)?.[0] ?? '';
+    expect(zerar).toContain('aria-label="Zerar Diretoria da Força Nacional de Segurança Pública"');
+    expect(zerar).not.toContain('disabled');
+    expect(html).not.toContain('fisc-repartir-tirar-0');
   });
 });
