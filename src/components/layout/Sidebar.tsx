@@ -60,7 +60,7 @@ export function rememberAreaVisit(areas: NavItem[], pathname: string, search: st
   }
 }
 
-const AreaItem: React.FC<{ area: NavItem; pathname: string; pendencia?: PendenciaDaArea }> = ({ area, pathname, pendencia }) => {
+const AreaItem: React.FC<{ area: NavItem; pathname: string; pendencia?: PendenciaDaArea; sub?: boolean }> = ({ area, pathname, pendencia, sub }) => {
   const active = isItemActive(area, pathname);
   const Icon = area.icon;
   // Com pendência, a área abre direto nela; sem pendência, na última página usada.
@@ -68,7 +68,7 @@ const AreaItem: React.FC<{ area: NavItem; pathname: string; pendencia?: Pendenci
   const contagem = pendencia?.contagem;
 
   return (
-    <div className="app-rail-item">
+    <div className={`app-rail-item${sub ? ' app-rail-sub' : ''}`}>
       <Link
         to={target}
         className="app-rail-link"
@@ -77,7 +77,7 @@ const AreaItem: React.FC<{ area: NavItem; pathname: string; pendencia?: Pendenci
       >
         {Icon && (
           <span className="app-rail-icon">
-            <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
+            <Icon size={sub ? 17 : 20} strokeWidth={active ? 2.2 : 1.8} />
           </span>
         )}
         <span className="app-rail-label">{area.label}</span>
@@ -128,9 +128,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
           <span>Compras</span>SUSP
         </Link>
       )}
-      {top.map((area) => (
-        <AreaItem key={area.id} area={area} pathname={pathname} pendencia={pendencias[area.id]} />
-      ))}
+      {top.filter((area) => !area.parentId).map((area) => {
+        // Subitens (Atas e Contratos › Alocação · Vínculos · Financeiro, pedido de 12/11/2026): no desktop só aparecem
+        // dentro da área, num bloco com a área-mãe; na barra inferior do celular continuam lado a lado, como antes.
+        const subs = top.filter((s) => s.parentId === area.id);
+        const item = <AreaItem key={area.id} area={area} pathname={pathname} pendencia={pendencias[area.id]} />;
+        if (subs.length === 0 || mode !== 'rail') return [item, ...subs.map((s) => <AreaItem key={s.id} area={s} pathname={pathname} pendencia={pendencias[s.id]} />)];
+        const aberto = isItemActive(area, pathname) || subs.some((s) => isItemActive(s, pathname));
+        // Fora da área os subitens ficam escondidos: a área-mãe mostra a soma dos números (vermelho se algum for) e o
+        // clique leva à primeira pendência, na ordem do menu.
+        const doBloco = [pendencias[area.id], ...subs.map((s) => pendencias[s.id])].filter((p): p is PendenciaDaArea => Boolean(p?.contagem));
+        const soma: PendenciaDaArea | undefined = doBloco.length
+          ? {
+              contagem: doBloco.reduce((t, p) => t + p.contagem, 0),
+              vermelho: doBloco.some((p) => p.vermelho),
+              motivoVermelho: doBloco.find((p) => p.vermelho)?.motivoVermelho,
+              destino: doBloco[0].destino
+            }
+          : undefined;
+        return (
+          <div key={area.id} className="app-rail-group" data-aberto={aberto ? 'true' : undefined}>
+            <AreaItem area={area} pathname={pathname} pendencia={aberto ? pendencias[area.id] : soma} />
+            {aberto && subs.map((s) => <AreaItem key={s.id} area={s} pathname={pathname} pendencia={pendencias[s.id]} sub />)}
+          </div>
+        );
+      })}
       <ContagensDaCarteira />
       {mode === 'rail' && <div className="app-rail-spacer" />}
       {bottom.map((area) => <AreaItem key={area.id} area={area} pathname={pathname} pendencia={pendencias[area.id]} />)}

@@ -37,10 +37,11 @@ describe('contarItensAAlocar', () => {
   });
 });
 
-const menu = () =>
+// Alocação, Vínculos e Financeiro são subitens de Atas e Contratos: só aparecem dentro da área (por isso o padrão '/atas').
+const menu = (rota = '/atas', mode: 'rail' | 'bottom' = 'rail') =>
   renderToStaticMarkup(
-    <MemoryRouter initialEntries={['/instrumentos']}>
-      <Sidebar mode="rail" />
+    <MemoryRouter initialEntries={[rota]}>
+      <Sidebar mode={mode} />
     </MemoryRouter>
   );
 
@@ -154,6 +155,47 @@ describe('números novos: Financeiro e Início', () => {
     const html = menu();
     expect(html).not.toContain('rail-count-');
     expect(html).not.toContain('href="/pagamentos"');
+  });
+});
+
+describe('subitens de Atas e Contratos', () => {
+  beforeEach(() => {
+    zerarContagensExtras();
+    vi.mocked(useAuth).mockReturnValue({ role: 'admin' } as any);
+    vi.mocked(useContagemVinculacao).mockReturnValue({ aosItens: 3, aoContrato: 2, notasForaDoContrato: 0 });
+    vi.mocked(useContagemFinanceiro).mockReturnValue({ total: 6, urgente: true });
+  });
+
+  it('dentro da área, Alocação, Vínculos e Financeiro aparecem embaixo de Atas e Contratos, cada um com o seu número', () => {
+    definirContagemExtra('itensAAlocar', 7);
+    const html = menu('/vinculacao/contratos');
+    expect(html).toContain('class="app-rail-group" data-aberto="true"');
+    expect(html.match(/app-rail-item app-rail-sub/g)).toHaveLength(3);
+    expect(html).toMatch(/data-testid="rail-count-alocacao"[^>]*>7</);
+    expect(html).toMatch(/data-testid="rail-count-vinculacao"[^>]*>5</);
+    expect(html).not.toContain('rail-count-carteira');
+  });
+
+  it('fora da área, os subitens somem e Atas e Contratos mostra a soma, vermelha se algum for, levando à 1ª pendência', () => {
+    definirContagemExtra('itensAAlocar', 7);
+    const html = menu('/emendas/pedidos');
+    expect(html).not.toContain('app-rail-sub');
+    expect(html).not.toContain('rail-count-alocacao');
+    expect(html).toMatch(/class="app-rail-count app-rail-count--urgente"[^>]*data-testid="rail-count-carteira"[^>]*>18</);
+    expect(html).toContain('href="/alocacao"');
+  });
+
+  it('fora da área e sem pendência nos subitens, nada de número', () => {
+    vi.mocked(useContagemVinculacao).mockReturnValue(null);
+    vi.mocked(useContagemFinanceiro).mockReturnValue(null);
+    expect(menu('/emendas/pedidos')).not.toContain('rail-count-');
+  });
+
+  it('no celular, a barra de baixo continua com as áreas lado a lado', () => {
+    const html = menu('/emendas/pedidos', 'bottom');
+    expect(html).not.toContain('app-rail-group');
+    expect(html).toMatch(/data-testid="rail-count-vinculacao"[^>]*>5</);
+    expect(html).toMatch(/data-testid="rail-count-execucao-financeira"[^>]*>6</);
   });
 });
 
