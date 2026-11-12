@@ -215,8 +215,8 @@ As vazias usadas por funções do banco (`*_ausente_da_fonte`, `correcoes_*`, `v
 
 1. **Valor total da ata (1.1)**: feito, PR #508 e migration 269 (soma homologada × preço vigente nas atas da CGLIC).
 2. **Juntar beneficiários (1.2)**: feito, PR #510 e migration 270.
-3. **Ordem de Fornecimento numa fonte só (1.3)**: PR #512, migration 271.
-4. **Entregas × linha do pedido (1.4)**: leitura pela linha, ou conferência com aviso.
+3. **Ordem de Fornecimento numa fonte só (1.3)**: feito, PR #512 e migration 271.
+4. **Entregas × linha do pedido (1.4)**: feito, PR #516 e migration 274. O pedido não muda depois da CCGA; para anulação do empenho e nota em outro contrato, aviso na Mesa da Fiscalização e Encerrar entrega pelo Gestor de Fiscalização.
 5. **Gestor e fiscal pelo id (2.2)**, que o dado de hoje permite trocar sem risco, e **perfis lidos do banco (2.3)**.
 6. **Vigia de chaves órfãs e formato único da `ata_key` (2.1)**, depois o gatilho na troca do número da ata.
 7. **Fontes únicas no meio do caminho**: 2.4, 2.5, 2.6, 2.7 e 2.8.
