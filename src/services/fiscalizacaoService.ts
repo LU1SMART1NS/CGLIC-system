@@ -226,7 +226,7 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
 
 export interface MovimentoEntrega {
   id: string;
-  tipo: 'CRIADA' | 'ETAPA' | 'VOLTA' | 'DESFEITO' | 'CORRECAO' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM';
+  tipo: 'CRIADA' | 'ETAPA' | 'VOLTA' | 'DESFEITO' | 'CORRECAO' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM' | 'BENEFICIARIO';
   etapa: EtapaEntrega | null;
   data: string | null;
   documentoSei: string | null;
@@ -293,6 +293,17 @@ export async function corrigirEtapaEntregas(input: { ids: string[]; etapa: Etapa
 /** Voltar etapa (migration 273): desfaz o último passo do item, com motivo. */
 export async function voltarEtapaEntrega(input: { id: string; motivo: string }): Promise<void> {
   const { error } = await cliente().rpc('voltar_etapa_entrega', { p_id: input.id, p_motivo: input.motivo.trim() });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Trocar o beneficiário de um item que não veio de emenda (migration 283): motivo e SEI ficam no histórico. */
+export async function trocarBeneficiarioEntrega(input: { id: string; beneficiarioId: string; motivo: string; documentoSei: string }): Promise<void> {
+  const { error } = await cliente().rpc('trocar_beneficiario_entrega', {
+    p_id: input.id,
+    p_beneficiario_id: input.beneficiarioId,
+    p_motivo: input.motivo.trim(),
+    p_documento_sei: input.documentoSei.replace(/\D/g, '')
+  });
   if (error) throw mapPostgresErrorToAppError(error);
 }
 

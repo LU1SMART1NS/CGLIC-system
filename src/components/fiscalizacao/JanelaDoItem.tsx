@@ -22,8 +22,9 @@ import { RowActionsMenu } from '../../design-system/components/RowActionsMenu';
 import { proximasEtapas, rotuloDoAvanco } from '../../utils/fiscalizacaoPassos';
 import { ReguaDoItem } from './ReguaDoItem';
 import { LigarItemDaAtaModal } from './LigarItemDaAtaModal';
+import { TrocarBeneficiarioModal } from './TrocarBeneficiarioModal';
 
-type Acao = 'avancar' | 'voltar' | 'corrigir' | 'parcial' | 'prevista' | 'responsavel';
+type Acao = 'avancar' | 'voltar' | 'corrigir' | 'parcial' | 'prevista' | 'responsavel' | 'beneficiario';
 
 const Campo: React.FC<{ rotulo: string; largo?: boolean; children: React.ReactNode }> = ({ rotulo, largo, children }) => (
   <div style={{ minWidth: 0, gridColumn: largo ? '1 / -1' : undefined }}>
@@ -46,6 +47,8 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
   const b = rotuloDoBeneficiario(e);
   const endereco = enderecoDeEntrega(e);
   const area = e.responsavel === 'AREA';
+  // Item de emenda: o beneficiário é o da linha do pedido (troca no Pedido 360).
+  const podeTrocarBeneficiario = podeAgir && e.origem !== 'EMENDA';
   const avanco = rotuloDoAvanco(proximasEtapas(e));
   const k = ataEItemDaChave(e.itemKey);
   // O link só aparece quando o contrato já tem item da ata para escolher (sem ata, a mesa aponta para a Vinculação).
@@ -59,6 +62,7 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
   if (acao === 'parcial') return <DividirEntregaModal entrega={e} onClose={fechar} />;
   if (acao === 'prevista') return <PrevistaModal entregas={[e]} onClose={fechar} />;
   if (acao === 'responsavel') return <ResponsavelModal entregas={[e]} onClose={fechar} />;
+  if (acao === 'beneficiario') return <TrocarBeneficiarioModal entrega={e} onClose={fechar} />;
   return (
     <Modal
       isOpen
@@ -70,13 +74,14 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
       footer={
         podeAgir ? (
           <>
-            {!area && (
+            {(!area || podeTrocarBeneficiario) && (
               <RowActionsMenu
                 label="Mais ações do item"
                 testId="fisc-janela-mais"
                 actions={[
-                  { label: 'Voltar etapa', onClick: () => setAcao('voltar') },
-                  ...(role === 'admin' ? [{ label: 'Corrigir a etapa', onClick: () => setAcao('corrigir') }] : [])
+                  ...(!area ? [{ label: 'Voltar etapa', onClick: () => setAcao('voltar') }] : []),
+                  ...(!area && role === 'admin' ? [{ label: 'Corrigir a etapa', onClick: () => setAcao('corrigir') }] : []),
+                  ...(podeTrocarBeneficiario ? [{ label: 'Trocar beneficiário', onClick: () => setAcao('beneficiario') }] : [])
                 ]}
               />
             )}
