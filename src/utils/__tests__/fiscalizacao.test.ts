@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { linhaParaContrato } from '../../services/fiscalizacaoService';
-import { cargaPorFiscal, mediaDaEquipeFiscal, podeSerFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato } from '../fiscalizacao';
+import { UNIDADE_A_INDICAR, cargaPorArea, unidadeDaArea, unidadeSugerida, cargaPorFiscal, mediaDaEquipeFiscal, podeSerFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato } from '../fiscalizacao';
 
 const base: ContratoFiscalizacao = {
   contractKey: '200331-00055-2026', uasg: '200331', numero: '00055/2026', fornecedor: 'CONDOR', objeto: null, assinatura: '2026-01-29', vigenciaFim: '2027-01-29',
@@ -104,5 +104,39 @@ describe('fiscalização do contrato', () => {
     expect(x.emendas).toEqual(['1']);
     expect(x.fiscalNome).toBe('Ana');
     expect(x.processoSei).toBeNull();
+  });
+});
+
+describe('unidade interna da área requisitante (migration 288)', () => {
+  it('vale a indicada; sem ela, a única do contrato; SFC/CGLIC e várias unidades ficam sem', () => {
+    expect(unidadeDaArea(c({ situacao: 'AREA', unidadeArea: 'DIOPI', unidadesDoContrato: ['CAEP'] }))).toBe('DIOPI');
+    expect(unidadeDaArea(c({ situacao: 'AREA_PADRAO', unidadesDoContrato: ['CAEP'] }))).toBe('CAEP');
+    expect(unidadeSugerida(c({ situacao: 'AREA_PADRAO', unidadesDoContrato: ['CAEP'] }))).toBe(true);
+    expect(unidadeDaArea(c({ situacao: 'AREA_PADRAO', unidadesDoContrato: ['CAEP', 'DFNSP'] }))).toBeNull();
+    expect(unidadeDaArea(c({ situacao: 'AREA_PADRAO' }))).toBeNull();
+    expect(unidadeDaArea(c({ situacao: 'SFC', unidadesDoContrato: ['CAEP'] }))).toBeNull();
+    expect(unidadeDaArea(c({ situacao: 'MISTA', unidadeArea: 'DFNSP' }))).toBe('DFNSP');
+  });
+
+  it('carga por unidade separa mista, conta a sugestão e põe "a indicar" por último', () => {
+    const carga = cargaPorArea([
+      c({ contractKey: 'a', situacao: 'AREA_PADRAO', unidadesDoContrato: ['CAEP'] }),
+      c({ contractKey: 'b', situacao: 'AREA', unidadeArea: 'CAEP' }),
+      c({ contractKey: 'c', situacao: 'MISTA', unidadeArea: 'DFNSP' }),
+      c({ contractKey: 'd', situacao: 'AREA_PADRAO' }),
+      c({ contractKey: 'e', situacao: 'SFC' })
+    ]);
+    expect(carga).toEqual([
+      { sigla: 'CAEP', toda: 2, mista: 0, pelaDivisao: 1 },
+      { sigla: 'DFNSP', toda: 0, mista: 1, pelaDivisao: 0 },
+      { sigla: null, toda: 1, mista: 0, pelaDivisao: 0 }
+    ]);
+    expect(UNIDADE_A_INDICAR).toBeTruthy();
+  });
+
+  it('lê a unidade e as unidades do contrato da RPC', () => {
+    const r = linhaParaContrato({ contract_key: 'k', situacao: 'AREA', unidade_area: 'CAEP', unidades_do_contrato: ['CAEP', null] });
+    expect(r.unidadeArea).toBe('CAEP');
+    expect(r.unidadesDoContrato).toEqual(['CAEP']);
   });
 });

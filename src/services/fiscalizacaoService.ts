@@ -31,6 +31,10 @@ export interface ContratoFiscalizacao {
   autuadoEm: string | null;
   definidoPorNome: string | null;
   definidoEm: string | null;
+  /** Unidade interna (sigla) que fiscaliza pela área requisitante: toda (AREA) ou a parte dela (MISTA). */
+  unidadeArea?: string | null;
+  /** Unidades internas do contrato pela divisão do contratado (ou pela alocação dos itens): sugestão na janela. */
+  unidadesDoContrato?: string[];
 }
 
 function cliente() {
@@ -58,7 +62,9 @@ export function linhaParaContrato(r: any): ContratoFiscalizacao {
     autuadoEm: r.autuado_em || null,
     definidoPorNome: r.definido_por_nome || null,
     definidoEm: r.definido_em || null,
-    atas: Array.isArray(r.atas) ? r.atas.filter(Boolean) : []
+    atas: Array.isArray(r.atas) ? r.atas.filter(Boolean) : [],
+    unidadeArea: r.unidade_area || null,
+    unidadesDoContrato: Array.isArray(r.unidades_do_contrato) ? r.unidades_do_contrato.filter(Boolean) : []
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -76,6 +82,8 @@ export interface DefinirFiscalizacaoInput {
   fiscalUserId: string | null;
   portariaSei: string | null;
   motivo: string | null;
+  /** Unidade interna (sigla) da área requisitante; obrigatória em AREA e MISTA. */
+  unidadeArea?: string | null;
 }
 
 /** Decisão do coordenador: quem fiscaliza, o fiscal da SFC/CGLIC e a portaria. */
@@ -85,7 +93,8 @@ export async function definirFiscalizacaoContrato(input: DefinirFiscalizacaoInpu
     p_fiscalizacao: input.fiscalizacao,
     p_fiscal_user_id: input.fiscalizacao === 'AREA' ? null : input.fiscalUserId,
     p_portaria_sei: (input.portariaSei || '').replace(/\D/g, '') || null,
-    p_motivo: (input.motivo || '').trim() || null
+    p_motivo: (input.motivo || '').trim() || null,
+    p_unidade_area: input.fiscalizacao === 'SFC' ? null : input.unidadeArea || null
   });
   if (error) throw mapPostgresErrorToAppError(error);
 }
