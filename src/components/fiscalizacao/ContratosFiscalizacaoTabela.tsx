@@ -98,13 +98,16 @@ export const CelulaFiscal: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) =>
   );
 
 export const CelulaProcesso: React.FC<{ c: ContratoFiscalizacao }> = ({ c }) =>
-  c.processoSei ? (
+  c.processoNup ? (
     <>
-      <NumeroSeiEtiqueta numero={c.processoSei} testId={`fisc-processo-${c.contractKey}`} />
-      <div style={carteiraDetalhe}>contrato de {dataBR(c.autuadoEm)}</div>
+      <NumeroSeiEtiqueta numero={c.processoNup} testId={`fisc-processo-${c.contractKey}`} />
+      <div style={carteiraDetalhe}>autuado em {dataBR(c.processoAutuadoEm)}</div>
     </>
   ) : c.situacao === 'SFC' || c.situacao === 'MISTA' ? (
-    <StatusBadge label="A autuar" variant="warning" size="sm" dot={false} />
+    <>
+      <StatusBadge label="A autuar" variant="warning" size="sm" dot={false} />
+      {c.processoSei && <div style={carteiraDetalhe}>SEI do contrato {c.processoSei}</div>}
+    </>
   ) : (
     <span style={carteiraDetalhe}>—</span>
   );
@@ -148,7 +151,7 @@ export const ContratosFiscalizacaoTabela: React.FC<{
     ...(comOrigem ? [{ key: 'origem', header: 'Origem', minWidth: '160px', render: (c: ContratoFiscalizacao) => <CelulaOrigem c={c} /> }] : []),
     { key: 'situacao', header: 'Fiscalização', minWidth: '150px', render: (c) => <CelulaSituacao c={c} /> },
     { key: 'fiscal', header: 'Fiscal SFC/CGLIC', sortValue: (c) => c.fiscalNome, render: (c) => <CelulaFiscal c={c} /> },
-    { key: 'processo', header: 'SEI do contrato', render: (c) => <CelulaProcesso c={c} /> },
+    { key: 'processo', header: 'Processo (NUP)', render: (c) => <CelulaProcesso c={c} /> },
     { key: 'vigencia', header: 'Vigência', nowrap: true, sortValue: (c) => c.vigenciaFim, render: (c) => <span style={carteiraValor}>{dataBR(c.vigenciaFim)}</span> }
   ];
   return (

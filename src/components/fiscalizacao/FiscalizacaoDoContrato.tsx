@@ -10,7 +10,7 @@ import { CarteiraDetailLabel } from '../carteira/CarteiraDetailLabel';
 import { carteiraDetalhe, carteiraValor } from '../carteira/carteiraStyles';
 import { useAuth } from '../../context/AuthContext';
 import { useFiscalizacaoDoContrato } from '../../hooks/useFiscalizacao';
-import { NOME_SFC, comSfc, dataBR, ehDoFiscal } from '../../utils/fiscalizacao';
+import { NOME_SFC, autuado, comSfc, dataBR, ehDoFiscal } from '../../utils/fiscalizacao';
 import { CelulaSituacao } from './ContratosFiscalizacaoTabela';
 import { DefinirFiscalizacaoModal, RegistrarProcessoModal } from './FiscalizacaoModais';
 import { MesaDaFiscalizacao } from './MesaDaFiscalizacao';
@@ -58,8 +58,8 @@ export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ cont
               </AppButton>
             )}
             {podeAutuar && (
-              <AppButton variant={contrato.processoSei ? 'outline' : 'primary'} size="sm" onClick={() => setAutuando(true)} data-testid="fisc-contrato-processo">
-                {contrato.processoSei ? 'Corrigir SEI do contrato' : 'Registrar SEI do contrato'}
+              <AppButton variant={autuado(contrato) ? 'outline' : 'primary'} size="sm" onClick={() => setAutuando(true)} data-testid="fisc-contrato-processo">
+                {autuado(contrato) ? 'Corrigir a autuação' : 'Registrar a autuação'}
               </AppButton>
             )}
           </div>
@@ -79,8 +79,8 @@ export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ cont
               Contrato de emenda ({contrato.emendas.join(', ')}) sem decisão. {coordenador ? `Defina quem fiscaliza; a sugestão é a ${NOME_SFC}.` : 'O coordenador decide quem fiscaliza.'}
             </NoticeBar>
           )}
-          {podeAutuar && !contrato.processoSei && (
-            <NoticeBar tone="info" testId="fisc-contrato-autuar">Falta registrar o número SEI do contrato (vale para a autuação).</NoticeBar>
+          {podeAutuar && !autuado(contrato) && (
+            <NoticeBar tone="info" testId="fisc-contrato-autuar">Falta registrar a autuação: o NUP do processo de acompanhamento contratual.</NoticeBar>
           )}
           <div style={grade}>
             <Campo rotulo="Fiscalização"><CelulaSituacao c={contrato} /></Campo>
@@ -95,11 +95,12 @@ export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ cont
               </Campo>
             )}
             {comSfc(contrato) && (
-              <Campo rotulo="SEI do contrato">
-                {contrato.processoSei ? (
+              <Campo rotulo="Processo (NUP)">
+                {contrato.processoNup ? (
                   <>
-                    <NumeroSeiEtiqueta numero={contrato.processoSei} testId="fisc-contrato-processo-sei" />
-                    <div style={carteiraDetalhe}>contrato de {dataBR(contrato.autuadoEm)}</div>
+                    <NumeroSeiEtiqueta numero={contrato.processoNup} testId="fisc-contrato-processo-sei" />
+                    <div style={carteiraDetalhe}>autuado em {dataBR(contrato.processoAutuadoEm)}</div>
+                    {contrato.processoSei && <div style={carteiraDetalhe}>SEI do contrato {contrato.processoSei}</div>}
                   </>
                 ) : (
                   <span style={carteiraDetalhe}>A autuar</span>

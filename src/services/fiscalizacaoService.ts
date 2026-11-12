@@ -27,8 +27,14 @@ export interface ContratoFiscalizacao {
   fiscalUserId: string | null;
   fiscalNome: string | null;
   portariaSei: string | null;
+  /** Número SEI do contrato (documento), da planilha da SFC/CGLIC (migration 266). */
   processoSei: string | null;
+  /** Data do contrato registrada com o número SEI do contrato. */
   autuadoEm: string | null;
+  /** NUP do processo de acompanhamento contratual: é a autuação (migration 294). Sem ele, o contrato está "a autuar". */
+  processoNup?: string | null;
+  /** AAAA-MM-DD: data da autuação do processo de acompanhamento. */
+  processoAutuadoEm?: string | null;
   definidoPorNome: string | null;
   definidoEm: string | null;
   /** Unidade interna (sigla) que fiscaliza pela área requisitante: toda (AREA) ou a parte dela (MISTA). */
@@ -60,6 +66,8 @@ export function linhaParaContrato(r: any): ContratoFiscalizacao {
     portariaSei: r.portaria_sei || null,
     processoSei: r.processo_sei || null,
     autuadoEm: r.autuado_em || null,
+    processoNup: r.processo_nup || null,
+    processoAutuadoEm: r.processo_autuado_em || null,
     definidoPorNome: r.definido_por_nome || null,
     definidoEm: r.definido_em || null,
     atas: Array.isArray(r.atas) ? r.atas.filter(Boolean) : [],
@@ -99,11 +107,21 @@ export async function definirFiscalizacaoContrato(input: DefinirFiscalizacaoInpu
   if (error) throw mapPostgresErrorToAppError(error);
 }
 
-/** Autuação pelo número SEI do contrato (fiscal ou coordenador; migration 266). */
+/** Número SEI do contrato (documento) e a data do contrato (fiscal ou coordenador; migration 266). */
 export async function registrarProcessoFiscalizacao(input: { contractKey: string; processoSei: string; autuadoEm: string }): Promise<void> {
   const { error } = await cliente().rpc('registrar_processo_fiscalizacao', {
     p_contract_key: input.contractKey,
     p_processo_sei: input.processoSei.replace(/\D/g, ''),
+    p_autuado_em: input.autuadoEm
+  });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Autuação: NUP do processo de acompanhamento e a data da autuação (fiscal ou coordenador; migration 294). */
+export async function registrarAutuacaoFiscalizacao(input: { contractKey: string; processoNup: string; autuadoEm: string }): Promise<void> {
+  const { error } = await cliente().rpc('registrar_autuacao_fiscalizacao', {
+    p_contract_key: input.contractKey,
+    p_processo_nup: input.processoNup.trim(),
     p_autuado_em: input.autuadoEm
   });
   if (error) throw mapPostgresErrorToAppError(error);

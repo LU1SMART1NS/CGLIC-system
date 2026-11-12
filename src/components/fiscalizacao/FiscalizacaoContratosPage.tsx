@@ -17,7 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useContratosFiscalizacao, useEntregasFiscalizacao, useFiscaisAtivos } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao, EntregaFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, dataBR, fiscaisVisiveis, hojeEmBrasilia, idsDosFiscaisComContrato, rotaDoContrato } from '../../utils/fiscalizacao';
+import { NOME_SFC, autuado, dataBR, fiscaisVisiveis, hojeEmBrasilia, idsDosFiscaisComContrato, rotaDoContrato } from '../../utils/fiscalizacao';
 import { FASES_ENTREGA, foiEntregue } from '../../utils/fiscalizacaoEntregas';
 import { agrupar, chaveDeOrdem, diasAte, numero, pct, programasDe, qtdTexto, resumir, type Resumo } from '../../utils/fiscalizacaoResumo';
 const POR_PAGINA = 25;
@@ -107,7 +107,7 @@ export const FiscalizacaoContratosPage: React.FC = () => {
       .map((c) => {
         const es = porContrato.get(c.contractKey) ?? [];
         const r = resumir(es);
-        const { comVoce, comOutros } = linhasDoContrato(es, !c.processoSei, () => {}, () => {});
+        const { comVoce, comOutros } = linhasDoContrato(es, !autuado(c), () => {}, () => {});
         const agora = comVoce[0] ?? comOutros[0] ?? null;
         const mais = comVoce.length ? comVoce.length - 1 : 0;
         const dias = agora?.limite ? diasAte(agora.limite, hoje) : null;
