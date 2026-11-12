@@ -122,7 +122,9 @@ export const ContratosFiscalizacaoTabela: React.FC<{
   comOrigem?: boolean;
   rowActions?: (c: ContratoFiscalizacao) => React.ReactNode;
   selecao?: SelecaoDeContratos;
-}> = ({ contratos, testId, comOrigem = false, rowActions, selecao }) => {
+  /** Lista só de contratos com a SFC/CGLIC: sem a coluna Fiscalização (repetiria a mesma etiqueta); o motivo vai sob o fiscal. */
+  semSituacao?: boolean;
+}> = ({ contratos, testId, comOrigem = false, rowActions, selecao, semSituacao = false }) => {
   const navigate = useNavigateWithOrigin();
   const colunas: Column<ContratoFiscalizacao>[] = [
     ...(selecao
@@ -146,8 +148,18 @@ export const ContratosFiscalizacaoTabela: React.FC<{
       : []),
     { key: 'contrato', header: 'Contrato', minWidth: '200px', sortValue: (c) => `${c.numero.split('/')[1] ?? ''}-${c.numero.split('/')[0]?.padStart(6, '0')}`, render: (c) => <CelulaContrato c={c} onAbrir={() => navigate(rotaDoContrato(c))} /> },
     ...(comOrigem ? [{ key: 'origem', header: 'Origem', minWidth: '160px', render: (c: ContratoFiscalizacao) => <CelulaOrigem c={c} /> }] : []),
-    { key: 'situacao', header: 'Fiscalização', minWidth: '150px', render: (c) => <CelulaSituacao c={c} /> },
-    { key: 'fiscal', header: 'Fiscal SFC/CGLIC', sortValue: (c) => c.fiscalNome, render: (c) => <CelulaFiscal c={c} /> },
+    ...(semSituacao ? [] : [{ key: 'situacao', header: 'Fiscalização', minWidth: '150px', render: (c: ContratoFiscalizacao) => <CelulaSituacao c={c} /> }]),
+    {
+      key: 'fiscal',
+      header: 'Fiscal SFC/CGLIC',
+      sortValue: (c) => c.fiscalNome,
+      render: (c) => (
+        <>
+          <CelulaFiscal c={c} />
+          {semSituacao && c.motivo && <div style={carteiraDetalhe} title={c.motivo}>{c.motivo.length > 60 ? `${c.motivo.slice(0, 60)}…` : c.motivo}</div>}
+        </>
+      )
+    },
     { key: 'processo', header: 'SEI do contrato', render: (c) => <CelulaProcesso c={c} /> },
     { key: 'vigencia', header: 'Vigência', nowrap: true, sortValue: (c) => c.vigenciaFim, render: (c) => <span style={carteiraValor}>{dataBR(c.vigenciaFim)}</span> }
   ];

@@ -132,6 +132,7 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
         <ContratosFiscalizacaoTabela
           contratos={pageItems}
           testId="fisc-dist-tabela"
+          semSituacao={seg === 'SFC'}
           rowActions={(c) => (
             <AppButton variant="outline" size="sm" onClick={() => setEditando(c)} data-testid={`fisc-dist-definir-${c.contractKey}`}>
               {c.situacao === 'A_DEFINIR' || c.situacao === 'AREA_PADRAO' ? 'Definir' : 'Alterar'}
