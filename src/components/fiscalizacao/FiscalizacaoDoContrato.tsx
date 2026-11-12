@@ -80,7 +80,7 @@ export const FiscalizacaoDoContrato: React.FC<{ contractKey: string }> = ({ cont
             </NoticeBar>
           )}
           {podeAutuar && !autuado(contrato) && (
-            <NoticeBar tone="info" testId="fisc-contrato-autuar">Falta registrar a autuação: o NUP do processo de acompanhamento contratual.</NoticeBar>
+            <NoticeBar tone="info" testId="fisc-contrato-autuar">Falta o NUP do processo.</NoticeBar>
           )}
           <div style={grade}>
             <Campo rotulo="Fiscalização"><CelulaSituacao c={contrato} /></Campo>

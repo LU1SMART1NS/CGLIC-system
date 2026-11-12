@@ -162,11 +162,11 @@ export const RegistrarProcessoModal: React.FC<{ contrato: ContratoFiscalizacao; 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
         {contrato.processoSei && (
           <span style={{ ...carteiraDetalhe, marginTop: 0 }} data-testid="fisc-processo-sei-do-contrato">
-            Procure no SEI pelo número do contrato, {contrato.processoSei}: a autuação é o processo de Acompanhamento Contratual em que ele está.
+            SEI do contrato: {contrato.processoSei}
           </span>
         )}
-        <AppInput label="Processo SEI" value={nup} onChange={(ev) => setNup(mascaraProcessoSei(ev.target.value))} inputMode="numeric" placeholder="08020.000000/2026-00" hint="Processo de acompanhamento contratual (tipo Gestão de Contratos: Acompanhamento Contratual)." data-testid="fisc-processo-nup" />
-        <AppDateInput label="Data da autuação" value={data} onValueChange={setData} max={hoje} hint="Andamento “Processo público gerado”." />
+        <AppInput label="Processo SEI" value={nup} onChange={(ev) => setNup(mascaraProcessoSei(ev.target.value))} inputMode="numeric" placeholder="08020.000000/2026-00" hint="Acompanhamento Contratual." data-testid="fisc-processo-nup" />
+        <AppDateInput label="Data da autuação" value={data} onValueChange={setData} max={hoje} />
       </div>
     </Modal>
   );
@@ -285,7 +285,7 @@ export const TransferirFiscalModal: React.FC<{
           ))}
         </AppSelect>
         <NoticeBar tone="info">
-          {nomeDestino || 'Quem receber'} passa a ser o fiscal desses contratos. O NUP do processo fica como está.
+          {nomeDestino || 'Quem receber'} passa a ser o fiscal desses contratos. O NUP fica como está.
         </NoticeBar>
       </div>
     </Modal>
