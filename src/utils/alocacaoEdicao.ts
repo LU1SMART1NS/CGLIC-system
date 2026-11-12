@@ -183,8 +183,15 @@ export function avaliarEdicao(linhas: LinhaAlocacao[], quantitativoSenasp: numbe
   }
 
   const erros: string[] = [];
-  if (totalAlocado > quantitativoSenasp) {
-    erros.push(`A soma das alocações (${fmt(totalAlocado)}) passa do quantitativo SENASP (${fmt(quantitativoSenasp)}) em ${fmt(totalAlocado - quantitativoSenasp)}. Reduza alguma unidade.`);
+  // Mesma regra do banco (save_allocations_atomic): acima do limite só não pode aumentar a soma gravada;
+  // diminuir é sempre permitido, para corrigir uma alocação que já passou (ex.: limite negativo pela fonte).
+  const totalGravado = linhas.reduce((s, l) => s + (l.adicionada ? 0 : l.original), 0);
+  if (totalAlocado > quantitativoSenasp && totalAlocado > totalGravado) {
+    erros.push(
+      quantitativoSenasp < 0
+        ? `O quantitativo SENASP deste item está negativo (${fmt(quantitativoSenasp)}): não dá para aumentar a alocação até a fonte ser corrigida. Diminuir continua permitido.`
+        : `A soma das alocações (${fmt(totalAlocado)}) passa do quantitativo SENASP (${fmt(quantitativoSenasp)}) em ${fmt(totalAlocado - quantitativoSenasp)}. Reduza alguma unidade.`
+    );
   }
   if (reservaAbaixo) {
     const r: { unidade: string; minimo: number; explicacao: string } = reservaAbaixo;

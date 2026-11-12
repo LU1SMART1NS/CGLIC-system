@@ -56,6 +56,18 @@ describe('alocacaoEdicao', () => {
     expect(a.podeSalvar).toBe(false);
   });
 
+  it('acima do limite (ex.: quantitativo negativo pela fonte) só diminui, como no banco', () => {
+    const aumentar = avaliarEdicao(com(iniciais(), 'a2', { qtd: 70000 }), -424);
+    expect(aumentar.erros[0]).toContain('está negativo (-424)');
+    expect(aumentar.podeSalvar).toBe(false);
+    const diminuir = avaliarEdicao(com(iniciais(), 'a2', { qtd: 50000 }), -424);
+    expect(diminuir.erros).toEqual([]);
+    expect(diminuir.podeSalvar).toBe(true);
+    // Trocar entre unidades sem aumentar a soma também passa.
+    const trocar = avaliarEdicao(com(com(iniciais(), 'a2', { qtd: 50000 }), 'a3', { qtd: 30000 }), 100);
+    expect(trocar.podeSalvar).toBe(true);
+  });
+
   it('a unidade não fica abaixo do que já empenhou', () => {
     const a = avaliarEdicao(com(iniciais(), 'a1', { qtd: 100000 }), TOTAL);
     expect(a.porLinha.get('a1')).toMatchObject({ minimo: 122400, abaixoDoMinimo: true });

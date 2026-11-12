@@ -239,6 +239,12 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
         <p style={{ margin: 0, fontSize: '0.85rem', color: CINZA }}>Carregando as alocações do item…</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+          {item.quantitativoSenasp < 0 && (
+            <NoticeBar tone="warning" testId="alocar-limite-negativo">
+              <strong>Quantitativo SENASP negativo ({formatNumber(item.quantitativoSenasp)}).</strong> O registrado da SENASP no Compras.gov.br é menor que o que
+              ela gerencia para os participantes. Confira o remanejamento na fonte; até lá a alocação só pode diminuir.
+            </NoticeBar>
+          )}
           {item.limiteProvisorioOutrosOrgaos ? (
             <NoticeBar tone="info" testId="alocar-limite-provisorio">
               <strong>Limite provisório: registrado da SENASP ({formatNumber(item.quantitativoSenasp)}).</strong> A quantidade da ata assinada
