@@ -5,7 +5,8 @@ import type { CarteiraAtaExecucao } from '../../../utils/carteiraItens';
 import type { ArpRecord } from '../../../types';
 
 const arp = (numero: string) => ({ numeroAtaRegistroPreco: numero, codigoUnidadeGerenciadora: '200331' }) as ArpRecord;
-const exec = (valorSenasp: number, valorConsumido: number | null) => ({ valorSenasp, valorConsumido }) as CarteiraAtaExecucao;
+const exec = (valorSenasp: number, valorConsumido: number | null, valorTotal = valorSenasp * 2) =>
+  ({ valorTotal, valorSenasp, valorConsumido }) as CarteiraAtaExecucao;
 const pelaValor = (f: FatiasDaAta): FatiasDaAta => ({ ...f, medida: 'VALOR' });
 
 describe('somarValorDasAtas', () => {
@@ -22,7 +23,7 @@ describe('somarValorDasAtas', () => {
 
   it('soma a parte SENASP e o consumido (consumido não lido conta zero)', () => {
     const t = somar('TODOS');
-    expect(t).toMatchObject({ atas: 2, valorSenasp: 1500, valorConsumido: 250, registradoParticipantes: 1300, registradoGti: 0 });
+    expect(t).toMatchObject({ atas: 2, valorTotal: 3000, valorSenasp: 1500, valorConsumido: 250, registradoParticipantes: 1300, registradoGti: 0 });
   });
 
   it('com GTI filtrado, soma a fatia dele em cada ata', () => {

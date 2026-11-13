@@ -74,6 +74,14 @@ const MAX_ITENS_EXPANDIDOS = 5;
 /** Linha de total: fundo cinza e borda mais forte, para não se confundir com uma ata. */
 const rodape: React.CSSProperties = { ...carteiraTd, background: '#f8fafc', borderTop: '2px solid #e2e8f0', borderBottom: 'none', verticalAlign: 'top' };
 const pctDe = (parte: number, todo: number) => (todo > 0 ? Math.round((parte / todo) * 100) : 0);
+/** Um total do rodapé: rótulo como o cabeçalho das colunas, valor e uma linha de detalhe. */
+const TotalDoRodape: React.FC<{ rotulo: string; valor: number; detalhe: string; testId: string }> = ({ rotulo, valor, detalhe, testId }) => (
+  <div data-testid={testId} style={{ whiteSpace: 'nowrap' }}>
+    <div style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em', color: '#64748b' }}>{rotulo}</div>
+    <div style={{ ...carteiraValor, ...carteiraNumero, marginTop: '0.15rem' }}>{formatCurrency(valor)}</div>
+    <div style={{ ...carteiraDetalhe, ...carteiraNumero }}>{detalhe}</div>
+  </div>
+);
 const cardNovo = (c: AtaGroupedCard) => ataEhNova(c.arp);
 
 function formatDateBR(dateStr?: string): string {
@@ -406,27 +414,34 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
           {totais && totais.atas > 0 && (
             <tfoot className="carteira-total" data-testid="arp-total">
               <tr>
-                <td colSpan={3} style={{ ...rodape, fontWeight: 800, color: '#334155' }}>
-                  Total {totais.atas === 1 ? 'da ata exibida' : `das ${totais.atas} atas exibidas`}
-                </td>
-                <td data-label="Valor SENASP" style={{ ...rodape, whiteSpace: 'nowrap' }} data-testid="arp-total-senasp">
-                  <div>
-                    <div style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(totais.valorSenasp)}</div>
-                    <div style={{ ...carteiraDetalhe, ...carteiraNumero }}>
-                      {formatCurrency(totais.valorConsumido)} consumidos ({pctDe(totais.valorConsumido, totais.valorSenasp)}%)
+                <td colSpan={totalColunas} style={rodape}>
+                  {/* Numa célula só, presa à esquerda: os totais não somem quando a tabela rola para o lado. */}
+                  <div style={{ position: 'sticky', left: '0.6rem', display: 'inline-flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: '2.5rem', rowGap: '0.75rem' }}>
+                    <div style={{ fontWeight: 800, color: '#334155', alignSelf: 'center' }}>
+                      Total {totais.atas === 1 ? 'da ata exibida' : `das ${totais.atas} atas exibidas`}
                     </div>
+                    <TotalDoRodape
+                      rotulo="Valor total das atas"
+                      valor={totais.valorTotal}
+                      detalhe="todos os órgãos, pelo preço vigente"
+                      testId="arp-total-atas"
+                    />
+                    {gtiFiltrado && (
+                      <TotalDoRodape
+                        rotulo={`Registrado ${GRUPO_GTI_INFO[gtiFiltrado].rotulo}`}
+                        valor={totais.registradoGti}
+                        detalhe={`${pctDe(totais.registradoGti, totais.valorTotal)}% do valor total`}
+                        testId="arp-total-gti"
+                      />
+                    )}
+                    <TotalDoRodape
+                      rotulo="Valor SENASP"
+                      valor={totais.valorSenasp}
+                      detalhe={`${formatCurrency(totais.valorConsumido)} consumidos (${pctDe(totais.valorConsumido, totais.valorSenasp)}%)`}
+                      testId="arp-total-senasp"
+                    />
                   </div>
                 </td>
-                <td colSpan={2} style={rodape} />
-                {gtiFiltrado && (
-                  <td data-label={`Registrado ${GRUPO_GTI_INFO[gtiFiltrado].rotulo}`} style={{ ...rodape, whiteSpace: 'nowrap' }} data-testid="arp-total-gti">
-                    <div title={`${formatCurrency(totais.registradoParticipantes)} registrados por todos os participantes dessas atas`}>
-                      <div style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(totais.registradoGti)}</div>
-                      <div style={carteiraDetalhe}>{pctDe(totais.registradoGti, totais.registradoParticipantes)}% do registrado pelos participantes</div>
-                    </div>
-                  </td>
-                )}
-                <td colSpan={1 + Number(colAlocacao) + Number(colEmpenho) + Number(colUnidade) + Number(colAtaAssinada)} style={rodape} />
               </tr>
             </tfoot>
           )}

@@ -4,6 +4,8 @@ import type { ArpRecord } from '../../types';
 
 export interface TotaisDasAtas {
   atas: number;
+  /** Valor total das atas (todos os órgãos), pelos itens. */
+  valorTotal: number;
   valorSenasp: number;
   valorConsumido: number;
   /** Registrado pelos participantes (todos os grupos) e pelo GTI filtrado, somados das fatias de cada ata. */
@@ -18,9 +20,10 @@ export function somarValorDasAtas(
   fatiasDaArp: (arp: ArpRecord) => FatiasDaAta | undefined,
   gti: FiltroGti
 ): TotaisDasAtas {
-  const t: TotaisDasAtas = { atas: arps.length, valorSenasp: 0, valorConsumido: 0, registradoParticipantes: 0, registradoGti: 0 };
+  const t: TotaisDasAtas = { atas: arps.length, valorTotal: 0, valorSenasp: 0, valorConsumido: 0, registradoParticipantes: 0, registradoGti: 0 };
   for (const arp of arps) {
     const exec = execucaoDaArp(arp);
+    t.valorTotal += exec?.valorTotal ?? 0;
     t.valorSenasp += exec?.valorSenasp ?? 0;
     t.valorConsumido += exec?.valorConsumido ?? 0;
     const fatias = fatiasDaArp(arp);

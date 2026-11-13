@@ -55,6 +55,8 @@ export interface CarteiraAtaExecucao {
   unidades: Set<string>;
   /** Qtd. da ata assinada: itens em que informar importa e quantos já foram informados (nula quando nenhum importa). */
   ataAssinada: AtaAssinadaDaAta | null;
+  /** Valor total da ata em R$ (todos os órgãos): quantidade homologada × preço vigente de cada item. */
+  valorTotal: number;
   /** Parte da SENASP em R$: quantidade SENASP × preço vigente de cada item (o mesmo preço da linha do item). */
   valorSenasp: number;
   /** Consumido em R$ (consumido × preço); nulo quando nenhum item tem o consumo lido. */
@@ -186,16 +188,18 @@ export function buildCarteiraItemRows(input: CarteiraItensInput): CarteiraItemRo
 }
 
 /** Resumo por ata (chave "{numeroAta}-{uasg}") a partir das linhas de itens. */
-/** Parte da SENASP e consumido, em R$, somados dos itens (quantidade × preço vigente do item). */
-export function valoresDaAta(itens: CarteiraItemRow[]): { valorSenasp: number; valorConsumido: number | null } {
+/** Valor total, parte da SENASP e consumido, em R$, somados dos itens (quantidade × preço vigente do item). */
+export function valoresDaAta(itens: CarteiraItemRow[]): { valorTotal: number; valorSenasp: number; valorConsumido: number | null } {
+  let valorTotal = 0;
   let valorSenasp = 0;
   let valorConsumido: number | null = null;
   for (const r of itens) {
     const preco = Number(r.item.valorUnitario) || 0;
+    valorTotal += Math.max(Number(r.item.quantidadeHomologadaItem) || 0, 0) * preco;
     valorSenasp += Math.max(r.quantitativoSenasp, 0) * preco;
     if (r.consumido != null) valorConsumido = (valorConsumido ?? 0) + r.consumido * preco;
   }
-  return { valorSenasp, valorConsumido };
+  return { valorTotal, valorSenasp, valorConsumido };
 }
 
 export function resumirAtas(rows: CarteiraItemRow[]): Map<string, CarteiraAtaExecucao> {

@@ -120,17 +120,18 @@ describe('resumirAtas e unidadesPorContrato', () => {
 });
 
 describe('valoresDaAta', () => {
-  const linha = (senasp: number, preco: number, consumido: number | null) =>
-    ({ quantitativoSenasp: senasp, consumido, item: { valorUnitario: preco } }) as unknown as CarteiraItemRow;
+  const linha = (senasp: number, preco: number, consumido: number | null, homologada = senasp) =>
+    ({ quantitativoSenasp: senasp, consumido, item: { valorUnitario: preco, quantidadeHomologadaItem: homologada } }) as unknown as CarteiraItemRow;
 
-  it('parte SENASP e consumido em R$ pelo preço de cada item', () => {
-    expect(valoresDaAta([linha(1084, 751.98, 817), linha(10, 100, null)])).toEqual({
+  it('valor total (todos os órgãos), parte SENASP e consumido em R$ pelo preço de cada item', () => {
+    expect(valoresDaAta([linha(1084, 751.98, 817, 5000), linha(10, 100, null, 30)])).toEqual({
+      valorTotal: 5000 * 751.98 + 3000,
       valorSenasp: 1084 * 751.98 + 1000,
       valorConsumido: 817 * 751.98
     });
   });
 
   it('consumido nulo quando nenhum item tem o consumo lido; quantidade negativa não abate o valor', () => {
-    expect(valoresDaAta([linha(-424, 50, null), linha(2, 50, null)])).toEqual({ valorSenasp: 100, valorConsumido: null });
+    expect(valoresDaAta([linha(-424, 50, null, 10), linha(2, 50, null, 10)])).toEqual({ valorTotal: 1000, valorSenasp: 100, valorConsumido: null });
   });
 });
