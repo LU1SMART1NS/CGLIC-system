@@ -87,10 +87,25 @@ describe('próximo passo do contrato (mesa)', () => {
       nada,
       nada
     );
-    expect(comVoce.map((l) => l.chave)).toEqual(['processo', 'cobrar', 'provisorio']);
+    // Item entregue sem a data: primeiro registrar a data (o prazo do TRP e do TRD conta dela).
+    expect(comVoce.map((l) => l.chave)).toEqual(['processo', 'cobrar', 'entrega']);
     expect(comVoce[1].titulo).toBe('Cobrar o fornecedor · 2 itens atrasados');
     expect(comVoce[1].limite).toBe(PASSADO);
     expect(comOutros.map((l) => l.quem)).toEqual(['CAEP', 'Exército (DFPC)']);
+  });
+  it('entregue: enviar à comissão; com a comissão espera o TRP; passados os dias, cobrar', () => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const antes = (d: number) => new Date(Date.parse(`${hoje}T12:00:00Z`) - d * 864e5).toISOString().slice(0, 10);
+    const r = linhasDoContrato(
+      [e({ etapa: 'ENTREGUE', entregueEm: antes(3) }), e({ etapa: 'ENTREGUE', entregueEm: antes(9), comissaoEnviadaEm: antes(5) }), e({ etapa: 'ENTREGUE', entregueEm: antes(30), comissaoEnviadaEm: antes(25) })],
+      false,
+      nada,
+      nada
+    );
+    expect(r.comVoce.map((l) => l.chave)).toEqual(['provisorio', 'cobrar-comissao']);
+    expect(r.comVoce[1].titulo).toBe('Cobrar a comissão de recebimento · 1 item sem TRP');
+    expect(r.comOutros.map((l) => l.quem)).toEqual(['Comissão de recebimento']);
+    expect(comQuemEstaOItem(e({ etapa: 'ENTREGUE', entregueEm: antes(9), comissaoEnviadaEm: antes(5) }))).toBe('OUTROS');
   });
   it('item pago de emenda pede o Ofício à SAL; sem emenda, finalizar', () => {
     expect(linhasDoContrato([e({ etapa: 'PAGAMENTO', pagoEm: '2026-05-01', origem: 'EMENDA' })], false, nada, nada).comVoce[0].chave).toBe('sal');

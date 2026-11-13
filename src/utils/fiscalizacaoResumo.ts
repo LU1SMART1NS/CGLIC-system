@@ -1,6 +1,8 @@
 // Contas das listas e telas 360 da Fiscalização (Contratos, Beneficiários, Programas), a partir dos itens.
 import type { EntregaFiscalizacao, OrigemDoRecurso } from '../services/fiscalizacaoService';
 import { etapaDef, foiEntregue, itemConcluido, ordemDaEtapa, prazoDaEntrega, rotuloDoBeneficiario, type FaseEntrega, type TomPrazo, nomeDoItem } from './fiscalizacaoEntregas';
+import { hojeEmBrasilia } from './fiscalizacao';
+import { prazoDoItemNoRecebimento } from './fiscalizacaoRecebimento';
 
 const ORDEM_DA_FASE: FaseEntrega[] = ['PREPARACAO', 'EXECUCAO', 'RECEBIMENTO', 'PAGAMENTO', 'FINALIZADO'];
 const somar = (es: EntregaFiscalizacao[]) => es.reduce((t, e) => t + e.quantidade, 0);
@@ -89,6 +91,9 @@ export const passaPrazo = (r: Resumo, filtro: string) => !filtro || (filtro === 
 /** Ordena a situação pelo prazo: vencidos (mais antigos) primeiro, depois os que vencem, por fim entregues e área. */
 export const ordemDaSituacao = (e: EntregaFiscalizacao): number => {
   if (e.responsavel === 'AREA') return 1e9;
+  // Entregue com o TRP, o TRD ou o envio em aberto: pelo prazo do recebimento (vencido sobe).
+  const r = prazoDoItemNoRecebimento(e, hojeEmBrasilia());
+  if (r?.dias != null) return r.dias;
   if (e.entregueEm) return 1e8 + ordemDaEtapa(e.etapa);
   return prazoDaEntrega(e).dias ?? 1e7;
 };

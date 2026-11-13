@@ -7,11 +7,12 @@ import { ErrorState } from '../../design-system/components/ErrorState';
 import { carteiraIdentificacao, carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { useMovimentosDaEntrega } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, dataBR } from '../../utils/fiscalizacao';
+import { NOME_SFC, dataBR, hojeEmBrasilia } from '../../utils/fiscalizacao';
 import { ataEItemDaChave, autorDoHistorico, etapaDef, observacaoDoHistorico, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, textoDoAviso, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
 import { IdentificacaoDoContrato } from './ContratosFiscalizacaoTabela';
 import { NomeComSigla } from '../emendas/emendasPartes';
 import { chaveDeOrdem, ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
+import { cobrancaDaComissao, prazoDoRecebimento } from '../../utils/fiscalizacaoRecebimento';
 
 const VARIANTE_DA_FASE: Record<FaseEntrega, StatusBadgeVariant> = { PREPARACAO: 'neutral', EXECUCAO: 'info', RECEBIMENTO: 'warning', PAGAMENTO: 'success', FINALIZADO: 'success' };
 const COR_DO_PRAZO = { danger: 'var(--color-danger-text)', warning: 'var(--color-warning-text)', success: 'var(--color-success-text)', neutral: '#64748b' } as const;
@@ -77,11 +78,30 @@ export const CelulaSituacaoDoItem: React.FC<{ e: EntregaFiscalizacao }> = ({ e }
   const p = prazoDaEntrega(e);
   const dias = (a: string, b: string) => Math.round((Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`)) / 864e5);
   const atraso = e.entregueEm && e.prevista && e.entregueEm > e.prevista ? dias(e.entregueEm, e.prevista) : 0;
+  // Entre a entrega e o envio para pagamento, o prazo que conta é o do TRP, do TRD ou do envio (o da entrega já passou).
+  const r = prazoDoRecebimento(e, hojeEmBrasilia());
+  const comissao = cobrancaDaComissao(e, hojeEmBrasilia());
   return (
     <>
       <StatusBadge label={d.nome} variant={e.etapa === 'CONTROLADO' ? 'danger' : VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
+      {r && !comissao && (
+        <div style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }} data-testid="prazo-recebimento">
+          <span style={{ color: COR_DO_PRAZO[r.tom], fontWeight: r.tom === 'neutral' ? 400 : 700 }}>{r.texto}</span>
+          {r.limite && r.tom === 'danger' && <> · era até {dataBR(r.limite)}</>}
+        </div>
+      )}
+      {comissao && (
+        <div style={carteiraDetalhe} data-testid="situacao-comissao">
+          {comissao.vencida ? (
+            <span style={{ color: COR_DO_PRAZO.danger, fontWeight: 700 }}>Cobrar a comissão · enviado há {comissao.dias} dias</span>
+          ) : (
+            <>com a comissão desde {dataBR(comissao.desde)} · cobrar em {dataBR(comissao.cobrarEm)}</>
+          )}
+          {r?.limite && <div>pelo TR, o TRP era até {dataBR(r.limite)}</div>}
+        </div>
+      )}
       <div style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>
-        {e.entregueEm ? (
+        {r && !e.entregueEm ? null : e.entregueEm ? (
           <>
             entregue em {dataBR(e.entregueEm)}
             {atraso > 0 && <span style={{ color: COR_DO_PRAZO.warning }}> · {atraso} {atraso === 1 ? 'dia' : 'dias'} de atraso</span>}

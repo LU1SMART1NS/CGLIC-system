@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 import type { ContagemPrazo, InicioPrazo } from '../utils/fiscalizacaoPrazo';
+import type { RegraDoRecebimento } from '../utils/fiscalizacaoRecebimento';
 
 /**
  * Prazo de entrega da ata (migration 301): sugestão lida do Termo de Referência no PNCP e o prazo confirmado pelo gestor
@@ -26,7 +27,15 @@ export interface PrazoDaAta {
   motivo: string | null;
   confirmadoPorNome: string | null;
   confirmadoEm: string | null;
+  /** Prazos do TRP e do TRD lidos do TR (sugestão) e os confirmados pelo gestor da ata, na mesma janela. */
+  recebimentoSugerido?: RegraDoRecebimentoDaAta | null;
+  recebimentoTrechos?: string[];
+  recebimento?: RegraDoRecebimentoDaAta | null;
+  /** O recebimento tem confirmação própria: atas com o prazo de entrega já confirmado ainda pedem a do recebimento. */
+  recebimentoConfirmadoEm?: string | null;
 }
+
+export type RegraDoRecebimentoDaAta = Pick<RegraDoRecebimento, 'trpDias' | 'trpContagem' | 'trdDias' | 'trdContagem' | 'trdInicio'>;
 
 function cliente() {
   if (!isSupabaseConfigured || !supabase) throw new Error('NETWORK_OR_CONFIG_ERROR: Supabase não está configurado');
@@ -54,7 +63,11 @@ export function linhaParaPrazoDaAta(r: any): PrazoDaAta {
     porItem: r.por_item && typeof r.por_item === 'object' ? r.por_item : {},
     motivo: r.motivo || null,
     confirmadoPorNome: r.confirmado_por_nome || null,
-    confirmadoEm: r.confirmado_em || null
+    confirmadoEm: r.confirmado_em || null,
+    recebimentoSugerido: r.recebimento_sugerido || null,
+    recebimentoTrechos: Array.isArray(r.recebimento_trechos) ? r.recebimento_trechos.filter(Boolean) : [],
+    recebimento: r.recebimento || null,
+    recebimentoConfirmadoEm: r.recebimento_confirmado_em || null
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -84,6 +97,8 @@ export async function confirmarPrazoDaAta(input: {
   inicio: InicioPrazo;
   porItem: Record<string, number>;
   motivo: string | null;
+  /** Prazos do TRP e do TRD como estão no TR; null = o TR não diz. */
+  recebimento?: RegraDoRecebimentoDaAta | null;
 }): Promise<{ contratos: number; itensComData: number }> {
   const { data, error } = await cliente().rpc('confirmar_prazo_entrega_ata', {
     p_ata_key: input.ataKey,
@@ -92,7 +107,9 @@ export async function confirmarPrazoDaAta(input: {
     p_contagem: input.semPrazo ? null : input.contagem,
     p_inicio: input.semPrazo ? null : input.inicio,
     p_por_item: input.semPrazo ? {} : input.porItem,
-    p_motivo: (input.motivo || '').trim() || null
+    p_motivo: (input.motivo || '').trim() || null,
+    // undefined: não mexe no recebimento; null: o TR não traz o prazo (migration 305).
+    p_recebimento: input.recebimento === undefined ? null : input.recebimento ?? { naoDiz: true }
   });
   if (error) throw mapPostgresErrorToAppError(error);
   const r = (data ?? {}) as { contratos?: number; itens_com_data?: number };

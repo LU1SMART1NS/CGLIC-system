@@ -19,7 +19,16 @@ describe('Início: prazo de entrega a confirmar (migrations 301 e 302)', () => {
   it('ata nova (sem leitura) pede para informar; confirmada não aparece', () => {
     const nova = calculateAttentionSummary({ arps: [ata], prazosAta: [prazo({ leitura: null, sugeridoDias: null, sugeridoInicio: null })] });
     expect(nova.items.find((i) => i.category === 'PRAZO_ENTREGA')).toMatchObject({ severity: 'ATENCAO', title: 'Informar o prazo de entrega', badgeLabel: 'a informar' });
-    const feita = calculateAttentionSummary({ arps: [ata], prazosAta: [prazo({ confirmadoEm: '2026-11-13T12:00:00Z' })] });
+    const feita = calculateAttentionSummary({ arps: [ata], prazosAta: [prazo({ confirmadoEm: '2026-11-13T12:00:00Z', recebimentoConfirmadoEm: '2026-11-13T12:00:00Z' })] });
     expect(feita.items.some((i) => i.category === 'PRAZO_ENTREGA')).toBe(false);
+  });
+  it('prazo de entrega confirmado e o recebimento não: pede o recebimento (migration 305)', () => {
+    const r = calculateAttentionSummary({
+      arps: [ata],
+      prazosAta: [prazo({ confirmadoEm: '2026-11-13T12:00:00Z', recebimentoSugerido: { trpDias: 0, trpContagem: 'CORRIDOS', trdDias: 10, trdContagem: 'UTEIS', trdInicio: 'ENTREGA' } })]
+    });
+    const item = r.items.find((i) => i.category === 'PRAZO_ENTREGA');
+    expect(item).toMatchObject({ title: 'Confirmar o prazo de recebimento lido do TR', badgeLabel: 'a confirmar' });
+    expect(item?.description).toContain('TRD em 10 dias úteis');
   });
 });

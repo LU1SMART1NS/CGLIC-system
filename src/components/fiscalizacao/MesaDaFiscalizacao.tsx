@@ -13,6 +13,8 @@ import { nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario } from '../../utils/fi
 import { EncerrarEntregasModal } from './EntregasModais';
 import { AvancarEtapaModal } from './EtapaModais';
 import { OrigemDoPrazo, PrazoDoContratoModal, ProrrogarPrazoModal, RecebimentoDaOrdemModal } from './PrazoModais';
+import { ComissaoDeRecebimentoModal, PrazoDeRecebimentoModal } from './PrazoDeRecebimentoModal';
+import { origemDoRecebimento, textoDoTrd, textoDoTrp } from '../../utils/fiscalizacaoRecebimento';
 import { textoDaRegra } from '../../utils/fiscalizacaoPrazo';
 import { comQuemEstaOItem, itens, linhaDeCadastro, linhaDeLigacao, linhasDoContrato, type Linha } from '../../utils/fiscalizacaoMesa';
 import { FiltroPendencia, MaisSemPendencia, SecaoDaMesa, type LinhaDeTrabalho } from '../mesa/MesaDeTrabalho';
@@ -26,7 +28,7 @@ import { DataTable } from '../../design-system/components/DataTable';
 import { CelulaItem, CelulaSituacaoDoItem } from './EntregasTabela';
 import { ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
 
-type Janela = { tipo: 'etapa' | 'encerrar' | 'recebimento' | 'prorrogar'; itens: EntregaFiscalizacao[]; inicial?: EtapaEntrega } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'sei' } | { tipo: 'quem' } | { tipo: 'prazo' } | { tipo: 'ligar' } | { tipo: 'cadastro' } | null;
+type Janela = { tipo: 'etapa' | 'encerrar' | 'recebimento' | 'prorrogar' | 'comissao' | 'cobranca'; itens: EntregaFiscalizacao[]; inicial?: EtapaEntrega } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'sei' } | { tipo: 'quem' } | { tipo: 'prazo' } | { tipo: 'prazoRecebimento' } | { tipo: 'ligar' } | { tipo: 'cadastro' } | null;
 
 const chaveDoGrupo = (g: EntregaFiscalizacao[]) => g[0].beneficiarioId ?? `planilha:${g[0].beneficiarioTexto}`;
 /** Acima disto, a lista abre só nos beneficiários com pendência (como o Andamento do Pedido 360). */
@@ -113,6 +115,17 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
             <span style={{ color: 'var(--color-warning-text)' }}>{c.prazoConflito ? 'a informar: as atas do contrato têm prazos diferentes' : 'a informar'}</span>
           )}
         </Campo>
+        <Campo rotulo="Recebimento">
+          {c.prazoRecebimento ? (
+            <span data-testid="fisc-mesa-recebimento">
+              <span>TRP {textoDoTrp(c.prazoRecebimento)}</span>
+              <div>TRD em {textoDoTrd(c.prazoRecebimento)}</div>
+              <div style={carteiraDetalhe}>{origemDoRecebimento(c.prazoRecebimento)}</div>
+            </span>
+          ) : (
+            <span style={{ color: 'var(--color-warning-text)' }} data-testid="fisc-mesa-recebimento">a informar</span>
+          )}
+        </Campo>
         <Campo rotulo="Origem">{c.emendas.length ? `${c.emendas.length === 1 ? 'Emenda' : 'Emendas'} ${c.emendas.slice(0, 3).join(', ')}${c.emendas.length > 3 ? ` +${c.emendas.length - 3}` : ''}` : 'Sem emenda'}</Campo>
         <span style={{ flex: 1 }} />
         {podeAgir && (
@@ -122,6 +135,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
             actions={[
               ...(coordenador ? [{ label: 'Alterar quem fiscaliza', onClick: () => setJanela({ tipo: 'quem' }) }] : []),
               { label: c.prazoEntrega ? 'Corrigir o prazo de entrega' : 'Informar o prazo de entrega', onClick: () => setJanela({ tipo: 'prazo' }) },
+              { label: c.prazoRecebimento ? 'Corrigir o prazo de recebimento' : 'Informar o prazo de recebimento', onClick: () => setJanela({ tipo: 'prazoRecebimento' }) },
               ...(autuado(c) ? [{ label: 'Corrigir a autuação', onClick: () => setJanela({ tipo: 'processo' }) }] : []),
               { label: c.processoSei ? 'Corrigir o SEI do contrato' : 'Registrar o SEI do contrato', onClick: () => setJanela({ tipo: 'sei' }) }
             ]}
@@ -204,6 +218,8 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
       {janela?.tipo === 'recebimento' && <RecebimentoDaOrdemModal entregas={janela.itens} onClose={fechar} />}
       {janela?.tipo === 'prorrogar' && <ProrrogarPrazoModal entregas={janela.itens} onClose={fechar} />}
       {janela?.tipo === 'prazo' && <PrazoDoContratoModal contrato={c} onClose={fechar} />}
+      {(janela?.tipo === 'comissao' || janela?.tipo === 'cobranca') && <ComissaoDeRecebimentoModal entregas={janela.itens} tipo={janela.tipo === 'comissao' ? 'ENVIO' : 'COBRANCA'} onClose={fechar} />}
+      {janela?.tipo === 'prazoRecebimento' && <PrazoDeRecebimentoModal contrato={c} onClose={fechar} />}
       {janela?.tipo === 'encerrar' && <EncerrarEntregasModal entregas={janela.itens} onClose={fechar} />}
       {janela?.tipo === 'item' && <JanelaDoItem e={janela.item} onClose={fechar} noContrato />}
       {janela?.tipo === 'processo' && <RegistrarProcessoModal contrato={c} onClose={fechar} />}
