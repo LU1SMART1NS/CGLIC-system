@@ -1,4 +1,6 @@
 import type { LinhaPedido, NotaDaLinha, PedidoEmenda } from '../services/emendasService';
+import { COR_DA_SITUACAO } from '../design-system/coresDaSituacao';
+import type { StatusBadgeVariant } from '../design-system/components/StatusBadge';
 import type { EntregaDaLinha } from '../services/fiscalizacaoService';
 import { linhasAtivas, ORDEM_ETAPA, passoNaContratacao, type PassoNaContratacao } from './emendasPedidos';
 import { PASSO, passosDaLinha } from './emendasMesa';
@@ -30,14 +32,14 @@ export const OPCOES_DA_CONTRATACAO: ReadonlyArray<{ value: PassoDaContratacao; l
  * Cor da etiqueta por fase (parecer de UX, 13/11/2026): verde no contrato, azul enquanto o fornecedor trabalha,
  * roxo no recebimento, verde quando pago. Amarelo e vermelho ficam só para os avisos.
  */
-export const VARIANTE_DA_ENTREGA: Record<PassoDeEntrega, 'success' | 'info' | 'purple'> = {
-  CONTRATADO: 'success',
-  EM_FORNECIMENTO: 'info',
-  ENTREGUE_PARTE: 'purple',
-  ENTREGUE: 'purple',
-  RECEBIDO: 'purple',
-  PAGO: 'success',
-  CONCLUIDO: 'success'
+export const VARIANTE_DA_ENTREGA: Record<PassoDeEntrega, StatusBadgeVariant> = {
+  CONTRATADO: COR_DA_SITUACAO.CONCLUIDO,
+  EM_FORNECIMENTO: COR_DA_SITUACAO.ANDAMENTO,
+  ENTREGUE_PARTE: COR_DA_SITUACAO.CONFERENCIA,
+  ENTREGUE: COR_DA_SITUACAO.CONFERENCIA,
+  RECEBIDO: COR_DA_SITUACAO.CONFERENCIA,
+  PAGO: COR_DA_SITUACAO.CONCLUIDO,
+  CONCLUIDO: COR_DA_SITUACAO.CONCLUIDO
 };
 
 export interface EntregaDoPedido {
