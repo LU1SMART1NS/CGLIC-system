@@ -65,6 +65,17 @@ export async function fetchPrazoDaAta(ataKey: string): Promise<PrazoDaAta | null
   return data ? linhaParaPrazoDaAta(data) : null;
 }
 
+/**
+ * Atas com o prazo do TR a confirmar que têm contrato acompanhado pela Fiscalização (migration 302): o aviso do Início
+ * do gestor da ata e do coordenador. As outras atas mantêm o item na aba Ações da Ata 360.
+ */
+export async function fetchPrazosAConfirmar(): Promise<PrazoDaAta[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const { data, error } = await cliente().rpc('atas_prazo_a_confirmar');
+  if (error) throw mapPostgresErrorToAppError(error);
+  return ((data || []) as unknown[]).map(linhaParaPrazoDaAta);
+}
+
 export async function confirmarPrazoDaAta(input: {
   ataKey: string;
   semPrazo: boolean;

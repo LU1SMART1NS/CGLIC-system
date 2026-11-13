@@ -21,3 +21,10 @@ describe('prazo de entrega da ata na aba Ações (migration 301)', () => {
     expect(itemDoPrazoDaAta(null)).toBeNull();
   });
 });
+
+describe('ata nova, fora da leitura dos editais (migration 302)', () => {
+  it('com contrato, pede para informar; sem contrato, nada', () => {
+    expect(itemDoPrazoDaAta(null, true, '00090/2026')).toMatchObject({ kind: 'PRAZO', title: 'Informar o prazo de entrega', badgeLabel: 'informar' });
+    expect(itemDoPrazoDaAta(null, false, '00090/2026')).toBeNull();
+  });
+});
