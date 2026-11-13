@@ -72,10 +72,10 @@ import { severityFromReajusteRadarNivel, severityFromPaymentStatusPrazo } from '
 import { rowToPaymentFollowUpCycle } from './paymentFollowUpService';
 import { fetchPaymentCyclesForContracts } from '../adapters/paymentCycleRpcAdapter';
 import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
-import { alocadoAcimaDoLimite, limiteComPreposicao, limiteProvisorio } from '../utils/ataAssinadaPendente';
+import { alocadoAcimaDoLimite, contratadoAcimaDoLimite, limiteComPreposicao, limiteProvisorio } from '../utils/ataAssinadaPendente';
 import { VIGENCIA_RULES, PAGAMENTO_RULES, TAREFA_RULES, classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
-import { motivoDoLembrete, motivoDoReajuste } from '../utils/motivoDetalhe';
+import { MOTIVO_CONTRATADO_ACIMA_DA_COTA, MOTIVO_QUANTITATIVOS_A_CONFERIR, motivoDoLembrete, motivoDoReajuste } from '../utils/motivoDetalhe';
 import { aguardandoResposta, COBRAR_CRITICO_DIAS, prazoEfetivo, textoCobrarResposta } from '../utils/modeloGestao';
 
 /**
@@ -271,7 +271,19 @@ export function motivosDosQuantitativos(aItem: any): Array<{ chave: string; text
   if (cota < 0) motivos.push({ chave: `COTA${cota}`, texto: `cota própria negativa (${fmt(cota)}): a SENASP remanejou quantidade de órgãos que não abriram mão`, selo: 'cota negativa', critico: true });
   // Migration 116: o limite caiu abaixo do que já estava alocado (ata assinada informada, registrado menor na fonte,
   // adesão reduzida). A janela de alocação só deixa diminuir.
-  const acimaDoLimite = alocadoAcimaDoLimite(aItem);
+  // Contratado acima da cota: os contratos já existem, o caminho é pedir remanejamento (mais cota). Nesse caso o
+  // "alocado acima" não aparece: a alocação cobre contratos e diminuí-la não resolve.
+  // Com a cota negativa o aviso crítico acima já trata do caso (o contratado sempre passa de zero).
+  const contratadoAcima = cota < 0 ? 0 : contratadoAcimaDoLimite(aItem);
+  if (contratadoAcima > 0) {
+    motivos.push({
+      chave: `CTR${contratadoAcima}`,
+      texto: `contratado (${fmt(n(aItem.quantidade_consumida))}) acima ${limiteComPreposicao(aItem)} (${fmt(Math.max(cota, 0))}): peça remanejamento de ${fmt(contratadoAcima)}`,
+      selo: 'pedir remanejamento',
+      critico: false
+    });
+  }
+  const acimaDoLimite = contratadoAcima > 0 ? 0 : alocadoAcimaDoLimite(aItem);
   if (acimaDoLimite > 0) {
     motivos.push({
       chave: `ALOC${acimaDoLimite}`,
@@ -859,13 +871,17 @@ export function calculateAttentionSummary(params: {
     const itemKey = aItem.item_key || aItem.itemKey || (numAta && numItem ? `${numAta}-${uasgItem}-${numItem}` : '');
     if (!itemKey) continue;
     const critico = motivos.some((m) => m.critico);
+    const remanejar = motivos.some((m) => m.chave.startsWith('CTR'));
     items.push({
       id: `ATT-QUANTITATIVOS-${itemKey}`,
       category: 'QUANTITATIVOS',
       severity: critico ? 'CRITICA' : 'ATENCAO',
       avisoChave: numAta && numItem ? chaveAvisoQuantitativos(numAta, uasgItem, numItem, motivos.map((m) => m.chave).join('|')) : undefined,
+      // Separa no filtro Motivo da aba Saldos o que pede remanejamento (contratado acima da cota) do resto.
+      motivoDetalhe: remanejar ? MOTIVO_CONTRATADO_ACIMA_DA_COTA : MOTIVO_QUANTITATIVOS_A_CONFERIR,
       title: critico
         ? 'Cota própria da SENASP negativa'
+        : remanejar ? 'Contratado acima da cota: pedir remanejamento'
         : motivos.every((m) => m.chave.startsWith('GER')) ? 'Pedir remanejamento à gerenciadora' : 'Quantitativos do item a conferir',
       description: `Ata ${numAta || 's/n'} — Item ${numItem || 's/n'}: ${motivos.map((m) => m.texto).join('; ')}`,
       arpKey: itemKey,

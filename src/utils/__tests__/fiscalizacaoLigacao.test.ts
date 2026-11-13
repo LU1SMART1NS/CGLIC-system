@@ -48,7 +48,7 @@ describe('passo da mesa', () => {
   it('com itens da ata: com o fiscal, uma ação', () => {
     const ligar = vi.fn();
     const l = linhaDeLigacao(es, true, ligar);
-    expect(l).toMatchObject({ tom: 'eu', titulo: 'Ligar ao item da ata · 2 itens da planilha' });
+    expect(l).toMatchObject({ tom: 'eu', titulo: 'Ligar ao item da ata · 2 itens' });
     l?.acoes[0].faz();
     expect(ligar).toHaveBeenCalled();
   });

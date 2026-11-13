@@ -13,7 +13,7 @@ import { prazoEfetivo } from '../utils/modeloGestao';
 
 /** CADASTRO: a ata veio do PNCP sem fornecedor e precisa da indicação do coordenador (atas_fornecedor_pncp).
  *  VINCULO: vínculo automático desmentido pela fonte, com trabalho do gestor, a conferir (migration 112). */
-export type AtaActionKind = 'SALDO' | 'TAREFA' | 'LEMBRETE' | 'CADASTRO' | 'VINCULO';
+export type AtaActionKind = 'SALDO' | 'TAREFA' | 'LEMBRETE' | 'CADASTRO' | 'VINCULO' | 'PRAZO';
 
 export interface AtaActionItem {
   id: string;

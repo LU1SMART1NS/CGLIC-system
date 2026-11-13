@@ -20,6 +20,9 @@ export interface RegraDoPrazo {
   trecho?: string | null;
   documento?: string | null;
   confirmadoPor?: string | null;
+  confirmadoEm?: string | null;
+  /** Prazo próprio de itens da ata, com a chave "ata|item" (migration 301). */
+  porItem?: Record<string, number>;
   /** Quem informou ou mudou a regra no contrato, quando e por quê. */
   definidoPor?: string | null;
   definidoEm?: string | null;
@@ -85,7 +88,7 @@ export function origemDaPrevista(e: Pick<EntregaFiscalizacao, 'prevista' | 'prev
     case 'PRORROGACAO':
       return `prorrogada${e.previstaAnterior ? `; era ${dataBR(e.previstaAnterior)}` : ''}${suspensos}`;
     case 'PLANILHA':
-      return 'da planilha da SFC/CGLIC; confirme pela Ordem';
+      return 'informada antes da Ordem; confirme pela Ordem';
     default:
       return 'informada à mão; confirme pela Ordem';
   }

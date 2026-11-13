@@ -96,7 +96,7 @@ export const TrocarBeneficiarioModal: React.FC<{ entrega: EntregaFiscalizacao; o
             {e.beneficiarioSigla && <span style={{ color: '#475569' }}> · {e.beneficiarioSigla}</span>}
           </div>
           <div style={carteiraDetalhe}>
-            {[e.municipio && e.uf ? `${e.municipio}/${e.uf}` : e.uf, e.beneficiarioId ? null : 'sem cadastro', e.beneficiarioTexto ? `na planilha: “${e.beneficiarioTexto}”` : null].filter(Boolean).join(' · ')}
+            {[e.municipio && e.uf ? `${e.municipio}/${e.uf}` : e.uf, e.beneficiarioId ? null : 'sem cadastro', e.beneficiarioTexto ? `escrito “${e.beneficiarioTexto}”` : null].filter(Boolean).join(' · ')}
           </div>
         </div>
 
@@ -108,7 +108,7 @@ export const TrocarBeneficiarioModal: React.FC<{ entrega: EntregaFiscalizacao; o
           {busca.trim().length < 2 && !escolhido && <span style={carteiraDetalhe}>Digite ao menos 2 letras. Não está no cadastro? Peça o cadastro em Emendas › Beneficiários.</span>}
         </div>
 
-        <AppTextarea label="Motivo" value={motivo} onChange={(ev) => setMotivo(ev.target.value)} rows={2} placeholder="ex.: a planilha da SFC trouxe a Força Nacional, mas o curso é do GAVOP" hint="Fica no histórico do item." data-testid="fisc-trocar-benef-motivo" />
+        <AppTextarea label="Motivo" value={motivo} onChange={(ev) => setMotivo(ev.target.value)} rows={2} placeholder="ex.: o item está com a Força Nacional, mas o curso é do GAVOP" hint="Fica no histórico do item." data-testid="fisc-trocar-benef-motivo" />
         <AppInput label="Documento SEI" value={sei} onChange={(ev) => setSei(ev.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="ex.: 37530982" hint="Número do documento que pede ou registra a troca." data-testid="fisc-trocar-benef-sei" />
         <span style={{ ...carteiraDetalhe, marginTop: 0 }}>A troca vale só para este item. Para trocar só parte das unidades, use Entrega parcial antes.</span>
       </div>

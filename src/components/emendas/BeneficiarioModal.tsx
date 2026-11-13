@@ -20,10 +20,12 @@ import {
   type BeneficiarioParaSalvar,
   type DadosDaReceita
 } from '../../services/emendasService';
-import { beneficiarioRepetido, linkDoWhatsapp, naturezaNaoPublica, parecidosCom, pendenciasDoBeneficiario, type FormularioBeneficiario as Formulario } from '../../utils/emendasBeneficiarios';
+import { beneficiarioRepetido, linkDoWhatsapp, UFS, naturezaNaoPublica, parecidosCom, pendenciasDoBeneficiario, type FormularioBeneficiario as Formulario } from '../../utils/emendasBeneficiarios';
 import { nomeProprioEmTitulo } from '../../utils/textCase';
 import { ConfirmDialog } from '../../design-system/components/ConfirmDialog';
 import { localDoBeneficiario, rotuloBeneficiario } from '../../services/emendasService';
+
+const ORDEM_UFS = [...UFS].sort();
 
 const EMAIL_PESSOAL = /@(gmail|hotmail|outlook|yahoo|bol|uol|live|icloud)\./i;
 
@@ -55,7 +57,7 @@ function formularioDe(b: BeneficiarioEmenda | null): Formulario {
     entregaComplemento: b?.entregaComplemento ?? '',
     entregaBairro: b?.entregaBairro ?? '',
     entregaMunicipio: b?.entregaMunicipio ?? '',
-    entregaUf: b?.entregaUf ?? '',
+    entregaUf: (b?.entregaUf ?? '').trim().toUpperCase(),
     responsavelNome: b?.responsavelNome ?? '',
     responsavelCargo: b?.responsavelCargo ?? '',
     responsavelTelefone: b?.responsavelTelefone ? formatarTelefone(b.responsavelTelefone) : '',
@@ -109,7 +111,10 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
   const [cnpj, setCnpj] = useState(formatarCnpj(beneficiario?.cnpj));
   const [receita, setReceita] = useState<DadosDaReceita | null>(beneficiario ? receitaDoCadastro(beneficiario) : null);
   const [receitaLidaAgora, setReceitaLidaAgora] = useState(false);
-  const [f, setF] = useState<Formulario>(() => ({ ...formularioDe(beneficiario), ...(beneficiario ? {} : inicial) }));
+  const [f, setF] = useState<Formulario>(() => {
+    const x = { ...formularioDe(beneficiario), ...(beneficiario ? {} : inicial) };
+    return { ...x, entregaUf: x.entregaUf.trim().toUpperCase() };
+  });
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
   const [erroCnpj, setErroCnpj] = useState('');
   const [buscandoCep, setBuscandoCep] = useState(false);
@@ -146,7 +151,7 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
     setBuscandoCep(true);
     try {
       const e = await consultarCep(cepInformado ?? f.entregaCep);
-      setF((x) => ({ ...x, entregaCep: formatarCep(e.cep), entregaLogradouro: e.logradouro || x.entregaLogradouro, entregaBairro: e.bairro || x.entregaBairro, entregaMunicipio: e.municipio || x.entregaMunicipio, entregaUf: e.uf || x.entregaUf }));
+      setF((x) => ({ ...x, entregaCep: formatarCep(e.cep), entregaLogradouro: e.logradouro || x.entregaLogradouro, entregaBairro: e.bairro || x.entregaBairro, entregaMunicipio: e.municipio || x.entregaMunicipio, entregaUf: e.uf?.toUpperCase() || x.entregaUf }));
       setMsgCep({ tom: 'info', texto: 'Endereço preenchido pelo CEP. Confira e complete o número.' });
     } catch (err) {
       setMsgCep({ tom: 'erro', texto: (err as Error).message });
@@ -436,7 +441,11 @@ export const BeneficiarioModal: React.FC<Props> = ({ beneficiario, lista, onAbri
             <AppInput label="Complemento" placeholder="Bloco, sala, portão" value={f.entregaComplemento} onChange={(e) => muda('entregaComplemento', e.target.value)} />
             <AppInput label="Bairro" value={f.entregaBairro} onChange={(e) => muda('entregaBairro', e.target.value)} />
             <AppInput label="Município" value={f.entregaMunicipio} onChange={(e) => muda('entregaMunicipio', e.target.value)} data-testid="emendas-beneficiario-municipio" />
-            <AppInput label="UF *" value={f.entregaUf} maxLength={2} onChange={(e) => muda('entregaUf', e.target.value.toUpperCase())} data-testid="emendas-beneficiario-uf" />
+            <AppSelect label="UF *" value={f.entregaUf} onChange={(e) => muda('entregaUf', e.target.value)} data-testid="emendas-beneficiario-uf">
+              <option value="">Escolha</option>
+              {f.entregaUf && !UFS.has(f.entregaUf) && <option value={f.entregaUf}>{f.entregaUf} (inválida)</option>}
+              {ORDEM_UFS.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
+            </AppSelect>
           </div>
           <span style={{ fontSize: '0.76rem', color: 'var(--color-text-muted)' }}>O CEP preenche logradouro, bairro e município; tudo pode ser corrigido antes de salvar.</span>
         </div>

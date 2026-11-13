@@ -45,6 +45,16 @@ export function motivoDoReajuste(nivel: ReajusteRadarPriorityLevel | undefined |
   return { chave: nivel, label: rotuloReajuste(nivel) };
 }
 
+/**
+ * Quantitativos do item (aba Saldos): o que pede remanejamento (contratado acima da cota) fica separado do resto,
+ * mesmo numa aba com outras categorias.
+ */
+export const MOTIVO_CONTRATADO_ACIMA_DA_COTA: MotivoDetalhe = { chave: 'remanejamento', label: 'Contratado acima da cota (pedir remanejamento)' };
+export const MOTIVO_QUANTITATIVOS_A_CONFERIR: MotivoDetalhe = { chave: 'a-conferir', label: 'Quantitativos a conferir' };
+
+/** Categorias cujo motivo detalhado aparece no filtro em qualquer aba (não só nas abas de uma categoria). */
+export const CATEGORIAS_COM_MOTIVO_DETALHADO: ReadonlySet<DashboardAttentionItem['category']> = new Set(['QUANTITATIVOS']);
+
 /** Valor do motivo de um aviso no filtro (e no endereço). */
 export function chaveDoMotivo(item: Pick<DashboardAttentionItem, 'category' | 'motivoDetalhe'>): string {
   return item.motivoDetalhe ? `${item.category}.${item.motivoDetalhe.chave}` : item.category;

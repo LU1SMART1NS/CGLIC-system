@@ -1,7 +1,7 @@
 import { buildAtaPath } from '../../hooks/useAta';
 import type { AlvoResolucao } from '../avisos/ResolverAviso';
 import type { DashboardAttentionCategory, DashboardAttentionItem } from '../../types/managementDashboard';
-import { chaveDoMotivo } from '../../utils/motivoDetalhe';
+import { CATEGORIAS_COM_MOTIVO_DETALHADO, chaveDoMotivo } from '../../utils/motivoDetalhe';
 
 /** Item de atenção enriquecido com a UASG de origem (a Gestão de Instrumentos consolida 200330 e 200331). */
 export interface AttentionItemWithUasg extends DashboardAttentionItem {
@@ -97,13 +97,16 @@ export function isMotivoCategoria(value: string | null): value is DashboardAtten
 
 /**
  * Motivo de um aviso no filtro "Motivo". Numa aba de uma categoria só (Reajustes, Lembretes) a categoria não separa
- * nada: usa o motivo detalhado (situação da data-base, regra do lembrete). Nas demais, a categoria do aviso.
+ * nada: usa o motivo detalhado (situação da data-base, regra do lembrete). Nas demais, a categoria do aviso, menos
+ * Quantitativos, que separa sempre o que pede remanejamento (contratado acima da cota) do resto.
  */
 export function motivoNoFiltro(
   item: Pick<DashboardAttentionItem, 'category' | 'motivoDetalhe'>,
   abaDeUmaCategoria: boolean
 ): { value: string; label: string } {
-  if (abaDeUmaCategoria && item.motivoDetalhe) return { value: chaveDoMotivo(item), label: item.motivoDetalhe.label };
+  if (item.motivoDetalhe && (abaDeUmaCategoria || CATEGORIAS_COM_MOTIVO_DETALHADO.has(item.category))) {
+    return { value: chaveDoMotivo(item), label: item.motivoDetalhe.label };
+  }
   return { value: item.category, label: getMotivoInfo(item.category).label };
 }
 

@@ -20,7 +20,7 @@ describe('prazo de entrega pela regra do contrato (migration 294)', () => {
     expect(textoDaRegra({ dias: 30, contagem: 'UTEIS', inicio: 'OF_RECEBIMENTO' })).toBe('30 dias úteis do recebimento da Ordem');
     expect(textoDaRegra({ dias: 90, contagem: 'CORRIDOS', inicio: 'EXERCITO' })).toBe('90 dias corridos da autorização do Exército');
     expect(origemDaPrevista({ prevista: '2026-12-15', previstaOrigem: 'PRORROGACAO', previstaAnterior: '2026-11-02', ordemRecebidaEm: null, prazoDias: null, diasSuspensos: 0 })).toBe('prorrogada; era 02/11/2026');
-    expect(origemDaPrevista({ prevista: '2026-11-30', previstaOrigem: 'PLANILHA', previstaAnterior: null, ordemRecebidaEm: null, prazoDias: null, diasSuspensos: 0 })).toBe('da planilha da SFC/CGLIC; confirme pela Ordem');
+    expect(origemDaPrevista({ prevista: '2026-11-30', previstaOrigem: 'PLANILHA', previstaAnterior: null, ordemRecebidaEm: null, prazoDias: null, diasSuspensos: 0 })).toBe('informada antes da Ordem; confirme pela Ordem');
     expect(origemDaPrevista({ prevista: '2026-11-26', previstaOrigem: 'ORDEM', previstaAnterior: null, ordemRecebidaEm: '2026-09-01', prazoDias: 30, diasSuspensos: 42 })).toBe('30 dias corridos do recebimento da Ordem em 01/09/2026 · +42 dias no Exército');
   });
   it('recebimento da Ordem só falta quando a data não está pela regra', () => {

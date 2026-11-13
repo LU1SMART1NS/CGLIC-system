@@ -86,6 +86,6 @@ export function voltaDoItem(e: Item, movimentos: MovimentoEntrega[]): VoltaDoIte
   const passos = movimentos.filter((m) => m.etapa && PASSOS.has(m.tipo));
   const atual = passos.findIndex((m) => m.etapa === e.etapa);
   const anterior = atual >= 0 ? passos.slice(atual + 1).find((m) => m.etapa !== e.etapa) : undefined;
-  if (atual < 0 || !anterior?.etapa) return { para: null, apaga: null, impede: `Não há passo anterior registrado antes de "${etapaDef(e.etapa).nome}" (veio da carga da planilha ou do pedido). Se está errado, peça ao coordenador para corrigir.` };
+  if (atual < 0 || !anterior?.etapa) return { para: null, apaga: null, impede: `Não há passo anterior registrado antes de "${etapaDef(e.etapa).nome}" (o item já chegou nesta etapa). Se está errado, peça ao coordenador para corrigir.` };
   return { para: anterior.etapa, apaga: passos[atual], impede: null };
 }

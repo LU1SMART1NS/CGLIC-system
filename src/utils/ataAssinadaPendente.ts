@@ -16,6 +16,8 @@ export interface SaldoParaAtaAssinada {
   assinada_senasp_participante?: number | string | null;
   total_alocado_unidades?: number | string | null;
   outros_orgaos_registrados?: number | string | null;
+  /** Contratado da SENASP no item (v_arp_item_saldo_detalhado.quantidade_consumida). */
+  quantidade_consumida?: number | string | null;
 }
 
 /** Situação da qtd. da ata assinada de um item; nula quando informar não muda nada (adesão, ou só a SENASP registrada). */
@@ -48,6 +50,14 @@ export function limiteProvisorio(s: SaldoParaAtaAssinada): boolean {
 /** Quanto a alocação às unidades passa da base do saldo (0 quando não passa). */
 export function alocadoAcimaDoLimite(s: SaldoParaAtaAssinada): number {
   return Math.max(num(s.total_alocado_unidades) - Math.max(quantidadeBaseSenasp(s), 0), 0);
+}
+
+/**
+ * Quanto o contratado da SENASP passa da base do saldo (0 quando não passa). Diferente do alocado acima: aqui os
+ * contratos já existem e só o remanejamento (mais cota) resolve; diminuir a alocação não adianta.
+ */
+export function contratadoAcimaDoLimite(s: SaldoParaAtaAssinada): number {
+  return Math.max(num(s.quantidade_consumida) - Math.max(quantidadeBaseSenasp(s), 0), 0);
 }
 
 /** Limite do item com a preposição, para "acima …": "da cota própria da SENASP", "da quantidade aprovada …" ou "do registrado …". */
