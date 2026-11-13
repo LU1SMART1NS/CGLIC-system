@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Versão: 20261113000305_prazos_de_recebimento.sql
+-- Versão: 20261113000306_prazos_de_recebimento.sql
 -- Prazos do recebimento (TRP e TRD), envio ao pagamento e comissão de recebimento (protótipo aprovado em 13/11/2026).
 --
 -- Os dias do TRP e do TRD vêm do Termo de Referência de cada ata: lidos (sugestão) e confirmados pelo gestor da ata na
