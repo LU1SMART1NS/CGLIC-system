@@ -53,7 +53,6 @@ const ContratoDaLinha: React.FC<{ linha: LinhaPedido; nota: NotaDaLinha | undefi
       ) : (
         numero
       )}
-      {!nota?.contractKey && ' · do controle anterior da CAEP'}
     </div>
   );
 };

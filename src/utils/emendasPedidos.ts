@@ -213,7 +213,7 @@ export function identificacaoDoPedido(
   if (p.numeroNoAno && p.anoDoNumero) return `Pedido ${p.numeroNoAno}/${p.anoDoNumero}${p.oficioProcessoSei ? ` · Processo ${p.oficioProcessoSei}` : ''}`;
   if (p.oficioProcessoSei) return `Processo ${p.oficioProcessoSei}`;
   if (p.siopEmenda) return `Emenda ${p.siopEmenda}`;
-  return p.origem === 'PLANILHA' ? 'Reserva da planilha' : `Reserva de ${dataBR(p.reservadoEm)}`;
+  return p.origem === 'PLANILHA' ? 'Reserva sem data' : `Reserva de ${dataBR(p.reservadoEm)}`;
 }
 
 /**

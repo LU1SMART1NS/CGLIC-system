@@ -211,14 +211,14 @@ export function andamentoDoPedido(
 
   // ---------- Interlocução ----------
   const reservar = base('reservar', 'INTERLOCUCAO', 'RESERVADO', semAutor ? 'Reservar os itens e indicar o parlamentar' : 'Reservar os itens com o parlamentar', 'FAZER', 'CAEP');
-  reservar.feito = doPlanilha ? 'sem data no controle anterior' : dataBR(p.reservadoEm);
+  reservar.feito = doPlanilha ? 'sem data registrada' : dataBR(p.reservadoEm);
   reservar.estado = comAcao('reservar') ? 'COMIGO' : 'FEITA';
 
   const minuta = base('minuta', 'INTERLOCUCAO', 'OFICIO', 'Enviar a minuta e receber o ofício', 'ORIENTAR', 'gabinete do parlamentar');
   minuta.regra = `ofício em até ${AVISO_SEM_OFICIO_DIAS} dias da minuta`;
   if (passou('OFICIO')) {
     minuta.estado = 'FEITA';
-    minuta.feito = p.oficioEm ? dataBR(p.oficioEm) : doPlanilha ? 'sem data no controle anterior' : null;
+    minuta.feito = p.oficioEm ? dataBR(p.oficioEm) : doPlanilha ? 'sem data registrada' : null;
   } else if (esta('MINUTA')) {
     // Com o prazo gravado na minuta pelo preço de hoje (migration 246), vale ele: é o mesmo do aviso "Prazo do ofício
     // vencido". Sem ele (minuta antiga), os 30 dias da minuta.

@@ -192,7 +192,7 @@ export const EmendasInicioPage: React.FC = () => {
       minWidth: LARGURA_AUTOR,
       render: (p) => (p.autorId ? <AutorDoPedido autor={autorPorId.get(p.autorId)} autorId={p.autorId} /> : <span style={carteiraDetalhe}>sem parlamentar</span>)
     },
-    { key: 'reserva', header: 'Reserva', nowrap: true, render: (p) => <span style={carteiraValor}>{p.origem === 'PLANILHA' ? 'da planilha' : dataBR(p.reservadoEm)}</span> },
+    { key: 'reserva', header: 'Reserva', nowrap: true, render: (p) => <span style={carteiraValor}>{p.origem === 'PLANILHA' ? '—' : dataBR(p.reservadoEm)}</span> },
     { key: 'itens', header: 'Itens', align: 'right', nowrap: true, render: (p) => <span style={{ ...carteiraValor, ...carteiraNumero }}>{formatNumber(p.linhas.filter((l) => !l.cancelada).length)}</span> },
     { key: 'etapa', header: 'Etapa', nowrap: true, render: (p) => <StatusBadge label={ROTULO_ETAPA[p.etapa]} variant={VARIANTE_ETAPA[p.etapa]} size="sm" dot={false} /> }
   ];
@@ -730,7 +730,7 @@ export const EmendasInicioPage: React.FC = () => {
             <PainelGaveta
               id="emendasSemAno"
               subtitulo="Clique na linha para abrir o pedido e informar o ano na conferência."
-              hint="Pedidos com o número da emenda, mas sem o ano (quase todos vieram da planilha). Sem o ano, o pedido não ganha número, não entra no filtro de nenhum ano e o sistema não lê o empenhado da emenda no Portal da Transparência nem calcula a sobra."
+              hint="Pedidos com o número da emenda, mas sem o ano. Sem o ano, o pedido não ganha número, não entra no filtro de nenhum ano e o sistema não lê o empenhado da emenda no Portal da Transparência nem calcula a sobra."
               onFechar={fecharGaveta}
             >
               <DataTable<PedidoEmenda>
