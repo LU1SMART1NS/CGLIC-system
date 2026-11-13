@@ -118,8 +118,12 @@ export const PAGAMENTO_RULES = {
   previsaoAvisoAntesDiasUteis: 5,
   /** Contrato marcado como mensal: a nota da competência anterior deve chegar até o dia N do mês. */
   notaMensalAteDia: 10,
-  /** Entrega prevista: avisar quando passar N dias úteis da data sem nota. */
-  entregaToleranciaDiasUteis: 5
+  /** Item entregue (registrado pelo fiscal na Fiscalização): avisar quando passar N dias corridos sem nota. */
+  notaAposEntregaDias: 10,
+  /** O aviso da nota depois da entrega fica urgente depois de N dias corridos. */
+  notaAposEntregaUrgenteDias: 30,
+  /** Só entram no aviso as entregas dos últimos N dias (as antigas vieram da planilha e já foram pagas por fora). */
+  avisoEntregaJanelaDias: 120
 };
 
 // -----------------------------------------------------------------------------
@@ -268,7 +272,9 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
   { key: 'pagamento.chegadaMinimaDiasUteis', group: 'pagamentos', label: 'Chegada mínima antes do vencimento', hint: 'Antecedência do processo em relação ao vencimento (Portaria DGFNSP 50/2025, art. 5º).', unit: 'dias úteis', min: 0, max: 30 },
   { key: 'pagamento.previsaoAvisoAntesDiasUteis', group: 'pagamentos', label: 'Avisar a previsão mensal quando faltar', hint: 'Dias úteis até o último dia útil do mês (Portaria DGFNSP 50/2025, art. 5º, § 2º, III).', unit: 'dias úteis', min: 0, max: 20 },
   { key: 'pagamento.notaMensalAteDia', group: 'pagamentos', label: 'Nota de contrato mensal chega até o dia', hint: 'Depois desse dia, o contrato marcado como mensal sem nota do mês anterior vira aviso.', unit: 'dia do mês', min: 1, max: 28 },
-  { key: 'pagamento.entregaToleranciaDiasUteis', group: 'pagamentos', label: 'Tolerância da entrega prevista', hint: 'Dias úteis depois da data prevista sem nota até virar aviso.', unit: 'dias úteis', min: 0, max: 30 },
+  { key: 'pagamento.notaAposEntregaDias', group: 'pagamentos', label: 'Nota depois da entrega', hint: 'Dias corridos depois da entrega registrada pelo fiscal sem nota até virar aviso para o gestor do contrato.', unit: 'dias', min: 1, max: 90 },
+  { key: 'pagamento.notaAposEntregaUrgenteDias', group: 'pagamentos', label: 'Nota depois da entrega: urgente após', hint: 'Dias corridos depois da entrega sem nota até o aviso ficar urgente.', unit: 'dias', min: 1, max: 180 },
+  { key: 'pagamento.avisoEntregaJanelaDias', group: 'pagamentos', label: 'Entregas que contam para o aviso de nota', hint: 'Só as entregues nos últimos N dias (as antigas da planilha já foram pagas).', unit: 'dias', min: 30, max: 730 },
 
   { key: 'emendas.avisoIndicacaoAntesDias', group: 'emendas', label: 'Avisar a ata da emenda a partir de', hint: 'Dias antes do fim da ata: pedidos e kits avisam que o contrato precisa ser assinado até lá.', unit: 'dias', min: 1, max: 365 },
   { key: 'emendas.corteIndicacaoAntesDias', group: 'emendas', label: 'Não receber indicação a menos de', hint: 'Dias antes do fim da ata. O sistema recusa nova reserva e novo ofício com itens da ata.', unit: 'dias', min: 0, max: 365 },
@@ -351,6 +357,8 @@ export function validateAlertRuleValues(values: Record<string, number>): Record<
   order('vigencia.faixaIntermediariaDias', 'vigencia.faixaAtencaoAteDias', 'A faixa de atenção deve ser maior que a intermediária.');
   order('atencaoNivel.criticoAteDias', 'atencaoNivel.atencaoAteDias', 'O prazo de atenção deve ser maior que o crítico.');
   order('pagamento.criticoAteDiasUteis', 'pagamento.atencaoAteDiasUteis', 'O prazo de atenção deve ser maior que o crítico.');
+  order('pagamento.notaAposEntregaDias', 'pagamento.notaAposEntregaUrgenteDias', 'O urgente deve vir depois do aviso da nota.');
+  order('pagamento.notaAposEntregaUrgenteDias', 'pagamento.avisoEntregaJanelaDias', 'A janela das entregas deve ser maior que o prazo do urgente.');
   order('emendas.corteIndicacaoAntesDias', 'emendas.avisoIndicacaoAntesDias', 'O aviso deve começar antes do corte da indicação.');
   if (!errors['emendas.tramiteAteContratoDias'] && !errors['emendas.corteReajusteAntesDias'] && values['emendas.tramiteAteContratoDias'] > values['emendas.corteReajusteAntesDias']) {
     errors['emendas.tramiteAteContratoDias'] = 'O tempo até o contrato não pode passar do corte do reajuste.';

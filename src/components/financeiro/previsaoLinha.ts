@@ -1,5 +1,5 @@
+import type { EntregaParaPagamento } from '../../services/entregasParaPagamentoService';
 import type {
-  EntregaPrevista,
   ExpectativaPagamento,
   HistoricoPagamentos,
   SugestaoExpectativa,
@@ -17,8 +17,8 @@ export interface LinhaExpectativa {
   marca?: ExpectativaPagamento;
   historico?: HistoricoPagamentos;
   sugestao: SugestaoExpectativa;
-  /** Entregas previstas a partir de hoje. */
-  entregas: EntregaPrevista[];
+  /** Itens a entregar pela Fiscalização, a partir de hoje (migration 305). */
+  entregas: EntregaParaPagamento[];
   classe: ClasseExpectativa;
 }
 

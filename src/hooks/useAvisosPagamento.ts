@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { useExpectativasPagamento } from './useExpectativasPagamento';
+import { useEntregasParaPagamento, useExpectativasPagamento } from './useExpectativasPagamento';
 import { FINANCEIRO_QUERY_KEYS } from './useFinanceiroCarteira';
 import { useContratosDoFinanceiro } from '../components/financeiro/useContratosDoFinanceiro';
 import { fetchCiclosEmAberto, fetchFaturasParaAvisos } from '../services/financeiroCarteiraService';
@@ -35,10 +35,12 @@ const paraAviso = (c: PaymentFollowUpCycle): CicloParaAviso => ({
 export function useAvisosPagamentoGerais(opts: { enabled?: boolean } = {}) {
   const enabled = opts.enabled ?? true;
   const { role } = useAuth();
-  const { marcas, entregas, isLoading: carregandoMarcas } = useExpectativasPagamento();
+  const { marcas, isLoading: carregandoMarcas } = useExpectativasPagamento();
+  const { entregas: todasAsEntregas, isLoading: carregandoEntregas } = useEntregasParaPagamento(null, { enabled });
+  const entregas = useMemo(() => todasAsEntregas.filter((e) => e.situacao === 'ENTREGUE'), [todasAsEntregas]);
   const { contrato, lista, escopo, isLoading: carregandoContratos } = useContratosDoFinanceiro();
   const temMarcas = marcas.size > 0 || entregas.length > 0;
-  // A regra só olha as faturas dos contratos marcados (mensal ou com entrega prevista) e só 4 campos: lê só isso, da
+  // A regra só olha as faturas dos contratos marcados (mensal) ou com item entregue pela Fiscalização e só 4 campos: lê só isso, da
   // tabela, em vez das 21 colunas da view e da conferência do Tesouro de todas as faturas.
   const contratosMarcados = useMemo(
     () => [...new Set([...marcas.keys(), ...entregas.map((e) => e.contractKey)])].sort(),
@@ -71,14 +73,16 @@ export function useAvisosPagamentoGerais(opts: { enabled?: boolean } = {}) {
   }, [enabled, lista, escopo, ehCoordenacao, envio.isSuccess, envio.data, mes, marcas, entregas, faturas.data, ciclos.data, contrato]);
 
   // Enquanto faturas e ciclos não chegam, os avisos de nota ficariam errados: espera.
-  const isLoading = carregandoMarcas || carregandoContratos || (temMarcas && (faturas.isLoading || ciclos.isLoading));
+  const isLoading = carregandoMarcas || carregandoEntregas || carregandoContratos || (temMarcas && (faturas.isLoading || ciclos.isLoading));
   return { avisos: isLoading ? SEM_AVISOS : avisos, isLoading };
 }
 
 /** Avisos de nota de um contrato (Contrato 360, aba Ações), com os ciclos que a tela já carregou. */
 export function useAvisosPagamentoDoContrato(contractKey: string, cycles: PaymentFollowUpCycle[], vigente: boolean) {
-  const { marcas, entregas } = useExpectativasPagamento();
-  const marcado = marcas.has(contractKey) || entregas.some((e) => e.contractKey === contractKey);
+  const { marcas } = useExpectativasPagamento();
+  const { entregas: doContrato } = useEntregasParaPagamento(contractKey);
+  const entregas = useMemo(() => doContrato.filter((e) => e.situacao === 'ENTREGUE'), [doContrato]);
+  const marcado = marcas.has(contractKey) || entregas.length > 0;
   // As faturas que o Contrato 360 já lê (contador das abas, Empenhos, Pagamentos): uma leitura de v_contrato_faturas
   // para a tela toda. Antes a fila de ações lia de novo as não canceladas, com os ciclos de cada uma, para usar só a
   // emissão e a referência. A conta tira as canceladas, e a ordem não importa.
@@ -89,7 +93,7 @@ export function useAvisosPagamentoDoContrato(contractKey: string, cycles: Paymen
     const marca = marcas.get(contractKey);
     return calcularAvisosPagamento({
       marcas: marca ? new Map([[contractKey, marca]]) : new Map(),
-      entregas: entregas.filter((e) => e.contractKey === contractKey),
+      entregas,
       faturas: faturas.data.faturas.map((f) => ({ contractKey, emissao: f.emissao, referencia: f.referencia, cancelada: f.cancelada })),
       ciclos: cycles.map(paraAviso),
       contratosVigentes: new Set([contractKey])

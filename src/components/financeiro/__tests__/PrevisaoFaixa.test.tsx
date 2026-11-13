@@ -8,7 +8,7 @@ vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: '
 vi.mock('../../../hooks/useDetailOrigin', () => ({ useNavigateWithOrigin: () => vi.fn() }));
 vi.mock('../../../hooks/usePrevisaoMensal', async (orig) => ({ ...(await orig<typeof import('../../../hooks/usePrevisaoMensal')>()), usePrevisaoMensal: vi.fn() }));
 vi.mock('../../../hooks/useFinanceiroCarteira', async (orig) => ({ ...(await orig<typeof import('../../../hooks/useFinanceiroCarteira')>()), useFaturasCarteira: vi.fn() }));
-vi.mock('../../../hooks/useExpectativasPagamento', () => ({ useExpectativasPagamento: vi.fn() }));
+vi.mock('../../../hooks/useExpectativasPagamento', () => ({ useExpectativasPagamento: vi.fn(), useEntregasParaPagamento: vi.fn(() => ({ entregas: [], isLoading: false })) }));
 vi.mock('../useContratosDoFinanceiro', async (orig) => ({ ...(await orig<typeof import('../useContratosDoFinanceiro')>()), useContratosDoFinanceiro: vi.fn() }));
 
 import { usePrevisaoMensal } from '../../../hooks/usePrevisaoMensal';
@@ -135,7 +135,7 @@ describe('Previsão: uma leitura falha, a faixa avisa e o resto fica', () => {
     } as never);
     const html = render(<PrevisaoContratos />);
     expect(html).toContain('data-testid="previsao-contratos-fontes-com-falha"');
-    expect(html).toContain('<strong>Como cada contrato costuma ser pago e entregas previstas</strong>');
+    expect(html).toContain('<strong>Como cada contrato costuma ser pago</strong>');
     // Os contratos carregaram: a lista conta o contrato vigente (sem marca, sem pagamento recente).
     expect(html).toMatch(/Todos<span[^>]*>1</);
   });

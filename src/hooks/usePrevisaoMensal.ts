@@ -19,7 +19,7 @@ import {
 
 const OPCOES = { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false } as const;
 /** Marcas de como o contrato costuma ser pago (mensal, por entrega...) e as entregas previstas. */
-export const ROTULO_EXPECTATIVAS = 'como cada contrato costuma ser pago e entregas previstas';
+export const ROTULO_EXPECTATIVAS = 'como cada contrato costuma ser pago';
 export const PRAZOS_EMENDAS_QUERY_KEY = ['prazos-emendas'] as const;
 
 /** Prazos das emendas (portaria anual), cadastrados pelo coordenador em Regras de Alertas. */
@@ -64,13 +64,12 @@ export function usePrevisaoMensal(mes: string, contratosVigentes: Set<string>) {
         ligacoes: ligacoes.data ?? [],
         empenhos: empenhos.rows,
         marcas: expectativas.marcas,
-        entregas: expectativas.entregas,
         entregasFiscalizacao: entregasFisc.data ?? [],
         historicos,
         ajustes: ajustes.data ?? [],
         contratosVigentes
       }),
-    [mes, faturas.data, ciclos.data, ligacoes.data, empenhos.rows, expectativas.marcas, expectativas.entregas, entregasFisc.data, historicos, ajustes.data, contratosVigentes]
+    [mes, faturas.data, ciclos.data, ligacoes.data, empenhos.rows, expectativas.marcas, entregasFisc.data, historicos, ajustes.data, contratosVigentes]
   );
 
   const [ano, mesNum] = mes.split('-').map(Number);
