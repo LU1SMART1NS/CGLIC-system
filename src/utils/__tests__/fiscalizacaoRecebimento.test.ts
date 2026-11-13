@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cobrancaDaComissao, datasDoRecebimento, prazoDoRecebimento, textoDaRegraDeRecebimento, trdAte, trpAte, type RegraDoRecebimento } from '../fiscalizacaoRecebimento';
+import { cobrancaDaComissao, datasDoRecebimento, origemDoRecebimento, prazoDoRecebimento, textoDaRegraDeRecebimento, trdAte, trpAte, type RegraDoRecebimento } from '../fiscalizacaoRecebimento';
 
 // Modelo da AGU: TRP no ato da entrega; TRD em 10 dias úteis do recebimento da nota (que chega com a entrega).
 const AGU: RegraDoRecebimento = { trpDias: 0, trpContagem: 'CORRIDOS', trdDias: 10, trdContagem: 'UTEIS', trdInicio: 'ENTREGA', origem: 'TR', ata: '00047/2024' };
@@ -70,5 +70,12 @@ describe('comissão de recebimento no TRD', () => {
   });
   it('item no TRP sem passar pela comissão segue o prazo do TR', () => {
     expect(cobrancaDaComissao({ etapa: 'TRP', etapaEm: '2026-11-06' }, '2026-11-13')).toBeNull();
+  });
+});
+
+describe('leitura automática do TR (migration 309)', () => {
+  it('diz que a regra foi lida do TR sem confirmação', () => {
+    expect(origemDoRecebimento({ ...AGU, automatico: true })).toBe('lido do TR da ata 00047/2024 (leitura automática)');
+    expect(origemDoRecebimento({ ...AGU, confirmadoPor: 'Fulana' })).toBe('do TR da ata 00047/2024, confirmado por Fulana');
   });
 });

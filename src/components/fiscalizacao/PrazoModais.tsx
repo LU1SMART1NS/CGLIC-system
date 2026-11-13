@@ -36,7 +36,9 @@ export const OrigemDoPrazo: React.FC<{ regra: RegraDoPrazo }> = ({ regra }) => (
   <span style={{ ...carteiraDetalhe, marginTop: 0 }}>
     {regra.origem === 'CONTRATO'
       ? `informado no contrato${regra.definidoPor ? ` por ${regra.definidoPor}` : ''}${regra.definidoEm ? ` em ${dataBR(regra.definidoEm.slice(0, 10))}` : ''}`
-      : `do TR da ata ${regra.ata ?? ''}${regra.confirmadoPor ? `, confirmado por ${regra.confirmadoPor}` : ''}${regra.confirmadoEm ? ` em ${dataBR(regra.confirmadoEm.slice(0, 10))}` : ''}`}
+      : regra.automatico
+        ? `lido do TR da ata ${regra.ata ?? ''} (leitura automática)`
+        : `do TR da ata ${regra.ata ?? ''}${regra.confirmadoPor ? `, confirmado por ${regra.confirmadoPor}` : ''}${regra.confirmadoEm ? ` em ${dataBR(regra.confirmadoEm.slice(0, 10))}` : ''}`}
   </span>
 );
 

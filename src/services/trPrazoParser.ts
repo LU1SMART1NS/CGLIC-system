@@ -153,21 +153,24 @@ function numeroDe(s: string): number | null {
 const pesoDe = (s: string) => (/nota\s+fiscal|material|\bbens\b/iu.test(s) ? 2 : 0) - (/servi[cç]o/iu.test(s) && !/material/iu.test(s) ? 2 : 0);
 const contagemDoTrecho = (s: string): ContagemPrazo => (/[uú]teis/iu.test(s) ? 'UTEIS' : 'CORRIDOS');
 
-function escolher(achados: Achado[]): Achado | null {
+const chaveDe = (a: Achado) => `${a.dias}|${a.contagem}|${a.doTrp}`;
+/** O achado de maior peso (o mais repetido entre eles) e se todos os de maior peso concordam. */
+function escolher(achados: Achado[]): { a: Achado; unanime: boolean } | null {
   if (!achados.length) return null;
   const topo = Math.max(...achados.map((a) => a.peso));
   const melhores = achados.filter((a) => a.peso === topo);
-  const chave = maisFrequente(melhores.map((a) => `${a.dias}|${a.contagem}|${a.doTrp}`));
-  return melhores.find((a) => `${a.dias}|${a.contagem}|${a.doTrp}` === chave) ?? null;
+  const chave = maisFrequente(melhores.map(chaveDe));
+  const a = melhores.find((x) => chaveDe(x) === chave);
+  return a ? { a, unanime: melhores.every((x) => chaveDe(x) === chave) } : null;
 }
 
 /**
  * Lê os prazos do recebimento (modelo da AGU: "recebidos provisoriamente ... no ato da entrega, juntamente com a nota
  * fiscal"; "o recebimento definitivo ocorrerá no prazo de 10 dias úteis, a contar do recebimento da nota fiscal").
  * Sem a cláusula do recebimento definitivo, não sugere nada (o gestor informa). Sem a do provisório, vale no ato da
- * entrega, como no modelo. Só sugere: o gestor da ata confirma.
+ * entrega, como no modelo. Leitura clara vale sozinha (migration 309); a outra o gestor da ata confirma.
  */
-export function lerRecebimentoDoTr(textoBruto: string): { recebimento: RecebimentoLidoDoTr | null; trechos: string[] } {
+export function lerRecebimentoDoTr(textoBruto: string): { recebimento: RecebimentoLidoDoTr | null; trechos: string[]; clara: boolean } {
   const texto = textoBruto.replace(/[\u0000-\u001f]/gu, ' ').replace(/\s+/gu, ' ');
   const trd: Achado[] = [];
   for (const m of texto.matchAll(FRASE_TRD)) {
@@ -176,8 +179,9 @@ export function lerRecebimentoDoTr(textoBruto: string): { recebimento: Recebimen
     if (!dias) continue;
     trd.push({ dias, contagem: contagemDoTrecho(s), peso: pesoDe(s), trecho: s, doTrp: /provis/iu.test(s) && !/nota\s+fiscal/iu.test(s) });
   }
-  const d = escolher(trd);
-  if (!d) return { recebimento: null, trechos: [] };
+  const td = escolher(trd);
+  if (!td) return { recebimento: null, trechos: [], clara: false };
+  const d = td.a;
   const trp: Achado[] = [];
   for (const m of texto.matchAll(FRASE_TRP)) {
     const s = m[0];
@@ -185,10 +189,14 @@ export function lerRecebimentoDoTr(textoBruto: string): { recebimento: Recebimen
     const dias = numeroDe(s);
     if (dias) trp.push({ dias, contagem: contagemDoTrecho(s), peso: pesoDe(s), trecho: s, doTrp: false });
   }
-  const p = escolher(trp);
+  const tp = escolher(trp);
+  const p = tp?.a ?? null;
   const limpo = (s: string) => limparTrecho(s.charAt(0).toUpperCase() + s.slice(1));
   return {
     recebimento: { trpDias: p?.dias ?? 0, trpContagem: p?.contagem ?? 'CORRIDOS', trdDias: d.dias, trdContagem: d.contagem, trdInicio: d.doTrp ? 'TRP' : 'ENTREGA' },
-    trechos: [...(p ? [limpo(p.trecho)] : []), limpo(d.trecho)]
+    trechos: [...(p ? [limpo(p.trecho)] : []), limpo(d.trecho)],
+    // Clara: o definitivo vem do trecho de material (nota fiscal ou bens) e todos os trechos assim dizem o mesmo; o
+    // provisório, quando há, também concorda. O modelo de serviço sozinho (do recebimento provisório) fica a conferir.
+    clara: d.peso >= 2 && td.unanime && (!tp || tp.unanime)
   };
 }

@@ -55,12 +55,14 @@ export const PrazoNoCartaoDaAta: React.FC<{ prazo: PrazoDaAta | null; carregando
       <span data-testid="ata-prazo-cartao">
         {p.semPrazo ? 'Sem prazo de entrega' : textoDaRegra({ dias: p.dias!, contagem: p.contagem ?? 'CORRIDOS', inicio: p.inicio ?? 'OF_RECEBIMENTO' })}
         <span style={{ ...carteiraDetalhe, display: 'block', marginTop: 0 }}>
-          {p.leitura ? 'do TR, ' : ''}confirmado por {p.confirmadoPorNome ?? '—'} em {quando}
+          {p.confirmadoAutomatico ? `lido do TR automaticamente em ${quando}` : <>{p.leitura ? 'do TR, ' : ''}confirmado por {p.confirmadoPorNome ?? '—'} em {quando}</>}
           {itens ? ` · ${itens} ${itens === 1 ? 'item' : 'itens'} com prazo próprio` : ''} {corrigir}
         </span>
         <span style={{ ...carteiraDetalhe, display: 'block', marginTop: 0 }} data-testid="ata-prazo-cartao-recebimento">
           {p.recebimentoConfirmadoEm ? (
-            p.recebimento ? `Recebimento: ${textoDaRegraDeRecebimento(p.recebimento as RegraDoRecebimento)}` : 'Recebimento: o TR não traz o prazo'
+            p.recebimento
+              ? `Recebimento: ${textoDaRegraDeRecebimento(p.recebimento as RegraDoRecebimento)}${p.recebimentoAutomatico ? ' (lido do TR automaticamente)' : ''}`
+              : 'Recebimento: o TR não traz o prazo'
           ) : (
             <>Recebimento <StatusBadge label="a confirmar" variant="warning" size="sm" dot={false} /></>
           )}

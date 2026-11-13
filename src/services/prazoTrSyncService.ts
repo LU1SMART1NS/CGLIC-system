@@ -47,6 +47,8 @@ export interface LeituraParaGravar extends PrazoLidoDoTr {
   /** Prazos do TRP e do TRD lidos do mesmo texto (migration 305); null quando o TR não traz o recebimento definitivo. */
   recebimento?: RecebimentoLidoDoTr | null;
   recebimentoTrechos?: string[];
+  /** Leitura clara do recebimento: vale sem a confirmação do gestor da ata (migration 309). */
+  recebimentoClaro?: boolean;
 }
 
 export interface OpcoesPrazoTr {
@@ -102,7 +104,7 @@ const bancoDeVerdade: BancoDoPrazoTr = {
       p_payload: {
         numero_controle_compra: l.numero_controle_compra, leitura: l.leitura, motivo: l.motivo, dias: l.dias, contagem: l.contagem,
         contagem_dita: l.contagemDita, inicio: l.inicio, trechos: l.trechos, documento: l.documento, url: l.url,
-        recebimento: l.recebimento ?? null, recebimento_trechos: l.recebimentoTrechos ?? []
+        recebimento: l.recebimento ?? null, recebimento_trechos: l.recebimentoTrechos ?? [], recebimento_claro: Boolean(l.recebimentoClaro)
       }
     });
     if (error) throw new Error(mensagemDeErro(error));
@@ -135,7 +137,7 @@ export async function lerPrazoDaCompra(
     const texto = textos.join('\n');
     const lido = lerPrazoDoTr(texto);
     const rec = lerRecebimentoDoTr(texto);
-    const leitura: LeituraParaGravar = { ...lido, numero_controle_compra: controle, documento, url, recebimento: rec.recebimento, recebimentoTrechos: rec.trechos };
+    const leitura: LeituraParaGravar = { ...lido, numero_controle_compra: controle, documento, url, recebimento: rec.recebimento, recebimentoTrechos: rec.trechos, recebimentoClaro: rec.clara };
     if (!melhor || (melhor.leitura === 'SEM_CLAUSULA' && lido.leitura !== 'SEM_CLAUSULA')) melhor = leitura;
     if (lido.leitura !== 'SEM_CLAUSULA') break;
   }

@@ -53,14 +53,21 @@ describe('lerRecebimentoDoTr (TRP e TRD)', () => {
     expect(r.recebimento).toEqual({ trpDias: 0, trpContagem: 'CORRIDOS', trdDias: 10, trdContagem: 'UTEIS', trdInicio: 'ENTREGA' });
     expect(r.trechos).toHaveLength(2);
     expect(r.trechos[0]).toMatch(/^Recebidos provisoriamente/);
+    expect(r.clara).toBe(true);
   });
 
   it('o trecho de material vence o modelo de serviço que vem junto no TR', () => {
     expect(lerRecebimentoDoTr(`${SERVICO} ${AGU_TRP} ${AGU_TRD}`).recebimento?.trdDias).toBe(10);
   });
 
-  it('só o modelo de serviço: conta do recebimento provisório', () => {
-    expect(lerRecebimentoDoTr(SERVICO).recebimento).toMatchObject({ trdDias: 30, trdContagem: 'CORRIDOS', trdInicio: 'TRP' });
+  it('só o modelo de serviço: conta do recebimento provisório, a conferir', () => {
+    const r = lerRecebimentoDoTr(SERVICO);
+    expect(r.recebimento).toMatchObject({ trdDias: 30, trdContagem: 'CORRIDOS', trdInicio: 'TRP' });
+    expect(r.clara).toBe(false);
+  });
+
+  it('trechos de material com prazos diferentes: a conferir', () => {
+    expect(lerRecebimentoDoTr(`${AGU_TRP} ${AGU_TRD} O recebimento definitivo ocorrerá no prazo de 8 (oito) dias úteis, a contar do recebimento da nota fiscal.`).clara).toBe(false);
   });
 
   it('texto do PDF embaralhado: "quinze (15) dias" e o número depois da vírgula', () => {
@@ -70,7 +77,7 @@ describe('lerRecebimentoDoTr (TRP e TRD)', () => {
 
   it('TRP em dias e sem a cláusula do definitivo', () => {
     expect(lerRecebimentoDoTr(`Os bens serão recebidos provisoriamente no prazo de 5 (cinco) dias úteis da entrega. ${AGU_TRD}`).recebimento).toMatchObject({ trpDias: 5, trpContagem: 'UTEIS' });
-    expect(lerRecebimentoDoTr(AGU_TRP)).toEqual({ recebimento: null, trechos: [] });
-    expect(lerRecebimentoDoTr('')).toEqual({ recebimento: null, trechos: [] });
+    expect(lerRecebimentoDoTr(AGU_TRP)).toEqual({ recebimento: null, trechos: [], clara: false });
+    expect(lerRecebimentoDoTr('')).toEqual({ recebimento: null, trechos: [], clara: false });
   });
 });

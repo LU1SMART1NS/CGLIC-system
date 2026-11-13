@@ -33,6 +33,9 @@ export interface PrazoDaAta {
   recebimento?: RegraDoRecebimentoDaAta | null;
   /** O recebimento tem confirmação própria: atas com o prazo de entrega já confirmado ainda pedem a do recebimento. */
   recebimentoConfirmadoEm?: string | null;
+  /** Valem pela leitura clara do TR, sem confirmação do gestor (migration 309). */
+  confirmadoAutomatico?: boolean;
+  recebimentoAutomatico?: boolean;
 }
 
 export type RegraDoRecebimentoDaAta = Pick<RegraDoRecebimento, 'trpDias' | 'trpContagem' | 'trdDias' | 'trdContagem' | 'trdInicio'>;
@@ -67,7 +70,9 @@ export function linhaParaPrazoDaAta(r: any): PrazoDaAta {
     recebimentoSugerido: r.recebimento_sugerido || null,
     recebimentoTrechos: Array.isArray(r.recebimento_trechos) ? r.recebimento_trechos.filter(Boolean) : [],
     recebimento: r.recebimento || null,
-    recebimentoConfirmadoEm: r.recebimento_confirmado_em || null
+    recebimentoConfirmadoEm: r.recebimento_confirmado_em || null,
+    confirmadoAutomatico: Boolean(r.confirmado_automatico),
+    recebimentoAutomatico: Boolean(r.recebimento_automatico)
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
