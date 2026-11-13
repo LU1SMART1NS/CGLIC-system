@@ -8,7 +8,7 @@ import { carteiraIdentificacao, carteiraDetalhe, carteiraNumero, carteiraValor }
 import { useMovimentosDaEntrega } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, dataBR } from '../../utils/fiscalizacao';
-import { ataEItemDaChave, etapaDef, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, textoDoAviso, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
+import { ataEItemDaChave, autorDoHistorico, etapaDef, observacaoDoHistorico, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, textoDoAviso, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
 import { IdentificacaoDoContrato } from './ContratosFiscalizacaoTabela';
 import { NomeComSigla } from '../emendas/emendasPartes';
 import { chaveDeOrdem, ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
@@ -136,7 +136,7 @@ export const CelulaItem: React.FC<{ e: EntregaFiscalizacao; comOrigem?: boolean 
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>· Ata {k.ata}</span>
           </>
         ) : (
-          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>da planilha · sem item da ata</span>
+          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>sem item da ata</span>
         )}
       </div>
       <div style={{ ...carteiraValor, color: '#0f172a' }}>{nomeDoItem(e)}</div>
@@ -169,8 +169,8 @@ export const HistoricoDaEntrega: React.FC<{ entregaId: string }> = ({ entregaId 
               <NumeroSeiEtiqueta numero={m.documentoSei} testId={`fisc-historico-sei-${m.id}`} />
             </span>
           )}
-          {m.observacao && <span style={carteiraDetalhe}> · {m.observacao}</span>}
-          <span style={carteiraDetalhe}> · {m.criadoPorNome ?? 'Sistema'}, {dataBR(m.criadoEm)}</span>
+          {observacaoDoHistorico(m.tipo, m.observacao) && <span style={carteiraDetalhe}> · {observacaoDoHistorico(m.tipo, m.observacao)}</span>}
+          <span style={carteiraDetalhe}> · {autorDoHistorico(m.criadoPorNome)}, {dataBR(m.criadoEm)}</span>
         </li>
       ))}
     </ul>

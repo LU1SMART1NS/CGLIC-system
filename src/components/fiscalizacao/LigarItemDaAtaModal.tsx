@@ -82,7 +82,7 @@ export const LigarItemDaAtaModal: React.FC<{ contractKey: string; contratoNumero
       onClose={onClose}
       size="lg"
       title={`Ligar ao item da ata · contrato ${contratoNumero}`}
-      subtitle="Para cada nome escrito na planilha, escolha o item da ata. A escolha vale para todos os itens com esse nome no contrato."
+      subtitle="Para cada nome de item, escolha o item da ata. A escolha vale para todos os itens com esse nome no contrato."
       testId="fisc-ligar-item"
       footer={
         semAta ? (
@@ -97,7 +97,7 @@ export const LigarItemDaAtaModal: React.FC<{ contractKey: string; contratoNumero
     >
       {semAta ? (
         <NoticeBar tone="warning" testId="fisc-ligar-item-sem-ata">
-          O contrato {contratoNumero} ainda não está ligado a nenhum item de ata. A ligação começa em Vinculação › Contratos à ata; no dia seguinte, os itens da planilha com o nome igual ao do item se ligam sozinhos, e os outros voltam para cá.
+          O contrato {contratoNumero} ainda não está ligado a nenhum item de ata. A ligação começa em Vinculação › Contratos à ata; no dia seguinte, os itens com o nome igual ao do item da ata se ligam sozinhos, e os outros voltam para cá.
         </NoticeBar>
       ) : grupos.length === 0 ? (
         <span style={carteiraDetalhe}>Todos os itens deste contrato já estão ligados ao item da ata.</span>
@@ -109,7 +109,7 @@ export const LigarItemDaAtaModal: React.FC<{ contractKey: string; contratoNumero
             return (
               <section key={g.chave} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }} data-testid={`fisc-ligar-grupo-${n}`}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Escrito na planilha</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Nome do item</div>
                   <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>
                     {numero(g.es.reduce((t, e) => t + e.quantidade, 0))}× {g.texto}
                   </div>

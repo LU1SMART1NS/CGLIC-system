@@ -133,3 +133,20 @@ export function passoDoItem(e: Pick<EntregaFiscalizacao, 'etapa' | 'pagoEm' | 'o
   }
 }
 
+
+/**
+ * Histórico do item sem os bastidores da carga inicial: o banco gravou "(na planilha: …)", "pela conferência da
+ * planilha" e o autor "Conferência da planilha (…)", que não interessam ao fiscal.
+ */
+export function observacaoDoHistorico(tipo: string, observacao: string | null | undefined): string | null {
+  if (!observacao) return null;
+  if (tipo === 'CARGA' && /planilha|carga/i.test(observacao)) return null;
+  const limpa = observacao
+    .replace(/\s*\(na planilha:\s*"[^"]*"\)/gi, '')
+    .replace(/\s*pela conferência da planilha/gi, '')
+    .trim();
+  return limpa || null;
+}
+
+export const autorDoHistorico = (nome: string | null | undefined): string =>
+  !nome ? 'Sistema' : /^(conferência|carga) da planilha/i.test(nome) ? 'Conferência do cadastro' : nome;

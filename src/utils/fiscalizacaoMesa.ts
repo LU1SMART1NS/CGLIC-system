@@ -85,9 +85,9 @@ export function linhaDeLigacao(es: EntregaFiscalizacao[], temItensDaAta: boolean
   const gs = gruposALigar(es);
   if (!gs.length) return null;
   const n = gs.reduce((t, g) => t + g.es.length, 0);
-  const nomes = gs.length === 1 ? `"${gs[0].texto}"` : `${gs.length} nomes escritos na planilha`;
-  if (!temItensDaAta) return { chave: 'ligar', tom: 'espera', quem: 'Vinculação', titulo: `Ligar o contrato à ata · ${itens(n)} da planilha esperam`, detalhe: `${nomes} · depois os itens se ligam pelo nome`, acoes: [] };
-  return { chave: 'ligar', tom: 'eu', titulo: `Ligar ao item da ata · ${itens(n)} da planilha`, detalhe: `${nomes} · uma escolha por nome`, acoes: [{ rotulo: 'Ligar ao item da ata', principal: true, faz: ligar }] };
+  const nomes = gs.length === 1 ? `"${gs[0].texto}"` : `${gs.length} nomes de item`;
+  if (!temItensDaAta) return { chave: 'ligar', tom: 'espera', quem: 'Vinculação', titulo: `Ligar o contrato à ata · ${itens(n)} esperam`, detalhe: `${nomes} · depois os itens se ligam pelo nome`, acoes: [] };
+  return { chave: 'ligar', tom: 'eu', titulo: `Ligar ao item da ata · ${itens(n)}`, detalhe: `${nomes} · uma escolha por nome`, acoes: [{ rotulo: 'Ligar ao item da ata', principal: true, faz: ligar }] };
 }
 
 /** Itens da planilha com o beneficiário escrito à mão (migration 272): um passo só, com quantos itens e quantos nomes. */
@@ -95,6 +95,6 @@ export function linhaDeCadastro(es: EntregaFiscalizacao[], ligar: () => void): L
   const gs = gruposSemCadastro(es);
   if (!gs.length) return null;
   const n = gs.reduce((t, g) => t + g.es.length, 0);
-  const nomes = gs.length === 1 ? `"${gs[0].texto}"` : `${gs.length} nomes escritos na planilha`;
-  return { chave: 'cadastro', tom: 'eu', titulo: `Ligar ao cadastro de beneficiários · ${itens(n)} da planilha`, detalhe: `${nomes} · sem endereço de entrega até ligar`, acoes: [{ rotulo: 'Ligar ao cadastro', principal: true, faz: ligar }] };
+  const nomes = gs.length === 1 ? `"${gs[0].texto}"` : `${gs.length} nomes sem cadastro`;
+  return { chave: 'cadastro', tom: 'eu', titulo: `Ligar ao cadastro de beneficiários · ${itens(n)}`, detalhe: `${nomes} · sem endereço de entrega até ligar`, acoes: [{ rotulo: 'Ligar ao cadastro', principal: true, faz: ligar }] };
 }

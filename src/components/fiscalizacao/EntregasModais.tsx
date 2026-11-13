@@ -89,7 +89,7 @@ export const CorrigirEtapaModal: React.FC<{ entregas: EntregaFiscalizacao[]; onC
           <NoticeBar tone="info">A Ordem fica registrada também no pedido de emenda, para a CAEP ver no Pedido 360.</NoticeBar>
         )}
         {!bloqueio && etapa === 'SAL' && <NoticeBar tone="info">O Ofício à SAL informa o parlamentar da entrega.</NoticeBar>}
-        <AppTextarea label="Motivo da correção" value={observacao} onChange={(ev) => setObservacao(ev.target.value)} rows={2} placeholder="ex.: a planilha trouxe a etapa errada" hint={`Fica no histórico do item (mínimo de ${MOTIVO_MINIMO} letras).`} data-testid="fisc-corrigir-motivo" />
+        <AppTextarea label="Motivo da correção" value={observacao} onChange={(ev) => setObservacao(ev.target.value)} rows={2} placeholder="ex.: o item estava na etapa errada" hint={`Fica no histórico do item (mínimo de ${MOTIVO_MINIMO} letras).`} data-testid="fisc-corrigir-motivo" />
       </div>
     </Modal>
   );

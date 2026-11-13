@@ -70,3 +70,16 @@ describe('nomes', () => {
     expect(nomeDoItem(e({ itemNome: 'Carabina', itemDescricao: 'Carabina 5,56' }))).toBe('Carabina');
   });
 });
+
+describe('histórico sem a planilha', () => {
+  it('tira "(na planilha: …)" e "pela conferência da planilha"', async () => {
+    const { observacaoDoHistorico, autorDoHistorico } = await import('../fiscalizacaoEntregas');
+    expect(observacaoDoHistorico('BENEFICIARIO', 'Ligado a PM/RS (na planilha: "Brigada")')).toBe('Ligado a PM/RS');
+    expect(observacaoDoHistorico('BENEFICIARIO', 'Ligado a PM/RS pela conferência da planilha (na planilha: "x")')).toBe('Ligado a PM/RS');
+    expect(observacaoDoHistorico('CARGA', 'Carga da planilha SFC, linha 12')).toBeNull();
+    expect(observacaoDoHistorico('ETAPA', 'entregue no quartel')).toBe('entregue no quartel');
+    expect(autorDoHistorico('Conferência da planilha (rodada 1)')).toBe('Conferência do cadastro');
+    expect(autorDoHistorico(null)).toBe('Sistema');
+    expect(autorDoHistorico('Maria')).toBe('Maria');
+  });
+});

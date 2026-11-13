@@ -68,7 +68,7 @@ describe('passo da mesa', () => {
   it('com nomes fora do cadastro: com o fiscal, uma ação', () => {
     const ligar = vi.fn();
     const l = linhaDeCadastro([e({ id: 'a', beneficiarioTexto: 'Polícia Civil - DF', uf: 'DF' }), e({ id: 'b', beneficiarioTexto: 'PCDF', uf: 'DF' })], ligar);
-    expect(l).toMatchObject({ tom: 'eu', titulo: 'Ligar ao cadastro de beneficiários · 2 itens da planilha', detalhe: '2 nomes escritos na planilha · sem endereço de entrega até ligar' });
+    expect(l).toMatchObject({ tom: 'eu', titulo: 'Ligar ao cadastro de beneficiários · 2 itens', detalhe: '2 nomes sem cadastro · sem endereço de entrega até ligar' });
     l?.acoes[0].faz();
     expect(ligar).toHaveBeenCalled();
   });

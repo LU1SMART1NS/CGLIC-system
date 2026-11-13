@@ -88,7 +88,7 @@ export function origemDaPrevista(e: Pick<EntregaFiscalizacao, 'prevista' | 'prev
     case 'PRORROGACAO':
       return `prorrogada${e.previstaAnterior ? `; era ${dataBR(e.previstaAnterior)}` : ''}${suspensos}`;
     case 'PLANILHA':
-      return 'da planilha da SFC/CGLIC; confirme pela Ordem';
+      return 'informada antes da Ordem; confirme pela Ordem';
     default:
       return 'informada à mão; confirme pela Ordem';
   }
