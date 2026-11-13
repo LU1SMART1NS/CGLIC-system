@@ -49,6 +49,8 @@ export interface OrgaoQuantitativo {
   saidaNaoParticipante: number;
   /** Parte que o Compras.gov.br ainda não mostra: continua no registrado do órgão que cedeu. */
   naoParticipanteAguardaFonte: number;
+  /** Órgão sem registro cuja quantidade também falta no total da fonte: não está com a SENASP (migration 296). */
+  foraDaFonte: number;
 }
 
 /** Remanejamento de um participante (ou da cota da SENASP) para órgão não participante (migration 219). */
@@ -237,7 +239,8 @@ export function mapOrgao(r: any): OrgaoQuantitativo {
     ataDaSenasp: r.ata_da_senasp !== false,
     remanejadoNaoParticipante: num(r.remanejado_nao_participante),
     saidaNaoParticipante: num(r.saida_nao_participante),
-    naoParticipanteAguardaFonte: num(r.nao_participante_aguarda_fonte)
+    naoParticipanteAguardaFonte: num(r.nao_participante_aguarda_fonte),
+    foraDaFonte: num(r.fora_da_fonte)
   };
 }
 
