@@ -6,15 +6,16 @@ import { formatCurrency } from '../carteira/carteiraFormat';
 import { carteiraFornecedor, carteiraSubtitle, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import type { ContratoDoFinanceiro } from './useContratosDoFinanceiro';
 import { rotuloDoMes } from './financeiroFormat';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 /** Diferença abaixo de R$ 1,00 conta como "conforme" (arredondamentos da OB). */
 const TOLERANCIA = 1;
 
 function situacao(previsto: number, pago: number): { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' } {
-  if (previsto === 0) return { label: 'Fora da previsão', variant: 'info' };
-  if (pago === 0) return { label: 'Não pago', variant: 'neutral' };
-  if (Math.abs(pago - previsto) < TOLERANCIA) return { label: 'Conforme', variant: 'success' };
-  return pago > previsto ? { label: 'Pago a mais', variant: 'warning' } : { label: 'Pago a menos', variant: 'warning' };
+  if (previsto === 0) return { label: 'Fora da previsão', variant: COR_DA_SITUACAO.ANDAMENTO };
+  if (pago === 0) return { label: 'Não pago', variant: COR_DA_SITUACAO.NEUTRO };
+  if (Math.abs(pago - previsto) < TOLERANCIA) return { label: 'Conforme', variant: COR_DA_SITUACAO.CONCLUIDO };
+  return pago > previsto ? { label: 'Pago a mais', variant: COR_DA_SITUACAO.ATENCAO } : { label: 'Pago a menos', variant: COR_DA_SITUACAO.ATENCAO };
 }
 
 /**

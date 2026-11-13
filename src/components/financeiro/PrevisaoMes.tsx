@@ -19,6 +19,7 @@ import { PrevistoPagoMes } from './PrevistoPagoMes';
 import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
 import { useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 
 interface FiltrosPrevisaoMes {
@@ -34,11 +35,11 @@ const FILTROS: CarteiraFilterSchema<FiltrosPrevisaoMes> = {
 };
 
 const ORIGEM: Record<OrigemPrevisao, { label: string; variant: 'info' | 'neutral' | 'warning' | 'purple' | 'success' }> = {
-  FATURA: { label: 'Fatura', variant: 'info' },
-  CICLO: { label: 'Ciclo', variant: 'purple' },
-  MENSAL: { label: 'Mensal', variant: 'neutral' },
-  ENTREGA: { label: 'Entrega prevista', variant: 'warning' },
-  MANUAL: { label: 'Incluída', variant: 'success' }
+  FATURA: { label: 'Fatura', variant: COR_DA_SITUACAO.ANDAMENTO },
+  CICLO: { label: 'Ciclo', variant: COR_DA_SITUACAO.CONFERENCIA },
+  MENSAL: { label: 'Mensal', variant: COR_DA_SITUACAO.NEUTRO },
+  ENTREGA: { label: 'Entrega prevista', variant: COR_DA_SITUACAO.ANDAMENTO },
+  MANUAL: { label: 'Incluída', variant: COR_DA_SITUACAO.CONCLUIDO }
 };
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
 
@@ -285,8 +286,8 @@ export const PrevisaoMes: React.FC = () => {
                             <div>
                               <span style={{ display: 'inline-flex', gap: '0.3rem', flexWrap: 'wrap' }}>
                                 <StatusBadge label={o.label} variant={o.variant} size="sm" dot={false} />
-                                {l.emenda && <StatusBadge label="Emenda" variant="warning" size="sm" dot={false} />}
-                                {l.ajustada && <StatusBadge label="Ajustada" variant="neutral" size="sm" dot={false} />}
+                                {l.emenda && <StatusBadge label="Emenda" variant={COR_DA_SITUACAO.NEUTRO} size="sm" dot={false} />}
+                                {l.ajustada && <StatusBadge label="Ajustada" variant={COR_DA_SITUACAO.NEUTRO} size="sm" dot={false} />}
                               </span>
                               <div style={{ ...subtle, marginTop: '0.2rem' }}>{l.detalhe}</div>
                             </div>

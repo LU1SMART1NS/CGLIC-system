@@ -14,6 +14,7 @@ import { Field } from './PaymentCycleModals';
 import { errorMessage } from './cicloPagamentoShared';
 import { formatCurrencyInputBR, isoToBR, parseCurrencyInputBR } from './paymentFormUtils';
 import { formatCurrency } from '../../../utils/format';
+import { COR_DA_SITUACAO } from '../../../design-system/coresDaSituacao';
 
 const AUTOMATICO = '__AUTO__';
 const ROTULO: Record<TipoExpectativa, string> = { MENSAL: 'Mensal', ENTREGA: 'Por entrega', EVENTUAL: 'Eventual' };
@@ -101,9 +102,9 @@ export const ExpectativaPagamentoContrato: React.FC<{ contractKey: string; canEd
       header: 'Situação',
       priority: 'primary',
       render: (e) => {
-        if (e.situacao === 'A_ENTREGAR') return <StatusBadge label={e.data < hoje ? 'Prazo vencido' : 'A entregar'} variant={e.data < hoje ? 'warning' : 'info'} size="sm" dot={false} />;
+        if (e.situacao === 'A_ENTREGAR') return <StatusBadge label={e.data < hoje ? 'Prazo vencido' : 'A entregar'} variant={e.data < hoje ? COR_DA_SITUACAO.ATENCAO : COR_DA_SITUACAO.ANDAMENTO} size="sm" dot={false} />;
         const dias = Math.round((Date.parse(`${hoje}T12:00:00Z`) - Date.parse(`${e.data}T12:00:00Z`)) / 864e5);
-        return <StatusBadge label={dias > PAGAMENTO_RULES.notaAposEntregaDias ? 'Entregue · cobrar a nota' : 'Entregue · aguardando a nota'} variant={dias > PAGAMENTO_RULES.notaAposEntregaDias ? 'warning' : 'success'} size="sm" dot={false} />;
+        return <StatusBadge label={dias > PAGAMENTO_RULES.notaAposEntregaDias ? 'Entregue · cobrar a nota' : 'Entregue · aguardando a nota'} variant={dias > PAGAMENTO_RULES.notaAposEntregaDias ? COR_DA_SITUACAO.ATENCAO : COR_DA_SITUACAO.CONFERENCIA} size="sm" dot={false} />;
       }
     },
     { key: 'data', header: 'Data', render: (e) => <strong>{isoToBR(e.data)}</strong> },

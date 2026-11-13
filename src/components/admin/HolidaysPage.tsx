@@ -27,6 +27,7 @@ import { formatDateBR, parseDateBRT } from '../../services/temporalEngineService
 import { DataTable } from '../../design-system/components/DataTable';
 import { AppInput, AppSelect, AppDateInput } from '../../design-system/components/FormFields';
 import { AdminListShell } from './shared/AdminListShell';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 const WEEKDAYS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 
@@ -208,7 +209,7 @@ export const HolidaysPage: React.FC = () => {
               sortValue: (r) => HOLIDAY_TIPO_LABEL[r.tipo],
               width: '170px',
               render: (r) => (
-                <StatusBadge size="sm" label={HOLIDAY_TIPO_LABEL[r.tipo]} variant={r.tipo === 'NACIONAL' ? 'info' : r.tipo === 'DISTRITAL' ? 'purple' : 'neutral'} />
+                <StatusBadge size="sm" label={HOLIDAY_TIPO_LABEL[r.tipo]} variant={r.tipo === 'NACIONAL' ? COR_DA_SITUACAO.ANDAMENTO : COR_DA_SITUACAO.NEUTRO} />
               )
             },
             {
@@ -217,11 +218,11 @@ export const HolidaysPage: React.FC = () => {
               width: '220px',
               render: (r) =>
                 !r.ativo ? (
-                  <StatusBadge size="sm" label="Desativado: dia útil" variant="neutral" />
+                  <StatusBadge size="sm" label="Desativado: dia útil" variant={COR_DA_SITUACAO.NEUTRO} />
                 ) : r.meioExpediente ? (
-                  <StatusBadge size="sm" label="Meio expediente: dia útil" variant="warning" />
+                  <StatusBadge size="sm" label="Meio expediente: dia útil" variant={COR_DA_SITUACAO.NEUTRO} />
                 ) : (
-                  <StatusBadge size="sm" label="Sem expediente" variant="success" />
+                  <StatusBadge size="sm" label="Sem expediente" variant={COR_DA_SITUACAO.NEUTRO} />
                 )
             }
           ]}

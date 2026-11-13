@@ -42,6 +42,8 @@ import {
 import { useLinhasAbertas } from './useLinhasAbertas';
 import { formatCurrency } from '../../utils/format';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
+import type { StatusBadgeVariant } from '../../design-system/components/StatusBadge';
 
 interface ContractPagamentosSectionProps {
   contract: ContractDashboardRecord;
@@ -64,13 +66,13 @@ const dataHora = (v?: string | null) => {
  * Etapa da fatura: cancelada, paga (OB que confirma ou "Pago"), sem como confirmar (OB da NP de outra despesa, ou
  * liquidada sem NP), liquidada aguardando OB ou em andamento.
  */
-export function etapaDaFatura(f: FaturaDoContrato): { label: string; variant: 'success' | 'info' | 'warning' | 'neutral' | 'danger' } {
-  if (f.cancelada) return { label: 'Cancelada', variant: 'neutral' };
-  if (f.paga) return { label: 'Paga', variant: 'success' };
-  if (f.pagamentoAConferir) return { label: 'Sem como confirmar', variant: 'neutral' };
-  if (f.dataLiquidacao) return f.np ? { label: 'Liquidada', variant: 'info' } : { label: 'Sem como confirmar', variant: 'neutral' };
-  if (f.situacao === 'Siafi Erro') return { label: 'Erro no SIAFI', variant: 'danger' };
-  return { label: f.situacao || 'Em andamento', variant: 'warning' };
+export function etapaDaFatura(f: FaturaDoContrato): { label: string; variant: StatusBadgeVariant } {
+  if (f.cancelada) return { label: 'Cancelada', variant: COR_DA_SITUACAO.NEUTRO };
+  if (f.paga) return { label: 'Paga', variant: COR_DA_SITUACAO.CONCLUIDO };
+  if (f.pagamentoAConferir) return { label: 'Sem como confirmar', variant: COR_DA_SITUACAO.NEUTRO };
+  if (f.dataLiquidacao) return f.np ? { label: 'Liquidada', variant: COR_DA_SITUACAO.ANDAMENTO } : { label: 'Sem como confirmar', variant: COR_DA_SITUACAO.NEUTRO };
+  if (f.situacao === 'Siafi Erro') return { label: 'Erro no SIAFI', variant: COR_DA_SITUACAO.URGENTE };
+  return { label: f.situacao || 'Em andamento', variant: COR_DA_SITUACAO.ANDAMENTO };
 }
 
 /** Prazo da etapa em curso numa linha: selo (vencido/faltam) e a data. */

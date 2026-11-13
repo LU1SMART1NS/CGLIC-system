@@ -32,6 +32,7 @@ import type { OrigemUnidadesItem } from '../../hooks/useItemUnidades';
 import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
 import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 /**
  * Aba Órgãos e quantitativos nas atas de OUTROS órgãos (migration 114): a SENASP participante ou em adesão.
@@ -249,7 +250,7 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.15rem', flexWrap: 'wrap' }}>
             <span style={pequeno}>UASG {l.uasg}{l.local ? ` · ${l.local}` : ''}</span>
             {l.ehSenasp && !participante
-              ? <StatusBadge label="Adesão" variant="warning" size="sm" dot={false} />
+              ? <StatusBadge label="Adesão" variant={COR_DA_SITUACAO.NEUTRO} size="sm" dot={false} />
               : <StatusBadge label={l.gerenciadora ? 'Gerenciadora' : 'Participante'} variant={l.gerenciadora ? 'info' : 'neutral'} size="sm" dot={false} />}
             {l.ehSenasp && <span style={pequeno}>{p.totalUnidadesInternas} {p.totalUnidadesInternas === 1 ? 'unidade interna' : 'unidades internas'}</span>}
           </div>
