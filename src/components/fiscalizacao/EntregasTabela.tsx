@@ -1,4 +1,5 @@
 import React from 'react';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { StatusBadge, type StatusBadgeVariant } from '../../design-system/components/StatusBadge';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
@@ -19,7 +20,13 @@ import { cobrancaDaComissao, prazoDoRecebimento } from '../../utils/fiscalizacao
  * fornecedor trabalha, roxo no recebimento, verde no pagamento e no fim. Amarelo e vermelho ficam só para alertas
  * (prazo, aviso da entrega); o Exército é etapa normal, com o "prazo suspenso" no texto e a régua do item em vermelho.
  */
-const VARIANTE_DA_FASE: Record<FaseEntrega, StatusBadgeVariant> = { PREPARACAO: 'info', EXECUCAO: 'info', RECEBIMENTO: 'purple', PAGAMENTO: 'success', FINALIZADO: 'success' };
+const VARIANTE_DA_FASE: Record<FaseEntrega, StatusBadgeVariant> = {
+  PREPARACAO: COR_DA_SITUACAO.ANDAMENTO,
+  EXECUCAO: COR_DA_SITUACAO.ANDAMENTO,
+  RECEBIMENTO: COR_DA_SITUACAO.CONFERENCIA,
+  PAGAMENTO: COR_DA_SITUACAO.CONCLUIDO,
+  FINALIZADO: COR_DA_SITUACAO.CONCLUIDO
+};
 const COR_DO_PRAZO = { danger: 'var(--color-danger-text)', warning: 'var(--color-warning-text)', success: 'var(--color-success-text)', neutral: '#64748b' } as const;
 
 export const CelulaEtapa: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
