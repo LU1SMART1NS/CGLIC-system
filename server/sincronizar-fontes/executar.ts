@@ -68,6 +68,7 @@ import {
   sincronizarAtasAMontar,
   testarAtasAMontar
 } from '../../src/services/atasAMontarSyncService';
+import { ORCAMENTO_PRAZO_TR_MS, sincronizarPrazoTr, testarPrazoTr } from '../../src/services/prazoTrSyncService';
 import {
   ORCAMENTO_EMENDAS_SIOP_PAINEL_MS,
   sincronizarEmendasDoPainelSiop,
@@ -84,12 +85,12 @@ import { lerAmbiente } from './ambiente';
  */
 export const ORCAMENTO_DE_TEMPO_MS = 100_000;
 
-export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias', 'cadastro_uasgs', 'itens_notas_siafi', 'saldo_contabil', 'autores_emendas', 'emendas_portal', 'reajuste_atas', 'notas_emendas_tesouro', 'execucao_emendas', 'atas_a_montar', 'emendas_siop_painel'] as const;
+export const RECURSOS_DO_SERVIDOR = ['contratos', 'atas', 'saldos_itens', 'itens_contratos', 'unidades_itens', 'atas_participacao', 'contratos_participantes', 'empenhos', 'faturas', 'ordens_bancarias', 'cadastro_uasgs', 'itens_notas_siafi', 'saldo_contabil', 'autores_emendas', 'emendas_portal', 'reajuste_atas', 'notas_emendas_tesouro', 'execucao_emendas', 'atas_a_montar', 'emendas_siop_painel', 'prazo_tr'] as const;
 export type RecursoDoServidor = (typeof RECURSOS_DO_SERVIDOR)[number];
 
 export interface PedidoDeSincronizacao {
   recurso: RecursoDoServidor;
-  /** Obrigatória para todos os recursos, exceto saldos_itens, cadastro_uasgs, autores_emendas, reajuste_atas, notas_emendas_tesouro, execucao_emendas, atas_a_montar e emendas_siop_painel, que valem para todas as carteiras. */
+  /** Obrigatória para todos os recursos, exceto saldos_itens, cadastro_uasgs, autores_emendas, reajuste_atas, notas_emendas_tesouro, execucao_emendas, atas_a_montar, emendas_siop_painel e prazo_tr, que valem para todas as carteiras. */
   uasg?: string;
   /** Ignora a validade (só o coordenador). */
   forcar?: boolean;
@@ -136,6 +137,8 @@ export interface DependenciasDeExecucao {
   /** Atas a montar: resultado do pregão e minuta da ata no PNCP, antes da publicação (migration 238). */
   sincronizarAtasAMontar: typeof sincronizarAtasAMontar;
   testarAtasAMontar: typeof testarAtasAMontar;
+  sincronizarPrazoTr: typeof sincronizarPrazoTr;
+  testarPrazoTr: typeof testarPrazoTr;
   /** Notas das emendas citadas no SEI que só o Tesouro tem (migration 184), uma vez por dia. */
   sincronizarNotasDasEmendasDoTesouro: typeof sincronizarNotasDasEmendasDoTesouro;
   contarNotasEmendasTesouroPendentes: typeof contarNotasEmendasTesouroPendentes;
@@ -213,6 +216,8 @@ const PADRAO: DependenciasDeExecucao = {
   contarReajusteAtasPendentes,
   sincronizarAtasAMontar,
   testarAtasAMontar,
+  sincronizarPrazoTr,
+  testarPrazoTr,
   sincronizarNotasDasEmendasDoTesouro,
   contarNotasEmendasTesouroPendentes,
   medirEmendasDoPortal,
@@ -233,7 +238,7 @@ export function validarPedido(corpo: unknown): { ok: true; pedido: PedidoDeSincr
   if (typeof recurso !== 'string' || !(RECURSOS_DO_SERVIDOR as readonly string[]).includes(recurso)) {
     return { ok: false, erro: `Recurso inválido. Use: ${RECURSOS_DO_SERVIDOR.join(', ')}.` };
   }
-  if (recurso !== 'saldos_itens' && recurso !== 'cadastro_uasgs' && recurso !== 'autores_emendas' && recurso !== 'emendas_portal' && recurso !== 'reajuste_atas' && recurso !== 'notas_emendas_tesouro' && recurso !== 'execucao_emendas' && recurso !== 'atas_a_montar' && recurso !== 'emendas_siop_painel') {
+  if (recurso !== 'saldos_itens' && recurso !== 'cadastro_uasgs' && recurso !== 'autores_emendas' && recurso !== 'emendas_portal' && recurso !== 'reajuste_atas' && recurso !== 'notas_emendas_tesouro' && recurso !== 'execucao_emendas' && recurso !== 'atas_a_montar' && recurso !== 'emendas_siop_painel' && recurso !== 'prazo_tr') {
     if (typeof uasg !== 'string' || !UASGS_CGLIC.includes(uasg.trim())) {
       return { ok: false, erro: `UASG inválida. Use: ${UASGS_CGLIC.join(', ')}.` };
     }
@@ -285,6 +290,8 @@ export async function executarPedido(
       consulta = await deps.contarReajusteAtasPendentes();
     } else if (pedido.recurso === 'atas_a_montar') {
       consulta = await deps.testarAtasAMontar({ orcamentoMs: ORCAMENTO_ATAS_A_MONTAR_MS, leitor: criarLeitorDeArquivos() });
+    } else if (pedido.recurso === 'prazo_tr') {
+      consulta = await deps.testarPrazoTr({ orcamentoMs: ORCAMENTO_PRAZO_TR_MS, leitor: criarLeitorDeArquivos() });
     } else if (pedido.recurso === 'notas_emendas_tesouro') {
       consulta = await deps.contarNotasEmendasTesouroPendentes(deps.chaveDoPortal());
     } else if (pedido.recurso === 'execucao_emendas') {
@@ -324,6 +331,8 @@ export async function executarPedido(
     resultado = await deps.sincronizarReajusteAtas({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_REAJUSTE_ATAS_MS, leitor: criarLeitorDeArquivos() });
   } else if (pedido.recurso === 'atas_a_montar') {
     resultado = await deps.sincronizarAtasAMontar({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_ATAS_A_MONTAR_MS, leitor: criarLeitorDeArquivos() });
+  } else if (pedido.recurso === 'prazo_tr') {
+    resultado = await deps.sincronizarPrazoTr({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_PRAZO_TR_MS, leitor: criarLeitorDeArquivos() });
   } else if (pedido.recurso === 'notas_emendas_tesouro') {
     resultado = await deps.sincronizarNotasDasEmendasDoTesouro({ forcar: pedido.forcar, orcamentoMs: ORCAMENTO_NOTAS_EMENDAS_TESOURO_MS, chave: deps.chaveDoPortal() });
   } else if (pedido.recurso === 'execucao_emendas') {
