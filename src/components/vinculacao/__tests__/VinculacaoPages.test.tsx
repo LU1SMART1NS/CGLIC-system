@@ -25,6 +25,7 @@ vi.mock('../../../hooks/useAvisosResolvidos', async (orig) => ({ ...(await orig<
 // Janelas: não abrem no render estático; os hooks delas não rodam.
 vi.mock('../VincularAosItensDialog', () => ({ VincularAosItensDialog: () => null }));
 vi.mock('../../alocacao/AlocarUnidadeModal', () => ({ AlocarUnidadeModal: () => null }));
+vi.mock('../../../hooks/useProgramasDaAlocacao', () => ({ useProgramasDosItens: () => new Map() }));
 vi.mock('../../../hooks/useDivisaoNaAta', () => ({
   useDivisoesNaAta: () => ({ de: () => ({ situacao: 'A_CONFERIR' }), mapa: new Map(), query: { isError: false } }),
   useMarcarDivisaoDaAta: () => ({ mutateAsync: vi.fn(), isPending: false })
