@@ -596,6 +596,28 @@ export async function fetchEntregasDoPedido(pedidoId: string): Promise<EntregaDa
   }));
 }
 
+/**
+ * Entregas de todas as linhas de pedidos de emenda (listas de Emendas, Início e telas 360): a mesma linha de
+ * fisc_entregas_do_pedido, com o pedido. Uma leitura só, paginada.
+ */
+export async function fetchEntregasDasEmendas(): Promise<Array<EntregaDaLinha & { pedidoId: string }>> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => cliente().rpc('fisc_entregas_das_emendas').order('id').range(de, ate));
+  return linhas.map((r) => ({
+    id: r.id,
+    pedidoId: r.pedido_id,
+    linhaId: r.linha_id,
+    contractKey: r.contract_key,
+    quantidade: Number(r.quantidade) || 0,
+    responsavel: r.responsavel,
+    etapa: r.etapa,
+    etapaEm: r.etapa_em || null,
+    prevista: r.prevista || null,
+    entregueEm: r.entregue_em || null,
+    divididaDe: r.dividida_de || null,
+    fiscalNome: r.fiscal_nome || null
+  }));
+}
+
 // ── Programas (migration 265) ─────────────────────────────────────────────────────────────────────
 
 export type OrigemDoRecurso = 'EMENDA' | 'FNSP' | 'FUNDO' | 'OUTRO';

@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEntregasDasEmendas } from '../../hooks/useFiscalizacao';
+import { entregaDoPedido, VARIANTE_DA_ENTREGA } from '../../utils/emendasEntrega';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Boxes, Check, ClipboardList, LayoutDashboard } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
@@ -55,6 +57,7 @@ import {
   reservadoPorItem,
   ROTULO_AVISO,
   ROTULO_ETAPA,
+  rotuloDaEtapaDoPedido,
   TIPOS_AVISO,
   type TipoAviso
 } from '../../utils/emendasPedidos';
@@ -160,7 +163,9 @@ export const EmendasInicioPage: React.FC = () => {
   );
   const contaSemPedido = contaEmendasSemPedido(emendasSemPedido);
   const { precos } = usePrecosParaEmenda();
-  const r = useMemo(() => resumoInicioEmendas(pedidos, itensLista, notas, hoje, diferencas, credor, precos), [pedidos, itensLista, notas, hoje, diferencas, credor, precos]);
+  // Só os avisos de entrega (atrasada, no Exército) entram nas pendências; a etapa da entrega fica na lista de Pedidos.
+  const { porLinha: entregas } = useEntregasDasEmendas();
+  const r = useMemo(() => resumoInicioEmendas(pedidos, itensLista, notas, hoje, diferencas, credor, precos, entregas), [pedidos, itensLista, notas, hoje, diferencas, credor, precos, entregas]);
   // Notas sem pedido agrupadas por emenda (migration 211): as notas da mesma emenda vão juntas para o mesmo pedido.
   const semPedidoPorEmenda = useMemo(() => notasSemPedidoPorEmenda(notasSemPedido, resolvidos), [notasSemPedido, resolvidos]);
   const semPedido = useMemo(() => semPedidoPorEmenda.flatMap((g) => g.notas), [semPedidoPorEmenda]);
@@ -296,7 +301,11 @@ export const EmendasInicioPage: React.FC = () => {
       header: 'Etapa',
       nowrap: true,
       sortValue: ordem.etapa.value,
-      render: ({ pedido: p }) => <StatusBadge label={ROTULO_ETAPA[p.etapa]} variant={VARIANTE_ETAPA[p.etapa]} size="sm" dot={false} />
+      // Contratado, o processo já está na SFC/CGLIC: a etiqueta diz a etapa da entrega (só a etiqueta, sem detalhe).
+      render: ({ pedido: p }) => {
+        const e = entregaDoPedido(p, notas, entregas, hoje);
+        return <StatusBadge label={e?.rotulo ?? rotuloDaEtapaDoPedido(p, notas)} variant={e ? VARIANTE_DA_ENTREGA[e.passo] : VARIANTE_ETAPA[p.etapa]} size="sm" dot={false} />;
+      }
     },
     {
       key: 'aviso',

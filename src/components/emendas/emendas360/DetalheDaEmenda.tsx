@@ -7,9 +7,11 @@ import { NoticeBar } from '../../../design-system/components/NoticeBar';
 import { ConfirmDialog } from '../../../design-system/components/ConfirmDialog';
 import { useToast } from '../../../design-system/components/Toast';
 import { carteiraDetalhe, carteiraNumero, carteiraSubtitle } from '../../carteira/carteiraStyles';
-import { useApagarEmendaSiop } from '../../../hooks/useEmendas';
+import { hojeEmBrasilia, useApagarEmendaSiop, useNotasDasLinhas } from '../../../hooks/useEmendas';
+import { useEntregasDasEmendas } from '../../../hooks/useFiscalizacao';
+import { entregaDoPedido, VARIANTE_DA_ENTREGA } from '../../../utils/emendasEntrega';
 import { dataBR } from '../../../utils/emendasKits';
-import { ROTULO_ETAPA } from '../../../utils/emendasPedidos';
+import { rotuloDaEtapaDoPedido } from '../../../utils/emendasPedidos';
 import { NOME_ORGAO_ASPAR, numeroDaEmenda, orgaoDoBeneficiario, orgaosNaOrdem, ROTULO_MEIO, semPedido, type EmendaNaLista } from '../../../utils/emendasSemPedido';
 import { formatarTelefone, nomeESigla, type AsparDoOrgao, type AutorEmenda, type BeneficiarioEmenda, type EmendaSiop, type OrgaoAspar, type PedidoEmenda } from '../../../services/emendasService';
 import { ContatoDoResponsavel } from '../ContatoDoResponsavel';
@@ -69,6 +71,10 @@ export const DetalheDaEmenda: React.FC<DetalheProps> = ({ l, autor, beneficiario
   const [registrando, setRegistrando] = useState(false);
   const [editandoAspar, setEditandoAspar] = useState<OrgaoAspar | null>(null);
   const [confirmarApagar, setConfirmarApagar] = useState(false);
+  // Etiqueta do pedido como na lista: contratado, a etapa da entrega (o processo já está na SFC/CGLIC).
+  const { data: notas = new Map() } = useNotasDasLinhas();
+  const { porLinha: entregas } = useEntregasDasEmendas();
+  const hoje = hojeEmBrasilia();
   const e = l.emenda;
   const beneficiario = e?.beneficiarioId ? beneficiarios.get(e.beneficiarioId) : undefined;
   // As ASPAR do estado do beneficiário indicado; sem ele, do estado do parlamentar ou da bancada.
@@ -196,7 +202,10 @@ export const DetalheDaEmenda: React.FC<DetalheProps> = ({ l, autor, beneficiario
                 {nomeDoPedido(p)}
                 {p.oficioProcessoSei ? ` · Processo ${p.oficioProcessoSei}` : ''}
               </AppButton>
-              <StatusBadge label={ROTULO_ETAPA[p.etapa]} variant="info" size="sm" dot={false} />
+              {(() => {
+                const e = entregaDoPedido(p, notas, entregas, hoje);
+                return <StatusBadge label={e?.rotulo ?? rotuloDaEtapaDoPedido(p, notas)} variant={e ? VARIANTE_DA_ENTREGA[e.passo] : 'info'} size="sm" dot={false} />;
+              })()}
             </div>
           ))}
         </div>
