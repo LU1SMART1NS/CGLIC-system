@@ -39,6 +39,7 @@ import {
   notaNoSegmento,
   semNotasCitadasEmFatura,
   situacaoDaNota,
+  tipoDaNota,
   type SegmentoNotaFora
 } from './notasForaDoContrato';
 
@@ -102,6 +103,8 @@ export const NotasForaDoContratoPage: React.FC<{ alternador?: React.ReactNode }>
     () => ({
       A_INCLUIR: noEscopo.filter((n) => notaNoSegmento(n, 'A_INCLUIR')).length,
       INCLUINDO: noEscopo.filter((n) => notaNoSegmento(n, 'INCLUINDO')).length,
+      AGUARDANDO: noEscopo.filter((n) => notaNoSegmento(n, 'AGUARDANDO')).length,
+      ANULADAS: noEscopo.filter((n) => notaNoSegmento(n, 'ANULADAS')).length,
       TODAS: noEscopo.length
     }),
     [noEscopo]
@@ -181,7 +184,7 @@ export const NotasForaDoContratoPage: React.FC<{ alternador?: React.ReactNode }>
         title="Empenhos ao contrato"
         subtitle="Sem contrato: notas que o Contratos.gov.br não lista em nenhum contrato. A correção é incluir a nota no contrato, lá."
         viewToggle={alternador}
-        hint={`Sem contrato: o sistema não vincula a nota à mão: indica o contrato onde incluí-la no Contratos.gov.br. Com pedido de emenda, é o contrato do pedido; sem ele, os contratos do fornecedor na ordem: item do pedido, assinado depois da nota, sem notas da fonte e data mais próxima. Marque "Vou incluir" e inclua lá: a linha fica com seu nome e sai sozinha quando a sincronização trouxer a nota. Se não chegar em ${PRAZO_DA_MARCA_DIAS} dias, volta para "A incluir".`}
+        hint={`Sem contrato: o sistema não vincula a nota à mão: indica o contrato onde incluí-la no Contratos.gov.br. Com pedido de emenda, é o contrato do pedido ou o contrato novo do fornecedor com o item do pedido (assinado depois da nota e ainda sem notas). Sem pedido, os contratos do fornecedor para conferir. Marque "Vou incluir" e inclua lá: a linha fica com seu nome e sai sozinha quando a sincronização trouxer a nota. Se não chegar em ${PRAZO_DA_MARCA_DIAS} dias, volta para "A incluir". Nota de pedido cujo contrato ainda não foi assinado fica em "Aguardando contrato"; nota anulada (R$ 0,00) fica em "Anuladas". Nenhuma das duas conta no número do menu.`}
       />
 
       <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da fila" testIdPrefix="vinc-notas-fora-fontes" />
@@ -203,6 +206,8 @@ export const NotasForaDoContratoPage: React.FC<{ alternador?: React.ReactNode }>
             segments={[
               { id: 'A_INCLUIR', label: 'A incluir', count: contagem.A_INCLUIR, dot: 'var(--color-warning)', title: 'Notas que pedem o gestor' },
               { id: 'INCLUINDO', label: 'Incluindo na fonte', count: contagem.INCLUINDO, dot: 'var(--primary)', title: `Marcadas "Vou incluir" há menos de ${PRAZO_DA_MARCA_DIAS} dias` },
+              { id: 'AGUARDANDO', label: 'Aguardando contrato', count: contagem.AGUARDANDO, dot: 'var(--text-muted)', title: 'Pedido de emenda na contratação: o contrato ainda não foi assinado' },
+              { id: 'ANULADAS', label: 'Anuladas', count: contagem.ANULADAS, title: 'Valor empenhado zero no Tesouro: não precisam entrar em contrato' },
               { id: 'TODAS', label: 'Todas', count: contagem.TODAS }
             ]}
           />
@@ -268,6 +273,7 @@ export const NotasForaDoContratoPage: React.FC<{ alternador?: React.ReactNode }>
                     {pageItems.map((n) => {
                       const k = contratoIndicado(n);
                       const situacao = situacaoDaNota(n);
+                      const tipo = tipoDaNota(n);
                       const estaAberta = aberta === n.empenhoId;
                       const alternar = () => setAberta(estaAberta ? null : n.empenhoId);
                       const pedido = n.pedidos[0];
@@ -307,19 +313,39 @@ export const NotasForaDoContratoPage: React.FC<{ alternador?: React.ReactNode }>
                             </td>
                             <td data-label="Valor" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>{formatCurrency(n.valorEmpenhado)}</td>
                             <td data-label="Incluir no contrato" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                              {k ? <strong>{numero(k)}</strong> : <span style={{ color: '#94a3b8' }}>—</span>}
+                              {k ? (
+                                <strong>{numero(k)}</strong>
+                              ) : tipo === 'ANULADA' ? (
+                                <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Não precisa</span>
+                              ) : tipo === 'AGUARDANDO_CONTRATO' ? (
+                                <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Contrato não assinado</span>
+                              ) : (
+                                <span style={{ color: '#94a3b8' }}>—</span>
+                              )}
                               <div style={subtle}>
                                 {situacao === 'INCLUINDO' && n.marca
                                   ? `Incluindo · ${n.marca.porNome || '—'}`
                                   : n.marca
                                     ? 'A inclusão não chegou'
-                                    : n.contratoPeloPedido
-                                      ? 'contrato do pedido'
-                                      : n.contratosDoFornecedor.length > 1
-                                        ? `sugestão · mais ${n.contratosDoFornecedor.length - 1} do fornecedor`
-                                        : n.contratosDoFornecedor.length === 1
-                                          ? 'único do fornecedor'
-                                          : 'fornecedor sem contrato'}
+                                    : tipo === 'ANULADA'
+                                      ? n.substituta
+                                        ? `anulada · substituída pela ${n.substituta.numero}`
+                                        : 'nota anulada'
+                                      : tipo === 'AGUARDANDO_CONTRATO'
+                                        ? n.pedidos[0]?.ccga === 'ENVIADA'
+                                          ? 'pedido na CCGA'
+                                          : n.pedidos[0]?.ccga === 'DEVOLVIDA'
+                                            ? 'devolvido pela CCGA'
+                                            : 'pedido na contratação'
+                                        : n.contratoPeloPedido
+                                          ? 'contrato do pedido'
+                                          : tipo === 'INCLUIR'
+                                            ? 'contrato novo com o item do pedido'
+                                            : n.contratosDoFornecedor.length > 1
+                                              ? `sugestão · confira · mais ${n.contratosDoFornecedor.length - 1}`
+                                              : n.contratosDoFornecedor.length === 1
+                                                ? 'único do fornecedor · confira'
+                                                : 'fornecedor sem contrato'}
                               </div>
                             </td>
                             {showGestorFilter && (
@@ -328,7 +354,9 @@ export const NotasForaDoContratoPage: React.FC<{ alternador?: React.ReactNode }>
                               </td>
                             )}
                             <td data-label="Na Carteira" style={carteiraTd}>
-                              {n.contratoPeloPedido ? (
+                              {tipo === 'ANULADA' ? (
+                                <StatusBadge label="Anulada" variant="neutral" size="sm" dot={false} />
+                              ) : n.contratoPeloPedido ? (
                                 <StatusBadge label={`Pelo pedido · ${numero(n.contratoPeloPedido)}`} variant="info" size="sm" dot={false} />
                               ) : n.pedidoDeOutroFornecedor.length > 0 ? (
                                 <StatusBadge label="Sem contrato · credor ≠ pedido" variant="danger" size="sm" dot={false} />
@@ -391,6 +419,8 @@ const PainelDaNota: React.FC<{
   const [escolhido, setEscolhido] = useState<string>(contratoIndicado(n) ?? '');
   const [obs, setObs] = useState(n.marca?.observacao ?? '');
   const situacao = situacaoDaNota(n);
+  const tipo = tipoDaNota(n);
+  const semContratoAindaOuAnulada = tipo === 'ANULADA' || tipo === 'AGUARDANDO_CONTRATO';
   const longa = obs.trim().length > OBS_MAX;
   const nome = 'contrato-' + n.empenhoId;
 
@@ -418,13 +448,22 @@ const PainelDaNota: React.FC<{
               ainda não chegou pela sincronização. Confira no Contratos.gov.br.
             </NoticeBar>
           )}
-          {n.pedidoDeOutroFornecedor.length > 0 && (
+          {!semContratoAindaOuAnulada && n.pedidoDeOutroFornecedor.length > 0 && (
             <NoticeBar tone="warning" testId="vinc-notas-fora-outro-fornecedor">
               O pedido {n.pedidos.map((p) => p.numero).join(', ')} aponta{' '}
               {n.pedidoDeOutroFornecedor.map((c) => `o contrato ${c.numero}${c.fornecedor ? ` (${c.fornecedor})` : ''}`).join(' e ')}, de outro fornecedor. O credor da
               nota é {n.credorNome ?? 'outro'}. Confira no SEI se a nota é deste pedido.
             </NoticeBar>
           )}
+          {tipo === 'AGUARDANDO_CONTRATO' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <span style={rotulo}>O que fazer</span>
+              <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.55 }}>
+                Nada por enquanto. Se o contrato já foi assinado e você sabe qual é, escolha abaixo e marque &quot;Vou incluir&quot;.
+              </p>
+            </div>
+          )}
+          {!semContratoAindaOuAnulada && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
             <span style={rotulo}>O que fazer no Contratos.gov.br</span>
             <ol style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.88rem', lineHeight: 1.55 }}>
@@ -436,9 +475,30 @@ const PainelDaNota: React.FC<{
               </li>
             </ol>
           </div>
-          {n.contratosDoFornecedor.length > 0 && (
+          )}
+          {tipo === 'AGUARDANDO_CONTRATO' && n.contratosDoFornecedor.length > 0 && (
+            <div style={{ maxWidth: '420px' }}>
+              <AppSelect
+                label={`Contrato do fornecedor (${n.contratosDoFornecedor.length})`}
+                value={escolhido}
+                onChange={(e) => setEscolhido(e.target.value)}
+                data-testid="vinc-notas-fora-contrato-aguardando"
+              >
+                <option value="">Escolher…</option>
+                {n.contratosDoFornecedor.map((c) => (
+                  <option key={c.contractKey} value={c.contractKey}>
+                    {c.numero}
+                    {c.assinatura ? ` · assinado em ${dataBR(c.assinatura)}` : ''}
+                  </option>
+                ))}
+              </AppSelect>
+            </div>
+          )}
+          {!semContratoAindaOuAnulada && n.contratosDoFornecedor.length > 0 && (
             <fieldset style={{ border: 0, margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-              <legend style={{ ...rotulo, padding: 0, marginBottom: '0.45rem' }}>{n.contratoPeloPedido ? 'Contrato' : 'Contratos sugeridos'}</legend>
+              <legend style={{ ...rotulo, padding: 0, marginBottom: '0.45rem' }}>
+                {n.contratoPeloPedido || tipo === 'INCLUIR' ? 'Contrato' : 'Contratos sugeridos · confira antes de incluir'}
+              </legend>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: '0.6rem' }}>
                 {sugeridos.map((c, i) => {
                   const marcado = escolhido === c.contractKey;
@@ -461,6 +521,8 @@ const PainelDaNota: React.FC<{
                         <strong>{c.numero}</strong>{' '}
                         {c.contractKey === n.contratoPeloPedido ? (
                           <StatusBadge label="Contrato do pedido" variant="info" size="sm" dot={false} />
+                        ) : i === 0 && tipo === 'INCLUIR' ? (
+                          <StatusBadge label="Contrato novo" variant="success" size="sm" dot={false} />
                         ) : i === 0 ? (
                           <StatusBadge label="1ª sugestão" variant="success" size="sm" dot={false} />
                         ) : null}
@@ -499,7 +561,7 @@ const PainelDaNota: React.FC<{
               )}
             </fieldset>
           )}
-          {podeMarcar && escolhido && (
+          {podeMarcar && escolhido && tipo !== 'ANULADA' && (
             <AppTextarea
               label="Observação (opcional)"
               placeholder="Ex.: incluo amanhã, depois de conferir no SEI"
@@ -519,7 +581,9 @@ const PainelDaNota: React.FC<{
         {n.credorCnpjCpf && <span>Credor {n.credorCnpjCpf}</span>}
         {n.pedidos.length > 0 ? (
           <span>
-            {n.pedidos.map((p) => `Pedido ${p.numero}${p.emenda ? ` · emenda ${p.emenda}` : ''}`).join('; ')}
+            {n.pedidos
+              .map((p) => `Pedido ${p.numero}${p.emenda ? ` · emenda ${p.emenda}` : ''}${p.ccga === 'ENVIADA' ? ` · na CCGA desde ${p.ccgaEm ? dataBR(p.ccgaEm) : '—'}` : p.ccga === 'DEVOLVIDA' ? ' · devolvido pela CCGA' : ''}`)
+              .join('; ')}
           </span>
         ) : (
           <span>Sem pedido de emenda</span>
@@ -532,7 +596,12 @@ const PainelDaNota: React.FC<{
         </NoticeBar>
       )}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
-        {escolhido && (
+        {tipo === 'ANULADA' && n.substituta?.contractKey && (
+          <AppButton variant="outline" size="sm" onClick={() => onAbrirContrato(n.substituta!.contractKey!)}>
+            Ver o contrato da {n.substituta.numero}
+          </AppButton>
+        )}
+        {tipo !== 'ANULADA' && escolhido && (
           <AppButton variant="outline" size="sm" onClick={() => onAbrirContrato(n.marca && situacao === 'INCLUINDO' ? n.marca.contractKey : escolhido)}>
             Ver o contrato
           </AppButton>
@@ -541,7 +610,7 @@ const PainelDaNota: React.FC<{
           noAlcance(n.marca.contractKey) && (
             <ActionButton action="desfazer" label="Desfazer marca" size="sm" title='Tira a marca e devolve a nota a "A incluir"' onClick={onDesfazer} disabled={desfazendo} data-testid="vinc-notas-fora-desfazer" />
           )
-        ) : podeMarcar && escolhido ? (
+        ) : podeMarcar && escolhido && tipo !== 'ANULADA' ? (
           <AppButton
             variant="primary"
             size="sm"

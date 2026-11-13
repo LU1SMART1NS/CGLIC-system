@@ -15,6 +15,23 @@ export interface ContratoDoFornecedor {
   semNotasDaFonte: boolean;
 }
 
+export interface PedidoDaNota {
+  numero: number;
+  emenda: string | null;
+  /** Etapa do pedido de emenda (ex.: CONTRATACAO). */
+  etapa?: string | null;
+  /** Envio à CCGA para contratar: ENVIADA ou DEVOLVIDA, com a data. */
+  ccga?: string | null;
+  ccgaEm?: string | null;
+}
+
+/** Nota que substituiu uma anulada: mesmo credor, plano interno e dia, com valor. */
+export interface NotaSubstituta {
+  numero: string;
+  valor: number;
+  contractKey: string | null;
+}
+
 export interface NotaForaDoContrato {
   empenhoId: string;
   numero: string;
@@ -26,17 +43,19 @@ export interface NotaForaDoContrato {
   credorCnpjCpf: string | null;
   /** Contrato em que a Carteira mostra a nota pelo pedido de emenda (origem EMENDA), se houver. */
   contratoPeloPedido: string | null;
-  pedidos: Array<{ numero: number; emenda: string | null }>;
+  pedidos: PedidoDaNota[];
   /** Contratos que o pedido aponta e que são de outro fornecedor (o pedido ou a nota estão errados). */
   pedidoDeOutroFornecedor: Array<{ contractKey: string; numero: string; fornecedor: string | null }>;
   /** Contratos do fornecedor (credor da nota), na ordem da sugestão. */
   contratosDoFornecedor: ContratoDoFornecedor[];
   marca: { contractKey: string; observacao: string | null; porNome: string | null; em: string } | null;
+  /** Só na nota anulada (valor zero), quando há outra nota que a substituiu. */
+  substituta?: NotaSubstituta | null;
 }
 
 const PAGINA = 1000;
 const COLUNAS =
-  'empenho_id, numero_oficial, uasg_emitente, ano_exercicio, data_emissao, valor_empenhado, credor_nome, credor_cnpj_cpf, contrato_pelo_pedido, pedidos, pedido_de_outro_fornecedor, contratos_do_fornecedor, marca_contract_key, marca_observacao, marca_por_nome, marca_em';
+  'empenho_id, numero_oficial, uasg_emitente, ano_exercicio, data_emissao, valor_empenhado, credor_nome, credor_cnpj_cpf, contrato_pelo_pedido, pedidos, pedido_de_outro_fornecedor, contratos_do_fornecedor, marca_contract_key, marca_observacao, marca_por_nome, marca_em, substituta';
 
 const lista = (v: unknown): any[] => (Array.isArray(v) ? v : []);
 
@@ -52,7 +71,7 @@ export function linhaNotaForaDoContrato(r: any): NotaForaDoContrato {
     credorCnpjCpf: r.credor_cnpj_cpf ?? null,
     contratoPeloPedido: r.contrato_pelo_pedido ?? null,
     pedidos: lista(r.pedidos)
-      .map((p) => ({ numero: Number(p.numero), emenda: p.emenda ?? null }))
+      .map((p) => ({ numero: Number(p.numero), emenda: p.emenda ?? null, etapa: p.etapa ?? null, ccga: p.ccga ?? null, ccgaEm: p.ccga_em ?? null }))
       .sort((a, b) => a.numero - b.numero),
     pedidoDeOutroFornecedor: lista(r.pedido_de_outro_fornecedor).map((c) => ({
       contractKey: String(c.contract_key),
@@ -69,6 +88,9 @@ export function linhaNotaForaDoContrato(r: any): NotaForaDoContrato {
     })),
     marca: r.marca_contract_key
       ? { contractKey: String(r.marca_contract_key), observacao: r.marca_observacao ?? null, porNome: r.marca_por_nome ?? null, em: String(r.marca_em) }
+      : null,
+    substituta: r.substituta
+      ? { numero: String(r.substituta.numero), valor: Number(r.substituta.valor ?? 0), contractKey: r.substituta.contrato ?? null }
       : null
   };
 }
