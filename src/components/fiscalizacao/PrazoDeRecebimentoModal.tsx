@@ -170,7 +170,7 @@ export const ComissaoDeRecebimentoModal: React.FC<{ entregas: EntregaFiscalizaca
                 { ids: entregas.map((e) => e.id), tipo, data, documentoSei: sei || null },
                 {
                   onSuccess: () => {
-                    toast.success(`${envio ? 'Envio à comissão registrado' : 'Cobrança registrada'}: cobrar de novo em ${dataBR(cobrarEm)} se o TRP não vier`);
+                    toast.success(`${envio ? 'Envio à comissão registrado' : 'Cobrança registrada'}: cobrar de novo em ${dataBR(cobrarEm)} se o ${envio ? 'TRP' : c?.passo ?? 'TRP'} não vier`);
                     onClose(true);
                   },
                   onError: (err) => toast.error(`Não foi possível salvar: ${(err as Error)?.message || 'erro desconhecido'}`)
@@ -184,7 +184,7 @@ export const ComissaoDeRecebimentoModal: React.FC<{ entregas: EntregaFiscalizaca
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
         {!envio && c && (
           <NoticeBar tone="warning" testId="fisc-comissao-situacao">
-            Enviado à comissão em {dataBR(c.desde)} ({c.dias} dias){primeiro?.comissaoCobradaEm ? `; última cobrança em ${dataBR(primeiro.comissaoCobradaEm)}` : ''}. O TRP ainda não veio.
+            {c.passo === 'TRP' ? 'Enviado à comissão' : 'TRP registrado'} em {dataBR(c.desde)} ({c.dias} dias){c.cobrancas && primeiro?.comissaoCobradaEm ? `; última cobrança em ${dataBR(primeiro.comissaoCobradaEm)}` : ''}. O {c.passo} ainda não veio.
           </NoticeBar>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.75rem' }}>
@@ -193,7 +193,7 @@ export const ComissaoDeRecebimentoModal: React.FC<{ entregas: EntregaFiscalizaca
         </div>
         {cobrarEm && (
           <span style={{ ...carteiraDetalhe, marginTop: 0 }}>
-            Sem o TRP até <b>{dataBR(cobrarEm)}</b> ({dias} dias), o item volta para você cobrar de novo.
+            Sem o {envio ? 'TRP' : c?.passo ?? 'TRP'} até <b>{dataBR(cobrarEm)}</b> ({dias} dias), o item volta para você cobrar de novo.
             {envio && primeiro?.entregueEm && primeiro.regraDeRecebimento !== false && primeiro.trpAte ? ` Pelo TR, o TRP era até ${dataBR(primeiro.trpAte)}.` : ''}
           </span>
         )}

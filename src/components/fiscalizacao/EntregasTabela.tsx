@@ -93,11 +93,11 @@ export const CelulaSituacaoDoItem: React.FC<{ e: EntregaFiscalizacao }> = ({ e }
       {comissao && (
         <div style={carteiraDetalhe} data-testid="situacao-comissao">
           {comissao.vencida ? (
-            <span style={{ color: COR_DO_PRAZO.danger, fontWeight: 700 }}>Cobrar a comissão · enviado há {comissao.dias} dias</span>
+            <span style={{ color: COR_DO_PRAZO.danger, fontWeight: 700 }}>Cobrar a comissão · sem {comissao.passo} há {comissao.dias} dias</span>
           ) : (
-            <>com a comissão desde {dataBR(comissao.desde)} · cobrar em {dataBR(comissao.cobrarEm)}</>
+            <>{comissao.passo} com a comissão desde {dataBR(comissao.desde)} · cobrar em {dataBR(comissao.cobrarEm)}</>
           )}
-          {r?.limite && <div>pelo TR, o TRP era até {dataBR(r.limite)}</div>}
+          {r?.limite && <div>pelo TR, o {comissao.passo} era até {dataBR(r.limite)}</div>}
         </div>
       )}
       <div style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>

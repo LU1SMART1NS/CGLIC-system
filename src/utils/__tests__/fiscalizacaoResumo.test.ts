@@ -102,10 +102,15 @@ describe('próximo passo do contrato (mesa)', () => {
       nada,
       nada
     );
-    expect(r.comVoce.map((l) => l.chave)).toEqual(['provisorio', 'cobrar-comissao']);
+    expect(r.comVoce.map((l) => l.chave)).toEqual(['provisorio', 'cobrar-comissao-trp']);
     expect(r.comVoce[1].titulo).toBe('Cobrar a comissão de recebimento · 1 item sem TRP');
     expect(r.comOutros.map((l) => l.quem)).toEqual(['Comissão de recebimento']);
     expect(comQuemEstaOItem(e({ etapa: 'ENTREGUE', entregueEm: antes(9), comissaoEnviadaEm: antes(5) }))).toBe('OUTROS');
+    // TRP registrado: a comissão deve o TRD; sem passar pela comissão, o TRD é do fiscal.
+    const trd = linhasDoContrato([e({ etapa: 'TRP', entregueEm: antes(30), etapaEm: antes(12), comissaoEnviadaEm: antes(25) }), e({ etapa: 'TRP', entregueEm: antes(9), etapaEm: antes(3), comissaoEnviadaEm: antes(8) }), e({ etapa: 'TRP', entregueEm: antes(9), etapaEm: antes(3) })], false, nada, nada);
+    expect(trd.comVoce.map((l) => l.chave)).toEqual(['definitivo', 'cobrar-comissao-trd']);
+    expect(trd.comVoce[1].titulo).toBe('Cobrar a comissão de recebimento · 1 item sem TRD');
+    expect(trd.comOutros.map((l) => l.chave)).toEqual(['comissao-trd']);
   });
   it('item pago de emenda pede o Ofício à SAL; sem emenda, finalizar', () => {
     expect(linhasDoContrato([e({ etapa: 'PAGAMENTO', pagoEm: '2026-05-01', origem: 'EMENDA' })], false, nada, nada).comVoce[0].chave).toBe('sal');

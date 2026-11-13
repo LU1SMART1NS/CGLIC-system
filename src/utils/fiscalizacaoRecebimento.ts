@@ -85,18 +85,26 @@ export function prazoDoRecebimento(
 }
 
 /**
- * Comissão de recebimento: depois do envio para o TRP, cobrar de novo a cada N dias sem o TRP (Ajustes › Regras e
- * alertas › Fiscalização). null quando o item não está com a comissão.
+ * Comissão de recebimento: depois do envio para o TRP, cobrar de novo a cada N dias sem o TRP; registrado o TRP, a
+ * comissão deve o TRD, e a conta recomeça do TRP (Ajustes › Regras e alertas › Fiscalização). null quando o item não
+ * está com a comissão (não foi enviado a ela, ou já tem o TRD).
  */
 export function cobrancaDaComissao(
-  e: Pick<EntregaFiscalizacao, 'etapa'> & Partial<Pick<EntregaFiscalizacao, 'comissaoEnviadaEm' | 'comissaoCobradaEm'>>,
+  e: Pick<EntregaFiscalizacao, 'etapa'> & Partial<Pick<EntregaFiscalizacao, 'comissaoEnviadaEm' | 'comissaoCobradaEm' | 'comissaoCobrancas' | 'etapaEm'>>,
   hoje: string
-): { desde: string; cobrarEm: string; vencida: boolean; dias: number } | null {
-  if (e.etapa !== 'ENTREGUE' || !e.comissaoEnviadaEm) return null;
-  const base = e.comissaoCobradaEm && e.comissaoCobradaEm > e.comissaoEnviadaEm ? e.comissaoCobradaEm : e.comissaoEnviadaEm;
+): { passo: 'TRP' | 'TRD'; desde: string; cobrarEm: string; vencida: boolean; dias: number; cobrancas: number } | null {
+  if (!e.comissaoEnviadaEm) return null;
+  let passo: 'TRP' | 'TRD';
+  let desde: string;
+  if (e.etapa === 'ENTREGUE') [passo, desde] = ['TRP', e.comissaoEnviadaEm];
+  else if (e.etapa === 'TRP') [passo, desde] = ['TRD', e.etapaEm && e.etapaEm > e.comissaoEnviadaEm ? e.etapaEm : e.comissaoEnviadaEm];
+  else return null;
+  // Só a cobrança desta fase conta (a do TRP não vale para o TRD).
+  const cobrada = e.comissaoCobradaEm && e.comissaoCobradaEm >= desde ? e.comissaoCobradaEm : null;
+  const base = cobrada ?? desde;
   const cobrarEm = new Date(Date.parse(`${base}T12:00:00Z`) + FISCALIZACAO_RULES.cobrarComissaoDias * 864e5).toISOString().slice(0, 10);
-  const dias = Math.round((Date.parse(`${hoje}T12:00:00Z`) - Date.parse(`${e.comissaoEnviadaEm}T12:00:00Z`)) / 864e5);
-  return { desde: e.comissaoEnviadaEm, cobrarEm, vencida: hoje >= cobrarEm, dias };
+  const dias = Math.round((Date.parse(`${hoje}T12:00:00Z`) - Date.parse(`${desde}T12:00:00Z`)) / 864e5);
+  return { passo, desde, cobrarEm, vencida: hoje >= cobrarEm, dias, cobrancas: cobrada ? e.comissaoCobrancas ?? 0 : 0 };
 }
 
 /**

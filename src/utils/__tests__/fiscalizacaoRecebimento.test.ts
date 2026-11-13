@@ -54,6 +54,21 @@ describe('comissão de recebimento', () => {
   });
   it('fora da comissão: sem envio ou já com TRP', () => {
     expect(cobrancaDaComissao({ etapa: 'ENTREGUE' }, '2026-11-13')).toBeNull();
-    expect(cobrancaDaComissao({ etapa: 'TRP', comissaoEnviadaEm: '2026-10-20' }, '2026-11-13')).toBeNull();
+    expect(cobrancaDaComissao({ etapa: 'TRD', comissaoEnviadaEm: '2026-10-20' }, '2026-11-13')).toBeNull();
+  });
+});
+
+describe('comissão de recebimento no TRD', () => {
+  it('depois do TRP, a comissão deve o TRD: a conta recomeça do TRP', () => {
+    expect(cobrancaDaComissao({ etapa: 'TRP', etapaEm: '2026-11-06', comissaoEnviadaEm: '2026-10-20' }, '2026-11-13')).toMatchObject({ passo: 'TRD', desde: '2026-11-06', cobrarEm: '2026-11-16', vencida: false, dias: 7 });
+    expect(cobrancaDaComissao({ etapa: 'TRP', etapaEm: '2026-10-25', comissaoEnviadaEm: '2026-10-20' }, '2026-11-13')).toMatchObject({ passo: 'TRD', vencida: true, dias: 19 });
+  });
+  it('a cobrança do TRP não vale para o TRD; a do TRD conta de novo', () => {
+    const doTrp = { etapa: 'TRP' as const, etapaEm: '2026-10-25', comissaoEnviadaEm: '2026-10-10', comissaoCobradaEm: '2026-10-21', comissaoCobrancas: 2 };
+    expect(cobrancaDaComissao(doTrp, '2026-11-13')).toMatchObject({ cobrarEm: '2026-11-04', cobrancas: 0 });
+    expect(cobrancaDaComissao({ ...doTrp, comissaoCobradaEm: '2026-11-08', comissaoCobrancas: 1 }, '2026-11-13')).toMatchObject({ cobrarEm: '2026-11-18', vencida: false, cobrancas: 1 });
+  });
+  it('item no TRP sem passar pela comissão segue o prazo do TR', () => {
+    expect(cobrancaDaComissao({ etapa: 'TRP', etapaEm: '2026-11-06' }, '2026-11-13')).toBeNull();
   });
 });
