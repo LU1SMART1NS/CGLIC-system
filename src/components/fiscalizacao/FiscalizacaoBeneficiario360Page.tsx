@@ -17,7 +17,6 @@ import { CarteiraDetailLabel } from '../carteira/CarteiraDetailLabel';
 import { useBackTarget } from '../../hooks/useDetailOrigin';
 import { useContratosFiscalizacao, useEntregasFiscalizacao } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC } from '../../utils/fiscalizacao';
 import { foiEntregue } from '../../utils/fiscalizacaoEntregas';
 import { agrupar, chaveDoBeneficiario, contratosDe, numero, pct, programasDe, qtdTexto, resumir, semCadastro, enderecoDeEntrega, rotaDoBeneficiario } from '../../utils/fiscalizacaoResumo';
 import { ItensPorContrato, type GrupoDeItens } from './FiscalizacaoCelulas';
@@ -65,8 +64,8 @@ export const FiscalizacaoBeneficiario360Page: React.FC = () => {
           identifiers={[]}
           identifiersTestId="fisc-benef-360-ids"
           title={sem ? e0.beneficiarioTexto ?? 'Beneficiário a informar' : e0.beneficiarioNome ?? '—'}
-          eyebrow={sem ? 'Beneficiário da planilha' : [e0.beneficiarioSigla, e0.municipio && e0.uf ? `${e0.municipio}/${e0.uf}` : e0.uf].filter(Boolean).join(' · ')}
-          subtitle={sem ? `nome escrito à mão na planilha da ${NOME_SFC}` : e0.beneficiarioRazao ?? undefined}
+          eyebrow={sem ? 'Beneficiário sem cadastro' : [e0.beneficiarioSigla, e0.municipio && e0.uf ? `${e0.municipio}/${e0.uf}` : e0.uf].filter(Boolean).join(' · ')}
+          subtitle={sem ? 'ligue ao cadastro de beneficiários para ter o endereço de entrega' : e0.beneficiarioRazao ?? undefined}
           notice={
             sem ? (
               <NoticeBar tone="warning" testId="fisc-benef-360-sem-cadastro" action={podeLigar ? <AppButton size="xs" variant="link" onClick={() => setLigando(true)} data-testid="fisc-benef-360-ligar">Ligar ao cadastro</AppButton> : undefined}>

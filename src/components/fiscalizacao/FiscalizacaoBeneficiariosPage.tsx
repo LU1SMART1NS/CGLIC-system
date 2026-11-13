@@ -14,7 +14,6 @@ import { CelulaBeneficiario } from './EntregasTabela';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useEntregasFiscalizacao } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC } from '../../utils/fiscalizacao';
 import { type Resumo, agrupar, chaveDoBeneficiario, nomeDoBeneficiario, passaPrazo, pct, programasDe, resumir, rotaDoBeneficiario, semCadastro, opcoesDePrazo } from '../../utils/fiscalizacaoResumo';
 import { CelulaEntregaResumo, CelulaItens, CelulaQuemDestinou } from './FiscalizacaoCelulas';
 import { LigarBeneficiarioModal } from './LigarBeneficiarioModal';
@@ -83,7 +82,7 @@ export const FiscalizacaoBeneficiariosPage: React.FC = () => {
       <PageHeader
         title="Beneficiários"
         subtitle="Quem recebe: o que já chegou e o que falta, em todos os contratos."
-        hint={`Responde quando o órgão ou o gabinete pergunta pelo que foi destinado a ele. O beneficiário vem do cadastro (Ajustes › Beneficiários). Nos itens da planilha da ${NOME_SFC}, o beneficiário foi escrito à mão: até ser ligado a um cadastro, cada grafia aparece numa linha, com a etiqueta Sem cadastro.`}
+        hint={`Responde quando o órgão ou o gabinete pergunta pelo que foi destinado a ele. O beneficiário vem do cadastro (Ajustes › Beneficiários). Beneficiário ainda sem cadastro aparece com a etiqueta Sem cadastro, uma linha para cada grafia, até ser ligado.`}
         icon={<Building2 size={26} color="var(--primary)" aria-hidden="true" />}
         actions={<HeaderRefreshAction onRefresh={() => entregasQ.refetch()} isRefreshing={entregasQ.isFetching} lastUpdated={entregasQ.dataUpdatedAt || null} dataTestId="fisc-benef-atualizar" tooltipTitle="Recarregar os beneficiários" />}
       />
@@ -98,7 +97,7 @@ export const FiscalizacaoBeneficiariosPage: React.FC = () => {
             </span>
           }
         >
-          {nomesSem} {nomesSem === 1 ? 'nome de beneficiário escrito na planilha está' : 'nomes de beneficiário escritos na planilha estão'} fora do cadastro: sem endereço de entrega e sem somar com o mesmo órgão escrito de outro jeito.
+          {nomesSem} {nomesSem === 1 ? 'nome de beneficiário está' : 'nomes de beneficiário estão'} fora do cadastro: sem endereço de entrega e sem somar com o mesmo órgão escrito de outro jeito.
         </NoticeBar>
       )}
       <CarteiraSegmentTabs<SegBenef>
@@ -124,7 +123,7 @@ export const FiscalizacaoBeneficiariosPage: React.FC = () => {
         <CarteiraFilterButton label="UF" value={uf} emptyValue="" options={ufs.map((u) => ({ value: u, label: u, count: doSeg.filter((l) => l.uf === u).length }))} onChange={setUf} testId="fisc-benef-filtro-uf" />
         <CarteiraFilterButton label="Prazo" value={prazo} emptyValue="" options={opcoesDePrazo((t) => doSeg.filter((l) => passaPrazo(l.r, t)).length)} onChange={setPrazo} testId="fisc-benef-filtro-prazo" />
         <CarteiraFilterButton label="Programa" value={programa} emptyValue="" options={progs.map((p) => ({ value: p, label: p, count: doSeg.filter((l) => programasDe(l.es).includes(p)).length }))} onChange={setPrograma} testId="fisc-benef-filtro-programa" />
-        <CarteiraFilterButton label="Cadastro" value={cadastro} emptyValue="" options={[{ value: 'com', label: 'Com cadastro', count: doSeg.filter((l) => !l.semCadastro).length }, { value: 'sem', label: 'Sem cadastro (planilha)', count: doSeg.filter((l) => l.semCadastro).length }]} onChange={setCadastro} testId="fisc-benef-filtro-cadastro" />
+        <CarteiraFilterButton label="Cadastro" value={cadastro} emptyValue="" options={[{ value: 'com', label: 'Com cadastro', count: doSeg.filter((l) => !l.semCadastro).length }, { value: 'sem', label: 'Sem cadastro', count: doSeg.filter((l) => l.semCadastro).length }]} onChange={setCadastro} testId="fisc-benef-filtro-cadastro" />
       </CarteiraFilterBar>
       <AdminListShell testId="fisc-benef-lista" isLoading={entregasQ.isLoading} isError={entregasQ.isError} errorTitle="Não foi possível carregar os beneficiários" errorMessage={entregasQ.error?.message} onRetry={() => entregasQ.refetch()} isEmpty={!entregasQ.isLoading && filtradas.length === 0} emptyTitle="Nenhum beneficiário nesta situação." emptyDescription="Ajuste a busca ou os filtros.">
         <DataTable<LinhaBenef> testId="fisc-benef-tabela" className="data-table-container--flush" data={filtradas.slice(0, POR_PAGINA)} keyExtractor={(l) => l.chave} columns={colunas} rowOpen={(l) => () => navigate(rotaDoBeneficiario(l.chave))} />

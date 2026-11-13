@@ -152,7 +152,7 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
               </>
             ) : (
               <>
-                <span style={carteiraDetalhe}>da planilha · sem item da ata</span>
+                <span style={carteiraDetalhe}>sem item da ata</span>
                 {podeLigar && (
                   <div>
                     <AppButton size="xs" variant="link" onClick={() => setLigando(true)} data-testid="fisc-janela-ligar">Ligar ao item da ata</AppButton>
@@ -164,7 +164,6 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
           <Campo rotulo="Origem">
             <span style={carteiraValor}>{e.emenda ? `Emenda ${e.emenda}` : e.programaTexto ?? 'Sem emenda'}</span>
             {e.emenda && e.programaTexto && <div style={carteiraDetalhe}>{e.programaTexto}</div>}
-            {e.origem === 'CARGA' && <div style={carteiraDetalhe}>da planilha da {NOME_SFC}</div>}
           </Campo>
           <Campo rotulo="Fiscal">
             <span style={carteiraValor}>{area ? 'Área requisitante' : e.fiscalNome ?? '—'}</span>
@@ -180,7 +179,7 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
               </div>
             ) : (
               <div>
-                <span style={carteiraDetalhe}>beneficiário escrito na planilha, sem cadastro: o endereço vem do cadastro</span>
+                <span style={carteiraDetalhe}>beneficiário sem cadastro: o endereço vem do cadastro</span>
                 {podeAgir && e.beneficiarioTexto && (
                   <div>
                     <AppButton size="xs" variant="link" onClick={() => setCadastrando(true)} data-testid="fisc-janela-cadastro">Ligar ao cadastro</AppButton>

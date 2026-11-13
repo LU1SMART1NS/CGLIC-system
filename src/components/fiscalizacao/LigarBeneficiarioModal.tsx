@@ -108,7 +108,7 @@ export const LigarBeneficiarioModal: React.FC<{ contractKey?: string; foco?: str
       onClose={onClose}
       size="lg"
       title="Ligar ao cadastro de beneficiários"
-      subtitle={total > 1 ? `${qtdTexto(restantes.length, 'nome escrito na planilha a ligar', 'nomes escritos na planilha a ligar')}${contractKey ? ' neste contrato' : ''}${pulados.length ? ` · ${qtdTexto(pulados.length, 'pulado', 'pulados')}` : ''}` : 'Escolha o beneficiário do cadastro que recebe estes itens.'}
+      subtitle={total > 1 ? `${qtdTexto(restantes.length, 'nome sem cadastro a ligar', 'nomes sem cadastro a ligar')}${contractKey ? ' neste contrato' : ''}${pulados.length ? ` · ${qtdTexto(pulados.length, 'pulado', 'pulados')}` : ''}` : 'Escolha o beneficiário do cadastro que recebe estes itens.'}
       testId="fisc-ligar-benef"
       footer={
         !g ? (
@@ -125,11 +125,11 @@ export const LigarBeneficiarioModal: React.FC<{ contractKey?: string; foco?: str
       {isLoading ? (
         <span style={carteiraDetalhe}>Carregando…</span>
       ) : !g ? (
-        <span style={carteiraDetalhe} data-testid="fisc-ligar-benef-fim">{total ? 'Os nomes que sobraram foram pulados: continuam na lista para depois.' : 'Todos os beneficiários da planilha já estão ligados ao cadastro.'}</span>
+        <span style={carteiraDetalhe} data-testid="fisc-ligar-benef-fim">{total ? 'Os nomes que sobraram foram pulados: continuam na lista para depois.' : 'Todos os beneficiários já estão ligados ao cadastro.'}</span>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
           <div style={{ padding: '0.65rem 0.8rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-subtle, #f8fafc)' }} data-testid="fisc-ligar-benef-escrito">
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Escrito na planilha</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Nome no item</div>
             <div style={{ fontWeight: 700, fontSize: '1rem' }}>{g.texto}{g.uf && <span style={{ color: '#64748b', fontWeight: 600 }}> · {g.uf}</span>}</div>
             <div style={carteiraDetalhe}>
               {qtdTexto(g.es.length, 'item', 'itens')} em {qtdTexto(contratos.length, 'contrato', 'contratos')}
@@ -154,7 +154,7 @@ export const LigarBeneficiarioModal: React.FC<{ contractKey?: string; foco?: str
             <AppButton size="xs" variant="link" onClick={() => setCadastrando(true)} data-testid="fisc-ligar-benef-novo">Cadastrar novo beneficiário</AppButton>
           </div>
           <span style={carteiraDetalhe}>
-            Ao ligar, “{g.texto}” passa a ser outra grafia do beneficiário escolhido: o mesmo nome em outra carga já chega ligado.
+            Ao ligar, “{g.texto}” passa a ser outra grafia do beneficiário escolhido: o mesmo nome em outro item já chega ligado.
           </span>
         </div>
       )}

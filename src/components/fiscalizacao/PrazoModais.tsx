@@ -122,7 +122,7 @@ export const RecebimentoDaOrdemModal: React.FC<{ entregas: EntregaFiscalizacao[]
         <CamposDoRecebimento recebidaEm={recebidaEm} setRecebidaEm={setRecebidaEm} dias={dias} setDias={setDias} regra={regra} minimo={emissao} />
         {comPlanilha > 0 && (
           <NoticeBar tone="warning" testId="fisc-recebimento-troca">
-            {comPlanilha === 1 ? '1 item tem' : `${comPlanilha} itens têm`} data prevista da planilha. Ela passa a ser a da conta acima; a da planilha fica no histórico.
+            {comPlanilha === 1 ? '1 item tem' : `${comPlanilha} itens têm`} data prevista informada antes. Ela passa a ser a da conta acima; a anterior fica no histórico.
           </NoticeBar>
         )}
       </div>

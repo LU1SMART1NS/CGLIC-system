@@ -10,7 +10,7 @@ import { carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/cart
 import { CelulaBeneficiario, CelulaItem, CelulaSituacaoDoItem } from './EntregasTabela';
 import { CarteiraDetailLabel } from '../carteira/CarteiraDetailLabel';
 import type { ContratoFiscalizacao, EntregaFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, rotaDoContrato } from '../../utils/fiscalizacao';
+import { rotaDoContrato } from '../../utils/fiscalizacao';
 import { foiEntregue, nomeDoItem, rotuloDoBeneficiario } from '../../utils/fiscalizacaoEntregas';
 import { type Resumo, ordemDaSituacao, textoQuantidade, chaveDoBeneficiario, contratosDe, numero, pct, PROGRAMA_DAS_EMENDAS, programasDe, qtdTexto, resumir, ufsDe } from '../../utils/fiscalizacaoResumo';
 /* Células e blocos das listas e telas 360 da Fiscalização (Contratos, Beneficiários, Beneficiário 360). */
@@ -49,7 +49,7 @@ export const CelulaQuemDestinou: React.FC<{ es: EntregaFiscalizacao[] }> = ({ es
   const emendas = [...new Map(es.filter((e) => e.emenda).map((e) => [e.emenda!, e.parlamentarNome ?? null])).entries()];
   const progs = programasDe(es.filter((e) => !(e.emenda && e.programaId === PROGRAMA_DAS_EMENDAS)));
   const linhas = [...emendas.map(([n, quem]) => (quem ? { t: quem, d: `Emenda ${n}` } : { t: `Emenda ${n}`, d: 'emenda parlamentar' })), ...progs.map((p) => ({ t: p, d: 'Programa' }))];
-  if (linhas.length === 0) return <span style={carteiraDetalhe}>Planilha da {NOME_SFC}</span>;
+  if (linhas.length === 0) return <span style={carteiraDetalhe}>—</span>;
   return (
     <>
       {linhas.slice(0, 2).map((x) => (
