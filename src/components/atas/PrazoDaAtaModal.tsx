@@ -59,15 +59,23 @@ export const PrazoDaAtaModal: React.FC<{
   // Prazo de entrega já confirmado e recebimento ainda não: confirma só o recebimento, sem motivo.
   const soRecebimento = confirmado && !recebimentoConfirmado;
   const excecoes = Object.fromEntries(Object.entries(porItem).filter(([, v]) => diasValidos(Number(v))).map(([k, v]) => [k, Number(v)]));
-  const mudou =
+  const mudouEntrega =
     confirmado &&
     (semPrazo !== Boolean(p?.semPrazo) ||
-      recebimentoMudou ||
       (!semPrazo && (dias !== p?.dias || contagem !== p?.contagem || inicio !== p?.inicio || JSON.stringify(excecoes) !== JSON.stringify(p?.porItem ?? {}))));
-  const ok = (semPrazo || diasValidos(dias)) && (!temRecebimento || regraValida(recebimento)) && (!confirmado || mudou || soRecebimento) && (!mudou || motivo.trim().length >= MOTIVO_MINIMO);
+  const mudou = mudouEntrega || recebimentoMudou;
+  // Leitura automática do TR (migration 309): a primeira correção não pede motivo, e confirmar sem mudar vale.
+  const entregaAuto = Boolean(p?.confirmadoAutomatico);
+  const recebimentoAuto = Boolean(p?.recebimentoAutomatico);
+  const precisaMotivo = (mudouEntrega && !entregaAuto) || (recebimentoMudou && !recebimentoAuto);
+  const ok =
+    (semPrazo || diasValidos(dias)) &&
+    (!temRecebimento || regraValida(recebimento)) &&
+    (!confirmado || mudou || soRecebimento || entregaAuto || recebimentoAuto) &&
+    (!precisaMotivo || motivo.trim().length >= MOTIVO_MINIMO);
   const confirmar = () =>
     salvar.mutate(
-      { ataKey, semPrazo, dias: semPrazo ? null : dias, contagem, inicio, porItem: semPrazo ? {} : excecoes, motivo: mudou ? motivo : null, recebimento: recebimentoFinal },
+      { ataKey, semPrazo, dias: semPrazo ? null : dias, contagem, inicio, porItem: semPrazo ? {} : excecoes, motivo: precisaMotivo || mudou ? motivo || null : null, recebimento: recebimentoFinal },
       {
         onSuccess: (r) => {
           toast.success(
@@ -97,7 +105,7 @@ export const PrazoDaAtaModal: React.FC<{
         <>
           <ActionButton action="cancelar" onClick={onClose} disabled={salvar.isPending} />
           <AppButton variant="primary" disabled={!ok} isLoading={salvar.isPending} onClick={confirmar} data-testid="ata-prazo-confirmar">
-            {soRecebimento && !mudou ? 'Confirmar o recebimento' : confirmado ? 'Corrigir os prazos' : semPrazo ? 'Confirmar: sem prazo de entrega' : 'Confirmar os prazos'}
+            {(entregaAuto || recebimentoAuto) && !mudou ? 'Confirmar a leitura do TR' : soRecebimento && !mudou ? 'Confirmar o recebimento' : confirmado ? 'Corrigir os prazos' : semPrazo ? 'Confirmar: sem prazo de entrega' : 'Confirmar os prazos'}
           </AppButton>
         </>
       }
@@ -126,7 +134,12 @@ export const PrazoDaAtaModal: React.FC<{
           </div>
         </div>
 
-        {confirmado && (
+        {entregaAuto && (
+          <NoticeBar tone="info" testId="ata-prazo-automatico">
+            Prazo de entrega lido do TR automaticamente (leitura clara) em {p?.confirmadoEm ? new Date(p.confirmadoEm).toLocaleDateString('pt-BR') : '—'}: já vale para os contratos. Confira; para corrigir agora não precisa de motivo.
+          </NoticeBar>
+        )}
+        {confirmado && !entregaAuto && (
           <NoticeBar tone="success" testId="ata-prazo-confirmado">
             Prazo de entrega confirmado por {p?.confirmadoPorNome ?? '—'} em {p?.confirmadoEm ? new Date(p.confirmadoEm).toLocaleDateString('pt-BR') : '—'}. Para mudar, diga o motivo.
           </NoticeBar>
@@ -179,6 +192,7 @@ export const PrazoDaAtaModal: React.FC<{
         )}
         <div data-testid="ata-prazo-recebimento" style={{ borderTop: '1px solid var(--border, #e2e8f0)', paddingTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
           <CarteiraDetailLabel>Recebimento (TRP e TRD)</CarteiraDetailLabel>
+          {recebimentoAuto && <NoticeBar tone="info" testId="ata-receb-automatico">Lido do TR automaticamente (leitura clara): já vale para os contratos. Para corrigir agora não precisa de motivo.</NoticeBar>}
           {soRecebimento && <NoticeBar tone="warning" testId="ata-receb-a-confirmar">O prazo de recebimento ainda não foi confirmado. Confira os trechos do TR e confirme.</NoticeBar>}
           {p?.recebimentoTrechos?.length ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -206,7 +220,7 @@ export const PrazoDaAtaModal: React.FC<{
           )}
         </div>
 
-        {mudou && (
+        {precisaMotivo && (
           <AppTextarea label="Por que o prazo muda?" value={motivo} onChange={(ev) => setMotivo(ev.target.value)} rows={2} placeholder="ex.: conferi o TR e o prazo é contado da assinatura" hint={`Fica no registro da ata (mínimo de ${MOTIVO_MINIMO} letras).`} data-testid="ata-prazo-motivo" />
         )}
         <span style={{ ...carteiraDetalhe, marginTop: 0 }}>Os contratos desta ata passam a usar estes prazos. Se um contrato tiver prazo próprio (aditivo), o fiscal muda no contrato, com o motivo.</span>

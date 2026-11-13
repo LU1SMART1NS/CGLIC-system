@@ -25,6 +25,8 @@ export interface RegraDoRecebimento {
   trechoTrp?: string | null;
   trechoTrd?: string | null;
   confirmadoPor?: string | null;
+  /** Vale pela leitura clara do TR, sem confirmação do gestor da ata (migration 309). */
+  automatico?: boolean;
   motivo?: string | null;
 }
 
@@ -40,7 +42,9 @@ export const origemDoRecebimento = (r: RegraDoRecebimento) =>
     ? 'informado no contrato'
     : r.origem === 'LEI'
       ? 'o TR não diz; vale a IN SEGES 77/2022'
-      : `do TR da ata ${r.ata ?? ''}${r.confirmadoPor ? `, confirmado por ${r.confirmadoPor}` : ''}`.trim();
+      : r.automatico
+        ? `lido do TR da ata ${r.ata ?? ''} (leitura automática)`
+        : `do TR da ata ${r.ata ?? ''}${r.confirmadoPor ? `, confirmado por ${r.confirmadoPor}` : ''}`.trim();
 
 /** Até quando emitir o TRP (no ato da entrega: no próprio dia). */
 export const trpAte = (entregueEm: string, r: RegraDoRecebimento) => (r.trpDias === 0 ? entregueEm : previstaPelaRegra(entregueEm, r.trpDias, r.trpContagem));
