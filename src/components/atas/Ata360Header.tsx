@@ -48,6 +48,8 @@ interface Ata360HeaderProps {
   /** Quadro do reajuste (migrations 158 e 159): só nas atas da SENASP com o reajuste lido. */
   reajuste?: { valor: string; hint: string; tone?: 'danger' | 'warning'; indice?: string | null } | null;
   onOpenReajuste?: () => void;
+  /** Prazo de entrega do TR (migration 301): texto da regra e se o gestor da ata já confirmou. */
+  prazoEntrega?: React.ReactNode;
 }
 
 export const pncpLinkStyle: React.CSSProperties = {
@@ -97,8 +99,7 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
   onIndicarFornecedor,
   verMais,
   reajuste = null,
-  onOpenReajuste
-}) => {
+  onOpenReajuste, prazoEntrega }) => {
   const back = useBackTarget({ path: '/atas', label: 'Voltar para Carteira' });
   const lifeline = React.useMemo(() => buildAtaLifeline(arp), [arp]);
   const managerQuery = useAtaManager(chaveGestaoDaArp(arp));
@@ -227,7 +228,8 @@ export const Ata360Header: React.FC<Ata360HeaderProps> = ({
         { label: 'Compra', value: arp.numeroCompra && arp.anoCompra ? `${arp.numeroCompra}/${arp.anoCompra}` : undefined },
         // Só aparece quando o PNCP informa: ausente não quer dizer que não aceita.
         ...(typeof pncp?.possibilidadeAdesao === 'boolean' ? [{ label: 'Aceita adesão', value: pncp.possibilidadeAdesao ? 'Sim' : 'Não' }] : []),
-        ...(arp.numeroControlePncpAta ? [{ label: 'Id PNCP', value: arp.numeroControlePncpAta }] : [])
+        ...(arp.numeroControlePncpAta ? [{ label: 'Id PNCP', value: arp.numeroControlePncpAta }] : []),
+        ...(prazoEntrega ? [{ label: 'Prazo de entrega', value: prazoEntrega }] : [])
       ]}
     >
       <div data-testid="ata-health-strip">

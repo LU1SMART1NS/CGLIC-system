@@ -45,6 +45,9 @@ import { AtaReajusteTab } from './reajuste/AtaReajusteTab';
 import { contarComAcao, quadroDoCartao, type SaldoDoItem } from './reajuste/reajusteRotulos';
 import { ROTULO_REAJUSTE_ATAS, useReajusteDaAta } from '../../hooks/useReajusteAtas';
 import { TrendingUp } from 'lucide-react';
+import { usePrazoDaAta } from '../../hooks/useAtaPrazoEntrega';
+import { PrazoDaAtaModal } from './PrazoDaAtaModal';
+import { PrazoNoCartaoDaAta, itemDoPrazoDaAta } from './prazoDaAtaPartes';
 
 const TAB_IDS: Ata360Tab[] = ['acoes', 'plano', 'itens', 'contratos', 'reajuste'];
 // Gestor de Saldo (domínio de alocações) só precisa chegar aos itens da ata.
@@ -97,7 +100,16 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   // no Contract360Page para /contratos/:contractKey.
   const queue = useAtaActionQueue(arp, saldos, taskPlan, { registro: registroFornecedor, itensNoBanco: itens.length });
 
-  const { role } = useAuth();
+  const { role, user } = useAuth();
+  // Prazo de entrega do TR (migration 301): só nas atas da SENASP; o gestor da ata ou o coordenador confirmam.
+  const prazoQuery = usePrazoDaAta(chaveGestao, Boolean(arp && !ataDeOutroOrgao(arp)));
+  const prazoDaAta = prazoQuery.data ?? null;
+  const podeConfirmarPrazo = Boolean(arp && !ataDeOutroOrgao(arp)) && (role === 'admin' || (role === 'gestor' && Boolean(user?.id) && gestorQuery.data?.gestorUserId === user?.id));
+  const [prazoAberto, setPrazoAberto] = React.useState(false);
+  const filaComPrazo = React.useMemo(() => {
+    const item = itemDoPrazoDaAta(prazoDaAta);
+    return item ? { ...queue, items: [...queue.items, item], counts: { ...queue.counts, [item.severity]: queue.counts[item.severity] + 1 } } : queue;
+  }, [queue, prazoDaAta]);
   const saldosOnly = semContratos(role);
   const abasDoPerfil = role === 'gestor_emendas' ? EMENDAS_TAB_IDS : SALDOS_TAB_IDS;
   // Reajuste dos preços registrados (migrations 158 e 159): só nas atas gerenciadas pela SENASP, fora do gestor de saldo.
@@ -274,7 +286,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   ) : null;
 
   const allTabs: { id: Ata360Tab; label: string }[] = [
-    { id: 'acoes', label: queue.items.length > 0 ? `Ações (${queue.items.length})` : 'Ações' },
+    { id: 'acoes', label: filaComPrazo.items.length > 0 ? `Ações (${filaComPrazo.items.length})` : 'Ações' },
     { id: 'plano', label: 'Plano de gestão' },
     { id: 'itens', label: `Itens (${itens.length})` },
     { id: 'contratos', label: linkedContracts.length > 0 ? `Contratos vinculados (${linkedContracts.length})` : 'Contratos vinculados' },
@@ -291,7 +303,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         arp={arp}
         itens={itens}
         saldos={saldos}
-        actionItems={queue.items}
+        actionItems={filaComPrazo.items}
         linkedContractsCount={linkedContracts.length}
         isLoadingSaldos={loadingSaldos}
         onOpenActions={() => goToTab('acoes')}
@@ -305,6 +317,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
           return q ? { ...q, indice: reajusteQuery.data.parametros?.indice } : null;
         })() : null}
         onOpenReajuste={() => goToTab('reajuste')}
+        prazoEntrega={arp && !ataDeOutroOrgao(arp) ? <PrazoNoCartaoDaAta prazo={prazoDaAta} carregando={prazoQuery.isLoading} podeConfirmar={podeConfirmarPrazo} onAbrir={() => setPrazoAberto(true)} /> : undefined}
       />
 
       {/* Gaveta entre o cartão e as abas; some junto com o cartão quando ele encolhe ao rolar. */}
@@ -331,7 +344,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
             icon={AlertTriangle}
           >
             <AtaActionQueue
-              queue={queue}
+              queue={filaComPrazo}
               ataKey={chaveGestao}
               plan={taskPlan}
               isLoading={loadingSaldos || loadingTaskPlan}
@@ -339,6 +352,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
               podeIndicarFornecedor={podeIndicarFornecedor}
               onIndicarFornecedor={abrirIndicar}
               onDesfazerIndicacao={desfazerIndicacao}
+              onConfirmarPrazo={podeConfirmarPrazo ? () => setPrazoAberto(true) : undefined}
             />
           </InstrumentSection>
         )}
@@ -431,6 +445,17 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         onConfirm={indicarFornecedor}
         isSaving={fornecedorPncp.indicar.isPending}
       />
+
+      {prazoAberto && arp && (
+        <PrazoDaAtaModal
+          ataKey={chaveGestao}
+          ata={arp.numeroAtaRegistroPreco}
+          compra={arp.numeroCompra && arp.anoCompra ? `${arp.numeroCompra}/${arp.anoCompra}` : null}
+          prazo={prazoDaAta}
+          itens={itens.map((i) => ({ numero: i.numeroItem, descricao: i.descricaoItem }))}
+          onClose={() => setPrazoAberto(false)}
+        />
+      )}
 
       {canEditLinks && (
         <LinkContractModal
