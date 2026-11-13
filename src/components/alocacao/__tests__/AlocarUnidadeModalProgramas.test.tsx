@@ -80,7 +80,12 @@ describe('Alocação do item com programas', () => {
     expect(html).toContain('data-testid="alocar-historico-remanejamentos"');
     expect(html).toContain('28451237');
     expect(html).toContain('Remanejar entre unidades');
-    expect(html).toContain('Reservar para um programa');
+    // Uma linha só para pôr quantidade: unidade (pendente) ou programa (grava na hora); ComprasSUSP é a CAEP.
+    expect(html).toContain('data-testid="alocar-linha-adicionar"');
+    expect(html).toContain('CAEP — somar às emendas');
+    expect(html).toContain('Pégasus · DGFNSP');
+    expect(html).not.toContain('>ComprasSUSP</option>');
+    expect(html).not.toContain('Gerenciar Unidades Internas');
   });
 
   it('ata sem divisão: quantidades editáveis e aviso de alocação opcional', () => {
