@@ -5,6 +5,7 @@ import { ErrorState } from '../../design-system/components/ErrorState';
 import { EmptyState } from '../../design-system/components/EmptyState';
 import { ActionButton, AppButton, AvisoCarregando, InfoHint, NoticeBar, StatusBadge, useConfirmDialog, useToast } from '../../design-system';
 import { useDivisoesNaAta, useMarcarDivisaoDaAta } from '../../hooks/useDivisaoNaAta';
+import { useProgramasDosItens } from '../../hooks/useProgramasDaAlocacao';
 import type { DivisaoNaAta, SituacaoDivisao } from '../../services/divisaoNaAtaService';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
@@ -159,6 +160,7 @@ export const ItensUnidadesPage: React.FC = () => {
   const [alocando, setAlocando] = useState<ItemParaAlocar | null>(null);
   const divisaoNaAta = useDivisoesNaAta();
   const marcar = useMarcarDivisaoDaAta();
+  const programasDosItens = useProgramasDosItens();
   const toast = useToast();
   const confirmar = useConfirmDialog();
   // Ata sem divisão (migration 297): alocar é opcional e o item sem unidade não é pendência.
@@ -290,7 +292,7 @@ export const ItensUnidadesPage: React.FC = () => {
   const abrirItem = (r: CarteiraItemRow) => navigate(`${buildAtaItemPath(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)}?aba=quantitativos`);
   const abrirAta = (r: CarteiraItemRow) => navigate(buildAtaPath(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora));
   const alocar = (r: CarteiraItemRow) =>
-    setAlocando({ numeroAta: r.arp.numeroAtaRegistroPreco, uasg: r.arp.codigoUnidadeGerenciadora, numeroItem: String(r.item.numeroItem), descricao: r.item.descricaoItem, quantitativoSenasp: r.quantitativoSenasp, limiteProvisorioOutrosOrgaos: r.limiteProvisorioOutrosOrgaos, semDivisaoNaAta: semDivisao(r) });
+    setAlocando({ numeroAta: r.arp.numeroAtaRegistroPreco, uasg: r.arp.codigoUnidadeGerenciadora, numeroItem: String(r.item.numeroItem), descricao: r.item.descricaoItem, quantitativoSenasp: r.quantitativoSenasp, limiteProvisorioOutrosOrgaos: r.limiteProvisorioOutrosOrgaos, semDivisaoNaAta: semDivisao(r), divisaoNaAta: divisaoNaAta.de(r.ataKey).situacao });
   /** Marca ou desmarca "a ata não divide": pergunta antes, porque muda a situação de todos os itens da ata. */
   const marcarDivisao = async (g: GrupoAta, situacao: Exclude<SituacaoDivisao, 'A_CONFERIR'>) => {
     const numero = g.primeiro.arp.numeroAtaRegistroPreco;
@@ -388,6 +390,17 @@ export const ItensUnidadesPage: React.FC = () => {
             <span style={{ color: '#94a3b8' }}>—</span>
           )}
         </td>
+        <td data-label="Programas" style={{ ...carteiraTd, fontSize: '0.8rem' }} data-testid={`alocacao-programas-${r.key}`}>
+          {(programasDosItens.get(r.key) ?? []).length === 0 ? (
+            <span style={{ color: '#94a3b8' }}>—</span>
+          ) : (
+            programasDosItens.get(r.key)!.map((p) => (
+              <div key={p.nome + p.emPedidos} style={{ whiteSpace: 'nowrap' }} title={p.emPedidos ? 'Reservado a parlamentares nos pedidos de emenda' : 'Reserva do programa'}>
+                {p.nome} {formatNumber(p.quantidade)}{p.emPedidos && <span style={subtle}> em pedidos</span>}
+              </div>
+            ))
+          )}
+        </td>
         <td data-label="Contratado" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
           {r.contratada != null && r.contratada > 0 ? (
             <>
@@ -446,6 +459,7 @@ export const ItensUnidadesPage: React.FC = () => {
               <CarteiraSortHeader label="Quantitativo SENASP" sortKey="senasp" align="right" {...sortItem} />
               <CarteiraSortHeader label="Alocado" sortKey="alocado" {...sortItem} />
               <th style={carteiraTh}>Unidades</th>
+              <th style={carteiraTh}>Programas</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }}>Contratado</th>
               <CarteiraSortHeader label="Falta alocar" sortKey="falta" align="right" {...sortItem} />
               <th style={carteiraTh}>Situação</th>
@@ -619,6 +633,7 @@ export const ItensUnidadesPage: React.FC = () => {
                                 <th style={{ ...carteiraTh, textAlign: 'right' }}>Quantitativo SENASP</th>
                                 <th style={carteiraTh}>Alocado</th>
                                 <th style={carteiraTh}>Unidades</th>
+                                <th style={carteiraTh}>Programas</th>
                                 <th style={{ ...carteiraTh, textAlign: 'right' }}>Contratado</th>
                                 <th style={{ ...carteiraTh, textAlign: 'right' }}>{semDiv ? 'Livre' : 'Falta alocar'}</th>
                                 <th style={carteiraTh}>Situação</th>

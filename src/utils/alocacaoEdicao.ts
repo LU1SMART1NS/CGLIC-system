@@ -29,6 +29,9 @@ export interface LinhaAlocacao {
   reservadoTotal?: number;
   /** Parte do reservado já em contrato, mas com o contrato ainda sem a unidade interna informada. */
   reservadoEmContratoSemUnidade?: number;
+  /** Reservas dos programas da unidade (migration 297): a parte ainda sem contrato e o total. */
+  reservadoProgramas?: number;
+  reservadoProgramasTotal?: number;
   removida: boolean;
   adicionada: boolean;
   /** Unidade desativada no catálogo: só mantém ou diminui (migration 108). */
@@ -66,7 +69,7 @@ export type MotivoDoMinimo = 'contratado' | 'empenhado' | 'reservado' | 'contrat
 export const ROTULO_MOTIVO_DO_MINIMO: Record<MotivoDoMinimo, string> = {
   contratado: 'contratado',
   empenhado: 'empenhado',
-  reservado: 'reservado a parlamentares',
+  reservado: 'reservado',
   contratado_e_reserva: 'contratado + reservado'
 };
 
@@ -78,6 +81,9 @@ export interface ExecucaoDaUnidade {
   reservado?: number;
   /** Reserva toda, inclusive a já contratada: a trava do banco (migration 157) não deixa a CAEP abaixo dela. */
   reservadoTotal?: number;
+  /** Reservas dos programas da unidade ainda sem contrato, e o total delas (migration 297: a trava confere o total). */
+  reservadoProgramas?: number;
+  reservadoProgramasTotal?: number;
 }
 
 /**
@@ -85,19 +91,22 @@ export interface ExecucaoDaUnidade {
  * (decisão do usuário em 27/10/2026), e nunca menos que o empenhado nem que a reserva toda.
  */
 export function presoDaUnidade(u: ExecucaoDaUnidade): { preso: number; motivo: MotivoDoMinimo | null; explicacao: string | null } {
-  const reservado = Math.max(0, u.reservado ?? 0);
+  const parlamentares = Math.max(0, u.reservado ?? 0);
+  const programas = Math.max(0, u.reservadoProgramas ?? 0);
+  const reservado = parlamentares + programas;
   const contratado = Math.max(0, u.contratado);
   const comReserva = contratado + reservado;
-  const preso = Math.max(comReserva, u.empenhado, u.reservadoTotal ?? 0);
+  const preso = Math.max(comReserva, u.empenhado, (u.reservadoTotal ?? 0) + (u.reservadoProgramasTotal ?? 0));
   if (preso === 0) return { preso, motivo: null, explicacao: null };
+  const deQuem = parlamentares > 0 && programas > 0 ? 'a parlamentares e a programas' : programas > 0 ? 'a programas' : 'a parlamentares';
   if (preso === comReserva && reservado > 0) {
     return contratado > 0
-      ? { preso, motivo: 'contratado_e_reserva', explicacao: `${fmt(contratado)} contratados + ${fmt(reservado)} reservados a parlamentares ainda fora do contratado` }
-      : { preso, motivo: 'reservado', explicacao: `${fmt(reservado)} reservados a parlamentares` };
+      ? { preso, motivo: 'contratado_e_reserva', explicacao: `${fmt(contratado)} contratados + ${fmt(reservado)} reservados ${deQuem} ainda fora do contratado` }
+      : { preso, motivo: 'reservado', explicacao: `${fmt(reservado)} reservados ${deQuem}` };
   }
   if (preso === comReserva) return { preso, motivo: 'contratado', explicacao: `${fmt(contratado)} contratados` };
   if (preso === u.empenhado) return { preso, motivo: 'empenhado', explicacao: `${fmt(u.empenhado)} empenhados` };
-  return { preso, motivo: 'reservado', explicacao: `${fmt(preso)} reservados a parlamentares` };
+  return { preso, motivo: 'reservado', explicacao: `${fmt(preso)} reservados ${deQuem}` };
 }
 
 const temReserva = (motivo: MotivoDoMinimo | null) => motivo === 'reservado' || motivo === 'contratado_e_reserva';
@@ -157,7 +166,9 @@ export function linhasIniciais(
   /** Contratado de cada unidade, pelo nome normalizado (normUnidade). */
   contratadoPorUnidade?: ReadonlyMap<string, number>,
   /** Reserva a parlamentares no item (vai para a linha da CAEP). */
-  reserva: ReservaDasEmendas = SEM_RESERVA
+  reserva: ReservaDasEmendas = SEM_RESERVA,
+  /** Reservas dos programas por unidade (reservasDosProgramasPorUnidade). */
+  programas?: ReadonlyMap<string, ReservasDosProgramas>
 ): LinhaAlocacao[] {
   return alocacoes.map((a) => {
     const exec = execucao.get(a.id);
@@ -171,10 +182,29 @@ export function linhasIniciais(
       contratado,
       vinculados: exec?.vinculados ?? 0,
       ...reservaDaUnidade(a.unitName, reserva, contratado),
+      reservadoProgramas: programas?.get(normUnidade(a.unitName))?.semContrato ?? 0,
+      reservadoProgramasTotal: programas?.get(normUnidade(a.unitName))?.total ?? 0,
       removida: false,
       adicionada: false
     };
   });
+}
+
+/** Reservas dos programas de uma unidade: o total e a parte ainda sem contrato ligado ao programa. */
+export interface ReservasDosProgramas {
+  total: number;
+  semContrato: number;
+}
+
+/** Soma as reservas dos programas por unidade (área responsável), pelo nome normalizado. */
+export function reservasDosProgramasPorUnidade(reservas: ReadonlyArray<{ area: string; quantidade: number; contratado: number }>): Map<string, ReservasDosProgramas> {
+  const mapa = new Map<string, ReservasDosProgramas>();
+  for (const r of reservas) {
+    const k = normUnidade(r.area);
+    const atual = mapa.get(k) ?? { total: 0, semContrato: 0 };
+    mapa.set(k, { total: atual.total + r.quantidade, semContrato: atual.semContrato + Math.max(0, r.quantidade - r.contratado) });
+  }
+  return mapa;
 }
 
 export function avaliarEdicao(linhas: LinhaAlocacao[], quantitativoSenasp: number): AvaliacaoEdicao {
@@ -195,7 +225,7 @@ export function avaliarEdicao(linhas: LinhaAlocacao[], quantitativoSenasp: numbe
     const acimaDoGravado = !!l.inativa && !l.removida && num(l.qtd) > l.original;
     if (acimaDoGravado) inativasAcima.push(l.unitName);
     const alterada = !l.adicionada && !l.removida && num(l.qtd) !== l.original;
-    porLinha.set(l.id, { alterada, minimo, motivoDoMinimo: preso > 0 ? motivo : null, abaixoDoMinimo, acimaDoGravado, podeRemover: l.vinculados === 0 && !(l.contratado > 0) && !((l.reservado ?? 0) > 0) });
+    porLinha.set(l.id, { alterada, minimo, motivoDoMinimo: preso > 0 ? motivo : null, abaixoDoMinimo, acimaDoGravado, podeRemover: l.vinculados === 0 && !(l.contratado > 0) && !((l.reservado ?? 0) > 0) && !((l.reservadoProgramasTotal ?? 0) > 0) });
     if (l.adicionada && !l.removida) mudancas.push(`+ ${l.unitName} ${fmt(num(l.qtd))}`);
     else if (l.removida && !l.adicionada) mudancas.push(`− ${l.unitName}`);
     else if (alterada) mudancas.push(`${l.unitName} ${fmt(l.original)} → ${fmt(num(l.qtd))}`);
@@ -214,7 +244,11 @@ export function avaliarEdicao(linhas: LinhaAlocacao[], quantitativoSenasp: numbe
   }
   if (reservaAbaixo) {
     const r: { unidade: string; minimo: number; explicacao: string } = reservaAbaixo;
-    erros.push(`A ${r.unidade} não pode ficar com menos de ${fmt(r.minimo)}: ${r.explicacao}. Para diminuir, peça à ${r.unidade} para liberar a reserva em Emendas › Pedidos.`);
+    erros.push(
+      r.explicacao.includes('programas') && !r.explicacao.includes('parlamentares')
+        ? `A ${r.unidade} não pode ficar com menos de ${fmt(r.minimo)}: ${r.explicacao}. Para diminuir, reduza antes a reserva do programa.`
+        : `A ${r.unidade} não pode ficar com menos de ${fmt(r.minimo)}: ${r.explicacao}. Para diminuir, peça à ${r.unidade} para liberar a reserva em Emendas › Pedidos.`
+    );
   }
   if (algumaAbaixo) erros.push('Há unidade abaixo do mínimo: a quantidade deve ser maior que zero e não pode ficar abaixo do que a unidade já contratou nem do que já empenhou.');
   if (inativasAcima.length > 0) {
@@ -222,6 +256,7 @@ export function avaliarEdicao(linhas: LinhaAlocacao[], quantitativoSenasp: numbe
   }
   if (linhas.some((l) => l.removida && l.contratado > 0)) erros.push('Unidade com contrato não pode ser removida. Tire a unidade das divisões dos contratos antes, na aba Contratos e empenhos.');
   if (linhas.some((l) => l.removida && (l.reservado ?? 0) > 0)) erros.push('A unidade com reserva a parlamentares não pode ser removida. A reserva precisa ser liberada antes, em Emendas › Pedidos.');
+  if (linhas.some((l) => l.removida && (l.reservadoProgramasTotal ?? 0) > 0)) erros.push('A unidade com reserva de programa não pode ser removida. Retire a reserva do programa antes.');
   if (linhas.some((l) => l.removida && l.vinculados > 0)) erros.push('Unidade com empenho vinculado não pode ser removida. Desvincule os empenhos antes.');
 
   return {

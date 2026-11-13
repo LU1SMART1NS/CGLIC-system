@@ -32,6 +32,7 @@ vi.mock('../../../hooks/useCarteiraItens', () => ({
 }));
 vi.mock('../../../hooks/useAtasAMontar', () => ({ useDivisoesDasAtasMontadas: () => new Map() }));
 vi.mock('../AlocarUnidadeModal', () => ({ AlocarUnidadeModal: () => null }));
+vi.mock('../../../hooks/useProgramasDaAlocacao', () => ({ useProgramasDosItens: () => new Map() }));
 vi.mock('../../../hooks/useDivisaoNaAta', () => ({
   useDivisoesNaAta: () => ({ de: (k: string) => divisoes.get(k) ?? { situacao: 'A_CONFERIR' }, mapa: divisoes, query: { isError: false } }),
   useMarcarDivisaoDaAta: () => ({ mutateAsync: vi.fn(), isPending: false })
