@@ -12,7 +12,7 @@ import { CarteiraDetailLabel } from '../carteira/CarteiraDetailLabel';
 import type { ContratoFiscalizacao, EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, rotaDoContrato } from '../../utils/fiscalizacao';
 import { foiEntregue, nomeDoItem, rotuloDoBeneficiario } from '../../utils/fiscalizacaoEntregas';
-import { type Resumo, ordemDaSituacao, textoQuantidade, chaveDoBeneficiario, contratosDe, numero, pct, programasDe, qtdTexto, resumir, ufsDe } from '../../utils/fiscalizacaoResumo';
+import { type Resumo, ordemDaSituacao, textoQuantidade, chaveDoBeneficiario, contratosDe, numero, pct, PROGRAMA_DAS_EMENDAS, programasDe, qtdTexto, resumir, ufsDe } from '../../utils/fiscalizacaoResumo';
 /* Células e blocos das listas e telas 360 da Fiscalização (Contratos, Beneficiários, Beneficiário 360). */
 
 
@@ -43,10 +43,11 @@ export const CelulaEntregaResumo: React.FC<{ es: EntregaFiscalizacao[]; r: Resum
   );
 };
 
-/** Quem destinou: emenda e parlamentar; sem emenda, o programa; sem nenhum, a planilha. */
+/** Quem destinou: emenda e parlamentar; sem emenda, o programa; sem nenhum, a planilha. O programa das emendas não se
+ * repete embaixo da emenda que já aparece. */
 export const CelulaQuemDestinou: React.FC<{ es: EntregaFiscalizacao[] }> = ({ es }) => {
   const emendas = [...new Map(es.filter((e) => e.emenda).map((e) => [e.emenda!, e.parlamentarNome ?? null])).entries()];
-  const progs = programasDe(es);
+  const progs = programasDe(es.filter((e) => !(e.emenda && e.programaId === PROGRAMA_DAS_EMENDAS)));
   const linhas = [...emendas.map(([n, quem]) => (quem ? { t: quem, d: `Emenda ${n}` } : { t: `Emenda ${n}`, d: 'emenda parlamentar' })), ...progs.map((p) => ({ t: p, d: 'Programa' }))];
   if (linhas.length === 0) return <span style={carteiraDetalhe}>Planilha da {NOME_SFC}</span>;
   return (

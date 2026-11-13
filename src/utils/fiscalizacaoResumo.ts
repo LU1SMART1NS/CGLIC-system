@@ -78,6 +78,8 @@ export const pct = (parte: number, todo: number) => (todo > 0 ? Math.round((part
 
 export const contratosDe = (es: EntregaFiscalizacao[]) => [...new Set(es.map((e) => e.contratoNumero))];
 export const ufsDe = (es: EntregaFiscalizacao[]) => [...new Set(es.map((e) => e.uf).filter((u): u is string => Boolean(u)))].sort();
+/** Programa das emendas parlamentares (id fixo de programa_das_emendas(), migration 297); itens da CAEP entram nele sozinhos (migration 299). */
+export const PROGRAMA_DAS_EMENDAS = '00000000-0000-4000-8000-0000000c5000';
 export const programasDe = (es: EntregaFiscalizacao[]) => [...new Set(es.map((e) => e.programaTexto).filter((p): p is string => Boolean(p)))];
 export const qtdTexto = (n: number, um: string, varios: string) => `${numero(n)} ${n === 1 ? um : varios}`;
 export const diasAte = (data: string, hoje: string) => Math.round((Date.parse(`${data}T12:00:00Z`) - Date.parse(`${hoje}T12:00:00Z`)) / 864e5);
