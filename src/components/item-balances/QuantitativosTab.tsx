@@ -370,7 +370,10 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
     const e = estado(l);
     const partes: React.ReactNode[] = [];
     if (o?.situacao === 'GERENCIADO') {
-      partes.push(<p key="g" style={{ margin: 0 }}>A ata assinada dá <b>{formatNumber(o.quantidadeAssinada)}</b> ao órgão e o Compras.gov.br registra <b>{formatNumber(o.quantidadeRegistrada ?? 0)}</b>{o.semRegistro ? ' (o órgão não tem registro neste item)' : ''}. Os <b>{formatNumber(o.gerenciado)}</b> restantes estão no registrado da SENASP, que os gerencia para o órgão e não os conta na cota própria. Quando a SENASP remanejar para o órgão, o registrado dele sobe e o gerenciado cai sozinho.</p>);
+      partes.push(<p key="g" style={{ margin: 0 }}>A ata assinada dá <b>{formatNumber(o.quantidadeAssinada)}</b> ao órgão e o Compras.gov.br registra <b>{formatNumber(o.quantidadeRegistrada ?? 0)}</b>{o.semRegistro ? ' (o órgão não tem registro neste item)' : ''}. {o.gerenciado > 0 ? <> Os <b>{formatNumber(o.gerenciado)}</b> restantes estão no registrado da SENASP, que os gerencia para o órgão e não os conta na cota própria. Quando a SENASP remanejar para o órgão, o registrado dele sobe e o gerenciado cai sozinho.</> : null}</p>);
+      if (o.foraDaFonte > 0) {
+        partes.push(<p key="f" style={{ margin: 0 }}>O órgão sumiu da lista do Compras.gov.br e <b>{formatNumber(o.foraDaFonte)}</b> também faltam no total registrado do item: essa quantidade não voltou para a SENASP e não sai da cota própria. Confira na fonte se o órgão ainda participa da ata.</p>);
+      }
     }
     if (o?.situacao === 'REMANEJADO_A_MENOS') {
       partes.push(<p key="r" style={{ margin: 0 }}>O registrado do órgão foi reduzido depois do registro da ata: houve remanejamento. A ata assinada dá <b>{formatNumber(o.quantidadeAssinada)}</b> e o Compras.gov.br registra <b>{formatNumber(o.quantidadeRegistrada ?? 0)}</b>. Pela regra aprovada, a redução é definitiva{o.gerenciado > 0 ? <>, menos <b>{formatNumber(o.gerenciado)}</b> marcados como "continua do órgão"</> : ''}.</p>);

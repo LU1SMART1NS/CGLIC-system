@@ -16,7 +16,7 @@ const rem = (p: Partial<RemanejamentoNaoParticipante>): RemanejamentoNaoParticip
 const org = (p: Partial<OrgaoQuantitativo>): OrgaoQuantitativo => ({
   uasg: '927555', nomeOrgao: null, tipoUnidade: 'PARTICIPANTE', ehSenasp: false, quantidadeAssinada: 20000, quantidadeRegistrada: 20000, semRegistro: false,
   situacao: 'IGUAL', falta: 0, acima: 0, remanejadoConfirmado: 0, resto: 0, continuaDoOrgao: null, gerenciado: 0, mudou: false,
-  mudouEm: null, atualizadoEm: null, ataDaSenasp: true, remanejadoNaoParticipante: 0, saidaNaoParticipante: 0, naoParticipanteAguardaFonte: 0, ...p
+  mudouEm: null, atualizadoEm: null, ataDaSenasp: true, remanejadoNaoParticipante: 0, saidaNaoParticipante: 0, naoParticipanteAguardaFonte: 0, foraDaFonte: 0, ...p
 });
 const fmt = (n: number) => String(n);
 
