@@ -35,17 +35,19 @@ import { BeneficiarioDaLinha, LinhaDoPedido, SituacaoDaLinhaEtiqueta, PrecoDaEme
 import type { AcaoDaJanela, ContextoDaJanela } from './EtapaPedidoModal';
 import { podeMontarQuadros } from '../../utils/emendasAutorizacao';
 import { proximaAcaoDaJanela } from './proximaAcaoDaJanela';
+import type { EntregaDaLinha } from '../../services/fiscalizacaoService';
+import { entregaDoItem, VARIANTE_DA_ENTREGA } from '../../utils/emendasEntrega';
 
 export type AoAgir = (acao: AcaoDaJanela, contexto?: ContextoDaJanela) => void;
 
 /** Contrato da linha: o achado no Contratos.gov.br (link para quem vê contratos) ou o número do controle anterior. */
-const ContratoDaLinha: React.FC<{ linha: LinhaPedido; nota: NotaDaLinha | undefined; podeVerContratos: boolean }> = ({ linha, nota, podeVerContratos }) => {
+const ContratoDaLinha: React.FC<{ linha: LinhaPedido; nota: NotaDaLinha | undefined; podeVerContratos: boolean; antes?: string | null }> = ({ linha, nota, podeVerContratos, antes }) => {
   const chave = nota?.contractKey ?? chaveDoContratoDaEmenda(linha.contratoNumero);
   const numero = nota?.contractKey ? numeroDaChave(nota.contractKey) : linha.contratoNumero;
   if (!numero) return null;
   return (
     <div style={carteiraDetalhe}>
-      Contrato{' '}
+      {antes ? `${antes} · ` : ''}Contrato{' '}
       {podeVerContratos && chave ? (
         <Link to={`/contratos/${encodeURIComponent(chave)}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--primary)', fontWeight: 700 }}>
           {numero}
@@ -85,6 +87,8 @@ interface BlocosProps {
   /** Empenhado × pedido (migration 187), por `emenda|item`: a etiqueta "X de Y na nota" de cada linha. */
   conferencia?: Map<string, ConferenciaEmpenho>;
   resolvidos?: { has: (chave: string) => boolean };
+  /** Entregas da Fiscalização por item do pedido: a etapa da entrega na coluna Situação. */
+  entregas?: Map<string, EntregaDaLinha[]>;
 }
 
 const VARIANTE_CONFERENCIA: Record<EtiquetaConferencia['tom'], StatusBadgeVariant> = { ok: 'success', mais: 'danger', menos: 'warning', cinza: 'neutral' };
@@ -112,7 +116,7 @@ function pendenciasDoGrupo(p: PedidoEmenda, g: GrupoDeLinhas, notas: Map<string,
  * valor e pendências; dentro, as solicitações de empenho da ata (uma por rodada, com as linhas que cada uma cobre) e
  * as linhas com a situação de cada uma. O bloco nasce aberto só com pendência ou com o item de onde o gestor veio.
  */
-export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, notas, precos, podeGerir, podeVerContratos, hoje, itemDeOrigem, onAcao, conferencia, resolvidos }) => {
+export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, notas, precos, podeGerir, podeVerContratos, hoje, itemDeOrigem, onAcao, conferencia, resolvidos, entregas }) => {
   const grupos = linhasPorAta(p, itens);
   const temItem = (l: LinhaPedido) => Boolean(itemDeOrigem) && itensDaLinha(l).some((x) => x.itemKey === itemDeOrigem);
   const depoisDaSolicitacao = ORDEM_ETAPA[p.etapa] >= ORDEM_ETAPA.SOLICITADO;
@@ -157,13 +161,35 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
       key: 'situacao',
       header: 'Situação',
       minWidth: '200px',
-      render: (l) => (
-        <>
-          <SituacaoDaLinhaEtiqueta s={situacaoDaLinha(p, l, notas)} testId={`emendas-linha-situacao-${l.id}`} />
-          <ContratoDaLinha linha={l} nota={notas.get(l.id)} podeVerContratos={podeVerContratos} />
-          <ConferenciaDaLinha p={p} linha={l} conferencia={conferencia} resolvidos={resolvidos} />
-        </>
-      )
+      render: (l) => {
+        // Contratado: a etapa da entrega (sem o nº do contrato na etiqueta nem "NE ligada") e uma linha de detalhe,
+        // com o contrato no fim; o atraso vira etiqueta amarela no lugar da previsão (parecer de UX, 13/11/2026).
+        const e = entregaDoItem(p, l, notas, entregas?.get(l.id), hoje);
+        if (!e)
+          return (
+            <>
+              <SituacaoDaLinhaEtiqueta s={situacaoDaLinha(p, l, notas)} testId={`emendas-linha-situacao-${l.id}`} />
+              <ContratoDaLinha linha={l} nota={notas.get(l.id)} podeVerContratos={podeVerContratos} />
+              <ConferenciaDaLinha p={p} linha={l} conferencia={conferencia} resolvidos={resolvidos} />
+            </>
+          );
+        return (
+          <>
+            <div data-testid={`emendas-linha-situacao-${l.id}`} data-situacao="ENTREGA">
+              <StatusBadge label={e.rotulo} variant={VARIANTE_DA_ENTREGA[e.passo]} size="sm" dot={false} />
+            </div>
+            {e.atrasadaDesde && (
+              <div style={{ marginTop: '0.25rem' }}>
+                <StatusBadge label={`Entrega atrasada desde ${dataBR(e.atrasadaDesde).slice(0, 5)}`} variant="warning" size="sm" dot={false} />
+              </div>
+            )}
+            <div style={{ marginTop: '0.2rem' }}>
+              <ContratoDaLinha linha={l} nota={notas.get(l.id)} podeVerContratos={podeVerContratos} antes={e.atrasadaDesde ? null : e.detalhe} />
+            </div>
+            <ConferenciaDaLinha p={p} linha={l} conferencia={conferencia} resolvidos={resolvidos} />
+          </>
+        );
+      }
     }
   ];
 

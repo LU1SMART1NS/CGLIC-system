@@ -15,7 +15,7 @@ export const SiopDaBancada: React.FC<{ e: EmendaSiop }> = ({ e }) => {
   if (!temBloqueio && fora.length === 0) return null;
   const celula: React.CSSProperties = { padding: '0.45rem 0.6rem', borderTop: '1px solid var(--color-border)', textAlign: 'right', whiteSpace: 'nowrap', ...carteiraNumero };
   const titulo: React.CSSProperties = { ...celula, textAlign: 'left', whiteSpace: 'normal' };
-  const cab: React.CSSProperties = { ...celula, borderTop: 0, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)' };
+  const cab: React.CSSProperties = { ...celula, borderTop: 0, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-muted)' };
   return (
     <div data-testid="emenda-360-siop-bancada" style={{ display: 'grid', gap: '0.4rem' }}>
       <div style={{ fontWeight: 700 }}>No SIOP, além da compra direta{e.siopLidoEm ? <span style={carteiraDetalhe}> · lido em {dataBR(e.siopLidoEm)}</span> : null}</div>

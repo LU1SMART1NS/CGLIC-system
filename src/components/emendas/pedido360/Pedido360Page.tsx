@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useEntregasDoPedido } from '../../../hooks/useFiscalizacao';
+import { entregaDoPedido } from '../../../utils/emendasEntrega';
 import { Navigate, useLocation, useParams } from 'react-router-dom';
 import { FileText, Layers, ListTodo, Wallet } from 'lucide-react';
 import { Instrument360Page } from '../../instrument360/Instrument360Page';
@@ -103,6 +105,8 @@ export const Pedido360Page: React.FC = () => {
   // Captação principal (migration 218): botão no cartão e gaveta entre o cartão e as abas, como na Ata 360.
   const gruposDosBeneficiarios = useMapaGruposBeneficiarios();
   const [captacaoAberta, setCaptacaoAberta] = useState(false);
+  // Entregas da Fiscalização por linha: a mesma leitura da régua da aba Andamento (o cache é o mesmo).
+  const { porLinha: entregasDasLinhas } = useEntregasDoPedido(pedido?.id);
 
   if (isLoading || carregandoItens) {
     return (
@@ -146,9 +150,10 @@ export const Pedido360Page: React.FC = () => {
   const p = pedido;
   const autor = p.autorId ? autorPorId.get(p.autorId) : undefined;
   const nomeDoAutor = autor?.nome ?? (p.autorId ?? AUTOR_A_DEFINIR);
-  const avisos = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id), precos);
-  // Só para o número do indicador Etapa ("2 com você"); a aba monta a mesma mesa.
-  const mesa = mesaDoPedido(p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos);
+  const entrega = entregaDoPedido(p, notas, entregasDasLinhas, hoje);
+  const avisos = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id), precos, entrega);
+  // Só para o número do indicador Etapa ("2 com você"); a aba monta a mesma mesa, com as mesmas entregas.
+  const mesa = mesaDoPedido(p, itens, notas, avisos, hoje, podeGerir, beneficiarios, precos, entregasDasLinhas);
   const valor = valorDoPedidoNaEtapa(p, itens, precos);
   const captacao = fatiasDaCaptacao([p], gruposDosBeneficiarios, itens, precos);
   // Com a migration 248, o envio para contratação é por ata (cada uma vai ao seu gestor); sem ela, o pedido inteiro.
@@ -182,6 +187,7 @@ export const Pedido360Page: React.FC = () => {
           beneficiarios={beneficiarios}
           notas={notas}
           avisos={avisos}
+          entrega={entrega}
           valor={valor}
           podeGerir={podeGerir}
           back={back}
@@ -260,6 +266,7 @@ export const Pedido360Page: React.FC = () => {
                 onAcao={onAcao}
                 conferencia={conferenciaPorItem}
                 resolvidos={resolvidos}
+                entregas={entregasDasLinhas}
               />
               {/* As rodadas de empenho saíram do Andamento (protótipo v7); o envio à CGOFI fica só em "Com você". */}
               <div style={{ marginTop: '1rem' }}>

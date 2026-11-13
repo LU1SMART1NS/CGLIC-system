@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Clock, FolderOpen, LayoutDashboard, ScrollText } from 'lucide-react';
+import { AlertTriangle, Clock, FileText, FolderOpen, LayoutDashboard, ScrollText } from 'lucide-react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
@@ -90,6 +90,11 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   const vencidas = minhasEntregas.filter((e) => prazoDaEntrega(e).tom === 'danger');
   const aVencer = minhasEntregas.filter((e) => prazoDaEntrega(e).tom === 'warning' && prazoDaEntrega(e).dias !== null);
   const noExercito = minhasEntregas.filter((e) => e.etapa === 'CONTROLADO');
+  // Envio à SFC (13/11/2026): a CAEP mandou as informações; a Ordem de Fornecimento é do fiscal (como o envio à CCGA,
+  // que chega ao Início do gestor da ata). Os itens que ainda esperam a CAEP ficam como linha do cartão.
+  const ordemAEmitir = minhasEntregas.filter((e) => e.etapa === 'INFO_ENVIADA');
+  const contratosDaOrdem = new Set(ordemAEmitir.map((e) => e.contractKey)).size;
+  const esperandoCaep = minhasEntregas.filter((e) => e.etapa === 'INFO_PEDIDA').length;
   const entregasCarregando = entregasConsulta.isLoading;
 
   // "Com você": só as decisões do coordenador, e só no Painel geral (escolhido um fiscal, o Painel é o dele).
@@ -156,6 +161,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
   const chipsDaFaixa: PainelFaixaChip[] = [
     { id: 'contratos', rotulo: escopo ? 'Contratos' : `Com a ${NOME_SFC}`, valor: qtd(daSfc.length), ativo: segmento === 'TODAS', onClick: () => irPara('TODAS') },
     { id: 'autuar', rotulo: 'A autuar', valor: qtd(aAutuar.length), ativo: segmento === 'AUTUAR', onClick: () => irPara('AUTUAR') },
+    { id: 'ordem', rotulo: 'Ordem a emitir', valor: entregasCarregando ? '…' : qtd(ordemAEmitir.length), onClick: () => navigate('/fiscalizacao/itens?ver=VOCE&fase=PREPARACAO') },
     { id: 'vencidas', rotulo: 'Itens com prazo vencido', valor: entregasCarregando ? '…' : qtd(vencidas.length), perigo: vencidas.length > 0, onClick: () => navigate('/fiscalizacao/itens?prazo=danger') },
     ...(!fiscal && !escopo ? [{ id: 'definir', rotulo: 'A definir', valor: qtd(aDefinir.length), perigo: aDefinir.length > 0, onClick: () => navigate(coordenador ? '/fiscalizacao/distribuicao' : '/fiscalizacao/inicio') }] : [])
   ];
@@ -198,6 +204,19 @@ export const FiscalizacaoInicioPage: React.FC = () => {
               ]}
               onClick={() => irPara(aAutuar.length ? 'AUTUAR' : 'TODAS')}
               testId="fisc-cartao-contratos"
+            />
+            <PainelCartao
+              rotulo="Ordem a emitir"
+              icone={<FileText size={16} />}
+              tom={ordemAEmitir.length ? 'primary' : 'success'}
+              valor={entregasCarregando ? '…' : ordemAEmitir.length ? String(ordemAEmitir.length) : 'Nenhuma'}
+              unidade={ordemAEmitir.length ? (ordemAEmitir.length === 1 ? 'item' : 'itens') : undefined}
+              linhas={[
+                { rotulo: 'Informações recebidas da CAEP', valor: ordemAEmitir.length ? `${contratosDaOrdem} ${contratosDaOrdem === 1 ? 'contrato' : 'contratos'}` : '' },
+                { rotulo: 'Esperando as informações', valor: String(esperandoCaep) }
+              ]}
+              onClick={() => navigate('/fiscalizacao/itens?ver=VOCE&fase=PREPARACAO')}
+              testId="fisc-cartao-ordem"
             />
             <PainelCartao
               rotulo="Itens com prazo vencido"

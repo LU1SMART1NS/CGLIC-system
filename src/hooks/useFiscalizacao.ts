@@ -9,6 +9,7 @@ import {
   encerrarEntregas,
   dividirEntrega,
   fetchEntregasDoPedido,
+  fetchEntregasDasEmendas,
   fetchEntregasFiscalizacao,
   fetchMovimentosDaEntrega,
   mudarEtapaEntregas,
@@ -115,12 +116,12 @@ export function useRegistrarAutuacaoFiscalizacao() {
 }
 
 /** Entregas de um contrato (ou de todos, sem contrato). */
-export function useEntregasFiscalizacao(contractKey?: string | null) {
+export function useEntregasFiscalizacao(contractKey?: string | null, { enabled = true }: { enabled?: boolean } = {}) {
   const { role } = useAuth();
   return useQuery<EntregaFiscalizacao[], Error>({
     queryKey: [...FISCALIZACAO_ENTREGAS_KEY, contractKey ?? 'todas'],
     queryFn: () => fetchEntregasFiscalizacao(contractKey ?? null),
-    enabled: podeVerFiscalizacao(role),
+    enabled: enabled && podeVerFiscalizacao(role),
     staleTime: 60 * 1000
   });
 }
@@ -211,6 +212,27 @@ export function useEntregasDoPedido(pedidoId: string | null | undefined) {
     queryKey: [...FISCALIZACAO_ENTREGAS_KEY, 'pedido', pedidoId],
     queryFn: () => fetchEntregasDoPedido(pedidoId as string),
     enabled: Boolean(pedidoId) && ler,
+    staleTime: 60 * 1000
+  });
+  const porLinha = useMemo(() => {
+    const m = new Map<string, EntregaDaLinha[]>();
+    for (const e of consulta.data ?? []) m.set(e.linhaId, [...(m.get(e.linhaId) ?? []), e]);
+    return m;
+  }, [consulta.data]);
+  return { consulta, porLinha };
+}
+
+/**
+ * Entregas de todas as linhas de pedidos de emenda, por linha (listas de Emendas, Início, Parlamentar e Emenda 360).
+ * Mesmo acesso da régua do Pedido 360; sem permissão ou com falha, o mapa vem vazio e as telas seguem pelas notas.
+ */
+export function useEntregasDasEmendas({ enabled = true }: { enabled?: boolean } = {}) {
+  const { role } = useAuth();
+  const ler = role === 'admin' || role === 'gestor_emendas' || role === 'gestor_fiscalizacao' || role === 'gestor' || role === 'leitor';
+  const consulta = useQuery({
+    queryKey: [...FISCALIZACAO_ENTREGAS_KEY, 'emendas'],
+    queryFn: fetchEntregasDasEmendas,
+    enabled: enabled && ler,
     staleTime: 60 * 1000
   });
   const porLinha = useMemo(() => {

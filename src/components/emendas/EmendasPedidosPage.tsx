@@ -43,9 +43,6 @@ import {
   FASES_PEDIDO,
   faseDaEtapa,
   type FasePedido,
-  passoNaContratacao,
-  rotuloDaEtapaDoPedido,
-  type PassoNaContratacao,
   linhasAtivas,
   orgaoDoPedido,
   ORDEM_ETAPA,
@@ -63,6 +60,8 @@ import { faltaAnoDaEmenda, numeroDoPedido, rotaDoPedido } from '../../utils/emen
 import { rotuloBeneficiario, type AutorEmenda, type EtapaPedido, type NotaDaLinha, type PedidoEmenda } from '../../services/emendasService';
 import { AutorDoPedido, LARGURA_AUTOR, ValorDoPedido } from './emendasPartes';
 import { usePrecosParaEmenda } from '../../hooks/useEmendasQuadro';
+import { useEntregasDasEmendas } from '../../hooks/useFiscalizacao';
+import { entregaDoPedido, OPCOES_DA_CONTRATACAO, VARIANTE_DA_ENTREGA, passoDaContratacao, type EntregaDoPedido, type PassoDaContratacao } from '../../utils/emendasEntrega';
 import { PedidoModal } from './PedidoModal';
 import { ItensEBeneficiarios } from './ItensEBeneficiarios';
 import { AnoDaEmenda } from './AnoDaEmenda';
@@ -72,8 +71,8 @@ const SEM_NOTAS = new Map<string, NotaDaLinha>();
 
 type Segmento = 'todos' | FasePedido | 'CANCELADO';
 /** Filtro de etapa dentro da fase; na Contratação, o passo pelo contrato e pela execução das notas (passoNaContratacao). */
-type FiltroEtapa = '' | Exclude<EtapaPedido, 'CANCELADO' | 'CONTRATACAO'> | PassoNaContratacao;
-type Linha = PedidoEmenda & { valor: number; fonteDoValor: 'OFICIO' | 'PREVISTO'; avisos: AvisoPedido[]; captacao: ReturnType<typeof fatiasDaCaptacao> };
+type FiltroEtapa = '' | Exclude<EtapaPedido, 'CANCELADO' | 'CONTRATACAO'> | PassoDaContratacao;
+type Linha = PedidoEmenda & { valor: number; fonteDoValor: 'OFICIO' | 'PREVISTO'; avisos: AvisoPedido[]; captacao: ReturnType<typeof fatiasDaCaptacao>; entrega: EntregaDoPedido | null };
 
 const POR_PAGINA = 25;
 /** Filtro de aviso da lista: um tipo, 'com' (qualquer aviso) ou 'grave' (só os vermelhos, como no cartão do Início). */
@@ -106,6 +105,7 @@ export const EmendasPedidosPage: React.FC = () => {
   const { data: autores = [] } = useAutoresEmendas();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
   const { data: kits = [] } = useKitsEmendas();
+  const { porLinha: entregas } = useEntregasDasEmendas();
   const podeGerir = usePodeGerirEmendas();
   const hoje = hojeEmBrasilia();
   // Vindo do Início: ?aviso= (tipo, 'com' ou 'grave') e ?etapa=. O pedido abre no Pedido 360.
@@ -160,15 +160,17 @@ export const EmendasPedidosPage: React.FC = () => {
     () =>
       pedidos.filter((p) => pedidoNoAno(p, filtroAno)).map((p) => {
         const v = valorDoPedidoNaEtapa(p, itens, precos);
+        const entrega = entregaDoPedido(p, notas, entregas, hoje);
         return {
           ...p,
           valor: v.valor,
           fonteDoValor: v.fonte,
-          avisos: avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id), precos),
-          captacao: fatiasDaCaptacao([p], gruposDosBeneficiarios, itens, precos)
+          avisos: avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credorPendente.get(p.id), precos, entrega),
+          captacao: fatiasDaCaptacao([p], gruposDosBeneficiarios, itens, precos),
+          entrega
         };
       }),
-    [pedidos, filtroAno, itens, hoje, notas, precos, diferencas, credorPendente, gruposDosBeneficiarios]
+    [pedidos, filtroAno, itens, hoje, notas, precos, diferencas, credorPendente, gruposDosBeneficiarios, entregas]
   );
   // Contagem do botão de ano: os pedidos não cancelados de cada ano (o "Todos" do trilho).
   const anosDoSeletor = useMemo(() => contagemPorAno(pedidos, anoCorrente), [pedidos, anoCorrente]);
@@ -189,7 +191,7 @@ export const EmendasPedidosPage: React.FC = () => {
     [linhas, segmento]
   );
   const etapaDoFiltro = useCallback(
-    (l: Linha): FiltroEtapa => passoNaContratacao(l, notas)?.passo ?? (l.etapa as FiltroEtapa),
+    (l: Linha): FiltroEtapa => passoDaContratacao(l, notas, l.entrega) ?? (l.etapa as FiltroEtapa),
     [notas]
   );
   // Opções do filtro de etapa: as etapas da fase da aba, com a contagem.
@@ -198,13 +200,7 @@ export const EmendasPedidosPage: React.FC = () => {
     if (!fase) return [];
     const valores: { value: FiltroEtapa; label: string }[] =
       fase.id === 'CONTRATACAO'
-        ? [
-            { value: 'AGUARDANDO_CONTRATO', label: 'Aguardando contrato' },
-            { value: 'PARTE_CONTRATADA', label: 'Parte contratada' },
-            { value: 'CONTRATADO', label: 'Contratado' },
-            { value: 'EM_EXECUCAO', label: 'Em execução' },
-            { value: 'PAGO', label: 'Pago' }
-          ]
+        ? [...OPCOES_DA_CONTRATACAO]
         : fase.etapas.map((e) => ({ value: e as FiltroEtapa, label: ROTULO_ETAPA[e] }));
     return valores.map((v) => ({ ...v, count: doSegmento.filter((l) => etapaDoFiltro(l) === v.value).length }));
   }, [segmento, doSegmento, etapaDoFiltro]);
@@ -329,12 +325,20 @@ export const EmendasPedidosPage: React.FC = () => {
         return (
           <>
             {l.etapa === 'CONTRATACAO' && etapaDoFiltro(l) !== 'AGUARDANDO_CONTRATO' ? (
-              <StatusBadge label={rotuloDaEtapaDoPedido(l, notas)} variant="success" size="sm" dot={false} />
+              <StatusBadge label={l.entrega?.rotulo ?? 'Contratado em parte'} variant={l.entrega ? VARIANTE_DA_ENTREGA[l.entrega.passo] : 'success'} size="sm" dot={false} />
             ) : (
               <StatusBadge label={ROTULO_ETAPA[l.etapa]} variant={VARIANTE_ETAPA[l.etapa]} size="sm" dot={false} />
             )}
-            {documento && <div style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{documento}</div>}
-            {r.divergem && <div style={carteiraDetalhe}>{r.texto}</div>}
+            {/* Uma linha de detalhe só (parecer de UX, 13/11/2026): com a entrega, o progresso ou a previsão; sem ela, a
+                emenda ou o processo. O nº da emenda fica no Pedido 360. */}
+            {l.entrega ? (
+              l.entrega.progresso && <div style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }} data-testid={`emendas-pedido-entrega-${l.id}`}>{l.entrega.progresso}</div>
+            ) : (
+              <>
+                {documento && <div style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>{documento}</div>}
+                {r.divergem && <div style={carteiraDetalhe}>{r.texto}</div>}
+              </>
+            )}
             {primeiro && (
               <div
                 title={l.avisos.map((a) => a.texto).join('\n')}

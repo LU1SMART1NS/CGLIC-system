@@ -2,6 +2,7 @@
  * Regras dos pedidos das emendas (migration 157), fora das telas para poder testar: etapas, valor, itens que cada
  * linha ocupa e avisos (30 dias sem ofício, divergência com o SIOP, ata vencendo ou vencida antes do empenho).
  */
+import type { EntregaDoPedido } from './emendasEntrega';
 import type { AcaoPedido, ConferenciaEmpenho, DocumentoSeiDoPedido, EtapaDoDocumento, EtapaPedido, ItemCaep, ItemDoKit, LinhaPedido, MotivoSemNota, NotaDaLinha, PedidoEmenda, RegraDaNota } from '../services/emendasService';
 import { avisoIndicacaoDias, corteIndicacaoDias, curto, dataBR, diasEntre, nomeDaLinhaDoPedido, passouDoCorte } from './emendasKits';
 import { chaveDoContrato, numeroDaChave } from './contractKeyUtils';
@@ -300,7 +301,9 @@ export type TipoAviso =
   | 'reajusteAntesDoContrato'
   | 'reajusteFora'
   | 'prazoDoOficio'
-  | 'reajusteProximo';
+  | 'reajusteProximo'
+  | 'entregaAtrasada'
+  | 'noExercito';
 
 export interface AvisoPedido {
   tipo: TipoAviso;
@@ -324,6 +327,8 @@ export const GRAVIDADE_DO_AVISO: Record<TipoAviso, number> = {
   devolvidoCcga: 7,
   prazoDoOficio: 8,
   semOficio: 9,
+  entregaAtrasada: 9.5,
+  noExercito: 9.6,
   reajusteProximo: 10,
   ataVencendo: 11,
   semEnvioCgofi: 12,
@@ -360,7 +365,9 @@ export const ROTULO_AVISO: Record<TipoAviso, string> = {
   semAutorizacao: 'Item sem empenho autorizado',
   semNota: 'Sem nota de empenho',
   semBeneficiario: 'Item sem beneficiário',
-  pedidoParado: 'Parado além do prazo da etapa'
+  pedidoParado: 'Parado além do prazo da etapa',
+  entregaAtrasada: 'Entrega atrasada',
+  noExercito: 'Aguardando o Exército'
 };
 
 /** Avisos que pedem ação já (vermelho); os demais são de atenção (amarelo). */
@@ -470,7 +477,9 @@ export function avisosDoPedido(
   notas?: Map<string, NotaDaLinha>,
   empenho?: ConferenciaEmpenho[],
   credor?: CredorNoPedido[],
-  precos?: Map<string, PrecoDoItem>
+  precos?: Map<string, PrecoDoItem>,
+  /** Entrega pela Fiscalização (emendasEntrega): prazo da Ordem vencido e produto parado no Exército. */
+  entrega?: EntregaDoPedido | null
 ): AvisoPedido[] {
   const avisos: AvisoPedido[] = precos ? avisosDoReajuste(p, hoje, precos, notas) : [];
   const anuladas = linhasComEmpenhoAnulado(p, notas);
@@ -565,6 +574,19 @@ export function avisosDoPedido(
     const prioridade = (a: AvisoPedido) => (a.tipo === 'ataNoCorte' ? 0 : 1);
     avisos.push(atas.sort((a, b) => prioridade(a) - prioridade(b) || a.texto.localeCompare(b.texto))[0]);
   }
+  if (entrega?.atrasados)
+    avisos.push({
+      tipo: 'entregaAtrasada',
+      curto: 'Entrega atrasada',
+      texto: `${entrega.atrasados === 1 ? '1 item passou' : `${entrega.atrasados} itens passaram`} da data prevista de entrega (${dataBR(entrega.vencidaDesde)}), pela Fiscalização da SFC/CGLIC`
+    });
+  // Todas as unidades no Exército: a etiqueta da etapa já diz; o aviso fica para quando é só uma parte.
+  if (entrega?.noExercito && entrega.noExercito < entrega.total)
+    avisos.push({
+      tipo: 'noExercito',
+      curto: 'No Exército',
+      texto: `${entrega.noExercito === 1 ? '1 item aguarda' : `${entrega.noExercito} itens aguardam`} a autorização do Exército (produto controlado), pela Fiscalização da SFC/CGLIC`
+    });
   return avisos.sort((a, b) => GRAVIDADE_DO_AVISO[a.tipo] - GRAVIDADE_DO_AVISO[b.tipo]);
 }
 

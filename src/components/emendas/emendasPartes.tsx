@@ -164,7 +164,10 @@ export const NomeComSigla: React.FC<{ b: Pick<BeneficiarioEmenda, 'nome' | 'sigl
   </div>
 );
 
-/** Beneficiário da linha: o nome com a sigla e, embaixo, o local de entrega; a razão social fica no cadastro (decisão de 28/10/2026). */
+/**
+ * Beneficiário da linha: o nome com a sigla e, embaixo, o local de entrega; a razão social fica no cadastro (decisão de
+ * 28/10/2026). Sem a etiqueta "Falta CNPJ" (13/11/2026): ela fica só no cadastro de Beneficiários, onde se corrige.
+ */
 export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficiarioId'>; beneficiarios: Map<string, BeneficiarioEmenda> }> = ({ linha, beneficiarios }) => {
   const b = linha.beneficiarioId ? beneficiarios.get(linha.beneficiarioId) : undefined;
   if (b) {
@@ -172,7 +175,6 @@ export const BeneficiarioDaLinha: React.FC<{ linha: Pick<LinhaPedido, 'beneficia
       <>
         <NomeComSigla b={b} />
         {localDoBeneficiario(b) && <div style={carteiraDetalhe}>{localDoBeneficiario(b)}</div>}
-        {!b.cnpj && <StatusBadge label="Falta CNPJ" variant="neutral" size="sm" dot={false} />}
       </>
     );
   }
