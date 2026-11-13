@@ -1,17 +1,18 @@
 import React, { useMemo, useState } from 'react';
-import { ActionButton, DataTable, Modal, NoticeBar, SectionHeader, StatusBadge, useToast, type Column } from '../../../design-system';
+import { ActionButton, DataTable, SectionHeader, StatusBadge, useToast, type Column } from '../../../design-system';
 import { useFaturasDoContrato } from '../../../hooks/useFaturasDoContrato';
-import { useExpectativasPagamento } from '../../../hooks/useExpectativasPagamento';
+import { useEntregasParaPagamento, useExpectativasPagamento } from '../../../hooks/useExpectativasPagamento';
+import type { EntregaParaPagamento } from '../../../services/entregasParaPagamentoService';
+import { PAGAMENTO_RULES } from '../../../config/alertRules';
 import {
   historicoDePagamentos,
   sugerirExpectativa,
   ultimosMesesFechados,
-  type EntregaPrevista,
   type TipoExpectativa
 } from '../../../services/expectativaPagamentoService';
-import { DateField, Field, FooterButtons } from './PaymentCycleModals';
-import { errorMessage, useEmpenhosDoContrato } from './cicloPagamentoShared';
-import { formatCurrencyInputBR, isoToBR, parseCurrencyInputBR, parseDateInputBR } from './paymentFormUtils';
+import { Field } from './PaymentCycleModals';
+import { errorMessage } from './cicloPagamentoShared';
+import { formatCurrencyInputBR, isoToBR, parseCurrencyInputBR } from './paymentFormUtils';
 import { formatCurrency } from '../../../utils/format';
 
 const AUTOMATICO = '__AUTO__';
@@ -19,8 +20,9 @@ const ROTULO: Record<TipoExpectativa, string> = { MENSAL: 'Mensal', ENTREGA: 'Po
 const subtle: React.CSSProperties = { fontSize: '0.78rem', color: '#64748b' };
 
 /**
- * Expectativa de pagamento do contrato (migration 89): mensal, por entrega ou eventual, com o valor mensal informado e
- * as entregas previstas. Base da previsão mensal da Portaria 50 e dos avisos de nota que não chegou.
+ * Expectativa de pagamento do contrato (migration 89): mensal, por entrega ou eventual, com o valor mensal informado.
+ * As entregas vêm da Fiscalização (migration 305): itens a entregar com a data prevista e itens entregues ainda sem
+ * pagamento. O cadastro manual de entregas previstas saiu. Base da previsão mensal da Portaria 50 e dos avisos de nota.
  */
 export const ExpectativaPagamentoContrato: React.FC<{ contractKey: string; canEdit: boolean; registradoPorNome?: string }> = ({
   contractKey,
@@ -28,7 +30,8 @@ export const ExpectativaPagamentoContrato: React.FC<{ contractKey: string; canEd
   registradoPorNome
 }) => {
   const toast = useToast();
-  const { marcas, entregas, definir, salvarEntrega, cancelarEntrega } = useExpectativasPagamento();
+  const { marcas, definir } = useExpectativasPagamento();
+  const { entregas: doContrato } = useEntregasParaPagamento(contractKey);
   const { data: faturasContrato } = useFaturasDoContrato(contractKey);
 
   const marca = marcas.get(contractKey);
@@ -48,14 +51,11 @@ export const ExpectativaPagamentoContrato: React.FC<{ contractKey: string; canEd
     [faturasContrato, meses, contractKey]
   );
   const sugestao = sugerirExpectativa(historico, meses.length);
-  const doContrato = entregas.filter((e) => e.contractKey === contractKey && e.situacao === 'PREVISTA');
 
   const [tipo, setTipo] = useState<string>(marca?.tipo ?? AUTOMATICO);
   const [valorMensal, setValorMensal] = useState(marca?.valorMensal ? formatCurrencyInputBR(String(Math.round(marca.valorMensal * 100))) : '');
   const [observacao, setObservacao] = useState(marca?.observacao ?? '');
   const [salvando, setSalvando] = useState(false);
-  const [entregaAberta, setEntregaAberta] = useState<EntregaPrevista | 'NOVA' | null>(null);
-  const [cancelando, setCancelando] = useState<EntregaPrevista | null>(null);
 
   // Quando a marca chega do banco (ou muda em outra aba), o formulário acompanha.
   React.useEffect(() => {
@@ -94,11 +94,21 @@ export const ExpectativaPagamentoContrato: React.FC<{ contractKey: string; canEd
         ? `Sugestão do sistema: talvez mensal (pago em 2 dos 3 últimos meses, média ${formatCurrency(historico?.media ?? 0)}).`
         : 'Sem padrão de pagamento nos 3 últimos meses.';
 
-  const colunas: Column<EntregaPrevista>[] = [
-    { key: 'data', header: 'Data prevista', priority: 'primary', render: (e) => <strong>{isoToBR(e.dataPrevista)}</strong> },
-    { key: 'descricao', header: 'O que será entregue', render: (e) => e.descricao },
-    { key: 'valor', header: 'Valor', align: 'right', render: (e) => formatCurrency(e.valor) },
-    { key: 'empenho', header: 'Empenho', render: (e) => (e.empenhoCanonicalKey ? e.empenhoCanonicalKey.split('-').pop() : '—') }
+  const hoje = new Date().toISOString().slice(0, 10);
+  const colunas: Column<EntregaParaPagamento>[] = [
+    {
+      key: 'situacao',
+      header: 'Situação',
+      priority: 'primary',
+      render: (e) => {
+        if (e.situacao === 'A_ENTREGAR') return <StatusBadge label={e.data < hoje ? 'Prazo vencido' : 'A entregar'} variant={e.data < hoje ? 'warning' : 'info'} size="sm" dot={false} />;
+        const dias = Math.round((Date.parse(`${hoje}T12:00:00Z`) - Date.parse(`${e.data}T12:00:00Z`)) / 864e5);
+        return <StatusBadge label={dias > PAGAMENTO_RULES.notaAposEntregaDias ? 'Entregue · cobrar a nota' : 'Entregue · aguardando a nota'} variant={dias > PAGAMENTO_RULES.notaAposEntregaDias ? 'warning' : 'success'} size="sm" dot={false} />;
+      }
+    },
+    { key: 'data', header: 'Data', render: (e) => <strong>{isoToBR(e.data)}</strong> },
+    { key: 'itens', header: 'Itens', align: 'right', render: (e) => e.itens },
+    { key: 'valor', header: 'Valor', align: 'right', render: (e) => (e.valor > 0 ? formatCurrency(e.valor) : '—') + (e.semPreco ? ` · ${e.semPreco} sem preço` : '') }
   ];
 
   return (
@@ -140,171 +150,20 @@ export const ExpectativaPagamentoContrato: React.FC<{ contractKey: string; canEd
 
       {(tipo === 'ENTREGA' || marca?.tipo === 'ENTREGA' || doContrato.length > 0) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <strong style={{ fontSize: '0.85rem' }}>Entregas previstas</strong>
-            {canEdit && <ActionButton action="adicionar" size="sm" onClick={() => setEntregaAberta('NOVA')} label="Incluir entrega" data-testid="expectativa-incluir-entrega" />}
+          <strong style={{ fontSize: '0.85rem' }}>Entregas pela Fiscalização</strong>
+          <div style={subtle}>
+            Datas do fiscal do contrato. A previsão mensal conta o pagamento no mês seguinte à entrega prevista; entregue há mais de{' '}
+            {PAGAMENTO_RULES.notaAposEntregaDias} dias sem nota, o gestor recebe aviso (regras em Ajustes › Regras e alertas).
           </div>
           <DataTable
             columns={colunas}
             data={doContrato}
-            keyExtractor={(e) => e.id}
-            emptyMessage="Nenhuma entrega prevista."
+            keyExtractor={(e) => `${e.situacao}-${e.data}`}
+            emptyMessage="Sem itens na Fiscalização: as datas de entrega vêm dos contratos acompanhados pela SFC/CGLIC."
             testId="expectativa-entregas"
-            rowActions={
-              canEdit
-                ? (e) => (
-                    <span style={{ display: 'inline-flex', gap: '0.3rem' }}>
-                      <ActionButton action="editar" size="sm" iconOnly label="Corrigir entrega" onClick={() => setEntregaAberta(e)} />
-                      <ActionButton action="remover" size="sm" iconOnly label="Cancelar entrega" onClick={() => setCancelando(e)} />
-                    </span>
-                  )
-                : undefined
-            }
           />
         </div>
       )}
-
-      <EntregaModal
-        contractKey={contractKey}
-        entrega={entregaAberta}
-        onClose={() => setEntregaAberta(null)}
-        onSubmit={async (input) => {
-          await salvarEntrega({ ...input, contractKey, registradoPorNome });
-          toast.success('Entrega prevista salva.');
-        }}
-      />
-      <CancelarEntregaModal
-        entrega={cancelando}
-        onClose={() => setCancelando(null)}
-        onSubmit={async (motivo) => {
-          await cancelarEntrega(cancelando!.id, motivo);
-          toast.success('Entrega cancelada.');
-        }}
-      />
     </div>
-  );
-};
-
-const EntregaModal: React.FC<{
-  contractKey: string;
-  entrega: EntregaPrevista | 'NOVA' | null;
-  onClose: () => void;
-  onSubmit: (input: { id?: string; dataPrevista: string; valor: number; descricao: string; empenhoCanonicalKey?: string | null }) => Promise<void>;
-}> = ({ contractKey, entrega, onClose, onSubmit }) => {
-  const { data: empenhos = [] } = useEmpenhosDoContrato(entrega ? contractKey : undefined);
-  const existente = entrega && entrega !== 'NOVA' ? entrega : null;
-  const [data, setData] = useState('');
-  const [valor, setValor] = useState('');
-  const [descricao, setDescricao] = useState('');
-  const [empenho, setEmpenho] = useState('');
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-
-  React.useEffect(() => {
-    setData(existente ? isoToBR(existente.dataPrevista) : '');
-    setValor(existente ? formatCurrencyInputBR(String(Math.round(existente.valor * 100))) : '');
-    setDescricao(existente?.descricao ?? '');
-    setEmpenho(existente?.empenhoCanonicalKey ?? '');
-    setErro(null);
-  }, [entrega]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!entrega) return null;
-
-  const enviar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const dataISO = parseDateInputBR(data);
-    const v = parseCurrencyInputBR(valor);
-    if (!dataISO || !v) return setErro('Informe a data completa e o valor.');
-    setSalvando(true);
-    setErro(null);
-    try {
-      await onSubmit({ id: existente?.id, dataPrevista: dataISO, valor: v, descricao: descricao.trim(), empenhoCanonicalKey: empenho || null });
-      onClose();
-    } catch (err) {
-      setErro(errorMessage(err, 'Não foi possível salvar a entrega.'));
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  return (
-    <Modal
-      isOpen
-      onClose={onClose}
-      title={existente ? 'Corrigir entrega prevista' : 'Incluir entrega prevista'}
-      size="md"
-      dismissible={!salvando}
-      testId="expectativa-entrega-modal"
-      footer={<FooterButtons formId="expectativa-entrega-form" onCancel={onClose} saving={salvando} submitLabel="Salvar" />}
-    >
-      <form id="expectativa-entrega-form" onSubmit={enviar} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <DateField id="entrega-data" label="Data prevista da entrega *" value={data} onChange={setData} />
-        <Field id="entrega-descricao" label="O que será entregue *">
-          <input id="entrega-descricao" className="form-input" type="text" placeholder="Ex.: 20 viaturas (ordem de fornecimento 3)" value={descricao} onChange={(e) => setDescricao(e.target.value)} required />
-        </Field>
-        <Field id="entrega-valor" label="Valor previsto *">
-          <input id="entrega-valor" className="form-input" type="text" inputMode="numeric" placeholder="0,00" value={valor} onChange={(e) => setValor(formatCurrencyInputBR(e.target.value))} required />
-        </Field>
-        <Field id="entrega-empenho" label="Empenho">
-          <select id="entrega-empenho" className="form-input" value={empenho} onChange={(e) => setEmpenho(e.target.value)}>
-            <option value="">Não informado</option>
-            {empenhos.map((e) => (
-              <option key={e.canonicalKey} value={e.canonicalKey}>
-                {e.numero} · saldo {formatCurrency(e.saldo)}
-              </option>
-            ))}
-          </select>
-        </Field>
-        {erro && <NoticeBar tone="danger" testId="expectativa-entrega-erro">{erro}</NoticeBar>}
-      </form>
-    </Modal>
-  );
-};
-
-const CancelarEntregaModal: React.FC<{ entrega: EntregaPrevista | null; onClose: () => void; onSubmit: (motivo: string) => Promise<void> }> = ({
-  entrega,
-  onClose,
-  onSubmit
-}) => {
-  const [motivo, setMotivo] = useState('');
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  React.useEffect(() => {
-    setMotivo('');
-    setErro(null);
-  }, [entrega?.id]);
-  if (!entrega) return null;
-  const enviar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSalvando(true);
-    try {
-      await onSubmit(motivo.trim());
-      onClose();
-    } catch (err) {
-      setErro(errorMessage(err, 'Não foi possível cancelar.'));
-    } finally {
-      setSalvando(false);
-    }
-  };
-  return (
-    <Modal
-      isOpen
-      onClose={onClose}
-      title="Cancelar entrega prevista"
-      size="md"
-      dismissible={!salvando}
-      testId="expectativa-cancelar-modal"
-      footer={<FooterButtons formId="expectativa-cancelar-form" onCancel={onClose} saving={salvando} submitLabel="Cancelar entrega" />}
-    >
-      <form id="expectativa-cancelar-form" onSubmit={enviar} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div style={{ fontSize: '0.85rem' }}>
-          {entrega.descricao} · {isoToBR(entrega.dataPrevista)} · {formatCurrency(entrega.valor)}
-        </div>
-        <Field id="cancelar-motivo" label="Motivo *">
-          <input id="cancelar-motivo" className="form-input" type="text" placeholder="Ex.: entrega adiada para 2027" value={motivo} onChange={(e) => setMotivo(e.target.value)} required />
-        </Field>
-        {erro && <NoticeBar tone="danger" testId="expectativa-cancelar-erro">{erro}</NoticeBar>}
-      </form>
-    </Modal>
   );
 };

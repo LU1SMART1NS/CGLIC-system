@@ -6,8 +6,8 @@
  *            ("Sem como confirmar": antigas ou pagas por outro documento; sem NP não há como saber se falta pagar);
  *   CICLO    ciclos de pagamento em aberto (um por nota fiscal do item "DO PAGAMENTO");
  *   MENSAL   contratos marcados como mensais sem fatura nem ciclo em aberto (valor mensal informado ou média de 3 meses);
- *   ENTREGA  entregas previstas para o mês da previsão e, nos contratos acompanhados pela Fiscalização, os itens com
- *            entrega prevista no mês anterior ao da previsão (migration 304; vencidos ficam de fora);
+ *   ENTREGA  nos contratos acompanhados pela Fiscalização, os itens com entrega prevista no mês anterior ao da
+ *            previsão (migration 304; vencidos ficam de fora; o cadastro manual de entregas saiu na migration 305);
  *   MANUAL   linhas incluídas à mão.
  * Os ajustes do mês (retirar, corrigir valor/subitem, marcar emenda) ficam em previsao_pagamentos_ajustes (migration 90).
  */
@@ -16,7 +16,7 @@ import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 import { isBusinessDay } from './temporalEngineService';
 import { etapaDaFatura, type FaturaCarteira, type EmpenhoCarteiraRow } from './financeiroCarteiraService';
 import type { PaymentFollowUpCycle } from '../types/paymentFollowUp';
-import type { EntregaPrevista, ExpectativaPagamento, HistoricoPagamentos } from './expectativaPagamentoService';
+import type { ExpectativaPagamento, HistoricoPagamentos } from './expectativaPagamentoService';
 
 export type OrigemPrevisao = 'FATURA' | 'CICLO' | 'MENSAL' | 'ENTREGA' | 'MANUAL';
 
@@ -137,7 +137,6 @@ export interface DadosDaPrevisao {
   ligacoes: Array<{ cycle_id: string; id_fatura: number }>;
   empenhos: EmpenhoCarteiraRow[];
   marcas: Map<string, ExpectativaPagamento>;
-  entregas: EntregaPrevista[];
   /** Entregas previstas pela Fiscalização (migration 304). */
   entregasFiscalizacao?: EntregasDaFiscalizacaoNaPrevisao[];
   historicos: Map<string, HistoricoPagamentos>;
@@ -237,25 +236,6 @@ export function montarPrevisao(d: DadosDaPrevisao): LinhaPrevisao[] {
           ? `média de ${historico.mesesComPagamento} ${historico.mesesComPagamento === 1 ? 'mês' : 'meses'} (${moedaCurta(historico.menor ?? 0)} a ${moedaCurta(historico.maior ?? 0)})`
           : 'sem pagamentos para a média: informe o valor',
       semValor: valor <= 0
-    });
-  }
-
-  // Entregas previstas no mês da previsão.
-  for (const ent of d.entregas) {
-    if (ent.situacao !== 'PREVISTA' || ent.dataPrevista.slice(0, 7) !== d.mesAlvo) continue;
-    const e = ent.empenhoCanonicalKey ? empenhoPorKey.get(ent.empenhoCanonicalKey) : undefined;
-    base.push({
-      chave: `entrega-${ent.id}`,
-      origem: 'ENTREGA',
-      contractKey: ent.contractKey,
-      ug: ugDaChave(ent.empenhoCanonicalKey) ?? ent.contractKey.slice(0, 6),
-      empenho: e?.numero ?? numeroDaChave(ent.empenhoCanonicalKey),
-      empenhoKey: ent.empenhoCanonicalKey,
-      subitem: null,
-      valorOriginal: ent.valor,
-      emendaAutomatica: emendaDe(e),
-      detalhe: `Entrega prevista: ${ent.descricao}`,
-      semValor: false
     });
   }
 
