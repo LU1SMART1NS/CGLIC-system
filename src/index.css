@@ -1413,13 +1413,7 @@ textarea.ds-field__control { resize: vertical; line-height: 1.4; }
    de expansão e ação, data-role="expand" / "action". Linha expandida: .carteira-expanded.
    ========================================================================== */
 @media (max-width: 767px) {
-  .carteira-stack, .carteira-stack tbody, .carteira-stack tfoot { display: block; width: 100%; }
-  /* Linha de total (Carteira de Atas): cartão cinza depois da lista, só com as células que têm valor. */
-  .carteira-stack tfoot tr { background: #f8fafc; }
-  .carteira-stack tfoot td { display: block; }
-  .carteira-stack tfoot td:empty { display: none; }
-  .carteira-stack tfoot td[data-label]::before { display: block; margin-bottom: 0.15rem; }
-  .carteira-stack tfoot td > * { text-align: left; }
+  .carteira-stack, .carteira-stack tbody { display: block; width: 100%; }
   .carteira-stack thead { display: none; }
   .carteira-stack tr {
     display: flex; flex-direction: column; gap: 0.45rem; position: relative;

@@ -4,7 +4,6 @@ import { ArpPortfolioHeader } from '../../components/atas/ArpPortfolioHeader';
 import { ArpPortfolioSummary } from '../../components/atas/ArpPortfolioSummary';
 import { ArpPortfolioFilters } from '../../components/atas/ArpPortfolioFilters';
 import { ArpPortfolioList } from '../../components/atas/ArpPortfolioList';
-import { TODAS_UNIDADES } from '../../components/carteira/CarteiraExecucaoSelects';
 import type { ArpRecord, ArpItemRecord, AtaGroupedCard } from '../../types';
 
 vi.mock('react-router-dom', () => ({
@@ -189,34 +188,6 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
     expect(html).toContain('Ver detalhes da ata 00001/2025');
     // Itens ficam recolhidos por padrão: só aparecem ao expandir a linha.
     expect(html).not.toContain('Colete Balístico Nível III-A');
-  });
-
-  it('4a. rodapé soma as atas exibidas e, com GTI filtrado, mostra o registrado por ele', () => {
-    const totais = { atas: 39, valorTotal: 2000, valorSenasp: 1500, valorConsumido: 300, registradoParticipantes: 1000, registradoGti: 770 };
-    const semGti = renderToStaticMarkup(
-      <ArpPortfolioList cards={[mockCard]} totalAtas={1} totais={totais} onSelectArp={vi.fn()} onSelectItem={vi.fn()} onResetFilters={vi.fn()} />
-    );
-    expect(semGti).toContain('Total das 39 atas exibidas');
-    expect(semGti).toContain('Valor total das atas');
-    expect(semGti).toMatch(/R\$\s2\.000,00/);
-    expect(semGti).toMatch(/R\$\s1\.500,00/);
-    expect(semGti).toContain('consumidos (20%)');
-    expect(semGti).not.toContain('arp-total-gti');
-
-    const comGti = renderToStaticMarkup(
-      <ArpPortfolioList
-        cards={[mockCard]}
-        totalAtas={1}
-        totais={totais}
-        filters={{ filtroAlocacao: 'TODOS', filtroEmpenho: 'TODOS', unidade: TODAS_UNIDADES, ataAssinada: 'TODOS', gti: 'LIGABOM' }}
-        onSelectArp={vi.fn()}
-        onSelectItem={vi.fn()}
-        onResetFilters={vi.fn()}
-      />
-    );
-    expect(comGti).toContain('Registrado LIGABOM');
-    expect(comGti).toContain('arp-total-gti');
-    expect(comGti).toContain('39% do valor total'); // 770 de 2.000
   });
 
   it('4b. deve abrir a linha já mostrando o item quando a busca casa apenas por item', () => {
