@@ -20,6 +20,9 @@ export interface RegraDoPrazo {
   trecho?: string | null;
   documento?: string | null;
   confirmadoPor?: string | null;
+  confirmadoEm?: string | null;
+  /** Prazo próprio de itens da ata, com a chave "ata|item" (migration 301). */
+  porItem?: Record<string, number>;
   /** Quem informou ou mudou a regra no contrato, quando e por quê. */
   definidoPor?: string | null;
   definidoEm?: string | null;

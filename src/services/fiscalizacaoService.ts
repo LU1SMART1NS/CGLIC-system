@@ -44,6 +44,8 @@ export interface ContratoFiscalizacao {
   unidadesDoContrato?: string[];
   /** Regra completa do prazo (migration 294): dias, contagem, a partir de quando, e de onde veio (TR da ata). */
   prazoEntrega?: RegraDoPrazo | null;
+  /** As atas do contrato têm prazos confirmados diferentes (migration 301): o fiscal informa o do contrato. */
+  prazoConflito?: boolean;
 }
 
 function cliente() {
@@ -73,7 +75,8 @@ export function linhaParaContrato(r: any): ContratoFiscalizacao {
     processoAutuadoEm: r.processo_autuado_em || null,
     definidoPorNome: r.definido_por_nome || null,
     definidoEm: r.definido_em || null,
-    prazoEntrega: r.prazo_entrega ?? null,
+    prazoEntrega: r.prazo_entrega && !r.prazo_entrega.conflito ? r.prazo_entrega : null,
+    prazoConflito: Boolean(r.prazo_entrega?.conflito),
     atas: Array.isArray(r.atas) ? r.atas.filter(Boolean) : [],
     unidadeArea: r.unidade_area || null,
     unidadesDoContrato: Array.isArray(r.unidades_do_contrato) ? r.unidades_do_contrato.filter(Boolean) : []

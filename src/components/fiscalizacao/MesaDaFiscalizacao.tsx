@@ -110,7 +110,7 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
               <div style={{ fontWeight: 400 }}><OrigemDoPrazo regra={c.prazoEntrega} /></div>
             </>
           ) : (
-            <span style={{ color: 'var(--color-warning-text)' }}>a informar</span>
+            <span style={{ color: 'var(--color-warning-text)' }}>{c.prazoConflito ? 'a informar: as atas do contrato têm prazos diferentes' : 'a informar'}</span>
           )}
         </Campo>
         <Campo rotulo="Origem">{c.emendas.length ? `${c.emendas.length === 1 ? 'Emenda' : 'Emendas'} ${c.emendas.slice(0, 3).join(', ')}${c.emendas.length > 3 ? ` +${c.emendas.length - 3}` : ''}` : 'Sem emenda'}</Campo>

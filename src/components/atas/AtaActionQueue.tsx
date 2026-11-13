@@ -23,6 +23,8 @@ interface AtaActionQueueProps {
   podeIndicarFornecedor?: boolean;
   onIndicarFornecedor?: () => void;
   onDesfazerIndicacao?: () => void;
+  /** Prazo de entrega do TR a confirmar (migration 301): gestor da ata ou coordenador. */
+  onConfirmarPrazo?: () => void;
 }
 
 const COUNT_LABELS: Record<SeverityLevel, [string, string]> = {
@@ -37,11 +39,12 @@ const KIND_LABELS: Record<AtaActionItem['kind'], string> = {
   TAREFA: 'Tarefa',
   LEMBRETE: 'Planejamento da vigência',
   CADASTRO: 'Cadastro',
-  VINCULO: 'Vínculo com contrato'
+  VINCULO: 'Vínculo com contrato',
+  PRAZO: 'Prazo de entrega'
 };
 
 /** Fila única da Ata 360 — mesmo layout da ContractActionQueue do Contrato 360. */
-export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, plan, isLoading = false, onGoTo, podeIndicarFornecedor = false, onIndicarFornecedor, onDesfazerIndicacao }) => {
+export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, plan, isLoading = false, onGoTo, podeIndicarFornecedor = false, onIndicarFornecedor, onDesfazerIndicacao, onConfirmarPrazo }) => {
   const { abrir, dialog, porChave, reexibir, podeResolver, podeResolverAlvo } = useResolverAviso();
 
   if (isLoading) {
@@ -54,7 +57,7 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
 
   const alvoDe = (item: AtaActionItem): AlvoResolucao | null => {
     const contexto = `Ata ${ataKey} · ${KIND_LABELS[item.kind]}`;
-    if (item.kind === 'CADASTRO') return null; // sem Resolvido: dispensar deixaria a ata sem itens
+    if (item.kind === 'CADASTRO' || item.kind === 'PRAZO') return null; // sem Resolvido: dispensar deixaria a ata sem itens
     if (item.kind === 'TAREFA') return item.taskId ? { tipo: 'TAREFA_ATA', taskId: item.taskId, titulo: item.title, contexto } : null;
     return item.avisoChave ? { tipo: 'AVISO', chave: item.avisoChave, titulo: item.title, contexto } : null;
   };
@@ -74,6 +77,12 @@ export const AtaActionQueue: React.FC<AtaActionQueueProps> = ({ queue, ataKey, p
         );
       case 'TAREFA':
         return check;
+      case 'PRAZO':
+        return onConfirmarPrazo ? (
+          <AppButton variant="primary" size="sm" onClick={onConfirmarPrazo} data-testid="acao-confirmar-prazo">
+            {item.badgeLabel === 'informar' ? 'Informar o prazo' : 'Conferir e confirmar'}
+          </AppButton>
+        ) : <EspacoResolvido />;
       case 'CADASTRO':
         if (!podeIndicarFornecedor) return <EspacoResolvido />;
         if (item.fornecedorEstado === 'PENDENTE' && onIndicarFornecedor) {
