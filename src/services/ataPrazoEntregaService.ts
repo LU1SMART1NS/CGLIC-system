@@ -108,7 +108,7 @@ export async function confirmarPrazoDaAta(input: {
     p_inicio: input.semPrazo ? null : input.inicio,
     p_por_item: input.semPrazo ? {} : input.porItem,
     p_motivo: (input.motivo || '').trim() || null,
-    // undefined: não mexe no recebimento; null: o TR não traz o prazo (migration 305).
+    // undefined: não mexe no recebimento; null: o TR não traz o prazo (migration 306).
     p_recebimento: input.recebimento === undefined ? null : input.recebimento ?? { naoDiz: true }
   });
   if (error) throw mapPostgresErrorToAppError(error);

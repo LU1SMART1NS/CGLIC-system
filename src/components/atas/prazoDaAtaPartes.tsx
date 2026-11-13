@@ -15,7 +15,7 @@ export function itemDoPrazoDaAta(p: PrazoDaAta | null, temContratos = false, ata
       ? { id: `prazo-${ataKey}`, kind: 'PRAZO', severity: 'ATENCAO', title: 'Informar o prazo de entrega', description: 'os contratos da ata herdam o prazo do TR', badgeLabel: 'informar' }
       : null;
   }
-  // Prazo de entrega confirmado e o do recebimento ainda não (migration 305): o mesmo item, para o recebimento.
+  // Prazo de entrega confirmado e o do recebimento ainda não (migration 306): o mesmo item, para o recebimento.
   if (p.confirmadoEm) {
     if (p.recebimentoConfirmadoEm) return null;
     const rec = p.recebimentoSugerido ? textoDaRegraDeRecebimento(p.recebimentoSugerido as RegraDoRecebimento) : null;

@@ -467,7 +467,7 @@ export function calculateAttentionSummary(params: {
   for (const arp of arps) {
     const p = prazoPorAta.get(chaveGestaoDaArp(arp));
     if (!p) continue;
-    // Prazo de entrega já confirmado: falta o do recebimento (TRP e TRD, migration 305).
+    // Prazo de entrega já confirmado: falta o do recebimento (TRP e TRD, migration 306).
     if (p.confirmadoEm) {
       const arpKeyR = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
       const rec = p.recebimentoSugerido ? textoDaRegraDeRecebimento(p.recebimentoSugerido as RegraDoRecebimento) : null;

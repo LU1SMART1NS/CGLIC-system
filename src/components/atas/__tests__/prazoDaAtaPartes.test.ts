@@ -18,7 +18,7 @@ describe('prazo de entrega da ata na aba Ações (migration 301)', () => {
   });
   it('confirmado ou sem linha: nada a fazer', () => {
     expect(itemDoPrazoDaAta({ ...base, confirmadoEm: '2026-11-13T12:00:00Z', dias: 90, contagem: 'CORRIDOS', inicio: 'EXERCITO', recebimentoConfirmadoEm: '2026-11-13T12:00:00Z' })).toBeNull();
-    // Entrega confirmada, recebimento não (migration 305): pede o recebimento.
+    // Entrega confirmada, recebimento não (migration 306): pede o recebimento.
     expect(itemDoPrazoDaAta({ ...base, confirmadoEm: '2026-11-13T12:00:00Z', dias: 90, contagem: 'CORRIDOS', inicio: 'EXERCITO' })).toMatchObject({ title: 'Informar o prazo de recebimento', badgeLabel: 'informar' });
     expect(itemDoPrazoDaAta(null)).toBeNull();
   });

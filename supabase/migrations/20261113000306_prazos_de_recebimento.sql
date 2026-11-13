@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Versão: 20261113000305_prazos_de_recebimento.sql
+-- Versão: 20261113000306_prazos_de_recebimento.sql
 -- Prazos do recebimento (TRP e TRD), envio ao pagamento e comissão de recebimento (protótipo aprovado em 13/11/2026).
 --
 -- Os dias do TRP e do TRD vêm do Termo de Referência de cada ata: lidos (sugestão) e confirmados pelo gestor da ata na
@@ -53,7 +53,7 @@ ALTER TABLE public.ata_prazo_entrega ADD CONSTRAINT ata_prazo_entrega_recebiment
   AND (recebimento_sugerido IS NULL OR recebimento_sugerido = public.fisc_recebimento_normalizado(recebimento_sugerido))
   AND (recebimento IS NULL OR recebimento_confirmado_em IS NOT NULL));
 COMMENT ON COLUMN public.ata_prazo_entrega.recebimento IS
-  'Prazos do TRP e do TRD confirmados pelo gestor da ata (migration 305). Com recebimento_confirmado_em e recebimento NULL: o TR não traz o prazo.';
+  'Prazos do TRP e do TRD confirmados pelo gestor da ata (migration 306). Com recebimento_confirmado_em e recebimento NULL: o TR não traz o prazo.';
 
 -- Prazo de recebimento informado no contrato: a regra (as cinco chaves) + origem CONTRATO, motivo, quem e quando.
 ALTER TABLE public.fisc_contratos ADD COLUMN IF NOT EXISTS prazo_recebimento JSONB;
@@ -66,7 +66,7 @@ ALTER TABLE public.fisc_entregas
   ADD COLUMN IF NOT EXISTS comissao_cobrada_em DATE,
   ADD COLUMN IF NOT EXISTS comissao_cobrancas  INTEGER NOT NULL DEFAULT 0;
 COMMENT ON COLUMN public.fisc_entregas.comissao_enviada_em IS
-  'Envio do item entregue à comissão de recebimento para o TRP (migration 305). Sem TRP, cobrar a cada N dias (alert_settings fiscalizacao.cobrarComissaoDias).';
+  'Envio do item entregue à comissão de recebimento para o TRP (migration 306). Sem TRP, cobrar a cada N dias (alert_settings fiscalizacao.cobrarComissaoDias).';
 
 ALTER TABLE public.fisc_entrega_movimentos DROP CONSTRAINT IF EXISTS fisc_entrega_movimentos_tipo;
 ALTER TABLE public.fisc_entrega_movimentos ADD CONSTRAINT fisc_entrega_movimentos_tipo CHECK (tipo IN (
@@ -512,7 +512,7 @@ DECLARE
   v_c     RECORD;
   v_ct    INTEGER := 0;
   v_it    INTEGER := 0;
-  -- Recebimento (migration 305): NULL = não mexe; {"naoDiz": true} = o TR não traz o prazo; senão, a regra.
+  -- Recebimento (migration 306): NULL = não mexe; {"naoDiz": true} = o TR não traz o prazo; senão, a regra.
   v_rec_informado BOOLEAN := p_recebimento IS NOT NULL;
   v_rec   JSONB := CASE WHEN p_recebimento IS NULL OR COALESCE((p_recebimento->>'naoDiz')::BOOLEAN, FALSE) THEN NULL
                         ELSE public.fisc_recebimento_normalizado(p_recebimento) END;

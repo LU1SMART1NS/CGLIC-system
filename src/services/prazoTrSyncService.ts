@@ -44,7 +44,7 @@ export interface LeituraParaGravar extends PrazoLidoDoTr {
   numero_controle_compra: string;
   documento: string | null;
   url: string;
-  /** Prazos do TRP e do TRD lidos do mesmo texto (migration 305); null quando o TR não traz o recebimento definitivo. */
+  /** Prazos do TRP e do TRD lidos do mesmo texto (migration 306); null quando o TR não traz o recebimento definitivo. */
   recebimento?: RecebimentoLidoDoTr | null;
   recebimentoTrechos?: string[];
 }

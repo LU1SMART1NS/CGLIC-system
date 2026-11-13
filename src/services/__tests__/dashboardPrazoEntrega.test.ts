@@ -22,7 +22,7 @@ describe('Início: prazo de entrega a confirmar (migrations 301 e 302)', () => {
     const feita = calculateAttentionSummary({ arps: [ata], prazosAta: [prazo({ confirmadoEm: '2026-11-13T12:00:00Z', recebimentoConfirmadoEm: '2026-11-13T12:00:00Z' })] });
     expect(feita.items.some((i) => i.category === 'PRAZO_ENTREGA')).toBe(false);
   });
-  it('prazo de entrega confirmado e o recebimento não: pede o recebimento (migration 305)', () => {
+  it('prazo de entrega confirmado e o recebimento não: pede o recebimento (migration 306)', () => {
     const r = calculateAttentionSummary({
       arps: [ata],
       prazosAta: [prazo({ confirmadoEm: '2026-11-13T12:00:00Z', recebimentoSugerido: { trpDias: 0, trpContagem: 'CORRIDOS', trdDias: 10, trdContagem: 'UTEIS', trdInicio: 'ENTREGA' } })]
