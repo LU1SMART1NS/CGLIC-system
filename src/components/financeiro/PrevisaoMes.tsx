@@ -200,7 +200,7 @@ export const PrevisaoMes: React.FC = () => {
               { id: 'FATURA', label: 'Faturas', count: n('FATURA'), title: 'Faturas do Contratos.gov.br ainda não pagas' },
               { id: 'CICLO', label: 'Ciclos', count: n('CICLO'), title: 'Ciclos de pagamento em aberto' },
               { id: 'MENSAL', label: 'Mensais', count: n('MENSAL'), title: 'Contratos mensais ainda sem nota' },
-              { id: 'ENTREGA', label: 'Entregas', count: n('ENTREGA'), title: 'Entregas previstas para o mês' },
+              { id: 'ENTREGA', label: 'Entregas', count: n('ENTREGA'), title: 'Entregas previstas para o mês e, da Fiscalização, as previstas para o mês anterior (o pagamento vem depois da entrega)' },
               { id: 'MANUAL', label: 'Incluídas', count: n('MANUAL') },
               { id: 'RETIRADAS', label: 'Retiradas', count: n('RETIRADAS') }
             ]}
