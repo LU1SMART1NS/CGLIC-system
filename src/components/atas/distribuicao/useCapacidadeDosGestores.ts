@@ -1,7 +1,7 @@
 import React from 'react';
 import { useGestorNiveis } from '../../../hooks/useGestorNiveis';
 import { useUsers } from '../../../hooks/useUsers';
-import { capacidadeDe } from './nivelGestor';
+import { CAPACIDADE_COORDENADOR, capacidadeDe } from './nivelGestor';
 import type { NivelDoGestor } from './EquipeFila';
 
 /**
@@ -13,11 +13,18 @@ export function useCapacidadeDosGestores() {
   const { data: usuarios } = useUsers();
   const nivelDe = React.useCallback(
     (gestorNome: string): NivelDoGestor => {
-      const userId = usuarios?.find((u) => u.nome === gestorNome)?.id ?? null;
-      return { userId, registro: (userId && niveis?.[userId]) || null };
+      const u = usuarios?.find((x) => x.nome === gestorNome);
+      const userId = u?.id ?? null;
+      const coordenador = Boolean(u?.ativo && u.perfil === 'coordenador');
+      return { userId, registro: (userId && niveis?.[userId]) || null, ...(coordenador ? { coordenador } : {}) };
     },
     [usuarios, niveis]
   );
-  const capacidadeDoGestor = React.useCallback((gestorNome: string) => capacidadeDe(nivelDe(gestorNome).registro?.nivel), [nivelDe]);
+  // Coordenador com carteira: capacidade fixa de coordenador, no lugar do nível.
+  const capacidadeDoGestor = React.useCallback(
+    (gestorNome: string) =>
+      nivelDe(gestorNome).coordenador ? CAPACIDADE_COORDENADOR : capacidadeDe(nivelDe(gestorNome).registro?.nivel),
+    [nivelDe]
+  );
   return { nivelDe, capacidadeDoGestor };
 }

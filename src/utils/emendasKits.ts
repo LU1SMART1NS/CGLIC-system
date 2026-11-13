@@ -201,12 +201,35 @@ export function buscarItensCaep(itens: ItemCaep[], texto: string): ItemCaep[] {
   // "item 2" vale como número exato do item, não como as palavras "item" e "2".
   const numeroItem = t.match(/\bitem\s*(\d+)\b/);
   if (numeroItem) t = t.replace(numeroItem[0], ' ');
-  const palavras = t.split(/\s+/).filter(Boolean);
+  const palavras = paraBusca(t).split(/\s+/).filter(Boolean);
   if (palavras.length === 0 && !numeroItem) return itens;
   return itens.filter((i) => {
     if (numeroItem && Number(i.numeroItem) !== Number(numeroItem[1])) return false;
-    const [num, ano] = i.numeroAta.split('/');
-    const alvo = semAcento(`${i.descricao} ${i.numeroAta} ${Number(num)}/${ano ?? ''}`);
+    const alvo = textoDeBuscaDoItem(i);
     return palavras.every((p) => alvo.includes(p));
   });
+}
+
+/** Sem acento, minúsculo e letra repetida uma vez só ("dumbbell" e "dumbel" se acham); números ficam como estão. */
+const paraBusca = (s: string) => semAcento(s).replace(/([a-z])\1+/g, '$1');
+
+// Texto de busca de cada item, calculado uma vez (a busca roda a cada letra digitada).
+const cacheBuscaItem = new WeakMap<ItemCaep, string>();
+function textoDeBuscaDoItem(i: ItemCaep): string {
+  let alvo = cacheBuscaItem.get(i);
+  if (alvo == null) {
+    const [num, ano] = i.numeroAta.split('/');
+    // Nome do quadro (o que o cartão mostra), descrição oficial, fornecedor e a ata com e sem zeros.
+    alvo = paraBusca(`${i.nomeCurto ?? ''} ${i.descricao} ${i.fornecedor ?? ''} ${i.numeroAta} ${Number(num)}/${ano ?? ''}`);
+    cacheBuscaItem.set(i, alvo);
+  }
+  return alvo;
+}
+
+/** Busca por palavras (todas precisam aparecer, em qualquer ordem) num texto livre, como o nome de um kit. */
+export function casaBuscaPorPalavras(texto: string, busca: string): boolean {
+  const palavras = paraBusca(busca.trim()).split(/\s+/).filter(Boolean);
+  if (palavras.length === 0) return true;
+  const alvo = paraBusca(texto);
+  return palavras.every((p) => alvo.includes(p));
 }

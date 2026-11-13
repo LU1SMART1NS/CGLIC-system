@@ -5,26 +5,25 @@ import { AppInput, AppSelect } from '../../design-system/components/FormFields';
 import { useToast } from '../../design-system/components/Toast';
 import { useDepartments } from '../../hooks/useDepartments';
 import { useSalvarProgramaFiscalizacao } from '../../hooks/useFiscalizacao';
-import type { OrigemDoRecurso, ProgramaFiscalizacao } from '../../services/fiscalizacaoService';
-import { ROTULO_ORIGEM } from '../../utils/fiscalizacaoResumo';
+import type { ProgramaFiscalizacao } from '../../services/fiscalizacaoService';
 
-interface Rascunho { nome: string; unidadeId: string; origem: OrigemDoRecurso | ''; ativo: boolean }
+interface Rascunho { nome: string; unidadeId: string; ativo: boolean }
 
 /**
  * Cadastro do programa (fisc_programas, migration 265), em Ajustes › Gestão › Programas: nome, área responsável (unidade
- * interna do cadastro, não texto livre), origem do recurso e situação. Programa com itens não se exclui, só se inativa.
+ * interna do cadastro, não texto livre) e situação. Programa com itens não se exclui, só se inativa.
  */
 export const ProgramaModal: React.FC<{ programa?: ProgramaFiscalizacao; onClose: () => void }> = ({ programa, onClose }) => {
   const toast = useToast();
   const salvar = useSalvarProgramaFiscalizacao();
   const { data: unidades = [] } = useDepartments();
-  const [p, setP] = useState<Rascunho>({ nome: programa?.nome ?? '', unidadeId: programa?.unidadeId ?? '', origem: programa?.origemRecurso ?? '', ativo: programa?.ativo ?? true });
+  const [p, setP] = useState<Rascunho>({ nome: programa?.nome ?? '', unidadeId: programa?.unidadeId ?? '', ativo: programa?.ativo ?? true });
   const opcoes = unidades.filter((u) => u.ativo || u.id === programa?.unidadeId).sort((a, b) => a.sigla.localeCompare(b.sigla, 'pt-BR'));
-  const ok = p.nome.trim().length >= 3 && Boolean(p.unidadeId) && Boolean(p.origem);
+  const ok = p.nome.trim().length >= 3 && Boolean(p.unidadeId);
   const gravar = async () => {
     if (!ok) return;
     try {
-      await salvar.mutateAsync({ id: programa?.id ?? null, nome: p.nome, unidadeId: p.unidadeId, origem: p.origem as OrigemDoRecurso, ativo: p.ativo });
+      await salvar.mutateAsync({ id: programa?.id ?? null, nome: p.nome, unidadeId: p.unidadeId, ativo: p.ativo });
       toast.success(programa ? `Programa "${p.nome.trim()}" atualizado.` : `Programa "${p.nome.trim()}" criado. Inclua os itens na tela do programa (Fiscalização › Programas).`);
       onClose();
     } catch (err) {
@@ -48,16 +47,10 @@ export const ProgramaModal: React.FC<{ programa?: ProgramaFiscalizacao; onClose:
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
         <AppInput label="Nome do programa" value={p.nome} maxLength={120} onChange={(ev) => setP({ ...p, nome: ev.target.value })} placeholder="ex.: Projeto Pegasus" error={p.nome && p.nome.trim().length < 3 ? 'Pelo menos 3 letras.' : undefined} data-testid="fisc-programa-nome" />
-        <AppSelect label="Área responsável" value={p.unidadeId} onChange={(ev) => setP({ ...p, unidadeId: ev.target.value })} hint="Unidade interna que envia as informações à SFC/CGLIC (cadastro em Ajustes › Unidades Internas)." data-testid="fisc-programa-area">
+        <AppSelect label="Área responsável" value={p.unidadeId} onChange={(ev) => setP({ ...p, unidadeId: ev.target.value })} hint="Unidade interna dona do programa: envia as informações à SFC/CGLIC e as reservas do programa na Alocação ficam na cota dela." data-testid="fisc-programa-area">
           <option value="">Escolha a unidade…</option>
           {opcoes.map((u) => (
             <option key={u.id} value={u.id}>{u.sigla}{u.nomeCompleto ? ` · ${u.nomeCompleto}` : ''}</option>
-          ))}
-        </AppSelect>
-        <AppSelect label="Origem do recurso" value={p.origem} onChange={(ev) => setP({ ...p, origem: ev.target.value as OrigemDoRecurso })} data-testid="fisc-programa-origem">
-          <option value="">Escolha…</option>
-          {(Object.keys(ROTULO_ORIGEM) as OrigemDoRecurso[]).map((o) => (
-            <option key={o} value={o}>{ROTULO_ORIGEM[o]}</option>
           ))}
         </AppSelect>
         {programa && (

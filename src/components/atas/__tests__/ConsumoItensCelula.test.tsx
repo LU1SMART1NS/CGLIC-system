@@ -24,4 +24,25 @@ describe('ConsumoItensCelula', () => {
     expect(html).toContain('Item 2 · ');
     expect(html).not.toContain('data-quadradinho');
   });
+
+  it('com o resumo e vários itens: contagem e alertas no lugar da descrição', () => {
+    const itens: ConsumoItem[] = [
+      { numero: '1', descricao: 'Capacete', pct: 30 },
+      { numero: '2', descricao: 'Colete', pct: 120 },
+      { numero: '3', descricao: 'Luva', pct: 85 }
+    ];
+    const html = renderToStaticMarkup(<ConsumoItensCelula itens={itens} resumo={{ total: 3, criticos: 1, atencao: 1 }} />);
+    expect(html).toContain('3 itens');
+    expect(html).toContain('1 crítico');
+    expect(html).toContain('1 em atenção');
+    expect(html).not.toContain('Item 2 · ');
+  });
+
+  it('com o resumo e um item só: continua a descrição', () => {
+    const html = renderToStaticMarkup(
+      <ConsumoItensCelula itens={[{ numero: '1', descricao: 'TOUCA', pct: 23 }]} resumo={{ total: 1, criticos: 0, atencao: 0 }} />
+    );
+    expect(html).toContain('Touca');
+    expect(html).not.toContain('1 itens');
+  });
 });

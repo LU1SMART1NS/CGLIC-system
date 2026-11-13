@@ -8,6 +8,9 @@ import {
 
 /** Valor do filtro de unidade sem filtro. Os demais valores são o nome da unidade normalizado (minúsculas). */
 export const TODAS_UNIDADES = 'TODAS';
+/** Filtro "Sem unidade" (Carteira de Atas): a parte da SENASP ainda não alocada a nenhuma unidade interna. */
+export const SEM_UNIDADE = 'SEM_UNIDADE';
+export const NOME_SEM_UNIDADE = 'Sem unidade';
 
 export const NIVEL_FILTER_VALUES = FILTRO_NIVEL_VALUES;
 
@@ -53,14 +56,17 @@ interface UnidadeSelectProps {
   unidades: Array<{ chave: string; nome: string }>;
   onChange: (value: string) => void;
   testId: string;
+  /** Inclui a opção "Sem unidade" (o que ainda não foi alocado), no fim da lista. */
+  comSemUnidade?: boolean;
 }
 
 /** Filtro de unidade interna. Uma unidade vinda da URL que não está na lista continua selecionável. */
-export const CarteiraUnidadeSelect: React.FC<UnidadeSelectProps> = ({ value, unidades, onChange, testId }) => {
-  const conhecida = value === TODAS_UNIDADES || unidades.some((u) => u.chave === value);
+export const CarteiraUnidadeSelect: React.FC<UnidadeSelectProps> = ({ value, unidades, onChange, testId, comSemUnidade = false }) => {
+  const conhecida = value === TODAS_UNIDADES || (comSemUnidade && value === SEM_UNIDADE) || unidades.some((u) => u.chave === value);
   const options = [
     ...(conhecida ? [] : [{ value, label: value }]),
-    ...unidades.map((u) => ({ value: u.chave, label: u.nome }))
+    ...unidades.map((u) => ({ value: u.chave, label: u.nome })),
+    ...(comSemUnidade ? [{ value: SEM_UNIDADE, label: NOME_SEM_UNIDADE }] : [])
   ];
   return (
     <CarteiraFilterButton label="Unidade" value={value} emptyValue={TODAS_UNIDADES} options={options} onChange={onChange} testId={testId} />

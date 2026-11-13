@@ -5,7 +5,7 @@ import { CARTEIRA_EXPANDED_CELL_STYLE } from '../carteira/CarteiraDetailLabel';
 import { carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import type { ContratoFiscalizacao, TransferenciaFiscal } from '../../services/fiscalizacaoService';
-import { comSfc, dataBR, hojeEmBrasilia, type CargaDoFiscal } from '../../utils/fiscalizacao';
+import { ROTULO_RELACAO_EQUIPE, comArea, comSfc, mediaDaEquipeFiscal, dataBR, hojeEmBrasilia, unidadeDaArea, type CargaDaArea, type CargaDoFiscal, type RelacaoComEquipe } from '../../utils/fiscalizacao';
 import { DesfazerTransferenciaFiscalModal, TransferirFiscalModal, TransferirFiscalTemporariamenteModal } from './FiscalizacaoModais';
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
 import { ArrowLeftRight } from 'lucide-react';
@@ -15,9 +15,14 @@ import { useSelecaoFila } from '../atas/distribuicao/DistribuicaoSelecao';
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 /** Carteira do fiscal: contratos e a ausência (saiu ou recebeu de colega). */
-const CarteiraCell: React.FC<{ f: CargaDoFiscal; ausencia: TransferenciaFiscal | null; recebidas: TransferenciaFiscal[] }> = ({ f, ausencia, recebidas }) => (
+const CarteiraCell: React.FC<{ f: CargaDoFiscal; ausencia: TransferenciaFiscal | null; recebidas: TransferenciaFiscal[]; relacao?: RelacaoComEquipe }> = ({ f, ausencia, recebidas, relacao }) => (
   <div>
     <span style={{ fontWeight: 700 }}>{plural(f.contratos, 'contrato', 'contratos')}</span>
+    {relacao && (
+      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: relacao === 'ACIMA' ? 'var(--color-danger-text)' : '#475569' }} data-testid={`fisc-equipe-relacao-${f.userId}`}>
+        {ROTULO_RELACAO_EQUIPE[relacao]}
+      </div>
+    )}
     {ausencia && (
       <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-warning-text)' }} data-testid={`fisc-equipe-ausente-${f.userId}`}>
         {ausencia.retornoPrevisto <= hojeEmBrasilia() ? `retorno em ${dataBR(ausencia.retornoPrevisto)}: devolver os contratos` : `ausente até ${dataBR(ausencia.retornoPrevisto)}`} · com {ausencia.destinoNome}
@@ -35,7 +40,6 @@ const CarteiraCell: React.FC<{ f: CargaDoFiscal; ausencia: TransferenciaFiscal |
 const PressaoCell: React.FC<{ f: CargaDoFiscal }> = ({ f }) => {
   const partes: Array<{ texto: string; cor: string }> = [];
   if (f.aAutuar > 0) partes.push({ texto: `${f.aAutuar} a autuar`, cor: 'var(--color-warning-text)' });
-  if (f.semPortaria > 0) partes.push({ texto: `${f.semPortaria} sem portaria`, cor: 'var(--color-warning-text)' });
   if (partes.length === 0) return <span style={{ color: '#94a3b8' }}>—</span>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', fontSize: '0.75rem', fontWeight: 700 }}>
@@ -51,6 +55,10 @@ interface FiscaisEquipeProps {
   contratos: ContratoFiscalizacao[];
   /** Ausências em curso (migration 261). */
   transferencias: TransferenciaFiscal[];
+  /** Unidades internas que fiscalizam pela área requisitante (e os contratos sem unidade). */
+  areas?: CargaDaArea[];
+  /** Abre a janela "Quem fiscaliza" (indicar a unidade). */
+  onDefinir?: (c: ContratoFiscalizacao) => void;
 }
 
 type Janela =
@@ -106,7 +114,7 @@ const ContratosDoFiscal: React.FC<{
  * Início › Fiscalização › Distribuição › Equipe: a carga de cada fiscal da SFC/CGLIC, como a Equipe de Atas e Contratos
  * (decisão de 11/11/2026). A seta abre os contratos do fiscal; a linha do contrato abre o Contrato 360.
  */
-export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, transferencias }) => {
+export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, transferencias, areas = [], onDefinir }) => {
   const [busca, setBusca] = useState('');
   const [aberto, setAberto] = useState<string | null>(null);
   const [janela, setJanela] = useState<Janela | null>(null);
@@ -116,6 +124,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
     const q = busca.trim().toLowerCase();
     return q ? carga.filter((f) => f.nome.toLowerCase().includes(q)) : carga;
   }, [carga, busca]);
+  const { porFiscal } = useMemo(() => mediaDaEquipeFiscal(carga), [carga]);
   const doFiscal = (userId: string) => contratos.filter((c) => comSfc(c) && c.fiscalUserId === userId);
 
   return (
@@ -172,9 +181,10 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
                         </td>
                         <td style={{ ...carteiraTd, minWidth: '160px' }}>
                           <span style={{ fontWeight: 800 }}>{f.nome}</span>
+                          {f.outroPerfil && <div className="pn-gc-perfil">{f.outroPerfil} · também fiscal</div>}
                         </td>
                         <td data-label="Carteira" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                          <CarteiraCell f={f} ausencia={ausencia} recebidas={transferencias.filter((t) => t.destinoUserId === f.userId)} />
+                          <CarteiraCell f={f} ausencia={ausencia} recebidas={transferencias.filter((t) => t.destinoUserId === f.userId)} relacao={porFiscal.get(f.userId)?.relacao ?? undefined} />
                         </td>
                         <td data-label="Pressão agora" style={carteiraTd}>
                           <PressaoCell f={f} />
@@ -241,6 +251,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
           </div>
         </div>
       )}
+      {areas.length > 0 && <AreasRequisitantes areas={areas} contratos={contratos} onDefinir={onDefinir} />}
       {janela?.tipo === 'TRANSFERIR' && (
         <TransferirFiscalModal
           carga={janela.carga}
@@ -255,6 +266,81 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
       )}
       {janela?.tipo === 'TEMPORARIA' && <TransferirFiscalTemporariamenteModal carga={janela.carga} ausentes={transferencias} onClose={() => setJanela(null)} />}
       {janela?.tipo === 'DESFAZER' && <DesfazerTransferenciaFiscalModal transferencia={janela.transferencia} onClose={() => setJanela(null)} />}
+    </div>
+  );
+};
+
+/**
+ * Equipe › Áreas requisitantes: os contratos que cada unidade interna fiscaliza (toda ou a parte da área numa mista),
+ * no desenho da tabela dos fiscais. A linha "Unidade a indicar" junta os contratos com a área sem unidade.
+ */
+const AreasRequisitantes: React.FC<{ areas: CargaDaArea[]; contratos: ContratoFiscalizacao[]; onDefinir?: (c: ContratoFiscalizacao) => void }> = ({ areas, contratos, onDefinir }) => {
+  const [aberta, setAberta] = useState<string | null>(null);
+  const chave = (a: CargaDaArea) => a.sigla ?? '__a_indicar__';
+  const daUnidade = (a: CargaDaArea) => contratos.filter((c) => comArea(c) && unidadeDaArea(c) === a.sigla);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }} data-testid="fisc-equipe-areas">
+      <div>
+        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>Áreas requisitantes</h3>
+        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Unidades internas que fiscalizam contratos, todos ou a parte da área numa fiscalização mista.</span>
+      </div>
+      <div data-testid="fisc-equipe-areas-tabela" style={carteiraTableShell}>
+        <div style={{ overflowX: 'auto', containerType: 'inline-size' }}>
+          <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
+                <th style={carteiraTh}>Unidade interna</th>
+                <th style={carteiraTh}>Carteira</th>
+                <th style={carteiraTh}>Pressão agora</th>
+              </tr>
+            </thead>
+            <tbody>
+              {areas.map((a) => {
+                const k = chave(a);
+                const expandida = aberta === k;
+                const total = a.toda + a.mista;
+                return (
+                  <React.Fragment key={k}>
+                    <tr data-testid={`fisc-equipe-area-${k}`}>
+                      <td data-role="expand" style={{ ...carteiraTd, padding: '0.7rem 0.4rem', textAlign: 'center' }}>
+                        <ActionButton action={expandida ? 'recolher' : 'expandir'} iconOnly type="button" size="xs" onClick={() => setAberta(expandida ? null : k)} expanded={expandida} label={expandida ? 'Recolher contratos' : 'Ver contratos'} data-testid={`fisc-equipe-area-expandir-${k}`} />
+                      </td>
+                      <td style={{ ...carteiraTd, minWidth: '160px' }}>
+                        {a.sigla ? <span style={{ fontWeight: 800 }}>{a.sigla}</span> : <span style={{ fontWeight: 800, color: 'var(--color-warning-text)' }}>Unidade a indicar</span>}
+                      </td>
+                      <td data-label="Carteira" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                        <span style={{ fontWeight: 700 }}>{plural(total, 'contrato', 'contratos')}</span>
+                        {a.mista > 0 && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{plural(a.mista, 'em fiscalização mista', 'em fiscalização mista')}</div>}
+                      </td>
+                      <td data-label="Pressão agora" style={carteiraTd}>
+                        {!a.sigla ? (
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-warning-text)' }}>indicar a unidade</span>
+                        ) : a.pelaDivisao > 0 ? (
+                          <span style={{ fontSize: '0.75rem', color: '#64748b' }} title="A unidade veio da divisão do contrato por unidade interna; o coordenador pode trocar">{plural(a.pelaDivisao, 'pela divisão do contrato', 'pela divisão do contrato')}</span>
+                        ) : (
+                          <span style={{ color: '#94a3b8' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                    {expandida && (
+                      <tr>
+                        <td colSpan={4} style={CARTEIRA_EXPANDED_CELL_STYLE}>
+                          <ContratosFiscalizacaoTabela
+                            contratos={daUnidade(a)}
+                            testId={`fisc-equipe-area-contratos-${k}`}
+                            rowActions={onDefinir ? (c) => <AppButton variant="outline" size="sm" onClick={() => onDefinir(c)}>{a.sigla ? 'Alterar' : 'Indicar'}</AppButton> : undefined}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 };

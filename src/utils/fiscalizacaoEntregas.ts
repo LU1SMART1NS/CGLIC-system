@@ -1,5 +1,12 @@
-import type { EntregaFiscalizacao, EtapaEntrega } from '../services/fiscalizacaoService';
-import { hojeEmBrasilia } from './fiscalizacao';
+import type { AvisoDaEntrega, EntregaFiscalizacao, EtapaEntrega } from '../services/fiscalizacaoService';
+import { dataBR, hojeEmBrasilia } from './fiscalizacao';
+
+/** O que mudou no pedido de emenda depois da entrega (migration 274), em uma frase. */
+export function textoDoAviso(a: AvisoDaEntrega): string {
+  if (a.tipo === 'OUTRO_CONTRATO') return `A nota deste item passou ao contrato ${a.contrato}`;
+  const quando = [a.data ? `em ${dataBR(a.data)}` : null, a.sei ? `SEI ${a.sei}` : null].filter(Boolean).join(' · ');
+  return `Empenho anulado no pedido${quando ? ` ${quando}` : ''}: o item foi cancelado`;
+}
 
 /** Fases e etapas da entrega (protótipo aprovado em 10/11/2026; migration 260). */
 export type FaseEntrega = 'PREPARACAO' | 'EXECUCAO' | 'RECEBIMENTO' | 'PAGAMENTO' | 'FINALIZADO';
@@ -49,14 +56,20 @@ export const foiEntregue = (e: Pick<EntregaFiscalizacao, 'etapa'>) => ordemDaEta
 
 export type TomPrazo = 'danger' | 'warning' | 'success' | 'neutral';
 
-/** Prazo da entrega pela data prevista (P4): vencida, vence em 30 dias, no prazo, entregue (com ou sem atraso). */
-export function prazoDaEntrega(e: Pick<EntregaFiscalizacao, 'etapa' | 'prevista' | 'entregueEm' | 'responsavel'>, hoje: string = hojeEmBrasilia()): { texto: string; tom: TomPrazo; dias: number | null } {
+/**
+ * Prazo da entrega pela data prevista (P4): vencida, vence em 30 dias, no prazo, entregue (com ou sem atraso).
+ * Aguardando o Exército, o prazo do fornecedor fica suspenso: a espera é da autorização da DFPC, não dele. O item não
+ * conta como vencido nem como a vencer enquanto espera.
+ */
+export function prazoDaEntrega(e: Pick<EntregaFiscalizacao, 'etapa' | 'prevista' | 'entregueEm' | 'responsavel'> & Partial<Pick<EntregaFiscalizacao, 'prazoInicio'>>, hoje: string = hojeEmBrasilia()): { texto: string; tom: TomPrazo; dias: number | null } {
   if (e.responsavel === 'AREA') return { texto: 'Sem acompanhamento', tom: 'neutral', dias: null };
   const dias = (a: string, b: string) => Math.round((Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`)) / 864e5);
   if (foiEntregue(e)) {
     if (e.entregueEm && e.prevista && e.entregueEm > e.prevista) return { texto: `Entregue com ${dias(e.entregueEm, e.prevista)} dias de atraso`, tom: 'warning', dias: null };
     return { texto: 'Entregue', tom: 'success', dias: null };
   }
+  if (!e.prevista && e.prazoInicio === 'EXERCITO') return { texto: 'Começa na autorização do Exército', tom: 'neutral', dias: null };
+  if (e.etapa === 'CONTROLADO') return { texto: 'Prazo suspenso', tom: 'neutral', dias: null };
   if (!e.prevista) return { texto: 'Sem data prevista', tom: 'neutral', dias: null };
   const d = dias(e.prevista, hoje);
   if (d < 0) return { texto: `Vencida há ${-d} ${d === -1 ? 'dia' : 'dias'}`, tom: 'danger', dias: d };

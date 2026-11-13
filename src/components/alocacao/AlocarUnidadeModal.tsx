@@ -1,6 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ActionButton, AlertCard, AppButton, Modal, NoticeBar, StatusBadge } from '../../design-system';
+import { ActionButton, AlertCard, AppButton, AppInput, AppSelect, Modal, NoticeBar, StatusBadge } from '../../design-system';
+import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
+import { useAlocacaoExtraDoItem, useProgramasParaAlocacao, useRemanejarEntreUnidades, useReservarParaPrograma } from '../../hooks/useProgramasDaAlocacao';
+import type { SituacaoDivisao } from '../../services/divisaoNaAtaService';
+import { descreverNumeroSei, lerNumeroSei } from '../../utils/numeroSei';
 import { useDepartments } from '../../hooks/useDepartments';
 import { useItemAllocations } from '../../hooks/useItemAllocations';
 import { useItemEmpenhoLinks } from '../../hooks/useItemEmpenhoLinks';
@@ -11,7 +15,7 @@ import { useContratadoDoItem } from '../../hooks/useContratadoDoItem';
 import { alocacoesPorContrato, contratadoPorNomeDaUnidade } from '../../utils/contratadoPorUnidade';
 import { summarizeAllocationExecution } from '../../utils/allocationExecution';
 import { useReservaDoItem } from '../../hooks/useReservaDoItem';
-import { avaliarEdicao, linhasDaDivisaoPlanejada, linhasIniciais, listaParaGravar, normUnidade, ROTULO_MOTIVO_DO_MINIMO, UNIDADE_DAS_EMENDAS, vinculosSemRemovidas, type LinhaAlocacao } from '../../utils/alocacaoEdicao';
+import { avaliarEdicao, linhasDaDivisaoPlanejada, linhasIniciais, listaParaGravar, normUnidade, presoDaUnidade, reservasDosProgramasPorUnidade, ROTULO_MOTIVO_DO_MINIMO, UNIDADE_DAS_EMENDAS, vinculosSemRemovidas, type LinhaAlocacao } from '../../utils/alocacaoEdicao';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
 import { MENSAGEM_CONFLITO_EDICAO } from '../../utils/conflitoEdicao';
 import { formatNumber } from '../item-balances/itemBalanceUtils';
@@ -32,6 +36,10 @@ export interface ItemParaAlocar {
    * provisório até informar a ata assinada (migration 116; a alocação não é bloqueada). Número de outros órgãos.
    */
   limiteProvisorioOutrosOrgaos?: number;
+  /** A ata não divide o quantitativo SENASP entre as unidades (migration 297): alocar é opcional. */
+  semDivisaoNaAta?: boolean;
+  /** Marcação da divisão na ata; sem ela, a janela lê do banco. Na ata que divide, passar entre unidades é Remanejar (com SEI). */
+  divisaoNaAta?: SituacaoDivisao;
 }
 
 interface AlocarUnidadeModalProps {
@@ -68,7 +76,7 @@ export const CatalogoVazioAviso: React.FC = () => (
 /**
  * Janela "Alocação do item", a mesma na fila Itens às unidades e na aba Alocação interna do Item 360: lista as
  * unidades já alocadas com o contratado, o empenhado e (na CAEP) o reservado a parlamentares, edita a quantidade na
- * linha (mínimo = contratado + reservado ainda sem contrato), remove (só sem contrato, empenho vinculado nem reserva) e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
+ * linha (mínimo = contratado + reservado ainda fora do contratado), remove (só sem contrato, empenho vinculado nem reserva) e acrescenta unidades; tudo é gravado de uma vez (save_allocations_atomic, versionado). Regras em alocacaoEdicao.
  */
 export const AlocarUnidadeModal: React.FC<AlocarUnidadeModalProps> = ({ item, ...rest }) =>
   item ? <JanelaAlocacao key={`${item.numeroAta}-${item.uasg}-${item.numeroItem}`} item={item} {...rest} /> : null;
@@ -82,14 +90,19 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   const { data: linksState, isLoading: linksLoading } = linksQuery;
   // Sem o reservado, a janela não edita: a CAEP poderia ficar abaixo da reserva sem aviso (o banco recusaria ao gravar).
   const reservadoQuery = useReservaDoItem(itemKey);
+  // Reservas dos programas, divisão da ata assinada e remanejamentos (migrations 297/298).
+  const extraQuery = useAlocacaoExtraDoItem(itemKey);
+  const extra = extraQuery.data;
+  const programasPorUnidade = React.useMemo(() => reservasDosProgramasPorUnidade(extra.reservas), [extra.reservas]);
   // Sem as alocações ou os vínculos lidos do banco, a janela não edita: gravar a partir de uma lista que não chegou
   // apagaria o que está salvo.
-  const naoCarregou = alocacoesQuery.isError || linksQuery.isError || reservadoQuery.isError;
-  const relendo = alocacoesQuery.isFetching || linksQuery.isFetching || reservadoQuery.isFetching;
+  const naoCarregou = alocacoesQuery.isError || linksQuery.isError || reservadoQuery.isError || extraQuery.isError;
+  const relendo = alocacoesQuery.isFetching || linksQuery.isFetching || reservadoQuery.isFetching || extraQuery.isFetching;
   const tentarDeNovo = () => {
     if (alocacoesQuery.isError) void alocacoesQuery.refetch();
     if (linksQuery.isError) void linksQuery.refetch();
     if (reservadoQuery.isError) void reservadoQuery.refetch();
+    if (extraQuery.isError) void extraQuery.refetch();
   };
   const { data: empenhoDoItem, isLoading: vinculosLoading } = useEmpenhoDoItem(itemKey);
   const { data: contratado, isLoading: contratadoLoading } = useContratadoDoItem(itemKey);
@@ -97,7 +110,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
   const divisao = useDivisoesDasAtasMontadas().get(itemKey);
   const salvarAlocacoes = useSaveAllocations();
   const salvarLinks = useSaveEmpenhoLinks();
-  const carregando = departmentsLoading || alocacoesLoading || linksLoading || vinculosLoading || contratadoLoading || reservadoQuery.isLoading;
+  const carregando = departmentsLoading || alocacoesLoading || linksLoading || vinculosLoading || contratadoLoading || reservadoQuery.isLoading || extraQuery.isLoading;
   const salvando = salvarAlocacoes.isPending || salvarLinks.isPending;
 
   // Linhas gravadas (derivadas das alocações e dos empenhos); a primeira edição passa a valer no lugar delas.
@@ -106,11 +119,11 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
     const gravadas = estado?.allocations ?? [];
     const exec = summarizeAllocationExecution(gravadas, empenhoDoItem, linksState?.links ?? {}, alocacoesPorContrato(contratado.contratos, gravadas));
     const inativas = new Set(departments.filter((d) => !d.ativo).map((d) => normUnidade(d.sigla)));
-    return linhasIniciais(gravadas, exec.porAlocacao, contratadoPorNomeDaUnidade(contratado.unidades), reservadoQuery.data).map((l) => {
+    return linhasIniciais(gravadas, exec.porAlocacao, contratadoPorNomeDaUnidade(contratado.unidades), reservadoQuery.data, programasPorUnidade).map((l) => {
       const linha = inativas.has(normUnidade(l.unitName)) ? { ...l, inativa: true } : l;
       return linha.id === removerId && linha.vinculados === 0 && linha.contratado === 0 && !(linha.reservado ?? 0) ? { ...linha, removida: true } : linha;
     });
-  }, [carregando, naoCarregou, estado, empenhoDoItem, linksState, removerId, contratado, departments, reservadoQuery.data]);
+  }, [carregando, naoCarregou, estado, empenhoDoItem, linksState, removerId, contratado, departments, reservadoQuery.data, programasPorUnidade]);
   const [editadas, setEditadas] = React.useState<LinhaAlocacao[] | null>(null);
   const linhas = editadas ?? iniciais;
   const setLinhas = (f: (ls: LinhaAlocacao[]) => LinhaAlocacao[]) => setEditadas((prev) => f(prev ?? iniciais ?? []));
@@ -185,7 +198,78 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
 
   const base = Math.max(item.quantitativoSenasp, aval.totalAlocado, 1);
   // Coluna Reservado: só quando o item tem a CAEP na lista ou alguma reserva.
-  const comReserva = lista.some((l) => (l.reservadoTotal ?? 0) > 0 || normUnidade(l.unitName) === normUnidade(UNIDADE_DAS_EMENDAS));
+  const comReserva = lista.some((l) => (l.reservadoTotal ?? 0) > 0 || (l.reservadoProgramasTotal ?? 0) > 0 || normUnidade(l.unitName) === normUnidade(UNIDADE_DAS_EMENDAS));
+  // Ata que divide: passar quantidade de uma unidade a outra é Remanejar, com o nº SEI da autorização (migration 297).
+  const divide = (item.divisaoNaAta ?? extra.divisao) === 'DIVIDE';
+  const temDivisaoAssinada = Object.keys(extra.divisaoAssinada).length > 0;
+  const daAta = (unit: string) => {
+    const k = Object.keys(extra.divisaoAssinada).find((u) => normUnidade(u) === normUnidade(unit));
+    return k ? extra.divisaoAssinada[k] : 0;
+  };
+  /** O que a unidade ainda pode usar ou ceder: alocado − (contratado + reservado). Na CAEP, é o das emendas sem pedido. */
+  const livreDa = (l: LinhaAlocacao) => Number(l.qtd || 0) - presoDaUnidade(l).preso;
+  const reservasDa = (unit: string) => extra.reservas.filter((r) => normUnidade(r.area) === normUnidade(unit));
+  const semAlteracoes = editadas === null;
+
+  // Reservas de programas e remanejamento: gravam na hora (RPCs da migration 297), com a versão do item.
+  const programasQuery = useProgramasParaAlocacao();
+  const reservar = useReservarParaPrograma();
+  const remanejar = useRemanejarEntreUnidades();
+  const [editandoReserva, setEditandoReserva] = React.useState<{ programaId: string; valor: string } | null>(null);
+  const [aberto, setAberto] = React.useState<'reservar' | 'remanejar' | null>(null);
+  const [form, setForm] = React.useState({ programa: '', qtdReserva: '', de: '', para: '', qtdRemanejar: '', sei: '', obs: '' });
+  const falhou = (err: any) => {
+    if (err?.sqlState === '40001') return MENSAGEM_CONFLITO_EDICAO;
+    return String(err?.message || 'Não foi possível gravar.');
+  };
+  const gravarReserva = async (programaId: string, quantidade: number) => {
+    setErro(null);
+    try {
+      await reservar.mutateAsync({ itemKey, programaId, quantidade, expectedVersion: estado?.version });
+      setEditandoReserva(null);
+      setEditadas(null);
+      onAlocado?.();
+    } catch (err) {
+      setErro(falhou(err));
+    }
+  };
+  const programasAtivos = (programasQuery.data ?? []).filter((p) => p.ativo);
+  const programaEscolhido = programasAtivos.find((p) => p.id === form.programa) ?? programasAtivos[0];
+  const qtdReserva = Number(form.qtdReserva || 0);
+  /** ComprasSUSP não tem reserva própria: informar quantidade = alocar à CAEP (vira emendas sem pedido). */
+  const reservarComprasSusp = () => {
+    if (qtdReserva <= 0) return;
+    if (qtdReserva > aval.aAlocar) {
+      setErro(aval.aAlocar > 0 ? `Só há ${formatNumber(aval.aAlocar)} livres da SENASP neste item.` : 'Não há livre da SENASP neste item: para a CAEP receber mais, use Remanejar entre unidades (com SEI).');
+      return;
+    }
+    const caep = lista.find((l) => !l.removida && normUnidade(l.unitName) === normUnidade(UNIDADE_DAS_EMENDAS));
+    if (caep) alterar(caep.id, { qtd: Number(caep.qtd || 0) + qtdReserva });
+    else setLinhas((ls) => [...ls, { id: Date.now().toString(), unitName: UNIDADE_DAS_EMENDAS, original: 0, qtd: qtdReserva, empenhado: 0, contratado: 0, vinculados: 0, removida: false, adicionada: true }]);
+    setForm((f) => ({ ...f, qtdReserva: '' }));
+    setAberto(null);
+    setErro(null);
+  };
+  const ativasComLivre = lista.filter((l) => !l.removida && !l.adicionada && livreDa(l) > 0);
+  const deEscolhida = ativasComLivre.find((l) => l.unitName === form.de) ?? ativasComLivre[0];
+  const destinos = departments.filter((d) => d.ativo && normUnidade(d.sigla) !== normUnidade(deEscolhida?.unitName ?? ''));
+  const paraEscolhida = destinos.find((d) => d.sigla === form.para) ?? destinos[0];
+  const qtdRemanejar = Number(form.qtdRemanejar || 0);
+  const seiLido = lerNumeroSei(form.sei);
+  const erroRemanejar = deEscolhida && qtdRemanejar > livreDa(deEscolhida) ? `A ${deEscolhida.unitName} só pode ceder ${formatNumber(Math.max(0, livreDa(deEscolhida)))} (o resto está contratado ou reservado).` : undefined;
+  const gravarRemanejamento = async () => {
+    if (!deEscolhida || !paraEscolhida || qtdRemanejar <= 0 || erroRemanejar || (seiLido.tipo !== 'DOCUMENTO' && seiLido.tipo !== 'PROCESSO')) return;
+    setErro(null);
+    try {
+      await remanejar.mutateAsync({ itemKey, de: deEscolhida.unitName, para: paraEscolhida.sigla, quantidade: qtdRemanejar, sei: seiLido.valor, observacao: form.obs.trim() || undefined, expectedVersion: estado?.version });
+      setForm((f) => ({ ...f, qtdRemanejar: '', sei: '', obs: '' }));
+      setAberto(null);
+      setEditadas(null);
+      onAlocado?.();
+    } catch (err) {
+      setErro(falhou(err));
+    }
+  };
   const ativas = lista.filter((l) => !l.removida);
   const corDe = (id: string) => CORES[lista.findIndex((l) => l.id === id) % CORES.length];
 
@@ -195,7 +279,7 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
       onClose={onFechar}
       title="Alocação do item"
       subtitle={`Ata ${item.numeroAta} · item ${item.numeroItem}${item.descricao ? ` · ${item.descricao}` : ''}`}
-      size="lg"
+      size="xl"
       dismissible={!salvando}
       testId="alocar-unidade-modal"
       footer={
@@ -239,6 +323,18 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
         <p style={{ margin: 0, fontSize: '0.85rem', color: CINZA }}>Carregando as alocações do item…</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+          {(item.semDivisaoNaAta || extra.divisao === 'NAO_DIVIDE') && (
+            <NoticeBar tone="info" testId="alocar-sem-divisao">
+              <strong>A ata não divide o quantitativo SENASP entre as unidades internas.</strong> Alocar a uma unidade é opcional e o
+              que fica sem unidade não é pendência.
+            </NoticeBar>
+          )}
+          {item.quantitativoSenasp < 0 && (
+            <NoticeBar tone="warning" testId="alocar-limite-negativo">
+              <strong>Quantitativo SENASP negativo ({formatNumber(item.quantitativoSenasp)}).</strong> O registrado da SENASP no Compras.gov.br é menor que o que
+              ela gerencia para os participantes. Confira o remanejamento na fonte; até lá a alocação só pode diminuir.
+            </NoticeBar>
+          )}
           {item.limiteProvisorioOutrosOrgaos ? (
             <NoticeBar tone="info" testId="alocar-limite-provisorio">
               <strong>Limite provisório: registrado da SENASP ({formatNumber(item.quantitativoSenasp)}).</strong> A quantidade da ata assinada
@@ -308,8 +404,9 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                       <th style={thStyle}>Unidade interna</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Contratado</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Empenhado</th>
-                      {comReserva && <th style={{ ...thStyle, textAlign: 'right' }} title="Reservado a parlamentares que ainda não virou contrato no Contratos.gov.br (o que já virou está em Contratado)">Reservado</th>}
+                      {comReserva && <th style={{ ...thStyle, textAlign: 'right' }} title="Reservado a parlamentares e a programas que ainda não está em Contratado">Reservado</th>}
                       <th style={{ ...thStyle, textAlign: 'right' }}>Alocado</th>
+                      <th style={{ ...thStyle, textAlign: 'right' }} title="Alocado − contratado − reservado: o que a unidade ainda pode usar ou remanejar. Na CAEP, são as emendas sem pedido.">Livre</th>
                       <th style={thStyle} aria-label="Ações" />
                     </tr>
                   </thead>
@@ -319,14 +416,23 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                       const fundo = l.removida ? FUNDO_LINHA.removida : l.adicionada ? FUNDO_LINHA.adicionada : a.alterada ? FUNDO_LINHA.alterada : undefined;
                       const td = { ...tdStyle, background: fundo };
                       const riscado: React.CSSProperties = l.removida ? { textDecoration: 'line-through', color: CINZA } : {};
+                      const travadaPelaAta = divide && !l.adicionada;
+                      const ehCaep = normUnidade(l.unitName) === normUnidade(UNIDADE_DAS_EMENDAS);
+                      const difere = divide && temDivisaoAssinada && !l.adicionada && !l.removida && daAta(l.unitName) !== l.original;
                       return (
-                        <tr key={l.id} data-testid={`alocar-unidade-linha-${l.unitName}`}>
+                        <React.Fragment key={l.id}>
+                        <tr data-testid={`alocar-unidade-linha-${l.unitName}`}>
                           <td style={td}>
                             <strong style={{ display: 'block', ...riscado }}>
                               {l.unitName}
                               {l.inativa && (
                                 <span style={{ marginLeft: '0.4rem', verticalAlign: '1px' }}>
                                   <StatusBadge label="Inativa" variant="neutral" size="sm" dot={false} />
+                                </span>
+                              )}
+                              {difere && (
+                                <span style={{ marginLeft: '0.4rem', verticalAlign: '1px' }} title={`A ata assinada dá ${formatNumber(daAta(l.unitName))} a esta unidade; a diferença veio de remanejamento (ver o histórico abaixo).`}>
+                                  <StatusBadge label={`difere da ata (${formatNumber(daAta(l.unitName))})`} variant="warning" size="sm" testId={`alocar-difere-da-ata-${l.unitName}`} />
                                 </span>
                               )}
                             </strong>
@@ -336,7 +442,16 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                           <td data-rotulo="Empenhado" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>{formatNumber(l.empenhado)}</td>
                           {comReserva && (
                             <td data-rotulo="Reservado" data-testid={`alocar-unidade-reservado-${l.unitName}`} style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', ...riscado }}>
-                              {l.reservado ? formatNumber(l.reservado) : '—'}
+                              {(l.reservado ?? 0) + (l.reservadoProgramas ?? 0) ? formatNumber((l.reservado ?? 0) + (l.reservadoProgramas ?? 0)) : '—'}
+                              {(l.reservadoEmContratoSemUnidade ?? 0) > 0 && !l.removida && (
+                                <small
+                                  data-testid={`alocar-unidade-reservado-em-contrato-${l.unitName}`}
+                                  title="Já viraram contrato, mas o contrato ainda está sem a unidade interna. Saem do reservado e entram em Contratado quando a unidade for informada em Contratos e empenhos."
+                                  style={{ display: 'block', color: CINZA, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                                >
+                                  {formatNumber(l.reservadoEmContratoSemUnidade!)} já em contrato
+                                </small>
+                              )}
                             </td>
                           )}
                           <td data-rotulo="Alocado" style={{ ...td, textAlign: 'right' }}>
@@ -353,18 +468,24 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                                     const d = e.target.value.replace(/\D/g, '');
                                     alterar(l.id, { qtd: d === '' ? '' : Number(d) });
                                   }}
-                                  disabled={salvando}
+                                  disabled={salvando || travadaPelaAta}
+                                  title={travadaPelaAta ? 'A ata assinada divide entre as unidades: para mudar, use Remanejar entre unidades (com o nº SEI da autorização).' : undefined}
                                   aria-label={`Quantidade alocada para ${l.unitName}`}
                                   aria-invalid={a.abaixoDoMinimo || a.acimaDoGravado || undefined}
                                   data-testid={`alocar-unidade-qtd-${l.unitName}`}
                                   className="form-input"
-                                  style={qtdStyle}
+                                  style={travadaPelaAta ? { ...qtdStyle, background: '#f1f5f9', color: '#334155', cursor: 'not-allowed' } : qtdStyle}
                                 />
+                                {travadaPelaAta && <span style={{ display: 'block', fontSize: '0.75rem', color: CINZA, marginTop: '0.15rem', whiteSpace: 'nowrap' }}>mudar: Remanejar</span>}
                                 {a.alterada && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-warning-text)', marginTop: '0.15rem' }}>antes {formatNumber(l.original)}</span>}
                                 {a.acimaDoGravado && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>máximo {formatNumber(l.original)} (desativada)</span>}
                                 {a.abaixoDoMinimo && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>mínimo {formatNumber(a.minimo)}{a.motivoDoMinimo ? ` (${ROTULO_MOTIVO_DO_MINIMO[a.motivoDoMinimo]})` : ''}</span>}
                               </>
                             )}
+                          </td>
+                          <td data-rotulo="Livre" data-testid={`alocar-unidade-livre-${l.unitName}`} style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, ...riscado }}>
+                            {l.removida ? '—' : formatNumber(Math.max(0, livreDa(l)))}
+                            {ehCaep && !l.removida && <small style={{ display: 'block', color: CINZA, fontSize: '0.75rem', fontWeight: 400, whiteSpace: 'nowrap' }}>emendas sem pedido</small>}
                           </td>
                           <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                             {l.removida || a.alterada ? (
@@ -383,12 +504,57 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
                                       : `${l.unitName} tem ${l.vinculados} ${l.vinculados === 1 ? 'empenho vinculado' : 'empenhos vinculados'}. Para remover, os empenhos precisam ser desvinculados antes (feito pelo gestor da ata).`
                                 }
                                 onClick={() => remover(l)}
-                                disabled={salvando || !a.podeRemover}
+                                disabled={salvando || !a.podeRemover || travadaPelaAta}
                                 data-testid={`alocar-unidade-remover-${l.unitName}`}
                               />
                             )}
                           </td>
                         </tr>
+                        {!l.removida && ehCaep && (l.reservadoTotal ?? 0) > 0 && (
+                          <tr data-testid="alocar-linha-parlamentares">
+                            <td style={{ ...tdStyle, paddingLeft: '1.5rem', background: '#fbfcfe' }}>
+                              <span style={{ color: CINZA }}>↳ </span><strong>ComprasSUSP</strong> · reservado a parlamentares
+                              <small style={{ display: 'block', color: 'var(--color-info-text-strong)', fontSize: '0.75rem' }}>{formatNumber(l.reservadoTotal ?? 0)} nos pedidos de emenda (automático)</small>
+                            </td>
+                            <td style={{ ...tdStyle, background: '#fbfcfe' }} />
+                            <td style={{ ...tdStyle, background: '#fbfcfe' }} />
+                            {comReserva && <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', background: '#fbfcfe' }}>{l.reservado ? formatNumber(l.reservado) : '—'}</td>}
+                            <td style={{ ...tdStyle, textAlign: 'right', color: CINZA, background: '#fbfcfe' }}>{formatNumber(l.reservadoTotal ?? 0)} em pedidos</td>
+                            <td style={{ ...tdStyle, background: '#fbfcfe' }} />
+                            <td style={{ ...tdStyle, background: '#fbfcfe' }} />
+                          </tr>
+                        )}
+                        {!l.removida && reservasDa(l.unitName).map((r) => (
+                          <tr key={r.programaId} data-testid={`alocar-linha-programa-${r.programaId}`}>
+                            <td style={{ ...tdStyle, paddingLeft: '1.5rem', background: '#fbfcfe' }}>
+                              <span style={{ color: CINZA }}>↳ </span><strong>{r.nome}</strong>
+                            </td>
+                            <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', background: '#fbfcfe' }}>{r.contratado ? formatNumber(r.contratado) : '—'}</td>
+                            <td style={{ ...tdStyle, background: '#fbfcfe' }} />
+                            {comReserva && <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', background: '#fbfcfe' }}>{formatNumber(Math.max(0, r.quantidade - r.contratado))}</td>}
+                            <td style={{ ...tdStyle, textAlign: 'right', background: '#fbfcfe' }}>
+                              {editandoReserva?.programaId === r.programaId ? (
+                                <span style={{ display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}>
+                                  <input className="form-input" value={editandoReserva.valor} inputMode="numeric" autoFocus aria-label={`Reserva de ${r.nome}`} data-testid={`alocar-reserva-qtd-${r.programaId}`}
+                                    onChange={(e) => setEditandoReserva({ programaId: r.programaId, valor: e.target.value.replace(/\D/g, '') })} style={{ ...qtdStyle, width: '100px' }} />
+                                  <ActionButton action="salvar" iconOnly size="xs" label="Salvar a reserva" isLoading={reservar.isPending}
+                                    onClick={() => void gravarReserva(r.programaId, Number(editandoReserva.valor || 0))} data-testid={`alocar-reserva-salvar-${r.programaId}`} />
+                                  <ActionButton action="cancelar" iconOnly size="xs" label="Cancelar" onClick={() => setEditandoReserva(null)} />
+                                </span>
+                              ) : (
+                                <span style={{ color: CINZA }}>reserva {formatNumber(r.quantidade)}</span>
+                              )}
+                            </td>
+                            <td style={{ ...tdStyle, background: '#fbfcfe' }} />
+                            <td style={{ ...tdStyle, textAlign: 'right', background: '#fbfcfe' }}>
+                              {editandoReserva?.programaId !== r.programaId && (
+                                <ActionButton action="editar" iconOnly size="xs" label={semAlteracoes ? `Mudar a reserva de ${r.nome} (0 retira)` : 'Salve ou desfaça as alterações antes de mudar a reserva'}
+                                  disabled={!semAlteracoes || salvando} onClick={() => setEditandoReserva({ programaId: r.programaId, valor: String(r.quantidade) })} data-testid={`alocar-reserva-editar-${r.programaId}`} />
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>
@@ -396,6 +562,62 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
               </div>
             )}
           </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+            <ActionButton action="novo" size="sm" label="Reservar para um programa" onClick={() => setAberto(aberto === 'reservar' ? null : 'reservar')} disabled={salvando} data-testid="alocar-abrir-reservar" />
+            <ActionButton action="remanejar" size="sm" label="Remanejar entre unidades" onClick={() => setAberto(aberto === 'remanejar' ? null : 'remanejar')} disabled={salvando || ativasComLivre.length === 0} title={ativasComLivre.length === 0 ? 'Nenhuma unidade com livre para ceder.' : undefined} data-testid="alocar-abrir-remanejar" />
+            {!semAlteracoes && <span style={{ fontSize: '0.78rem', color: CINZA }}>Reservar para um programa (exceto ComprasSUSP) e remanejar gravam na hora: salve ou desfaça as alterações antes.</span>}
+          </div>
+
+          {aberto === 'reservar' && (
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.6rem' }} data-testid="alocar-form-reservar">
+              <p style={{ ...secaoStyle, margin: 0 }}>Reservar para um programa</p>
+              {programasAtivos.length === 0 ? (
+                <p style={{ margin: 0, fontSize: '0.82rem', color: CINZA }}>Nenhum programa ativo. Os programas são cadastrados em Ajustes › Programas.</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'flex-end' }}>
+                  <AppSelect label="Programa" value={programaEscolhido?.id ?? ''} onChange={(e) => setForm((f) => ({ ...f, programa: e.target.value }))} data-testid="alocar-reservar-programa"
+                    hint={programaEscolhido?.emendas ? 'Vai para a CAEP como emendas sem pedido (limite dos pedidos de parlamentares).' : programaEscolhido?.area === UNIDADE_DAS_EMENDAS ? 'Área responsável: CAEP · desconta das emendas sem pedido' : `Área responsável: ${programaEscolhido?.area ?? ''}`}>
+                    {programasAtivos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </AppSelect>
+                  <AppInput label="Quantidade" value={form.qtdReserva} onChange={(e) => setForm((f) => ({ ...f, qtdReserva: e.target.value.replace(/\D/g, '') }))} inputMode="numeric" style={{ width: '120px', textAlign: 'right' }} data-testid="alocar-reservar-qtd" />
+                  <AppButton type="button" variant="primary" size="sm" disabled={qtdReserva <= 0 || reservar.isPending || (!programaEscolhido?.emendas && !semAlteracoes)} isLoading={reservar.isPending}
+                    onClick={() => {
+                      if (!programaEscolhido) return;
+                      if (programaEscolhido.emendas) return reservarComprasSusp();
+                      const atual = extra.reservas.find((r) => r.programaId === programaEscolhido.id)?.quantidade ?? 0;
+                      void gravarReserva(programaEscolhido.id, atual + qtdReserva).then(() => setForm((f) => ({ ...f, qtdReserva: '' })));
+                    }}
+                    data-testid="alocar-reservar-salvar">
+                    Reservar
+                  </AppButton>
+                </div>
+              )}
+              {programaEscolhido?.emendas && <span style={{ fontSize: '0.78rem', color: CINZA }}>Entra na lista de unidades como alocação da CAEP: confira e clique em Salvar alterações.</span>}
+            </div>
+          )}
+
+          {aberto === 'remanejar' && deEscolhida && (
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.6rem' }} data-testid="alocar-form-remanejar">
+              <p style={{ ...secaoStyle, margin: 0 }}>Remanejar entre unidades</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'flex-end' }}>
+                <AppSelect label="De (cede)" value={deEscolhida.unitName} onChange={(e) => setForm((f) => ({ ...f, de: e.target.value }))} data-testid="alocar-remanejar-de">
+                  {ativasComLivre.map((l) => <option key={l.id} value={l.unitName}>{l.unitName} · livre {formatNumber(livreDa(l))}</option>)}
+                </AppSelect>
+                <AppSelect label="Para (recebe)" value={paraEscolhida?.sigla ?? ''} onChange={(e) => setForm((f) => ({ ...f, para: e.target.value }))} data-testid="alocar-remanejar-para">
+                  {destinos.map((d) => <option key={d.id} value={d.sigla}>{d.sigla}</option>)}
+                </AppSelect>
+                <AppInput label="Quantidade" value={form.qtdRemanejar} onChange={(e) => setForm((f) => ({ ...f, qtdRemanejar: e.target.value.replace(/\D/g, '') }))} inputMode="numeric" error={erroRemanejar} style={{ width: '120px', textAlign: 'right' }} data-testid="alocar-remanejar-qtd" />
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'flex-end' }}>
+                <AppInput label="Nº SEI da autorização da unidade" value={form.sei} onChange={(e) => setForm((f) => ({ ...f, sei: e.target.value }))} hint={descreverNumeroSei(seiLido)} error={seiLido.tipo === 'INVALIDO' ? 'Número SEI inválido.' : undefined} style={{ width: '230px' }} data-testid="alocar-remanejar-sei" />
+                <AppInput label="Observação (opcional)" value={form.obs} maxLength={500} onChange={(e) => setForm((f) => ({ ...f, obs: e.target.value }))} style={{ width: '260px' }} data-testid="alocar-remanejar-obs" />
+                <ActionButton action="remanejar" size="sm" isLoading={remanejar.isPending} data-testid="alocar-remanejar-salvar"
+                  disabled={!semAlteracoes || qtdRemanejar <= 0 || !!erroRemanejar || (seiLido.tipo !== 'DOCUMENTO' && seiLido.tipo !== 'PROCESSO') || remanejar.isPending}
+                  onClick={() => void gravarRemanejamento()} />
+              </div>
+            </div>
+          )}
 
           <div>
             <p style={secaoStyle}>Alocar a outra unidade</p>
@@ -448,6 +670,22 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
               </>
             )}
           </div>
+
+          {extra.remanejamentos.length > 0 && (
+            <div data-testid="alocar-historico-remanejamentos">
+              <p style={secaoStyle}>Remanejamentos</p>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.83rem', color: '#1e293b' }}>
+                {extra.remanejamentos.map((m, i) => (
+                  <li key={`${m.feitoEm}-${i}`} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.35rem 0.6rem' }}>
+                    <strong>{m.de} → {m.para}</strong>
+                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatNumber(m.quantidade)} un</span>
+                    <NumeroSeiEtiqueta numero={m.sei} testId={`alocar-historico-sei-${i}`} />
+                    <span style={{ color: CINZA }}>{m.feitoPorNome ?? '—'} · {formatDateBR(m.feitoEm.slice(0, 10))}{m.observacao ? ` · ${m.observacao}` : ''}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </Modal>

@@ -19,11 +19,19 @@ const Barra: React.FC<{ pct: number; altura: number; largura?: string }> = ({ pc
   </span>
 );
 
+/** Itens da ata e os que estão em alerta de saldo, embaixo da barra quando a ata tem mais de um item. */
+export interface ResumoDosItens {
+  total: number;
+  criticos: number;
+  atencao: number;
+}
+
 /**
- * Coluna de consumo da Carteira de Atas: porcentagem e descrição do item mais consumido. Passar o mouse (ou
- * tocar) abre a lista de todos os itens com a porcentagem.
+ * Coluna de consumo da Carteira de Atas: porcentagem do item mais consumido e, embaixo, a descrição dele (ata de
+ * um item) ou quantos itens a ata tem e quantos estão em alerta. Passar o mouse (ou tocar) abre a lista de todos
+ * os itens com a porcentagem.
  */
-export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: string }> = ({ itens, testId }) => {
+export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; resumo?: ResumoDosItens; testId?: string }> = ({ itens, resumo, testId }) => {
   const ordenados = React.useMemo(() => [...itens].sort((a, b) => b.pct - a.pct), [itens]);
   const btnRef = React.useRef<HTMLButtonElement>(null);
   const [anchor, setAnchor] = React.useState<DOMRect | null>(null);
@@ -80,8 +88,18 @@ export const ConsumoItensCelula: React.FC<{ itens: ConsumoItem[]; testId?: strin
           data-testid={testId ? `${testId}-descricao` : undefined}
           style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginTop: '0.3rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
         >
-          {total > 1 && <strong style={{ color: '#334155' }}>{rotuloItem(topo.numero)} · </strong>}
-          {descricaoItemEmFrase(topo.descricao)}
+          {resumo && resumo.total > 1 ? (
+            <>
+              <strong style={{ color: '#334155' }}>{resumo.total} itens</strong>
+              {resumo.criticos > 0 && <strong style={{ color: 'var(--color-danger-text)' }}> · {resumo.criticos} {resumo.criticos === 1 ? 'crítico' : 'críticos'}</strong>}
+              {resumo.atencao > 0 && <strong style={{ color: 'var(--color-warning-text)' }}> · {resumo.atencao} em atenção</strong>}
+            </>
+          ) : (
+            <>
+              {total > 1 && <strong style={{ color: '#334155' }}>{rotuloItem(topo.numero)} · </strong>}
+              {descricaoItemEmFrase(topo.descricao)}
+            </>
+          )}
         </span>
       </button>
       {anchor && (

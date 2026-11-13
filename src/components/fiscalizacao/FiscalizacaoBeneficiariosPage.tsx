@@ -17,6 +17,9 @@ import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC } from '../../utils/fiscalizacao';
 import { type Resumo, agrupar, chaveDoBeneficiario, nomeDoBeneficiario, passaPrazo, pct, programasDe, resumir, rotaDoBeneficiario, semCadastro, opcoesDePrazo } from '../../utils/fiscalizacaoResumo';
 import { CelulaEntregaResumo, CelulaItens, CelulaQuemDestinou } from './FiscalizacaoCelulas';
+import { LigarBeneficiarioModal } from './LigarBeneficiarioModal';
+import { gruposSemCadastro } from '../../utils/fiscalizacaoBeneficiarioLigacao';
+import { useAuth } from '../../context/AuthContext';
 const POR_PAGINA = 25;
 
 // ── Fiscalização › Beneficiários ─────────────────────────────────────────────────────────────────
@@ -34,6 +37,9 @@ export const FiscalizacaoBeneficiariosPage: React.FC = () => {
   const [programa, setPrograma] = useState('');
   const [cadastro, setCadastro] = useState('');
   const [prazo, setPrazo] = useState('');
+  const [ligando, setLigando] = useState(false);
+  const { role } = useAuth();
+  const podeLigar = role === 'admin' || role === 'gestor_fiscalizacao';
 
   const linhas = useMemo<LinhaBenef[]>(
     () =>
@@ -62,6 +68,8 @@ export const FiscalizacaoBeneficiariosPage: React.FC = () => {
   const ufs = [...new Set(doSeg.map((l) => l.uf).filter((x): x is string => Boolean(x)))].sort();
   const progs = [...new Set(doSeg.flatMap((l) => programasDe(l.es)))];
   const qtdSem = linhas.filter((l) => l.semCadastro).length;
+  // Nomes a ligar: as grafias do mesmo nome (com e sem a UF no fim, acento, caixa) contam uma vez, como na janela.
+  const nomesSem = useMemo(() => gruposSemCadastro(entregas).length, [entregas]);
 
   const colunas: Column<LinhaBenef>[] = [
     { key: 'beneficiario', header: 'Beneficiário', minWidth: '260px', priority: 'primary', sortValue: (l) => l.es[0].beneficiarioNome ?? l.es[0].beneficiarioTexto, render: (l) => <CelulaBeneficiario e={l.es[0]} destaque /> },
@@ -80,8 +88,17 @@ export const FiscalizacaoBeneficiariosPage: React.FC = () => {
         actions={<HeaderRefreshAction onRefresh={() => entregasQ.refetch()} isRefreshing={entregasQ.isFetching} lastUpdated={entregasQ.dataUpdatedAt || null} dataTestId="fisc-benef-atualizar" tooltipTitle="Recarregar os beneficiários" />}
       />
       {qtdSem > 0 && (
-        <NoticeBar tone="warning" testId="fisc-benef-sem-cadastro" action={<AppButton size="xs" variant="link" onClick={() => setCadastro('sem')}>Ver os {qtdSem}</AppButton>}>
-          {qtdSem} {qtdSem === 1 ? 'beneficiário da planilha está' : 'beneficiários da planilha estão'} sem cadastro. Ligue cada um ao cadastro para as contas somarem.
+        <NoticeBar
+          tone="warning"
+          testId="fisc-benef-sem-cadastro"
+          action={
+            <span style={{ display: 'inline-flex', gap: '0.75rem' }}>
+              <AppButton size="xs" variant="link" onClick={() => setCadastro('sem')}>Ver os {qtdSem}</AppButton>
+              {podeLigar && <AppButton size="xs" variant="link" onClick={() => setLigando(true)} data-testid="fisc-benef-ligar">Ligar ao cadastro</AppButton>}
+            </span>
+          }
+        >
+          {nomesSem} {nomesSem === 1 ? 'nome de beneficiário escrito na planilha está' : 'nomes de beneficiário escritos na planilha estão'} fora do cadastro: sem endereço de entrega e sem somar com o mesmo órgão escrito de outro jeito.
         </NoticeBar>
       )}
       <CarteiraSegmentTabs<SegBenef>
@@ -112,6 +129,7 @@ export const FiscalizacaoBeneficiariosPage: React.FC = () => {
       <AdminListShell testId="fisc-benef-lista" isLoading={entregasQ.isLoading} isError={entregasQ.isError} errorTitle="Não foi possível carregar os beneficiários" errorMessage={entregasQ.error?.message} onRetry={() => entregasQ.refetch()} isEmpty={!entregasQ.isLoading && filtradas.length === 0} emptyTitle="Nenhum beneficiário nesta situação." emptyDescription="Ajuste a busca ou os filtros.">
         <DataTable<LinhaBenef> testId="fisc-benef-tabela" className="data-table-container--flush" data={filtradas.slice(0, POR_PAGINA)} keyExtractor={(l) => l.chave} columns={colunas} rowOpen={(l) => () => navigate(rotaDoBeneficiario(l.chave))} />
       </AdminListShell>
+      {ligando && <LigarBeneficiarioModal onClose={() => setLigando(false)} />}
     </PageContainer>
   );
 };

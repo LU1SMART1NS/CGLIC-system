@@ -12,7 +12,7 @@ const org = (p: Partial<OrgaoQuantitativo> & { uasg: string }): OrgaoQuantitativ
   nomeOrgao: null, tipoUnidade: 'PARTICIPANTE', ehSenasp: false, quantidadeAssinada: 0, quantidadeRegistrada: 0, semRegistro: false,
   situacao: 'IGUAL', falta: 0, acima: 0, remanejadoConfirmado: 0, resto: 0, continuaDoOrgao: null, gerenciado: 0, mudou: false,
   mudouEm: null, atualizadoEm: null, ataDaSenasp: true,
-  remanejadoNaoParticipante: 0, saidaNaoParticipante: 0, naoParticipanteAguardaFonte: 0, ...p
+  remanejadoNaoParticipante: 0, saidaNaoParticipante: 0, naoParticipanteAguardaFonte: 0, foraDaFonte: 0, ...p
 });
 const unidade = (codigoUnidade: string, nomeUnidade: string, quantidadeRegistrada: number, tipoUnidade = 'PARTICIPANTE') =>
   ({ codigoUnidade, nomeUnidade, quantidadeRegistrada, tipoUnidade } as UnidadeItemRecord);

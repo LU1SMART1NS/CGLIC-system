@@ -13,7 +13,7 @@ import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useAuth } from '../../context/AuthContext';
 import { useEntregasFiscalizacao, useFiscaisAtivos } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC } from '../../utils/fiscalizacao';
+import { NOME_SFC, fiscaisVisiveis } from '../../utils/fiscalizacao';
 import { FASES_ENTREGA, etapaDef, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
 import { comQuemEstaOItem } from '../../utils/fiscalizacaoMesa';
 import { EntregasTabela } from './EntregasTabela';
@@ -40,7 +40,7 @@ const faseDa = (e: EntregaFiscalizacao): FaseEntrega | null => (e.responsavel ==
 export const FiscalizacaoEntregasPage: React.FC = () => {
   const { user, role } = useAuth();
   const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useEntregasFiscalizacao(null);
-  const { fiscais } = useFiscaisAtivos();
+  const { servidores } = useFiscaisAtivos();
   const [params, setParams] = useSearchParams();
   const ehFiscal = role === 'gestor_fiscalizacao';
   const seg: Segmento = (SEGMENTOS as string[]).includes(params.get('ver') ?? '') ? (params.get('ver') as Segmento) : ehFiscal ? 'VOCE' : 'TODAS';
@@ -56,6 +56,7 @@ export const FiscalizacaoEntregasPage: React.FC = () => {
   const entregas = useMemo(() => data ?? [], [data]);
 
   const doFiscal = useMemo(() => entregas.filter((e) => !fiscal || e.fiscalUserId === fiscal), [entregas, fiscal]);
+  const fiscais = useMemo(() => fiscaisVisiveis(servidores, new Set(entregas.map((e) => e.fiscalUserId).filter((id): id is string => Boolean(id)))), [servidores, entregas]);
   const opcoesFiscal = fiscais.map((f) => ({ value: f.id, label: f.id === user?.id ? `${f.nome} (você)` : f.nome, count: entregas.filter((e) => e.fiscalUserId === f.id).length }));
   const conta = (s: Segmento) => doFiscal.filter((e) => s === 'TODAS' || LADO[comQuemEstaOItem(e)] === s).length;
   const doSeg = useMemo(() => doFiscal.filter((e) => seg === 'TODAS' || LADO[comQuemEstaOItem(e)] === seg), [doFiscal, seg]);

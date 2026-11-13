@@ -7,7 +7,9 @@ import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { useToast } from '../../design-system/components/Toast';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
 import { VoltarEtapaJanela } from '../mesa/VoltarEtapaJanela';
-import { useMovimentosDaEntrega, useMudarEtapaEntregas, useVoltarEtapaEntrega } from '../../hooks/useFiscalizacao';
+import { useFiscalizacaoDoContrato, useMovimentosDaEntrega, useMudarEtapaEntregas, useRegistrarRecebimentoOrdem, useVoltarEtapaEntrega } from '../../hooks/useFiscalizacao';
+import { CamposDoRecebimento, SaidaDoExercito } from './PrazoModais';
+import { previstaPelaRegra, textoDaRegra } from '../../utils/fiscalizacaoPrazo';
 import type { EntregaFiscalizacao, EtapaEntrega } from '../../services/fiscalizacaoService';
 import { bloqueioDaEtapa, etapaDef, nomeDoItem, rotuloDoBeneficiario } from '../../utils/fiscalizacaoEntregas';
 import { EXPLICA, VERBO, proximasDoGrupo, rotuloDoAvanco, voltaDoItem } from '../../utils/fiscalizacaoPassos';
@@ -33,10 +35,19 @@ export const AvancarEtapaModal: React.FC<{ entregas: EntregaFiscalizacao[]; /** 
   const [data, setData] = useState(hojeEmBrasilia());
   const [sei, setSei] = useState('');
   const [observacao, setObservacao] = useState('');
+  // Ordem de Fornecimento (migration 294): o recebimento pelo fornecedor e o prazo dão a data prevista.
+  const receber = useRegistrarRecebimentoOrdem();
+  const { contrato } = useFiscalizacaoDoContrato(entregas[0]?.contractKey ?? '');
+  const [recebidaEm, setRecebidaEm] = useState('');
+  const regra = contrato?.prazoEntrega;
+  const [dias, setDias] = useState<number>(regra?.dias ?? NaN);
+  // Só a Ordem com prazo contado do recebimento pede a data do recebimento; nos outros casos a conta sai sozinha.
+  const pedeRecebimento = !regra || regra.inicio === 'OF_RECEBIMENTO';
   const hoje = hojeEmBrasilia();
   const def = etapa ? etapaDef(etapa) : null;
   const bloqueio = etapa ? bloqueioDaEtapa(entregas, etapa) : null;
-  const ok = Boolean(etapa) && !bloqueio && Boolean(data) && data <= hoje && (!def?.sei || seiValido(sei));
+  const recebimentoOk = etapa !== 'ORDEM' || !pedeRecebimento || !recebidaEm || (recebidaEm >= data && recebidaEm <= hoje && Number.isInteger(dias) && dias >= 1);
+  const ok = Boolean(etapa) && !bloqueio && Boolean(data) && data <= hoje && (!def?.sei || seiValido(sei)) && recebimentoOk;
   const atuais = [...new Set(entregas.map((e) => etapaDef(e.etapa).nome))];
   const titulo = (inicial && opcoes.includes(inicial) ? VERBO[inicial] : rotuloDoAvanco(opcoes)) ?? 'Registrar o andamento';
   return (
@@ -63,6 +74,11 @@ export const AvancarEtapaModal: React.FC<{ entregas: EntregaFiscalizacao[]; /** 
                 {
                   onSuccess: () => {
                     toast.success(`${plural(entregas.length, 'item', 'itens')} em "${etapaDef(etapa).nome}"`);
+                    if (etapa === 'ORDEM' && recebidaEm) {
+                      // Na implementação, uma RPC só grava a Ordem e o recebimento.
+                      receber.mutate({ ids: entregas.map((e) => e.id), recebidaEm, prazoDias: dias }, { onSuccess: () => { toast.success(`Entrega prevista para ${dataBR(previstaPelaRegra(recebidaEm, dias, regra?.contagem))}`); onClose(true); } });
+                      return;
+                    }
                     onClose(true);
                   },
                   onError: (err) => toast.error(`Não foi possível registrar: ${erroDe(err)}`)
@@ -113,10 +129,28 @@ export const AvancarEtapaModal: React.FC<{ entregas: EntregaFiscalizacao[]; /** 
 
         {etapa && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.75rem' }}>
-            <AppDateInput label={etapa === 'ENTREGUE' ? 'Entregue em' : 'Data'} value={data} onValueChange={setData} max={hoje} />
-            {def?.sei && <AppInput label="Documento SEI" value={sei} onChange={(ev) => setSei(ev.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="ex.: 37530982" hint="Número do documento desta etapa." data-testid="fisc-avancar-sei" />}
+            <AppDateInput label={etapa === 'ENTREGUE' ? 'Entregue em' : etapa === 'ORDEM' ? 'Emitida em' : entregas.every((x) => x.etapa === 'CONTROLADO') ? 'Autorizado pelo Exército em' : 'Data'} value={data} onValueChange={setData} max={hoje} />
+            {def?.sei && <AppInput label={etapa === 'ORDEM' ? 'Documento SEI da Ordem' : 'Documento SEI'} value={sei} onChange={(ev) => setSei(ev.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="ex.: 37530982" hint="Número do documento desta etapa." data-testid="fisc-avancar-sei" />}
           </div>
         )}
+        {etapa === 'ORDEM' && !bloqueio && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }} data-testid="fisc-avancar-recebimento">
+            <b style={{ fontSize: '0.85rem' }}>Prazo de entrega</b>
+            {pedeRecebimento ? (
+              <>
+                <CamposDoRecebimento recebidaEm={recebidaEm} setRecebidaEm={setRecebidaEm} dias={dias} setDias={setDias} regra={regra} minimo={data} opcional />
+                {!recebidaEm && <span style={{ ...carteiraDetalhe, marginTop: 0 }}>Sem o recebimento, os itens ficam com você em "Informar o recebimento da Ordem" e sem prazo.</span>}
+              </>
+            ) : regra?.inicio === 'OF_EMISSAO' ? (
+              <NoticeBar tone="info">O prazo deste contrato conta da emissão: entrega prevista em <b>{dataBR(previstaPelaRegra(data, regra.dias, regra.contagem))}</b> ({textoDaRegra(regra)}).</NoticeBar>
+            ) : regra?.inicio === 'ASSINATURA' ? (
+              <span style={{ ...carteiraDetalhe, marginTop: 0 }}>O prazo deste contrato conta da assinatura ({textoDaRegra(regra)}): a data prevista já está nos itens e a Ordem não a muda.</span>
+            ) : (
+              <span style={{ ...carteiraDetalhe, marginTop: 0 }}>O prazo deste contrato conta da autorização do Exército ({regra ? textoDaRegra(regra) : ''}): os itens ficam sem data até lá.</span>
+            )}
+          </div>
+        )}
+        {etapa && !bloqueio && entregas.every((e) => e.etapa === 'CONTROLADO') && <SaidaDoExercito entregas={entregas} autorizadoEm={data} regra={regra} />}
         {bloqueio && <NoticeBar tone="danger" testId="fisc-avancar-bloqueio">{bloqueio}</NoticeBar>}
         {!bloqueio && etapa === 'ORDEM' && entregas.some((e) => e.pedidoId) && <NoticeBar tone="info">A Ordem fica registrada também no pedido de emenda, para a CAEP ver no Pedido 360.</NoticeBar>}
         {!bloqueio && etapa === 'SAL' && <NoticeBar tone="info">O Ofício à SAL informa o parlamentar da entrega.</NoticeBar>}

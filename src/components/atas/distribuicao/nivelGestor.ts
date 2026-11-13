@@ -13,6 +13,12 @@ export const ROTULO_NIVEL: Record<NivelGestor, string> = { INICIANTE: 'Iniciante
 /** Parte da carga cheia que cada nível aguenta. */
 export const CAPACIDADE_NIVEL: Record<NivelGestor, number> = { INICIANTE: 0.6, INTERMEDIARIO: 0.85, AVANCADO: 1 };
 
+/**
+ * Coordenador que também tem carteira (gestor ou fiscal): entra na média da equipe com metade da capacidade, porque
+ * divide o tempo com a coordenação — cada instrumento dele pesa o dobro. Vale no lugar do nível.
+ */
+export const CAPACIDADE_COORDENADOR = 0.5;
+
 /** Sem nível informado, vale a capacidade de Intermediário até o coordenador informar. */
 export const CAPACIDADE_SEM_NIVEL = CAPACIDADE_NIVEL.INTERMEDIARIO;
 

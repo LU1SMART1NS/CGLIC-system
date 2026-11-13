@@ -24,7 +24,7 @@ import type { OrgaoQuantitativo, QuantitativosDoItem, RemanejamentoNaoParticipan
 import {
   contratadoDoOrgao,
   extratoDaCotaPropria,
-  mudaramNoMesmoSegundo,
+  mudaramNaMesmaOperacao,
   SITUACOES_COM_ACAO,
   textoDaSituacao,
   type EstadoContratado
@@ -370,7 +370,10 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
     const e = estado(l);
     const partes: React.ReactNode[] = [];
     if (o?.situacao === 'GERENCIADO') {
-      partes.push(<p key="g" style={{ margin: 0 }}>A ata assinada dá <b>{formatNumber(o.quantidadeAssinada)}</b> ao órgão e o Compras.gov.br registra <b>{formatNumber(o.quantidadeRegistrada ?? 0)}</b>{o.semRegistro ? ' (o órgão não tem registro neste item)' : ''}. Os <b>{formatNumber(o.gerenciado)}</b> restantes estão no registrado da SENASP, que os gerencia para o órgão e não os conta na cota própria. Quando a SENASP remanejar para o órgão, o registrado dele sobe e o gerenciado cai sozinho.</p>);
+      partes.push(<p key="g" style={{ margin: 0 }}>A ata assinada dá <b>{formatNumber(o.quantidadeAssinada)}</b> ao órgão e o Compras.gov.br registra <b>{formatNumber(o.quantidadeRegistrada ?? 0)}</b>{o.semRegistro ? ' (o órgão não tem registro neste item)' : ''}. {o.gerenciado > 0 ? <> Os <b>{formatNumber(o.gerenciado)}</b> restantes estão no registrado da SENASP, que os gerencia para o órgão e não os conta na cota própria. Quando a SENASP remanejar para o órgão, o registrado dele sobe e o gerenciado cai sozinho.</> : null}</p>);
+      if (o.foraDaFonte > 0) {
+        partes.push(<p key="f" style={{ margin: 0 }}>O órgão sumiu da lista do Compras.gov.br e <b>{formatNumber(o.foraDaFonte)}</b> também faltam no total registrado do item: essa quantidade não voltou para a SENASP e não sai da cota própria. Confira na fonte se o órgão ainda participa da ata.</p>);
+      }
     }
     if (o?.situacao === 'REMANEJADO_A_MENOS') {
       partes.push(<p key="r" style={{ margin: 0 }}>O registrado do órgão foi reduzido depois do registro da ata: houve remanejamento. A ata assinada dá <b>{formatNumber(o.quantidadeAssinada)}</b> e o Compras.gov.br registra <b>{formatNumber(o.quantidadeRegistrada ?? 0)}</b>. Pela regra aprovada, a redução é definitiva{o.gerenciado > 0 ? <>, menos <b>{formatNumber(o.gerenciado)}</b> marcados como "continua do órgão"</> : ''}.</p>);
@@ -379,8 +382,8 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       partes.push(<p key="a" style={{ margin: 0 }}>{o.situacao === 'FORA_DA_ATA' ? 'O órgão está registrado no Compras.gov.br, mas não tem quantidade na ata assinada: confira os números informados. ' : ''}O que passa da ata assinada sem origem confirmada conta como remanejado da cota própria da SENASP. Se veio de outro órgão, confirme o remanejamento na linha dele escolhendo este órgão como destino.</p>);
     }
     if (o?.mudou && o.mudouEm) {
-      const par = mudaramNoMesmoSegundo(q.orgaos, o.uasg);
-      partes.push(<p key="m" style={{ margin: 0 }}>Última mudança do registrado no Compras.gov.br: {formatDataHoraBR(o.mudouEm)}. {par.length ? <>No mesmo segundo também mudou: <b>{par.map((x) => nomeDe(x.uasg)).join(', ')}</b>.</> : 'Nenhum outro órgão do item mudou no mesmo segundo.'}</p>);
+      const par = mudaramNaMesmaOperacao(q.orgaos, o.uasg);
+      partes.push(<p key="m" style={{ margin: 0 }}>Última mudança do registrado no Compras.gov.br: {formatDataHoraBR(o.mudouEm)}. {par.length ? <>Na mesma operação também mudou: <b>{par.map((x) => nomeDe(x.uasg)).join(', ')}</b>.</> : 'Nenhum outro órgão do item mudou na mesma operação.'}</p>);
     }
     const contin = q.continua.find((c) => c.uasg === l.uasg);
     if (contin) partes.push(<p key="c" style={{ margin: 0 }}><b>{contin.marcadoPorNome}</b> marcou em {formatDataHoraBR(contin.marcadoEm)} que {formatNumber(contin.quantidade)} continuam do órgão: “{contin.justificativa}”</p>);
@@ -473,7 +476,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
           )}
           {extrato.entre.length > 0 && (
             <div style={{ ...pequeno, marginTop: '0.35rem' }}>
-              Entre participantes, sem efeito na cota: {extrato.entre.map((e) => `${nomeDe(e.de)} para ${nomeDe(e.para ?? '')} ${formatNumber(e.quantidade)}${e.automatico ? ' (mesmo segundo)' : ' (confirmado)'}`).join(' · ')}.
+              Entre participantes, sem efeito na cota: {extrato.entre.map((e) => `${nomeDe(e.de)} para ${nomeDe(e.para ?? '')} ${formatNumber(e.quantidade)}${e.automatico ? ' (mesma operação)' : ' (confirmado)'}`).join(' · ')}.
             </div>
           )}
           <div style={{ ...pequeno, marginTop: '0.35rem' }}>

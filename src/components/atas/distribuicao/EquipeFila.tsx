@@ -16,7 +16,7 @@ import { contemBusca } from './filaComum';
 import { AlterarNivelModal } from './AlterarNivelModal';
 import { OcupacaoBarra, escalaDeOcupacao } from './OcupacaoBarra';
 import { PESO_COMPLEXIDADE } from './complexidade';
-import { ROTULO_NIVEL, avaliarSubida, type AvaliacaoSubida, type NivelGestor, type NivelRegistrado } from './nivelGestor';
+import { CAPACIDADE_COORDENADOR, ROTULO_NIVEL, avaliarSubida, type AvaliacaoSubida, type NivelGestor, type NivelRegistrado } from './nivelGestor';
 import { diaMes, textoQuantidade, type Recebidas } from './transferenciaTemporaria';
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
@@ -86,12 +86,22 @@ const NivelCell: React.FC<{
   onAlterar?: () => void;
   onSubir?: () => void;
   nome: string;
-}> = ({ registro, avaliacao, onAlterar, onSubir, nome }) => (
+  coordenador?: boolean;
+}> = ({ registro, avaliacao, onAlterar, onSubir, nome, coordenador }) =>
+  coordenador ? (
+    <span
+      style={{ ...seloStyle, background: '#f1f5f9', color: '#475569' }}
+      title={`Divide o tempo com a coordenação: entra na média da equipe com ${CAPACIDADE_COORDENADOR * 100}% da capacidade (cada instrumento pesa o dobro).`}
+      data-testid={`nivel-selo-${nome}`}
+    >
+      Coordenador
+    </span>
+  ) : (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
     <SeloNivel nivel={registro?.nivel} onClick={onAlterar} testId={`nivel-selo-${nome}`} />
     {avaliacao?.pronto && <ProntoParaSubir proximo={avaliacao.proximo} onClick={onSubir} testId={`nivel-pronto-${nome}`} />}
   </div>
-);
+  );
 
 /** Pressão do momento: o que aperta agora (não muda a carga estrutural). */
 const PressaoCell: React.FC<{ l: DistribuicaoLinha; aVincular?: number }> = ({ l, aVincular = 0 }) => {
@@ -129,6 +139,8 @@ const TITULO_OCUPACAO =
 export interface NivelDoGestor {
   userId: string | null;
   registro: NivelRegistrado | null;
+  /** Coordenador que também é gestor: capacidade fixa de coordenador, no lugar do nível. */
+  coordenador?: boolean;
 }
 
 interface EquipeFilaProps {
@@ -244,6 +256,7 @@ export const EquipeFila: React.FC<EquipeFilaProps> = ({ linhas, mediaOcupacao, c
                         <td data-label="Nível" style={carteiraTd}>
                           <NivelCell
                             nome={nome}
+                            coordenador={nivel.coordenador}
                             registro={nivel.registro}
                             avaliacao={avaliacao}
                             onAlterar={canAjustar && nivel.userId ? () => setAlterando({ nome, userId: nivel.userId as string }) : undefined}

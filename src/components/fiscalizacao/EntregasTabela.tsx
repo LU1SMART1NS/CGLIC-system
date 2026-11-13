@@ -8,7 +8,7 @@ import { carteiraIdentificacao, carteiraDetalhe, carteiraNumero, carteiraValor }
 import { useMovimentosDaEntrega } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, dataBR } from '../../utils/fiscalizacao';
-import { ataEItemDaChave, etapaDef, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
+import { ataEItemDaChave, etapaDef, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, textoDoAviso, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
 import { IdentificacaoDoContrato } from './ContratosFiscalizacaoTabela';
 import { NomeComSigla } from '../emendas/emendasPartes';
 import { chaveDeOrdem, ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
@@ -26,6 +26,13 @@ export const CelulaEtapa: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
     );
   }
   const d = etapaDef(e.etapa);
+  if (e.aviso)
+    return (
+      <>
+        <StatusBadge label={e.aviso.tipo === 'ITEM_CANCELADO' ? 'empenho anulado' : 'nota em outro contrato'} variant="danger" size="sm" dot={false} />
+        <div style={carteiraDetalhe}>{textoDoAviso(e.aviso)}</div>
+      </>
+    );
   return (
     <>
       <StatusBadge label={d.nome} variant={e.etapa === 'CONTROLADO' ? 'danger' : VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
@@ -80,6 +87,10 @@ export const CelulaSituacaoDoItem: React.FC<{ e: EntregaFiscalizacao }> = ({ e }
             {atraso > 0 && <span style={{ color: COR_DO_PRAZO.warning }}> · {atraso} {atraso === 1 ? 'dia' : 'dias'} de atraso</span>}
             {e.pagoEm && <> · pago em {dataBR(e.pagoEm)}</>}
           </>
+        ) : !e.prevista && e.prazoInicio === 'EXERCITO' ? (
+          <>prazo começa na autorização do Exército</>
+        ) : e.etapa === 'CONTROLADO' ? (
+          <>prazo suspenso{e.etapaEm ? ` · no Exército desde ${dataBR(e.etapaEm)}` : ''}</>
         ) : e.prevista ? (
           <>
             <span style={{ color: COR_DO_PRAZO[p.tom], fontWeight: p.tom === 'danger' || p.tom === 'warning' ? 700 : 400 }}>{p.texto}</span> · prevista {dataBR(e.prevista)}
@@ -149,7 +160,7 @@ export const HistoricoDaEntrega: React.FC<{ entregaId: string }> = ({ entregaId 
             <b style={{ color: 'var(--color-danger-text)' }}>Voltou para {etapaDef(m.etapa).nome}</b>
           ) : m.tipo === 'DESFEITO' && m.etapa ? (
             <b style={{ textDecoration: 'line-through', color: '#94a3b8' }}>{etapaDef(m.etapa).nome}</b>
-          ) : <b>{m.etapa ? etapaDef(m.etapa).nome : m.tipo === 'DIVISAO' ? 'Divisão' : m.tipo === 'PREVISTA' ? `Data prevista: ${dataBR(m.data)}` : m.tipo === 'RESPONSAVEL' ? 'Quem fiscaliza' : m.tipo === 'ITEM' ? 'Item da ata' : m.tipo === 'PROGRAMA' ? 'Programa' : 'Registro'}</b>}
+          ) : <b>{m.etapa ? etapaDef(m.etapa).nome : m.tipo === 'DIVISAO' ? 'Divisão' : m.tipo === 'PREVISTA' ? `Data prevista: ${dataBR(m.data)}` : m.tipo === 'RECEBIMENTO' ? `Ordem recebida pelo fornecedor em ${dataBR(m.data)}` : m.tipo === 'PRORROGACAO' ? `Prazo prorrogado para ${dataBR(m.data)}` : m.tipo === 'SUSPENSAO' ? 'Prazo suspenso no Exército' : m.tipo === 'RESPONSAVEL' ? 'Quem fiscaliza' : m.tipo === 'BENEFICIARIO' ? 'Beneficiário' : m.tipo === 'ITEM' ? 'Item da ata' : m.tipo === 'PROGRAMA' ? 'Programa' : 'Registro'}</b>}
           {m.tipo === 'DESFEITO' && <span style={carteiraDetalhe}> (desfeito)</span>}
           {m.tipo === 'CORRECAO' && <span style={carteiraDetalhe}> (correção do coordenador)</span>}
           {m.etapa && m.data && m.tipo !== 'VOLTA' && <span> em {dataBR(m.data)}</span>}

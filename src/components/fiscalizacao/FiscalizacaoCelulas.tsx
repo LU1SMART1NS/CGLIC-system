@@ -33,7 +33,9 @@ export const CelulaEntregaResumo: React.FC<{ es: EntregaFiscalizacao[]; r: Resum
       {tudo ? (
         <div style={{ ...carteiraDetalhe, color: 'var(--color-success-text)', fontWeight: 700 }}>tudo entregue</div>
       ) : r.vencidas ? (
-        <div style={{ ...carteiraDetalhe, color: 'var(--color-danger-text)', fontWeight: 700 }}>{r.vencidas === 1 ? '1 item com prazo vencido' : `${r.vencidas} itens com prazo vencido`}{r.noExercito ? ` (${r.noExercito} no Exército)` : ''}</div>
+        <div style={{ ...carteiraDetalhe, color: 'var(--color-danger-text)', fontWeight: 700 }}>{r.vencidas === 1 ? '1 item com prazo vencido' : `${r.vencidas} itens com prazo vencido`}</div>
+      ) : r.noExercito ? (
+        <div style={carteiraDetalhe}>{r.noExercito === 1 ? '1 item no Exército' : `${r.noExercito} itens no Exército`} · prazo suspenso</div>
       ) : (
         <div style={carteiraDetalhe}>{r.proxima ? r.proxima.texto.toLowerCase() : 'sem data prevista'}</div>
       )}
@@ -111,13 +113,14 @@ export const ItensPorContrato: React.FC<{ grupos: GrupoDeItens[]; abrir: (e: Ent
       key: 'item',
       header: 'Item',
       minWidth: '260px',
+      width: comBeneficiario ? '40%' : '60%',
       priority: 'primary',
       sortValue: (e) => nomeDoItem(e),
       render: (e) => <CelulaItem e={e} comOrigem={!semPrograma || Boolean(e.emenda)} />
     },
-    ...(comBeneficiario ? [{ key: 'ben', header: 'Beneficiário', sortValue: (e: EntregaFiscalizacao) => rotuloDoBeneficiario(e).principal, render: (e: EntregaFiscalizacao) => <CelulaBeneficiario e={e} /> }] : []),
-    { key: 'qtd', header: 'Qtd.', align: 'right', nowrap: true, sortValue: (e) => e.quantidade, sortFirstDir: 'desc', render: (e) => <span style={carteiraNumero}>{numero(e.quantidade)}</span> },
-    { key: 'etapa', header: 'Etapa', minWidth: '210px', sortValue: (e) => ordemDaSituacao(e), render: (e) => <CelulaSituacaoDoItem e={e} /> }
+    ...(comBeneficiario ? [{ key: 'ben', header: 'Beneficiário', width: '33%', sortValue: (e: EntregaFiscalizacao) => rotuloDoBeneficiario(e).principal, render: (e: EntregaFiscalizacao) => <CelulaBeneficiario e={e} /> }] : []),
+    { key: 'qtd', header: 'Qtd.', align: 'right', nowrap: true, width: comBeneficiario ? '7%' : '10%', sortValue: (e) => e.quantidade, sortFirstDir: 'desc', render: (e) => <span style={carteiraNumero}>{numero(e.quantidade)}</span> },
+    { key: 'etapa', header: 'Etapa', minWidth: '210px', width: comBeneficiario ? '20%' : '30%', sortValue: (e) => ordemDaSituacao(e), render: (e) => <CelulaSituacaoDoItem e={e} /> }
   ];
   const todos = (abrirTodos: boolean) => setFechados(Object.fromEntries(grupos.map((g) => [g.chave, !abrirTodos])));
   if (grupos.length === 0) return <NoticeBar tone="info">{vazio ?? 'Nenhum item.'}</NoticeBar>;
@@ -160,7 +163,7 @@ export const ItensPorContrato: React.FC<{ grupos: GrupoDeItens[]; abrir: (e: Ent
             </button>
             {aberto && (
               <div className="emendas-bloco-ata__corpo">
-                <DataTable<EntregaFiscalizacao> testId={`${testId}-${g.chave}-tabela`} data={g.es} keyExtractor={(e) => e.id} columns={colunas} className="data-table-container--flush emendas-tabela-topo" rowOpen={(e) => () => abrir(e)} />
+                <DataTable<EntregaFiscalizacao> testId={`${testId}-${g.chave}-tabela`} data={g.es} keyExtractor={(e) => e.id} columns={colunas} className="data-table-container--flush emendas-tabela-topo tabela-colunas-fixas" rowOpen={(e) => () => abrir(e)} />
               </div>
             )}
           </section>

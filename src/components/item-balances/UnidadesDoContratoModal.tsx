@@ -6,6 +6,7 @@ import type { ContratadoDaUnidade, QuantidadeDoContrato } from '../../services/c
 import type { InternalAllocation } from '../../types';
 import { formatNumber } from './itemBalanceUtils';
 import { MENSAGEM_CONFLITO_EDICAO, ehConflitoEdicao } from '../../utils/conflitoEdicao';
+import { useAlocacaoExtraDoItem, useLigarContratoAosProgramas, useProgramasDaDivisao } from '../../hooks/useProgramasDaAlocacao';
 
 export interface ContratoParaDividir {
   contractKey: string;
@@ -80,17 +81,36 @@ const JanelaUnidades: React.FC<
   const { dividir, desfazerDivisao } = useAcoesContratado(itemKey);
   const [linhas, setLinhas] = React.useState<LinhaDivisao[]>(() => linhasDaDivisao(q, allocations, unidades));
   const [erro, setErro] = React.useState<string | null>(erroInicial);
-  const salvando = dividir.isPending || desfazerDivisao.isPending;
+  // Programa de cada unidade neste contrato (migration 297): conta em Contratado do programa e baixa a reserva dele.
+  const extra = useAlocacaoExtraDoItem(itemKey).data;
+  const gravadosQuery = useProgramasDaDivisao(itemKey, contrato.contractKey);
+  const gravados = gravadosQuery.data;
+  const ligar = useLigarContratoAosProgramas();
+  const [escolhidos, setEscolhidos] = React.useState<Record<string, string>>({});
+  const programaGravado = (unidade: string) => gravados?.get(unidade) ?? '';
+  const programaDe = (unidade: string) => escolhidos[unidade] ?? programaGravado(unidade);
+  const reservasDa = (unidade: string) => extra.reservas.filter((r) => r.area.trim().toLowerCase() === unidade.trim().toLowerCase());
+  const comProgramas = linhas.some((l) => reservasDa(l.unidade).length > 0 || programaGravado(l.unidade));
+  const salvando = dividir.isPending || desfazerDivisao.isPending || ligar.isPending;
   const aval = avaliarDivisao(linhas, total);
+  const programasMudaram = linhas.filter((l) => programaDe(l.unidade) !== programaGravado(l.unidade));
+  const nomeDoPrograma = (id: string) => extra.reservas.find((r) => r.programaId === id)?.nome ?? 'programa';
   const semQuantidade = q.quantidadeContratada == null || q.quantidadeContratada <= 0;
   const corDe = (i: number) => CORES[i % CORES.length];
 
   const alterar = (unidade: string, texto: string) => setLinhas((ls) => ls.map((l) => (l.unidade === unidade ? { ...l, texto } : l)));
 
   const salvar = async () => {
-    if (!aval.podeSalvar) return;
+    if (!podeGravar) return;
     setErro(null);
     try {
+      if (!aval.podeSalvar) {
+        // Só o programa mudou: liga as partes que mudaram.
+        await ligar.mutateAsync({ itemKey, contractKey: contrato.contractKey, ligacoes: programasMudaram.map((l) => ({ unidade: l.unidade, programaId: programaDe(l.unidade) || null })) });
+        toast.success(`Programas do contrato ${contrato.numeroContrato} gravados.`);
+        onFechar();
+        return;
+      }
       await dividir.mutateAsync({
         contractKey: contrato.contractKey,
         unidades: linhas
@@ -99,6 +119,18 @@ const JanelaUnidades: React.FC<
         quantidadeVista: total,
         versao: q.versao
       });
+      // A divisão regrava as partes: liga de novo as que têm programa e as que mudaram.
+      const ligacoes = linhas
+        .filter((l) => (aval.porLinha.get(l.unidade)?.quantidade ?? 0) > 0 && (programaDe(l.unidade) || programaDe(l.unidade) !== programaGravado(l.unidade)))
+        .map((l) => ({ unidade: l.unidade, programaId: programaDe(l.unidade) || null }));
+      if (ligacoes.length > 0) {
+        try {
+          await ligar.mutateAsync({ itemKey, contractKey: contrato.contractKey, ligacoes });
+        } catch (e: any) {
+          setErro(`A divisão foi gravada, mas o programa não: ${e?.message || 'erro ao ligar o programa'}. Abra de novo e escolha o programa.`);
+          return;
+        }
+      }
       toast.success(`Unidades do contrato ${contrato.numeroContrato} gravadas.`);
       onFechar();
     } catch (e: any) {
@@ -119,6 +151,10 @@ const JanelaUnidades: React.FC<
     }
   };
 
+  // Programa só vale em unidade com parte neste contrato.
+  const programaSemParte = programasMudaram.some((l) => programaDe(l.unidade) && (aval.porLinha.get(l.unidade)?.quantidade ?? 0) <= 0);
+  const podeGravar = (aval.podeSalvar || (programasMudaram.length > 0 && aval.erros.length === 0)) && !programaSemParte;
+
   return (
     <Modal
       isOpen
@@ -131,8 +167,13 @@ const JanelaUnidades: React.FC<
       footer={
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '0.8rem', color: CINZA, flex: '1 1 240px', minWidth: 0 }} data-testid="unidades-contrato-resumo">
-            {aval.mudancas.length === 0 ? (
+            {aval.mudancas.length === 0 && programasMudaram.length === 0 ? (
               'Nenhuma alteração.'
+            ) : aval.mudancas.length === 0 ? (
+              <>
+                <strong style={{ color: 'var(--text-primary)' }}>Programa:</strong>{' '}
+                {programasMudaram.map((l) => `${l.unidade} → ${programaDe(l.unidade) ? nomeDoPrograma(programaDe(l.unidade)) : 'sem programa'}`).join(' · ')}
+              </>
             ) : (
               <>
                 <strong style={{ color: 'var(--text-primary)' }}>
@@ -156,7 +197,7 @@ const JanelaUnidades: React.FC<
             )}
             <ActionButton action={podeEditar ? 'cancelar' : 'fechar'} size="sm" onClick={onFechar} disabled={salvando} />
             {podeEditar && !semQuantidade && (
-              <AppButton variant="primary" size="sm" onClick={() => void salvar()} isLoading={dividir.isPending} disabled={salvando || !aval.podeSalvar} data-testid="unidades-contrato-salvar">
+              <AppButton variant="primary" size="sm" onClick={() => void salvar()} isLoading={dividir.isPending} disabled={salvando || !podeGravar} data-testid="unidades-contrato-salvar">
                 Salvar divisão
               </AppButton>
             )}
@@ -242,6 +283,7 @@ const JanelaUnidades: React.FC<
                       <th style={{ ...th, textAlign: 'right' }}>Em outros contratos</th>
                       <th style={{ ...th, textAlign: 'right' }}>Livre</th>
                       <th style={{ ...th, textAlign: 'right' }}>Deste contrato</th>
+                      {comProgramas && <th style={th} title="Programa da unidade a que esta parte do contrato pertence: conta em Contratado do programa e baixa a reserva dele.">Programa</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -275,6 +317,33 @@ const JanelaUnidades: React.FC<
                             {a.naoCabe && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>não cabe: livre {formatNumber(Math.max(a.livre, 0))}</span>}
                             {a.alterada && !ruim && l.original > 0 && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-warning-text)', marginTop: '0.15rem' }}>antes {formatNumber(l.original)}</span>}
                           </td>
+                          {comProgramas && (
+                            <td style={td}>
+                              {reservasDa(l.unidade).length === 0 && !programaGravado(l.unidade) ? (
+                                <span style={{ color: CINZA, fontSize: '0.8rem' }}>—</span>
+                              ) : (
+                                <select
+                                  className="form-input"
+                                  value={programaDe(l.unidade)}
+                                  onChange={(e) => setEscolhidos((m) => ({ ...m, [l.unidade]: e.target.value }))}
+                                  disabled={salvando || !podeEditar}
+                                  aria-label={`Programa da parte da ${l.unidade}`}
+                                  data-testid={`unidades-contrato-programa-${l.unidade}`}
+                                  style={{ minWidth: '170px', width: 'auto' }}
+                                >
+                                  <option value="">Sem programa</option>
+                                  {reservasDa(l.unidade).map((r) => (
+                                    <option key={r.programaId} value={r.programaId}>
+                                      {r.nome} · reserva {formatNumber(r.quantidade)}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                              {programaDe(l.unidade) && (aval.porLinha.get(l.unidade)?.quantidade ?? 0) <= 0 && (
+                                <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-danger-text)', marginTop: '0.15rem' }}>informe a quantidade</span>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -285,6 +354,7 @@ const JanelaUnidades: React.FC<
                         Soma
                       </td>
                       <td style={{ ...td, ...nums, fontWeight: 700 }}>{formatNumber(aval.soma)}</td>
+                      {comProgramas && <td style={td} />}
                     </tr>
                   </tfoot>
                 </table>
@@ -292,6 +362,7 @@ const JanelaUnidades: React.FC<
             )}
             <p style={{ margin: '0.5rem 0 0', fontSize: '0.78rem', color: CINZA }}>
               Só unidades alocadas neste item recebem parte do contrato. Para contratar por outra unidade, aloque primeiro. Só números inteiros.
+              {comProgramas && ' O programa precisa ter reserva suficiente no item (Alocação › janela do item).'}
             </p>
           </div>
         </div>

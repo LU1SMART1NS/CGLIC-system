@@ -26,7 +26,14 @@ export interface AllocationRow {
   empenhado: number;
   /** Notas do item ligadas à unidade (vinculadas aos itens ou a vincular): com alguma, a alocação não pode ser removida. */
   vinculados: number;
+  /** Só na CAEP: reservado a parlamentares que ainda não está no contratado (sem contrato ou em contrato sem unidade). */
+  reservado?: number;
+  /** Parte do reservado já em contrato, mas com o contrato ainda sem a unidade interna. */
+  reservadoEmContratoSemUnidade?: number;
 }
+
+/** Livre para contratar: o alocado menos o contratado e, na CAEP, menos o reservado a parlamentares. */
+const livreParaContratar = (r: AllocationRow) => r.allocatedQty - r.contratado - (r.reservado ?? 0);
 
 interface AllocationsTabProps {
   /** UASG gerenciadora do item (de onde vem o quantitativo a alocar). */
@@ -129,12 +136,31 @@ export const AllocationsTab: React.FC<AllocationsTabProps> = ({
     {
       key: 'livre',
       header: 'Livre p/ contratar',
-      sortValue: (r) => r.allocatedQty - r.contratado,
+      sortValue: livreParaContratar,
       sortFirstDir: 'desc',
       align: 'right',
       render: (r) => {
-        const livre = r.allocatedQty - r.contratado;
-        return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: livre < 0 ? 'var(--danger)' : 'var(--success)' }}>{formatNumber(livre)}</span>;
+        const livre = livreParaContratar(r);
+        const reservado = r.reservado ?? 0;
+        const emContrato = r.reservadoEmContratoSemUnidade ?? 0;
+        return (
+          <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: livre < 0 ? 'var(--danger)' : 'var(--success)' }}>{formatNumber(livre)}</span>
+            {reservado > 0 && (
+              <small
+                data-testid={`alocacao-reservado-${r.unitName}`}
+                title={
+                  emContrato > 0
+                    ? `${formatNumber(emContrato)} já viraram contrato, mas o contrato ainda está sem a unidade interna: entram em Contratado quando a unidade for informada em Contratos e empenhos.`
+                    : 'Reservado a parlamentares em Emendas › Pedidos, ainda sem contrato.'
+                }
+                style={{ color: 'var(--text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+              >
+                {formatNumber(reservado)} reservados{emContrato > 0 ? ` (${formatNumber(emContrato)} já em contrato)` : ''}
+              </small>
+            )}
+          </span>
+        );
       }
     },
     {

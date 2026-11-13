@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { avaliarEdicao, folgaDasUnidades, linhasDaDivisaoPlanejada, linhasIniciais, listaParaGravar, presoDaUnidade, vinculosSemRemovidas, type LinhaAlocacao } from '../alocacaoEdicao';
+import { avaliarEdicao, folgaDasUnidades, linhasDaDivisaoPlanejada, linhasIniciais, listaParaGravar, presoDaUnidade, reservaForaDoContratado, vinculosSemRemovidas, type LinhaAlocacao } from '../alocacaoEdicao';
 import type { AllocationExecution } from '../allocationExecution';
 
 const gravadas = [
@@ -54,6 +54,18 @@ describe('alocacaoEdicao', () => {
     expect(a.aAlocar).toBe(-7800);
     expect(a.erros[0]).toContain('passa do quantitativo SENASP');
     expect(a.podeSalvar).toBe(false);
+  });
+
+  it('acima do limite (ex.: quantitativo negativo pela fonte) só diminui, como no banco', () => {
+    const aumentar = avaliarEdicao(com(iniciais(), 'a2', { qtd: 70000 }), -424);
+    expect(aumentar.erros[0]).toContain('está negativo (-424)');
+    expect(aumentar.podeSalvar).toBe(false);
+    const diminuir = avaliarEdicao(com(iniciais(), 'a2', { qtd: 50000 }), -424);
+    expect(diminuir.erros).toEqual([]);
+    expect(diminuir.podeSalvar).toBe(true);
+    // Trocar entre unidades sem aumentar a soma também passa.
+    const trocar = avaliarEdicao(com(com(iniciais(), 'a2', { qtd: 50000 }), 'a3', { qtd: 30000 }), 100);
+    expect(trocar.podeSalvar).toBe(true);
   });
 
   it('a unidade não fica abaixo do que já empenhou', () => {
@@ -136,8 +148,17 @@ describe('reservado a parlamentares na CAEP (decisão do usuário em 27/10/2026:
     expect(caep).toMatchObject({ reservado: 9, reservadoTotal: 28, contratado: 36 });
     const a = avaliarEdicao([{ ...caep, qtd: 40 }], 74);
     expect(a.porLinha.get('c')).toMatchObject({ minimo: 45, motivoDoMinimo: 'contratado_e_reserva', abaixoDoMinimo: true });
-    expect(a.erros).toEqual(['A CAEP não pode ficar com menos de 45: 36 contratados + 9 reservados a parlamentares ainda sem contrato. Para diminuir, peça à CAEP para liberar a reserva em Emendas › Pedidos.']);
+    expect(a.erros).toEqual(['A CAEP não pode ficar com menos de 45: 36 contratados + 9 reservados a parlamentares ainda fora do contratado. Para diminuir, peça à CAEP para liberar a reserva em Emendas › Pedidos.']);
     expect(avaliarEdicao([{ ...caep, qtd: 45 }], 74).podeSalvar).toBe(true);
+  });
+
+  it('caso real 00108/2024 item 1: reserva já em contrato sem unidade interna continua no reservado (218, não 89)', () => {
+    const [caep] = linhasIniciais([{ id: 'c', unitName: 'CAEP', allocatedQty: 225, empenhadaQty: 0 }], new Map(), new Map(), { total: 218, semContrato: 89 });
+    expect(caep).toMatchObject({ reservado: 218, reservadoTotal: 218, reservadoEmContratoSemUnidade: 129, contratado: 0 });
+    // Informada a unidade nos contratos, os 129 passam para o contratado e saem do reservado.
+    const [depois] = linhasIniciais([{ id: 'c', unitName: 'CAEP', allocatedQty: 225, empenhadaQty: 0 }], new Map(), new Map([['caep', 129]]), { total: 218, semContrato: 89 });
+    expect(depois).toMatchObject({ reservado: 89, reservadoEmContratoSemUnidade: 0, contratado: 129 });
+    expect(reservaForaDoContratado({ total: 218, semContrato: 89 }, 50)).toEqual({ reservado: 168, emContratoSemUnidade: 79 });
   });
 
   it('o mínimo: contratado + reservado sem contrato, e nunca menos que o empenhado nem que a reserva toda', () => {

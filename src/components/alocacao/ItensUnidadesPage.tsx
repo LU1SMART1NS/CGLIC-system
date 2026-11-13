@@ -3,7 +3,10 @@ import { PageContainer } from '../../design-system/components/PageContainer';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
 import { EmptyState } from '../../design-system/components/EmptyState';
-import { ActionButton, AppButton, AvisoCarregando } from '../../design-system';
+import { ActionButton, AppButton, AvisoCarregando, InfoHint, NoticeBar, StatusBadge, useConfirmDialog, useToast } from '../../design-system';
+import { useDivisoesNaAta, useMarcarDivisaoDaAta } from '../../hooks/useDivisaoNaAta';
+import { useProgramasDosItens } from '../../hooks/useProgramasDaAlocacao';
+import type { DivisaoNaAta, SituacaoDivisao } from '../../services/divisaoNaAtaService';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useAuth } from '../../context/AuthContext';
 import { useAtasPortfolio } from '../../hooks/useAtasPortfolio';
@@ -52,19 +55,32 @@ interface Filtros {
   gestor: string;
   busca: string;
   ver: string;
+  divisao: string;
 }
 const TODOS = 'TODOS';
 const PAGE_SIZE = 20;
 const SCHEMA: CarteiraFilterSchema<Filtros> = {
-  nivel: { param: 'alocacao', default: 'SEM', values: ['SEM', 'PARCIAL', 'TOTAL', TODOS] },
+  nivel: { param: 'alocacao', default: 'SEM', values: ['SEM', 'PARCIAL', 'TOTAL', 'LIVRE', TODOS] },
   vigencia: { param: 'situacao', default: 'VIGENTES', values: ['VIGENTES', 'HISTORICO', TODOS] },
   unidade: { param: 'unidade', default: TODAS_UNIDADES },
   uasg: { param: 'uasg', default: TODOS },
   gestor: { param: 'gestor', default: TODOS_GESTORES },
   busca: { param: 'busca', default: '' },
-  ver: { param: 'ver', default: 'ATA', values: ['ATA', 'ITEM'] }
+  ver: { param: 'ver', default: 'ATA', values: ['ATA', 'ITEM'] },
+  divisao: { param: 'divisao', default: TODOS, values: ['DIVIDE', 'NAO_DIVIDE', 'A_CONFERIR', TODOS] }
 };
+const CINZA = '#94a3b8';
+/** Selo da divisão na ata, abaixo do número. */
+const SELO_DIVISAO: Record<SituacaoDivisao, { label: string; variant: 'info' | 'neutral' | 'warning'; title: string }> = {
+  DIVIDE: { label: 'Divisão pela ata', variant: 'info', title: 'A ata assinada divide o quantitativo SENASP entre as unidades internas: a alocação é a da ata.' },
+  NAO_DIVIDE: { label: 'Ata sem divisão', variant: 'neutral', title: 'A ata assinada não divide o quantitativo SENASP: alocar às unidades é opcional, sem pendência.' },
+  A_CONFERIR: { label: 'Divisão a conferir', variant: 'warning', title: 'Ninguém conferiu ainda se a ata divide o quantitativo SENASP entre as unidades internas.' }
+};
+const origemDaDivisao = (d: DivisaoNaAta) =>
+  d.situacao === 'A_CONFERIR' ? 'Ainda não conferida.' : d.fonte === 'PESSOA' && d.marcadoEm ? `Marcado por ${d.marcadoPorNome ?? 'alguém'} em ${formatDateBR(d.marcadoEm.slice(0, 10))}.` : '';
 const VERDE = 'var(--color-success)';
+const TITULO_NEGATIVO =
+  'O registrado da SENASP no Compras.gov.br é menor que o que ela gerencia para os participantes. Confira o remanejamento na fonte; até lá a alocação só pode diminuir.';
 const AMARELO = 'var(--color-warning-solid)';
 const VERMELHO = 'var(--color-danger)';
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
@@ -78,7 +94,7 @@ const CHIP: Record<NivelAtendimento, { color: string; bg: string; label: (n: num
 };
 
 /** Alocado contra o quantitativo SENASP: número e barra (âmbar enquanto parcial, verde quando completo). */
-const AlocadoBar: React.FC<{ alocado: number; senasp: number }> = ({ alocado, senasp }) => {
+const AlocadoBar: React.FC<{ alocado: number; senasp: number; opcional?: boolean }> = ({ alocado, senasp, opcional }) => {
   const pct = senasp > 0 ? Math.min(100, (alocado / senasp) * 100) : 0;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: '110px' }}>
@@ -86,7 +102,7 @@ const AlocadoBar: React.FC<{ alocado: number; senasp: number }> = ({ alocado, se
         {formatNumber(alocado)} <span style={subtle}>de {formatNumber(senasp)}</span>
       </span>
       <div aria-hidden="true" style={{ height: '5px', background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: senasp > 0 && alocado >= senasp ? 'var(--color-success-solid)' : 'var(--color-warning)' }} />
+        <div style={{ width: `${pct}%`, height: '100%', background: opcional ? 'var(--color-info-solid, #5992ed)' : senasp > 0 && alocado >= senasp ? 'var(--color-success-solid)' : 'var(--color-warning)' }} />
       </div>
     </div>
   );
@@ -104,8 +120,14 @@ interface GrupoAta {
   falta: number;
   nivel: NivelAtendimento;
   contagem: Record<NivelAtendimento, number>;
+  /** Itens com quantitativo SENASP negativo (conferir o remanejamento na fonte). */
+  negativos: number;
   /** A busca achou um item (e não a ata em si): a ata já abre mostrando o item. */
   achouItem: boolean;
+  /** Se a ata assinada divide o quantitativo SENASP entre as unidades internas. */
+  divisao: DivisaoNaAta;
+  /** Itens com alguma alocação (mostrado só nas atas sem divisão). */
+  comAlocacao: number;
 }
 
 /**
@@ -134,8 +156,15 @@ export const ItensUnidadesPage: React.FC = () => {
       : atasNaoCarregaram && rows.length === 0
         ? 'As atas não carregaram.'
         : null;
-  const { filters, setFilter, resetFilters } = useCarteiraFilters(SCHEMA);
+  const { filters, setFilter, setFilters, resetFilters } = useCarteiraFilters(SCHEMA);
   const [alocando, setAlocando] = useState<ItemParaAlocar | null>(null);
+  const divisaoNaAta = useDivisoesNaAta();
+  const marcar = useMarcarDivisaoDaAta();
+  const programasDosItens = useProgramasDosItens();
+  const toast = useToast();
+  const confirmar = useConfirmDialog();
+  // Ata sem divisão (migration 297): alocar é opcional e o item sem unidade não é pendência.
+  const semDivisao = React.useCallback((r: CarteiraItemRow) => !!r.semDivisaoNaAta, []);
   // Divisão planejada na montagem da ata (migration 240): aparece no item ainda sem alocação.
   const divisoesPlanejadas = useDivisoesDasAtasMontadas();
   const porAta = filters.ver === 'ATA';
@@ -143,13 +172,20 @@ export const ItensUnidadesPage: React.FC = () => {
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
   const [todosItens, setTodosItens] = useState<Record<string, boolean>>({});
 
-  // Itens com quantitativo SENASP conhecido: sem ele não há o que alocar.
-  const base = useMemo(() => rows.filter((r) => r.quantitativoSenasp > 0), [rows]);
+  // Itens com quantitativo SENASP conhecido: sem ele não há o que alocar. O negativo entra com aviso: vem da fonte
+  // (registrado da SENASP menor que o gerenciado para os participantes) e esconder o item escondia o problema.
+  const base = useMemo(() => rows.filter((r) => r.quantitativoSenasp !== 0), [rows]);
+  const negativos = useMemo(() => base.filter((r) => r.quantitativoSenasp < 0 && r.faixa !== 'EXPIRADO'), [base]);
   const nivelCounts = useMemo(() => {
-    const n: Record<NivelAtendimento, number> = { SEM: 0, PARCIAL: 0, TOTAL: 0 };
-    for (const r of base) if (filters.vigencia === TODOS || (filters.vigencia === 'HISTORICO' ? r.faixa === 'EXPIRADO' : r.faixa !== 'EXPIRADO')) n[r.nivelAlocacao]++;
+    const n: Record<NivelAtendimento | 'LIVRE', number> = { SEM: 0, PARCIAL: 0, TOTAL: 0, LIVRE: 0 };
+    for (const r of base) if (filters.vigencia === TODOS || (filters.vigencia === 'HISTORICO' ? r.faixa === 'EXPIRADO' : r.faixa !== 'EXPIRADO')) n[semDivisao(r) ? 'LIVRE' : r.nivelAlocacao]++;
     return n;
-  }, [base, filters.vigencia]);
+  }, [base, filters.vigencia, semDivisao]);
+  const divisaoCounts = useMemo(() => {
+    const n: Record<string, number> = {};
+    for (const k of new Set(base.map((r) => r.ataKey))) n[divisaoNaAta.de(k).situacao] = (n[divisaoNaAta.de(k).situacao] ?? 0) + 1;
+    return n;
+  }, [base, divisaoNaAta]);
   const uasgs = useMemo(() => {
     const m = new Map<string, number>();
     // Filtro pela carteira da CGLIC (nas atas de outros órgãos, a UASG da ata é a do outro órgão).
@@ -166,7 +202,9 @@ export const ItensUnidadesPage: React.FC = () => {
   const lista = useMemo(() => {
     return base
       .filter((r) => {
-        if (filters.nivel !== TODOS && r.nivelAlocacao !== filters.nivel) return false;
+        if (filters.nivel === 'LIVRE' && !semDivisao(r)) return false;
+        if (filters.nivel !== TODOS && filters.nivel !== 'LIVRE' && (semDivisao(r) || r.nivelAlocacao !== filters.nivel)) return false;
+        if (filters.divisao !== TODOS && divisaoNaAta.de(r.ataKey).situacao !== filters.divisao) return false;
         if (filters.vigencia === 'VIGENTES' && r.faixa === 'EXPIRADO') return false;
         if (filters.vigencia === 'HISTORICO' && r.faixa !== 'EXPIRADO') return false;
         if (filters.unidade !== TODAS_UNIDADES && !(r.alocadoPorUnidade[filters.unidade] > 0)) return false;
@@ -183,7 +221,7 @@ export const ItensUnidadesPage: React.FC = () => {
         return true;
       })
       .sort((a, b) => comparePrazo(a.diasRestantes, b.diasRestantes) || a.arp.numeroAtaRegistroPreco.localeCompare(b.arp.numeroAtaRegistroPreco) || Number(a.item.numeroItem) - Number(b.item.numeroItem));
-  }, [base, filters, showGestorFilter, busca, ataCasaBusca]);
+  }, [base, filters, showGestorFilter, busca, ataCasaBusca, semDivisao, divisaoNaAta]);
 
   const grupos = useMemo<GrupoAta[]>(() => {
     const todosDaAta = new Map<string, CarteiraItemRow[]>();
@@ -198,8 +236,10 @@ export const ItensUnidadesPage: React.FC = () => {
       let alocado = 0;
       for (const r of itens) {
         contagem[r.nivelAlocacao]++;
-        senasp += r.quantitativoSenasp;
-        alocado += Math.min(r.alocado, r.quantitativoSenasp);
+        // Item com quantitativo negativo não entra na soma da ata (o aviso fica no item).
+        const senaspItem = Math.max(0, r.quantitativoSenasp);
+        senasp += senaspItem;
+        alocado += Math.min(r.alocado, senaspItem);
       }
       return {
         ataKey,
@@ -211,12 +251,15 @@ export const ItensUnidadesPage: React.FC = () => {
         senasp,
         alocado,
         falta: Math.max(0, senasp - alocado),
+        negativos: itens.filter((r) => r.quantitativoSenasp < 0).length,
         nivel: agregarNivel(itens.map((r) => r.nivelAlocacao)) ?? 'SEM',
         contagem,
-        achouItem: !!busca && !ataCasaBusca(vis[0])
+        achouItem: !!busca && !ataCasaBusca(vis[0]),
+        divisao: divisaoNaAta.de(ataKey),
+        comAlocacao: itens.filter((r) => r.alocado > 0).length
       };
     });
-  }, [base, lista, busca, ataCasaBusca]);
+  }, [base, lista, busca, ataCasaBusca, divisaoNaAta]);
 
   const colunasItem = useMemo<Record<string, CarteiraSortColumn<CarteiraItemRow>>>(
     () => ({
@@ -249,7 +292,31 @@ export const ItensUnidadesPage: React.FC = () => {
   const abrirItem = (r: CarteiraItemRow) => navigate(`${buildAtaItemPath(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)}?aba=quantitativos`);
   const abrirAta = (r: CarteiraItemRow) => navigate(buildAtaPath(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora));
   const alocar = (r: CarteiraItemRow) =>
-    setAlocando({ numeroAta: r.arp.numeroAtaRegistroPreco, uasg: r.arp.codigoUnidadeGerenciadora, numeroItem: String(r.item.numeroItem), descricao: r.item.descricaoItem, quantitativoSenasp: r.quantitativoSenasp, limiteProvisorioOutrosOrgaos: r.limiteProvisorioOutrosOrgaos });
+    setAlocando({ numeroAta: r.arp.numeroAtaRegistroPreco, uasg: r.arp.codigoUnidadeGerenciadora, numeroItem: String(r.item.numeroItem), descricao: r.item.descricaoItem, quantitativoSenasp: r.quantitativoSenasp, limiteProvisorioOutrosOrgaos: r.limiteProvisorioOutrosOrgaos, semDivisaoNaAta: semDivisao(r), divisaoNaAta: divisaoNaAta.de(r.ataKey).situacao });
+  /** Marca ou desmarca "a ata não divide": pergunta antes, porque muda a situação de todos os itens da ata. */
+  const marcarDivisao = async (g: GrupoAta, situacao: Exclude<SituacaoDivisao, 'A_CONFERIR'>) => {
+    const numero = g.primeiro.arp.numeroAtaRegistroPreco;
+    const ok = await confirmar(
+      situacao === 'NAO_DIVIDE'
+        ? {
+            title: `A ata ${numero} não divide entre as unidades?`,
+            message: `Os ${g.itens.length} itens saem de "Sem alocação" e "Parcialmente alocados" e vão para "Sem divisão na ata". O que já estiver alocado continua, como alocação opcional.`,
+            confirmLabel: 'Marcar sem divisão'
+          }
+        : {
+            title: `A ata ${numero} divide entre as unidades?`,
+            message: 'Os itens voltam a ser cobrados como pendência de alocação até que o alocado alcance o quantitativo SENASP. Nada é apagado.',
+            confirmLabel: 'A ata divide'
+          }
+    );
+    if (!ok) return;
+    try {
+      await marcar.mutateAsync({ numeroAta: numero, uasg: g.primeiro.arp.codigoUnidadeGerenciadora, situacao });
+      toast.success(situacao === 'NAO_DIVIDE' ? `Ata ${numero} marcada: não divide entre as unidades.` : `Ata ${numero} marcada: divide entre as unidades.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível marcar a ata.');
+    }
+  };
   const estaAberta = (g: GrupoAta) => abertas[g.ataKey] ?? g.achouItem;
   const todasAbertas = paginaAtas.pageItems.length > 0 && paginaAtas.pageItems.every(estaAberta);
   const abrirOuFecharTodas = () =>
@@ -268,12 +335,13 @@ export const ItensUnidadesPage: React.FC = () => {
   }
   const hasActive = hasActiveCarteiraFilters(SCHEMA, { ...filters, ver: SCHEMA.ver.default }) && filters.nivel === SCHEMA.nivel.default;
   const isBusy = (isLoading && arps.length === 0) || scopeLoading || loadingExecucao;
-  const nivelAtivo = (filters.nivel === TODOS ? 'TODOS' : filters.nivel) as NivelAtendimento | 'TODOS';
+  const nivelAtivo = (filters.nivel === TODOS ? 'TODOS' : filters.nivel) as NivelAtendimento | 'LIVRE' | 'TODOS';
   const nomeUnidade = (u: string) => unidades.find((x) => x.chave === u)?.nome ?? u;
 
   /** Colunas do item, as mesmas na lista corrida e dentro da ata aberta. */
   const celulasDoItem = (r: CarteiraItemRow, comAta: boolean) => {
     const falta = Math.max(0, r.quantitativoSenasp - r.alocado);
+    const opcional = semDivisao(r);
     const unidadesDoItem = Object.entries(r.alocadoPorUnidade).filter(([, q]) => q > 0);
     return (
       <>
@@ -298,9 +366,18 @@ export const ItensUnidadesPage: React.FC = () => {
             {descricaoItemEmFrase(r.item.descricaoItem) || '—'}
           </div>
         </td>
-        <td data-label="Quantitativo SENASP" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatNumber(r.quantitativoSenasp)} un</td>
+        <td data-label="Quantitativo SENASP" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+          {r.quantitativoSenasp < 0 ? (
+            <span title={TITULO_NEGATIVO} data-testid={`alocacao-negativo-${r.key}`}>
+              <span style={{ color: 'var(--color-danger-text)', fontWeight: 700 }}>{formatNumber(r.quantitativoSenasp)} un</span>
+              <div style={{ ...subtle, color: 'var(--color-danger-text)' }}>negativo: conferir na fonte</div>
+            </span>
+          ) : (
+            <>{formatNumber(r.quantitativoSenasp)} un</>
+          )}
+        </td>
         <td data-label="Alocado" style={carteiraTd}>
-          <AlocadoBar alocado={r.alocado} senasp={r.quantitativoSenasp} />
+          <AlocadoBar alocado={r.alocado} senasp={r.quantitativoSenasp} opcional={opcional} />
         </td>
         <td data-label="Unidades" style={{ ...carteiraTd, fontSize: '0.8rem' }}>
           {unidadesDoItem.length > 0 ? (
@@ -311,6 +388,17 @@ export const ItensUnidadesPage: React.FC = () => {
             </span>
           ) : (
             <span style={{ color: '#94a3b8' }}>—</span>
+          )}
+        </td>
+        <td data-label="Programas" style={{ ...carteiraTd, fontSize: '0.8rem' }} data-testid={`alocacao-programas-${r.key}`}>
+          {(programasDosItens.get(r.key) ?? []).length === 0 ? (
+            <span style={{ color: '#94a3b8' }}>—</span>
+          ) : (
+            programasDosItens.get(r.key)!.map((p) => (
+              <div key={p.nome + p.emPedidos} style={{ whiteSpace: 'nowrap' }} title={p.emPedidos ? 'Reservado a parlamentares nos pedidos de emenda' : 'Reserva do programa'}>
+                {p.nome} {formatNumber(p.quantidade)}{p.emPedidos && <span style={subtle}> em pedidos</span>}
+              </div>
+            ))
           )}
         </td>
         <td data-label="Contratado" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
@@ -328,10 +416,14 @@ export const ItensUnidadesPage: React.FC = () => {
           )}
         </td>
         <td data-label="Falta alocar" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: falta > 0 ? 'var(--color-warning-text)' : undefined }}>
-          {falta > 0 ? `${formatNumber(falta)} un` : '—'}
+          {opcional ? <span style={{ ...subtle, fontWeight: 600 }} title="Sem divisão na ata: o que não foi alocado fica livre, sem pendência">{formatNumber(falta)} livre</span> : falta > 0 ? `${formatNumber(falta)} un` : '—'}
         </td>
         <td data-label="Situação" style={carteiraTd}>
-          <CarteiraNivelPill nivel={r.nivelAlocacao} labels={NIVEL_ALOCACAO_LABEL} />
+          {opcional ? (
+            <StatusBadge label={r.alocado > 0 ? 'Com alocação' : 'Sem divisão'} variant={r.alocado > 0 ? 'info' : 'neutral'} size="sm" testId={`alocacao-sem-divisao-${r.key}`} />
+          ) : (
+            <CarteiraNivelPill nivel={r.nivelAlocacao} labels={NIVEL_ALOCACAO_LABEL} />
+          )}
         </td>
         {comAta && showGestorFilter && (
           <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
@@ -346,7 +438,7 @@ export const ItensUnidadesPage: React.FC = () => {
         )}
         {podeAlocar && (
           <td data-role="action" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap' }}>
-            {r.nivelAlocacao !== 'TOTAL' && (
+            {(opcional || r.nivelAlocacao !== 'TOTAL') && (
               <ActionButton action="novo" size="sm" onClick={() => alocar(r)} data-testid={`vinc-itens-alocar-${r.key}`} title="Alocar quantitativo a uma unidade interna">
                 Alocar
               </ActionButton>
@@ -367,6 +459,7 @@ export const ItensUnidadesPage: React.FC = () => {
               <CarteiraSortHeader label="Quantitativo SENASP" sortKey="senasp" align="right" {...sortItem} />
               <CarteiraSortHeader label="Alocado" sortKey="alocado" {...sortItem} />
               <th style={carteiraTh}>Unidades</th>
+              <th style={carteiraTh}>Programas</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }}>Contratado</th>
               <CarteiraSortHeader label="Falta alocar" sortKey="falta" align="right" {...sortItem} />
               <th style={carteiraTh}>Situação</th>
@@ -413,6 +506,7 @@ export const ItensUnidadesPage: React.FC = () => {
               const mostrarTodos = todosItens[g.ataKey] || filters.nivel === TODOS;
               const itensMostrados = mostrarTodos ? g.itens : g.visiveis;
               const outros = g.itens.length - g.visiveis.length;
+              const semDiv = g.divisao.situacao === 'NAO_DIVIDE';
               return (
                 <React.Fragment key={g.ataKey}>
                   <tr
@@ -433,14 +527,22 @@ export const ItensUnidadesPage: React.FC = () => {
                         data-testid={`vinc-atas-expand-${g.ataKey}`}
                       />
                     </td>
-                    <td data-role="id" style={{ ...carteiraTd, minWidth: '200px', maxWidth: '320px' }}>
+                    <td data-role="id" style={{ ...carteiraTd, minWidth: '280px', maxWidth: '360px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.15rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '0.5rem', rowGap: '0.15rem' }}>
                           <CarteiraIdLink onClick={() => abrirAta(g.primeiro)} label={`Abrir a ata ${numero}`} title={`Abrir a Ata 360 · UASG ${arp.codigoUnidadeGerenciadora}`}>
                             {numero}
                           </CarteiraIdLink>
                           <SeloPapelSenasp arp={arp} testId={`vinc-atas-papel-${g.ataKey}`} />
+                          <span title={SELO_DIVISAO[g.divisao.situacao].title} style={{ whiteSpace: 'nowrap' }}>
+                            <StatusBadge label={SELO_DIVISAO[g.divisao.situacao].label} variant={SELO_DIVISAO[g.divisao.situacao].variant} size="sm" testId={`vinc-atas-divisao-${g.ataKey}`} />
+                          </span>
                         </div>
+                        {g.negativos > 0 && (
+                          <span title={TITULO_NEGATIVO} style={{ ...subtle, color: 'var(--color-danger-text)' }} data-testid={`vinc-atas-negativo-${g.ataKey}`}>
+                            {g.negativos === 1 ? '1 item' : `${g.negativos} itens`} com quantitativo SENASP negativo
+                          </span>
+                        )}
                         {g.fornecedor && (
                           <CarteiraCellFilter descricao={`fornecedor ${g.fornecedor}`} onFilter={() => setFilter('busca', g.fornecedor!)}>
                             <div title={g.fornecedor} style={carteiraFornecedor}>
@@ -460,7 +562,12 @@ export const ItensUnidadesPage: React.FC = () => {
                           {g.itens.length} {g.itens.length === 1 ? 'item' : 'itens'}
                         </div>
                         <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-                          {(['SEM', 'PARCIAL', 'TOTAL'] as const)
+                          {semDiv && g.comAlocacao > 0 && (
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', padding: '0.05rem 0.4rem', color: 'var(--color-info-text-strong)', background: 'var(--color-info-bg)' }}>
+                              {g.comAlocacao} com alocação
+                            </span>
+                          )}
+                          {!semDiv && (['SEM', 'PARCIAL', 'TOTAL'] as const)
                             .filter((n) => g.contagem[n] > 0)
                             .map((n) => (
                               <span key={n} style={{ fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', padding: '0.05rem 0.4rem', color: CHIP[n].color, background: CHIP[n].bg }}>
@@ -471,13 +578,13 @@ export const ItensUnidadesPage: React.FC = () => {
                       </div>
                     </td>
                     <td data-label="Alocado" style={carteiraTd}>
-                      <AlocadoBar alocado={g.alocado} senasp={g.senasp} />
+                      <AlocadoBar alocado={g.alocado} senasp={g.senasp} opcional={semDiv} />
                     </td>
-                    <td data-label="Falta alocar" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: g.falta > 0 ? 'var(--color-warning-text)' : undefined }}>
-                      {g.falta > 0 ? `${formatNumber(g.falta)} un` : '—'}
+                    <td data-label="Falta alocar" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: !semDiv && g.falta > 0 ? 'var(--color-warning-text)' : undefined }}>
+                      {semDiv ? <span style={{ ...subtle, fontWeight: 600 }}>{formatNumber(g.falta)} livre</span> : g.falta > 0 ? `${formatNumber(g.falta)} un` : '—'}
                     </td>
                     <td data-label="Situação" style={carteiraTd}>
-                      <CarteiraNivelPill nivel={g.nivel} labels={NIVEL_ALOCACAO_ATA_LABEL} />
+                      {semDiv ? <StatusBadge label="Sem divisão" variant="neutral" size="sm" /> : <CarteiraNivelPill nivel={g.nivel} labels={NIVEL_ALOCACAO_ATA_LABEL} />}
                     </td>
                     {showGestorFilter && (
                       <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
@@ -494,7 +601,30 @@ export const ItensUnidadesPage: React.FC = () => {
                   {aberta && (
                     <tr className="carteira-expanded" data-testid={`vinc-atas-itens-${g.ataKey}`}>
                       <td colSpan={totalColunasAta} style={CARTEIRA_EXPANDED_CELL_STYLE}>
-                        <CarteiraDetailLabel>{mostrarTodos ? 'Itens da ata' : `Itens da ata · ${NIVEL_ALOCACAO_LABEL[filters.nivel as NivelAtendimento].toLowerCase()}`}</CarteiraDetailLabel>
+                        <div
+                          data-testid={`vinc-atas-divisao-controle-${g.ataKey}`}
+                          style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem 1rem', marginBottom: '0.75rem', padding: '0.6rem 0.8rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem' }}
+                        >
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, color: '#1e293b', cursor: podeAlocar ? 'pointer' : 'default' }}>
+                            <input
+                              type="checkbox"
+                              checked={semDiv}
+                              disabled={!podeAlocar}
+                              onChange={(e) => void marcarDivisao(g, e.target.checked ? 'NAO_DIVIDE' : 'DIVIDE')}
+                              data-testid={`vinc-atas-sem-divisao-${g.ataKey}`}
+                              style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                            />
+                            A ata não divide o quantitativo SENASP entre as unidades internas
+                          </label>
+                          <InfoHint content="Marcada, alocar às unidades fica opcional e o que fica sem unidade não é pendência. Desmarcada, vale a divisão da ata assinada e os itens voltam a ser cobrados." />
+                          {origemDaDivisao(g.divisao) && <span style={{ ...subtle, fontWeight: 400 }}>{origemDaDivisao(g.divisao)}</span>}
+                          {g.divisao.situacao === 'A_CONFERIR' && podeAlocar && (
+                            <AppButton type="button" variant="link" size="sm" onClick={() => void marcarDivisao(g, 'DIVIDE')} data-testid={`vinc-atas-divide-${g.ataKey}`}>
+                              Conferi: a ata divide
+                            </AppButton>
+                          )}
+                        </div>
+                        <CarteiraDetailLabel>{mostrarTodos || filters.nivel === 'LIVRE' ? 'Itens da ata' : `Itens da ata · ${NIVEL_ALOCACAO_LABEL[filters.nivel as NivelAtendimento].toLowerCase()}`}</CarteiraDetailLabel>
                         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
                           <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
@@ -503,8 +633,9 @@ export const ItensUnidadesPage: React.FC = () => {
                                 <th style={{ ...carteiraTh, textAlign: 'right' }}>Quantitativo SENASP</th>
                                 <th style={carteiraTh}>Alocado</th>
                                 <th style={carteiraTh}>Unidades</th>
+                                <th style={carteiraTh}>Programas</th>
                                 <th style={{ ...carteiraTh, textAlign: 'right' }}>Contratado</th>
-                                <th style={{ ...carteiraTh, textAlign: 'right' }}>Falta alocar</th>
+                                <th style={{ ...carteiraTh, textAlign: 'right' }}>{semDiv ? 'Livre' : 'Falta alocar'}</th>
                                 <th style={carteiraTh}>Situação</th>
                                 {podeAlocar && <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>}
                               </tr>
@@ -566,6 +697,34 @@ export const ItensUnidadesPage: React.FC = () => {
 
       <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="da alocação" testIdPrefix="alocacao-fontes" />
 
+      {!isBusy && !motivoListaNaoCarregou && negativos.length > 0 && (
+        <NoticeBar
+          tone="warning"
+          testId="alocacao-negativos"
+          action={
+            <AppButton
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                const atas = [...new Set(negativos.map((r) => r.arp.numeroAtaRegistroPreco))];
+                setAbertas({});
+                setFilters({ nivel: TODOS, vigencia: 'VIGENTES', busca: atas.length === 1 ? atas[0] : '' });
+              }}
+            >
+              Ver {negativos.length === 1 ? 'o item' : 'os itens'}
+            </AppButton>
+          }
+        >
+          <strong>
+            {negativos.length === 1 ? '1 item' : `${formatNumber(negativos.length)} itens`} com quantitativo SENASP negativo
+          </strong>{' '}
+          ({[...new Set(negativos.map((r) => `ata ${r.arp.numeroAtaRegistroPreco} item ${Number(r.item.numeroItem)}`))].slice(0, 3).join(', ')}
+          {negativos.length > 3 ? '…' : ''}): o registrado da SENASP no Compras.gov.br é menor que o que ela gerencia para os participantes. Confira o
+          remanejamento na fonte; até lá a alocação só pode diminuir.
+        </NoticeBar>
+      )}
+
       {isBusy ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} aria-busy="true" aria-label="Carregando itens...">
           <AvisoCarregando label="Carregando itens" />
@@ -587,7 +746,8 @@ export const ItensUnidadesPage: React.FC = () => {
               { id: 'TOTAL', label: 'Alocados', count: nivelCounts.TOTAL, dot: VERDE, title: 'O alocado alcança o quantitativo SENASP' },
               { id: 'PARCIAL', label: 'Parcialmente alocados', count: nivelCounts.PARCIAL, dot: AMARELO, title: 'O alocado não alcança o quantitativo SENASP' },
               { id: 'SEM', label: 'Sem alocação', count: nivelCounts.SEM, dot: VERMELHO, title: 'Nenhuma unidade recebeu o item' },
-              { id: 'TODOS', label: 'Todos', count: nivelCounts.SEM + nivelCounts.PARCIAL + nivelCounts.TOTAL }
+              { id: 'LIVRE', label: 'Sem divisão na ata', count: nivelCounts.LIVRE, dot: CINZA, title: 'A ata não divide o quantitativo SENASP: alocar às unidades é opcional, sem pendência' },
+              { id: 'TODOS', label: 'Todos', count: nivelCounts.SEM + nivelCounts.PARCIAL + nivelCounts.TOTAL + nivelCounts.LIVRE }
             ]}
           />
 
@@ -617,6 +777,18 @@ export const ItensUnidadesPage: React.FC = () => {
               ]}
               onChange={(v) => setFilter('vigencia', v)}
               testId="vinc-itens-filter-vigencia"
+            />
+            <CarteiraFilterButton
+              label="Divisão na ata"
+              value={filters.divisao}
+              emptyValue={TODOS}
+              options={[
+                { value: 'DIVIDE', label: 'A ata divide', count: divisaoCounts.DIVIDE ?? 0 },
+                { value: 'NAO_DIVIDE', label: 'A ata não divide', count: divisaoCounts.NAO_DIVIDE ?? 0 },
+                { value: 'A_CONFERIR', label: 'A conferir', count: divisaoCounts.A_CONFERIR ?? 0 }
+              ]}
+              onChange={(v) => setFilter('divisao', v)}
+              testId="vinc-itens-filter-divisao"
             />
             <CarteiraUnidadeSelect value={filters.unidade} unidades={unidades} onChange={(v) => setFilter('unidade', v)} testId="vinc-itens-filter-unidade" />
             <CarteiraFilterButton label="UASG" value={filters.uasg} emptyValue={TODOS} options={[...uasgs.keys()].sort().map((u) => ({ value: u, label: u, count: uasgs.get(u) }))} onChange={(v) => setFilter('uasg', v)} testId="vinc-itens-filter-uasg" />

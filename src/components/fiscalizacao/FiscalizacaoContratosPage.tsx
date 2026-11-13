@@ -11,13 +11,13 @@ import { CarteiraFilterBar, carteiraCounter } from '../carteira/CarteiraFilterBa
 import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
-import { CelulaContrato, CelulaFiscal } from './ContratosFiscalizacaoTabela';
+import { CelulaContrato, CelulaFiscal, CelulaProcesso } from './ContratosFiscalizacaoTabela';
 import { COR, linhasDoContrato, type Linha } from '../../utils/fiscalizacaoMesa';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useContratosFiscalizacao, useEntregasFiscalizacao, useFiscaisAtivos } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao, EntregaFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, dataBR, hojeEmBrasilia, rotaDoContrato } from '../../utils/fiscalizacao';
+import { NOME_SFC, autuado, dataBR, fiscaisVisiveis, hojeEmBrasilia, idsDosFiscaisComContrato, rotaDoContrato } from '../../utils/fiscalizacao';
 import { FASES_ENTREGA, foiEntregue } from '../../utils/fiscalizacaoEntregas';
 import { agrupar, chaveDeOrdem, diasAte, numero, pct, programasDe, qtdTexto, resumir, type Resumo } from '../../utils/fiscalizacaoResumo';
 const POR_PAGINA = 25;
@@ -88,7 +88,8 @@ export const FiscalizacaoContratosPage: React.FC = () => {
   const entregas = useMemo(() => entregasQ.data ?? [], [entregasQ.data]);
   const carregando = contratosQ.isLoading || entregasQ.isLoading;
   const falha = contratosQ.error ?? entregasQ.error;
-  const { fiscais } = useFiscaisAtivos();
+  const { servidores } = useFiscaisAtivos();
+  const fiscais = useMemo(() => fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos)), [servidores, contratos]);
   const hoje = hojeEmBrasilia();
   const ehFiscal = role === 'gestor_fiscalizacao';
   const [seg, setSeg] = useState<SegContrato>(ehFiscal ? 'VOCE' : 'TODOS');
@@ -106,7 +107,7 @@ export const FiscalizacaoContratosPage: React.FC = () => {
       .map((c) => {
         const es = porContrato.get(c.contractKey) ?? [];
         const r = resumir(es);
-        const { comVoce, comOutros } = linhasDoContrato(es, !c.processoSei, () => {}, () => {});
+        const { comVoce, comOutros } = linhasDoContrato(es, !autuado(c), () => {}, () => {});
         const agora = comVoce[0] ?? comOutros[0] ?? null;
         const mais = comVoce.length ? comVoce.length - 1 : 0;
         const dias = agora?.limite ? diasAte(agora.limite, hoje) : null;
@@ -131,6 +132,8 @@ export const FiscalizacaoContratosPage: React.FC = () => {
 
   const colunas: Column<LinhaContrato>[] = [
     { key: 'contrato', header: 'Contrato', minWidth: '210px', priority: 'primary', sortValue: (l) => chaveDeOrdem(l.c.numero), render: (l) => <CelulaContratoDaLista l={l} hoje={hoje} abrir={(c) => navigate(rotaDoContrato(c))} /> },
+    // NUP do processo de acompanhamento contratual (autuação, migration 294) ou "A autuar".
+    { key: 'processo', header: 'Processo SEI', sortValue: (l) => l.c.processoNup ?? '', render: (l) => <CelulaProcesso c={l.c} /> },
     { key: 'passo', header: 'Próximo passo', minWidth: '320px', sortValue: (l) => l.dias ?? 99999, render: (l) => <CelulaAgora l={l} /> },
     { key: 'entrega', header: 'Entrega', sortValue: (l) => pct(l.r.entregues, l.r.acompanhadas), render: (l) => <CelulaAndamento l={l} /> },
     // Fiscal: texto simples e sempre visível, como a coluna Gestor da Carteira.

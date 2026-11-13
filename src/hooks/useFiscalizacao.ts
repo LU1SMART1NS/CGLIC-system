@@ -2,10 +2,11 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { useUsers } from './useUsers';
+import { podeSerFiscal } from '../utils/fiscalizacao';
 import {
   definirFiscalizacaoContrato,
-  definirPrevistaEntregas,
   definirResponsavelEntregas,
+  encerrarEntregas,
   dividirEntrega,
   fetchEntregasDoPedido,
   fetchEntregasFiscalizacao,
@@ -13,11 +14,17 @@ import {
   mudarEtapaEntregas,
   corrigirEtapaEntregas,
   voltarEtapaEntrega,
+  trocarBeneficiarioEntrega,
+  repartirEntregaEntreBeneficiarios,
   type EntregaDaLinha,
   type EntregaFiscalizacao,
   type MovimentoEntrega,
   fetchContratosFiscalizacao,
   registrarProcessoFiscalizacao,
+  registrarAutuacaoFiscalizacao,
+  registrarRecebimentoOrdem,
+  prorrogarPrazoEntregas,
+  definirPrazoDoContrato,
   type ContratoFiscalizacao,
   type DefinirFiscalizacaoInput,
   desfazerTransferenciaFiscal,
@@ -32,6 +39,7 @@ import {
   type ProgramaFiscalizacao,
   fetchItensDaAtaDoContrato,
   ligarItensAoItemDaAta,
+  ligarItensAoBeneficiario,
   type ItemDaAtaDoContrato
 } from '../services/fiscalizacaoService';
 
@@ -63,18 +71,21 @@ export function useFiscalizacaoDoContrato(contractKey: string | null | undefined
   return { consulta, contrato };
 }
 
-/** Servidores ativos com o perfil Gestor de Fiscalização (os que podem ser fiscal). */
+/**
+ * Servidores ativos para a Fiscalização. `fiscais`: quem pode receber contratos (Gestor de Fiscalização e Coordenador —
+ * o banco aceita os mesmos). `servidores`: todos os ativos, com o perfil, para mostrar quem já tem contrato como fiscal
+ * mesmo com outro perfil (fiscaisVisiveis / cargaPorFiscal).
+ */
 export function useFiscaisAtivos() {
   const usuarios = useUsers();
-  const fiscais = useMemo(
-    () =>
-      (usuarios.data ?? [])
-        .filter((u) => u.ativo && u.perfil === 'gestor_fiscalizacao')
-        .map((u) => ({ id: u.id, nome: u.nome }))
-        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
-    [usuarios.data]
-  );
-  return { fiscais, consulta: usuarios };
+  const { fiscais, servidores } = useMemo(() => {
+    const ativos = (usuarios.data ?? [])
+      .filter((u) => u.ativo)
+      .map((u) => ({ id: u.id, nome: u.nome, perfil: u.perfil as string }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    return { servidores: ativos, fiscais: ativos.filter((u) => podeSerFiscal(u.perfil)) };
+  }, [usuarios.data]);
+  return { fiscais, servidores, consulta: usuarios };
 }
 
 export function useDefinirFiscalizacao() {
@@ -89,6 +100,14 @@ export function useRegistrarProcessoFiscalizacao() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { contractKey: string; processoSei: string; autuadoEm: string }) => registrarProcessoFiscalizacao(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY })
+  });
+}
+
+export function useRegistrarAutuacaoFiscalizacao() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { contractKey: string; processoNup: string; autuadoEm: string }) => registrarAutuacaoFiscalizacao(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY })
   });
 }
@@ -123,9 +142,20 @@ function useMutacaoDeEntregas<I>(fn: (input: I) => Promise<void>) {
 export const useMudarEtapaEntregas = () => useMutacaoDeEntregas(mudarEtapaEntregas);
 export const useCorrigirEtapaEntregas = () => useMutacaoDeEntregas(corrigirEtapaEntregas);
 export const useVoltarEtapaEntrega = () => useMutacaoDeEntregas(voltarEtapaEntrega);
+export const useTrocarBeneficiarioEntrega = () => useMutacaoDeEntregas(trocarBeneficiarioEntrega);
+export const useRepartirEntregaEntreBeneficiarios = () => useMutacaoDeEntregas(repartirEntregaEntreBeneficiarios);
 export const useDividirEntrega = () => useMutacaoDeEntregas(dividirEntrega);
-export const useDefinirPrevistaEntregas = () => useMutacaoDeEntregas(definirPrevistaEntregas);
 export const useDefinirResponsavelEntregas = () => useMutacaoDeEntregas(definirResponsavelEntregas);
+export const useEncerrarEntregas = () => useMutacaoDeEntregas(encerrarEntregas);
+export const useRegistrarRecebimentoOrdem = () => useMutacaoDeEntregas(registrarRecebimentoOrdem);
+export const useProrrogarPrazoEntregas = () => useMutacaoDeEntregas(prorrogarPrazoEntregas);
+export function useDefinirPrazoDoContrato() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: definirPrazoDoContrato,
+    onSuccess: () => qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY })
+  });
+}
 
 /** Ausências de fiscal em curso (migration 261). */
 export function useTransferenciasFiscalizacao() {
@@ -211,3 +241,15 @@ export function useItensDaAtaDoContrato(contractKey: string | null | undefined) 
 }
 
 export const useLigarItensAoItemDaAta = () => useMutacaoDeEntregas(async (input: { ids: string[]; itemKey: string }) => { await ligarItensAoItemDaAta(input); });
+
+/** Ligar ao cadastro também muda as outras grafias do beneficiário (Emendas): recarrega os dois. */
+export function useLigarItensAoBeneficiario() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ligarItensAoBeneficiario,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: FISCALIZACAO_ENTREGAS_KEY });
+      void qc.invalidateQueries({ queryKey: ['emendas', 'beneficiarios'] });
+    }
+  });
+}

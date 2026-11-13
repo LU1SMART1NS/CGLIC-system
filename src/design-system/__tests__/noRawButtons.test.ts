@@ -26,6 +26,7 @@ const PERMITIDOS: Record<string, number> = {
   'src/components/emendas/pedido360/AndamentoDoPedido.tsx': 1, // cabeçalho recolhível das fases do pedido
   'src/components/emendas/PedidoAberto.tsx': 1, // cabeçalho recolhível dos blocos por ata do pedido
   'src/components/fiscalizacao/FiscalizacaoCelulas.tsx': 1, // cabeçalho recolhível dos blocos por contrato (mesmo padrão do PedidoAberto)
+  'src/components/fiscalizacao/GavetaDistribuicaoFiscais.tsx': 2, // cartão clicável de cada fiscal e o "A definir" (mesmo padrão da GavetaDistribuicao)
   'src/components/fiscalizacao/MesaDaFiscalizacao.tsx': 1, // cabeçalho recolhível dos blocos por beneficiário (mesmo padrão do PedidoAberto)
   'src/components/emendas/PedidoModal.tsx': 15, // abas do celular, chips de filtro, segmentos Parlamentar/Órgão e Por beneficiário/Por item, seletor e opções de beneficiário (com Cadastrar novo órgão) e autor, descrição que abre e o − e + da quantidade
   'src/components/instrument360/HealthStripParts.tsx': 1, // tile clicável

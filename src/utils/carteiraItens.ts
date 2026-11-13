@@ -44,6 +44,8 @@ export interface CarteiraItemRow {
   ataAssinada: SituacaoAtaAssinada | null;
   /** Outros órgãos registrados quando o limite da alocação é provisório (ata da CGLIC sem a ata assinada); senão 0. */
   limiteProvisorioOutrosOrgaos: number;
+  /** A ata marcou que não divide o quantitativo SENASP entre as unidades (migration 297): alocar é opcional, não é pendência. */
+  semDivisaoNaAta?: boolean;
 }
 
 /** Resumo de uma ata a partir dos itens: usado pelos filtros de alocação, empenho e unidade na carteira de Atas. */
@@ -55,6 +57,16 @@ export interface CarteiraAtaExecucao {
   unidades: Set<string>;
   /** Qtd. da ata assinada: itens em que informar importa e quantos já foram informados (nula quando nenhum importa). */
   ataAssinada: AtaAssinadaDaAta | null;
+  /** Valor total da ata em R$ (todos os órgãos): quantidade homologada × preço vigente de cada item. */
+  valorTotal: number;
+  /** Parte da SENASP em R$: quantidade SENASP × preço vigente de cada item (o mesmo preço da linha do item). */
+  valorSenasp: number;
+  /** Consumido em R$ (consumido × preço); nulo quando nenhum item tem o consumo lido. */
+  valorConsumido: number | null;
+  /** Alocado em R$ a cada unidade interna (chave normalizada): quantidade alocada × preço vigente de cada item. */
+  valorAlocadoPorUnidade: Record<string, number>;
+  /** Parte da SENASP ainda não alocada a nenhuma unidade, em R$: soma, item a item, de (SENASP − alocado) × preço, nunca negativa. */
+  valorSemUnidade: number;
 }
 
 export interface CarteiraItensInput {
@@ -67,6 +79,8 @@ export interface CarteiraItensInput {
   links: CarteiraItemLink[];
   empenhos: CarteiraItemEmpenho[];
   prazoOf: (arp: ArpRecord) => { dias: number | null; faixa: PrazoFaixa };
+  /** Atas ("{numeroAta}-{uasg}") marcadas como "não divide entre as unidades". */
+  atasSemDivisao?: Set<string>;
 }
 
 /** Nome de unidade comparável: sem diferença de caixa ou espaços. */
@@ -174,11 +188,35 @@ export function buildCarteiraItemRows(input: CarteiraItensInput): CarteiraItemRo
         empenhado,
         nivelEmpenho: nivelEmpenho(empenhado, contratada),
         ataAssinada: saldo ? situacaoAtaAssinada(saldo) : null,
-        limiteProvisorioOutrosOrgaos: saldo && limiteProvisorio(saldo) ? Number(saldo.outros_orgaos_registrados) || 0 : 0
+        limiteProvisorioOutrosOrgaos: saldo && limiteProvisorio(saldo) ? Number(saldo.outros_orgaos_registrados) || 0 : 0,
+        semDivisaoNaAta: input.atasSemDivisao?.has(ataKey) ?? false
       });
     }
   }
   return rows;
+}
+
+/** Valor total, parte da SENASP, consumido e alocado por unidade, em R$, somados dos itens (quantidade × preço vigente do item). */
+export function valoresDaAta(
+  itens: CarteiraItemRow[]
+): Pick<CarteiraAtaExecucao, 'valorTotal' | 'valorSenasp' | 'valorConsumido' | 'valorAlocadoPorUnidade' | 'valorSemUnidade'> {
+  const valorAlocadoPorUnidade: Record<string, number> = {};
+  let valorTotal = 0;
+  let valorSenasp = 0;
+  let valorSemUnidade = 0;
+  let valorConsumido: number | null = null;
+  for (const r of itens) {
+    const preco = Number(r.item.valorUnitario) || 0;
+    valorTotal += Math.max(Number(r.item.quantidadeHomologadaItem) || 0, 0) * preco;
+    valorSenasp += Math.max(r.quantitativoSenasp, 0) * preco;
+    // Item alocado acima da cota não esconde o que falta nos outros: a sobra de cada item é contada sozinha.
+    valorSemUnidade += Math.max(Math.max(r.quantitativoSenasp, 0) - (r.alocado ?? 0), 0) * preco;
+    if (r.consumido != null) valorConsumido = (valorConsumido ?? 0) + r.consumido * preco;
+    for (const [unidade, qtd] of Object.entries(r.alocadoPorUnidade ?? {})) {
+      valorAlocadoPorUnidade[unidade] = (valorAlocadoPorUnidade[unidade] ?? 0) + qtd * preco;
+    }
+  }
+  return { valorTotal, valorSenasp, valorConsumido, valorAlocadoPorUnidade, valorSemUnidade };
 }
 
 /** Resumo por ata (chave "{numeroAta}-{uasg}") a partir das linhas de itens. */
@@ -195,7 +233,8 @@ export function resumirAtas(rows: CarteiraItemRow[]): Map<string, CarteiraAtaExe
       nivelAlocacao: agregarNivel(itens.map((r) => r.nivelAlocacao)),
       nivelEmpenho: agregarNivel(itens.map((r) => r.nivelEmpenho)),
       unidades,
-      ataAssinada: resumirAtaAssinada(itens.map((r) => r.ataAssinada))
+      ataAssinada: resumirAtaAssinada(itens.map((r) => r.ataAssinada)),
+      ...valoresDaAta(itens)
     });
   }
   return resumo;

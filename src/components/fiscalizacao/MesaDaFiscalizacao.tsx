@@ -8,22 +8,25 @@ import { carteiraDetalhe, carteiraNumero } from '../carteira/carteiraStyles';
 import { useAuth } from '../../context/AuthContext';
 import { useEntregasFiscalizacao, useFiscalizacaoDoContrato } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao, EtapaEntrega } from '../../services/fiscalizacaoService';
-import { NOME_SFC, ehDoFiscal } from '../../utils/fiscalizacao';
+import { NOME_SFC, autuado, dataBR, ehDoFiscal } from '../../utils/fiscalizacao';
 import { nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario } from '../../utils/fiscalizacaoEntregas';
-import { PrevistaModal } from './EntregasModais';
+import { EncerrarEntregasModal } from './EntregasModais';
 import { AvancarEtapaModal } from './EtapaModais';
-import { comQuemEstaOItem, itens, linhaDeLigacao, linhasDoContrato, type Linha } from '../../utils/fiscalizacaoMesa';
+import { OrigemDoPrazo, PrazoDoContratoModal, ProrrogarPrazoModal, RecebimentoDaOrdemModal } from './PrazoModais';
+import { textoDaRegra } from '../../utils/fiscalizacaoPrazo';
+import { comQuemEstaOItem, itens, linhaDeCadastro, linhaDeLigacao, linhasDoContrato, type Linha } from '../../utils/fiscalizacaoMesa';
 import { FiltroPendencia, MaisSemPendencia, SecaoDaMesa, type LinhaDeTrabalho } from '../mesa/MesaDeTrabalho';
 import { blocoDaMesa as bloco } from '../mesa/mesaEstilos';
 import { LigarItemDaAtaModal } from './LigarItemDaAtaModal';
-import { DefinirFiscalizacaoModal, RegistrarProcessoModal } from './FiscalizacaoModais';
+import { LigarBeneficiarioModal } from './LigarBeneficiarioModal';
+import { DefinirFiscalizacaoModal, RegistrarProcessoModal, RegistrarSeiDoContratoModal } from './FiscalizacaoModais';
 import { JanelaDoItem } from './JanelaDoItem';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { DataTable } from '../../design-system/components/DataTable';
 import { CelulaItem, CelulaSituacaoDoItem } from './EntregasTabela';
 import { ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
 
-type Janela = { tipo: 'etapa' | 'prevista'; itens: EntregaFiscalizacao[]; inicial?: EtapaEntrega } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'quem' } | { tipo: 'ligar' } | null;
+type Janela = { tipo: 'etapa' | 'encerrar' | 'recebimento' | 'prorrogar'; itens: EntregaFiscalizacao[]; inicial?: EtapaEntrega } | { tipo: 'item'; item: EntregaFiscalizacao } | { tipo: 'processo' } | { tipo: 'sei' } | { tipo: 'quem' } | { tipo: 'prazo' } | { tipo: 'ligar' } | { tipo: 'cadastro' } | null;
 
 const chaveDoGrupo = (g: EntregaFiscalizacao[]) => g[0].beneficiarioId ?? `planilha:${g[0].beneficiarioTexto}`;
 /** Acima disto, a lista abre só nos beneficiários com pendência (como o Andamento do Pedido 360). */
@@ -56,10 +59,13 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
   const coordenador = role === 'admin';
   const podeAgir = Boolean(c && (coordenador || (role === 'gestor_fiscalizacao' && ehDoFiscal(c, user?.id))));
   const { comVoce, comOutros } = useMemo(() => {
-    const r = linhasDoContrato(es, Boolean(c && !c.processoSei), (tipo, l, inicial) => setJanela({ tipo, itens: l, inicial }), () => setJanela({ tipo: 'processo' }));
+    const r = linhasDoContrato(es, Boolean(c && !autuado(c)), (tipo, l, inicial) => setJanela({ tipo, itens: l, inicial }), () => setJanela({ tipo: 'processo' }));
     // Itens da planilha sem item da ata (migration 268): com o fiscal quando o contrato já tem itens de ata; senão, espera a Vinculação.
     const linha = linhaDeLigacao(es, Boolean(c?.atas?.length), () => setJanela({ tipo: 'ligar' }));
     if (linha) (linha.tom === 'espera' ? r.comOutros : r.comVoce).unshift(linha);
+    // Beneficiário escrito à mão na planilha (migration 272): ligar ao cadastro.
+    const cadastro = linhaDeCadastro(es, () => setJanela({ tipo: 'cadastro' }));
+    if (cadastro) r.comVoce.unshift(cadastro);
     return r;
   }, [es, c]);
   const grupos = useMemo(() => {
@@ -86,8 +92,27 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem 1.75rem', alignItems: 'flex-start', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-card)' }} data-testid="fisc-mesa-faixa">
         <Campo rotulo="Fiscalização"><StatusBadge label={c.situacao === 'MISTA' ? 'Mista' : NOME_SFC} variant={c.situacao === 'MISTA' ? 'purple' : 'info'} size="sm" dot={false} /></Campo>
         <Campo rotulo="Fiscal">{c.fiscalNome ?? '—'}</Campo>
-        <Campo rotulo="Portaria">{c.portariaSei ? <NumeroSeiEtiqueta numero={c.portariaSei} testId="fisc-mesa-portaria" /> : <span style={carteiraDetalhe}>não registrada</span>}</Campo>
-        <Campo rotulo="SEI do contrato">{c.processoSei ? <NumeroSeiEtiqueta numero={c.processoSei} testId="fisc-mesa-processo" /> : <span style={{ color: 'var(--color-warning-text)' }}>a autuar</span>}</Campo>
+        <Campo rotulo="Processo SEI">
+          {c.processoNup ? (
+            <>
+              <NumeroSeiEtiqueta numero={c.processoNup} testId="fisc-mesa-processo" />
+              <div style={carteiraDetalhe}>autuado em {dataBR(c.processoAutuadoEm)}</div>
+            </>
+          ) : (
+            <span style={{ color: 'var(--color-warning-text)' }}>a autuar</span>
+          )}
+        </Campo>
+        <Campo rotulo="SEI do contrato">{c.processoSei ? <NumeroSeiEtiqueta numero={c.processoSei} testId="fisc-mesa-sei-contrato" /> : <span style={carteiraDetalhe}>não registrado</span>}</Campo>
+        <Campo rotulo="Prazo de entrega">
+          {c.prazoEntrega ? (
+            <>
+              <span>{textoDaRegra(c.prazoEntrega)}</span>
+              <div style={{ fontWeight: 400 }}><OrigemDoPrazo regra={c.prazoEntrega} /></div>
+            </>
+          ) : (
+            <span style={{ color: 'var(--color-warning-text)' }}>a informar</span>
+          )}
+        </Campo>
         <Campo rotulo="Origem">{c.emendas.length ? `${c.emendas.length === 1 ? 'Emenda' : 'Emendas'} ${c.emendas.slice(0, 3).join(', ')}${c.emendas.length > 3 ? ` +${c.emendas.length - 3}` : ''}` : 'Sem emenda'}</Campo>
         <span style={{ flex: 1 }} />
         {podeAgir && (
@@ -96,7 +121,9 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
             testId="fisc-mesa-mais"
             actions={[
               ...(coordenador ? [{ label: 'Alterar quem fiscaliza', onClick: () => setJanela({ tipo: 'quem' }) }] : []),
-              ...(c.processoSei ? [{ label: 'Corrigir o SEI do contrato', onClick: () => setJanela({ tipo: 'processo' }) }] : [])
+              { label: c.prazoEntrega ? 'Corrigir o prazo de entrega' : 'Informar o prazo de entrega', onClick: () => setJanela({ tipo: 'prazo' }) },
+              ...(autuado(c) ? [{ label: 'Corrigir a autuação', onClick: () => setJanela({ tipo: 'processo' }) }] : []),
+              { label: c.processoSei ? 'Corrigir o SEI do contrato' : 'Registrar o SEI do contrato', onClick: () => setJanela({ tipo: 'sei' }) }
             ]}
           />
         )}
@@ -156,12 +183,12 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
                       testId={`fisc-mesa-tabela-${k}`}
                       data={g}
                       keyExtractor={(e) => e.id}
-                      className="data-table-container--flush emendas-tabela-topo"
+                      className="data-table-container--flush emendas-tabela-topo tabela-colunas-fixas"
                       rowOpen={(e) => () => setJanela({ tipo: 'item', item: e })}
                       columns={[
-                        { key: 'item', header: 'Item', minWidth: '260px', priority: 'primary', sortValue: (e) => nomeDoItem(e), render: (e) => <CelulaItem e={e} comOrigem={!umaEmenda} /> },
-                        { key: 'qtd', header: 'Qtd.', align: 'right', nowrap: true, sortValue: (e) => e.quantidade, sortFirstDir: 'desc', render: (e) => <span style={carteiraNumero}>{e.quantidade.toLocaleString('pt-BR')}</span> },
-                        { key: 'etapa', header: 'Etapa', minWidth: '230px', sortValue: (e) => ordemDaSituacao(e), render: (e) => <CelulaSituacaoDoItem e={e} /> }
+                        { key: 'item', header: 'Item', minWidth: '260px', width: '60%', priority: 'primary', sortValue: (e) => nomeDoItem(e), render: (e) => <CelulaItem e={e} comOrigem={!umaEmenda} /> },
+                        { key: 'qtd', header: 'Qtd.', align: 'right', nowrap: true, width: '10%', sortValue: (e) => e.quantidade, sortFirstDir: 'desc', render: (e) => <span style={carteiraNumero}>{e.quantidade.toLocaleString('pt-BR')}</span> },
+                        { key: 'etapa', header: 'Etapa', minWidth: '230px', width: '30%', sortValue: (e) => ordemDaSituacao(e), render: (e) => <CelulaSituacaoDoItem e={e} /> }
                       ]}
                     />
                   </div>
@@ -174,10 +201,15 @@ export const MesaDaFiscalizacao: React.FC<{ contractKey: string }> = ({ contract
       </section>
 
       {janela?.tipo === 'etapa' && <AvancarEtapaModal entregas={janela.itens} inicial={janela.inicial} onClose={fechar} />}
-      {janela?.tipo === 'prevista' && <PrevistaModal entregas={janela.itens} onClose={fechar} />}
+      {janela?.tipo === 'recebimento' && <RecebimentoDaOrdemModal entregas={janela.itens} onClose={fechar} />}
+      {janela?.tipo === 'prorrogar' && <ProrrogarPrazoModal entregas={janela.itens} onClose={fechar} />}
+      {janela?.tipo === 'prazo' && <PrazoDoContratoModal contrato={c} onClose={fechar} />}
+      {janela?.tipo === 'encerrar' && <EncerrarEntregasModal entregas={janela.itens} onClose={fechar} />}
       {janela?.tipo === 'item' && <JanelaDoItem e={janela.item} onClose={fechar} noContrato />}
       {janela?.tipo === 'processo' && <RegistrarProcessoModal contrato={c} onClose={fechar} />}
+      {janela?.tipo === 'sei' && <RegistrarSeiDoContratoModal contrato={c} onClose={fechar} />}
       {janela?.tipo === 'ligar' && <LigarItemDaAtaModal contractKey={c.contractKey} contratoNumero={c.numero} onClose={fechar} />}
+      {janela?.tipo === 'cadastro' && <LigarBeneficiarioModal contractKey={c.contractKey} onClose={fechar} />}
       {janela?.tipo === 'quem' && <DefinirFiscalizacaoModal contrato={c} onClose={fechar} />}
     </div>
   );

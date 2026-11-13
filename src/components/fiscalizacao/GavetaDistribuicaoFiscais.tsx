@@ -1,6 +1,7 @@
 import React from 'react';
 import { formatNumber } from '../../utils/format';
-import type { CargaDoFiscal } from '../../utils/fiscalizacao';
+import { mediaDaEquipeFiscal, type CargaDoFiscal } from '../../utils/fiscalizacao';
+import { BarraDeOcupacao } from '../atas/distribuicao/OcupacaoBarra';
 
 const plural = (n: number, um: string, varios: string) => `${formatNumber(n)} ${n === 1 ? um : varios}`;
 
@@ -20,7 +21,10 @@ export const GavetaDistribuicaoFiscais: React.FC<{
   const comCarteira = carga.filter((f) => f.contratos > 0);
   const semCarteira = carga.filter((f) => f.contratos === 0).map((f) => f.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const maior = Math.max(0, ...comCarteira.map((f) => f.contratos));
-  const pendencias = (f: CargaDoFiscal) => f.aAutuar + f.semPortaria;
+  const pendencias = (f: CargaDoFiscal) => f.aAutuar;
+  const { media, porFiscal } = mediaDaEquipeFiscal(carga);
+  // Régua comum: a maior ocupação (ou a média) ocupa quase toda a largura, como na Distribuição de Atas e Contratos.
+  const escala = Math.max(0, ...[...porFiscal.values()].map((o) => o.ocupacao), media ?? 0) * 1.1;
   const fiscais = [...comCarteira].sort((a, b) => pendencias(b) - pendencias(a) || b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));
 
   if (carga.length === 0 && aDefinir === 0) {
@@ -47,7 +51,7 @@ export const GavetaDistribuicaoFiscais: React.FC<{
           </button>
         )}
         {fiscais.map((f) => {
-          const pct = maior > 0 ? Math.round((100 * f.contratos) / maior) : 0;
+          const o = porFiscal.get(f.userId) ?? { ocupacao: f.contratos, relacao: null };
           return (
             <button
               key={f.userId}
@@ -61,24 +65,31 @@ export const GavetaDistribuicaoFiscais: React.FC<{
                 <strong>{f.nome}</strong>
                 <span className="pn-gc-ir" aria-hidden="true">›</span>
               </span>
+              {f.outroPerfil && <span className="pn-gc-perfil">{f.outroPerfil} · também fiscal</span>}
               <span className="pn-gc-corpo">
                 <span className="pn-gc-lado">
                   <span className="pn-gc-rotulo">Contratos</span>
                   <span className="pn-gc-num">{formatNumber(f.contratos)}</span>
                   <span className="pn-gc-tags">
                     {f.aAutuar > 0 && <span className="pn-gc-tag pn-gc-tag--atencao">{formatNumber(f.aAutuar)} a autuar</span>}
-                    {f.semPortaria > 0 && <span className="pn-gc-tag pn-gc-tag--atencao">{formatNumber(f.semPortaria)} sem portaria</span>}
                   </span>
                 </span>
               </span>
               <span className="pn-gc-carga">
-                <span className="pn-gc-barra" aria-hidden="true">
-                  <span style={{ width: `${Math.max(2, pct)}%` }} />
-                </span>
-                <span className="pn-gc-carga-texto">
-                  {plural(f.contratos, 'contrato', 'contratos')}
-                  {f.contratos === maior && maior > 0 && fiscais.length > 1 ? ' · maior carteira' : ''}
-                </span>
+                <BarraDeOcupacao
+                  ocupacao={o.ocupacao}
+                  relacao={o.relacao}
+                  escala={escala}
+                  media={media}
+                  rodape={`${plural(f.contratos, 'contrato', 'contratos')}${f.contratos === maior && maior > 0 && fiscais.length > 1 ? ' · maior carteira' : ''}`}
+                  title={
+                    f.outroPerfil === 'Coordenador'
+                      ? 'A barra mostra a ocupação: o coordenador entra na média com metade da capacidade (cada contrato pesa o dobro). O tracejado é a média da equipe.'
+                      : 'A barra mostra a ocupação (contratos do fiscal). O tracejado é a média da equipe.'
+                  }
+                  testId="fisc-inicio-distribuicao-relacao"
+                  minWidth="0"
+                />
               </span>
             </button>
           );

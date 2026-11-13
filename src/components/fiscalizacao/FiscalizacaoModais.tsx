@@ -6,36 +6,40 @@ import { AppDateInput, AppInput, AppSelect, AppTextarea } from '../../design-sys
 import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { useToast } from '../../design-system/components/Toast';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
-import { documentoSeiValido, mascaraDocumentoSei } from '../../utils/mascaras';
-import { useDefinirFiscalizacao, useDesfazerTransferenciaFiscal, useFiscaisAtivos, useRegistrarProcessoFiscalizacao, useTransferirContratosFiscal, useTransferirFiscalTemporaria } from '../../hooks/useFiscalizacao';
+import { documentoSeiValido, mascaraDocumentoSei, mascaraProcessoSei, processoSeiValido } from '../../utils/mascaras';
+import { useDepartments } from '../../hooks/useDepartments';
+import { useDefinirFiscalizacao, useDesfazerTransferenciaFiscal, useFiscaisAtivos, useRegistrarAutuacaoFiscalizacao, useRegistrarProcessoFiscalizacao, useTransferirContratosFiscal, useTransferirFiscalTemporaria } from '../../hooks/useFiscalizacao';
 import type { ContratoFiscalizacao, DecisaoFiscalizacao, TransferenciaFiscal } from '../../services/fiscalizacaoService';
-import { MOTIVO_MINIMO, NOME_SFC, dataBR, decisaoPedeMotivo, decisaoSugerida, deEmenda, hojeEmBrasilia, numeroDoContrato, type CargaDoFiscal } from '../../utils/fiscalizacao';
+import { MOTIVO_MINIMO, NOME_SFC, dataBR, decisaoPedeMotivo, decisaoSugerida, deEmenda, hojeEmBrasilia, unidadeDaArea, numeroDoContrato, type CargaDoFiscal } from '../../utils/fiscalizacao';
 
-const seiValido = (s: string) => /^\d{7,10}$/.test(s.replace(/\D/g, ''));
 const erroDe = (err: unknown) => (err as { message?: string } | null)?.message || 'erro desconhecido';
 
-/** Coordenador: quem fiscaliza o contrato (toda SFC/CGLIC, mista ou toda área requisitante), fiscal e portaria. */
+/** Coordenador: quem fiscaliza o contrato (toda SFC/CGLIC, mista ou toda área requisitante) e o fiscal. */
 export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao; onClose: () => void }> = ({ contrato, onClose }) => {
   const toast = useToast();
   const { fiscais, consulta } = useFiscaisAtivos();
   const salvar = useDefinirFiscalizacao();
   const [decisao, setDecisao] = useState<DecisaoFiscalizacao>(() => decisaoSugerida(contrato));
   const [fiscal, setFiscal] = useState(contrato.fiscalUserId ?? '');
-  const [portaria, setPortaria] = useState(contrato.portariaSei ?? '');
   const [motivo, setMotivo] = useState(contrato.motivo ?? '');
+  const departamentos = useDepartments();
+  const doContrato = contrato.unidadesDoContrato ?? [];
+  const [unidade, setUnidade] = useState(() => unidadeDaArea({ ...contrato, situacao: 'AREA' }) ?? '');
+  const comUnidade = decisao !== 'SFC';
+  const outrasUnidades = (departamentos.data ?? []).filter((d) => d.ativo && !doContrato.includes(d.sigla));
+  const faltaUnidade = comUnidade && !unidade;
   const pedeMotivo = decisaoPedeMotivo(contrato, decisao);
   const comFiscal = decisao !== 'AREA';
   const faltaMotivo = pedeMotivo && motivo.trim().length < MOTIVO_MINIMO;
   const faltaFiscal = comFiscal && !fiscal;
-  const portariaRuim = comFiscal && portaria.trim() !== '' && !seiValido(portaria);
-  const bloqueado = faltaMotivo || faltaFiscal || portariaRuim;
+  const bloqueado = faltaMotivo || faltaFiscal || faltaUnidade;
 
   const enviar = () =>
     salvar.mutate(
-      { contractKey: contrato.contractKey, fiscalizacao: decisao, fiscalUserId: fiscal || null, portariaSei: portaria || null, motivo: pedeMotivo || motivo ? motivo : null },
+      { contractKey: contrato.contractKey, fiscalizacao: decisao, fiscalUserId: fiscal || null, portariaSei: null, motivo: pedeMotivo || motivo ? motivo : null, unidadeArea: comUnidade ? unidade : null },
       {
         onSuccess: () => {
-          toast.success(`Contrato ${numeroDoContrato(contrato)}: ${decisao === 'AREA' ? 'com a área requisitante' : `${decisao === 'MISTA' ? 'fiscalização mista' : NOME_SFC} · ${fiscais.find((f) => f.id === fiscal)?.nome ?? ''}`}`);
+          toast.success(`Contrato ${numeroDoContrato(contrato)}: ${decisao === 'AREA' ? `com a área requisitante · ${unidade}` : `${decisao === 'MISTA' ? 'fiscalização mista' : NOME_SFC} · ${fiscais.find((f) => f.id === fiscal)?.nome ?? ''}`}`);
           onClose();
         },
         onError: (err) => toast.error(`Não foi possível salvar: ${erroDe(err)}`)
@@ -64,6 +68,25 @@ export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao
           <option value="MISTA">Mista: parte {NOME_SFC}, parte área requisitante</option>
           <option value="AREA">Toda pela área requisitante</option>
         </AppSelect>
+        {comUnidade && (
+          <AppSelect
+            label={decisao === 'AREA' ? 'Unidade interna que fiscaliza' : 'Unidade interna da parte da área requisitante'}
+            value={unidade}
+            onChange={(ev) => setUnidade(ev.target.value)}
+            hint={doContrato.length === 1 ? `Sugestão: o contrato é todo da ${doContrato[0]} na divisão por unidade.` : doContrato.length > 1 ? `O contrato se divide entre ${doContrato.join(', ')}: escolha a que fiscaliza.` : 'O contrato não está dividido por unidade: escolha a unidade.'}
+            data-testid="fisc-definir-unidade"
+          >
+            <option value="">Escolher…</option>
+            {doContrato.length > 0 && (
+              <optgroup label="Do contrato">
+                {doContrato.map((u) => <option key={u} value={u}>{u}</option>)}
+              </optgroup>
+            )}
+            <optgroup label={doContrato.length > 0 ? 'Outras unidades' : 'Unidades internas'}>
+              {outrasUnidades.map((d) => <option key={d.sigla} value={d.sigla}>{d.sigla} · {d.nomeCompleto}</option>)}
+            </optgroup>
+          </AppSelect>
+        )}
         {comFiscal && (
           <>
             <AppSelect label={`Fiscal ${NOME_SFC}`} value={fiscal} onChange={(ev) => setFiscal(ev.target.value)} data-testid="fisc-definir-fiscal">
@@ -75,7 +98,6 @@ export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao
             {!consulta.isLoading && fiscais.length === 0 && (
               <NoticeBar tone="warning">Nenhum servidor ativo com o perfil Gestor de Fiscalização. Dê o perfil em Ajustes › Usuários.</NoticeBar>
             )}
-            <AppInput label="Portaria de designação (SEI)" value={portaria} onChange={(ev) => setPortaria(ev.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="ex.: 34152364" hint="Opcional agora; o fiscal vê o que falta no Início dele." error={portariaRuim ? 'Só números, 7 a 10 dígitos.' : undefined} />
           </>
         )}
         {decisao === 'MISTA' && <NoticeBar tone="info">Os itens do contrato chegam com a {NOME_SFC}. Na próxima etapa do módulo, o fiscal marca as que ficam com a área requisitante.</NoticeBar>}
@@ -97,8 +119,61 @@ export const DefinirFiscalizacaoModal: React.FC<{ contrato: ContratoFiscalizacao
   );
 };
 
-/** Fiscal ou coordenador: autuação pelo número SEI do contrato (documento) e a data do contrato (migration 266). */
+/**
+ * Fiscal ou coordenador: autuação = NUP do processo de acompanhamento contratual no SEI e a data da autuação
+ * (andamento "Processo público gerado"; migration 294). O número SEI do contrato ajuda a achar o processo.
+ */
 export const RegistrarProcessoModal: React.FC<{ contrato: ContratoFiscalizacao; onClose: () => void }> = ({ contrato, onClose }) => {
+  const toast = useToast();
+  const registrar = useRegistrarAutuacaoFiscalizacao();
+  const [nup, setNup] = useState(() => mascaraProcessoSei(contrato.processoNup ?? ''));
+  const [data, setData] = useState(() => contrato.processoAutuadoEm ?? hojeEmBrasilia());
+  const hoje = hojeEmBrasilia();
+  const ok = processoSeiValido(nup) && Boolean(data) && data <= hoje;
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={contrato.processoNup ? 'Corrigir a autuação' : 'Registrar a autuação'}
+      subtitle={`Contrato ${numeroDoContrato(contrato)} · ${contrato.fornecedor ?? ''}`}
+      size="sm"
+      dismissible={!registrar.isPending}
+      testId="fisc-processo-modal"
+      footer={
+        <>
+          <ActionButton action="cancelar" onClick={onClose} disabled={registrar.isPending} />
+          <AppButton
+            variant="primary"
+            disabled={!ok}
+            isLoading={registrar.isPending}
+            data-testid="fisc-processo-salvar"
+            onClick={() =>
+              registrar.mutate(
+                { contractKey: contrato.contractKey, processoNup: nup, autuadoEm: data },
+                { onSuccess: () => { toast.success(`Autuação do contrato ${numeroDoContrato(contrato)} registrada`); onClose(); }, onError: (err) => toast.error(`Não foi possível registrar: ${erroDe(err)}`) }
+              )
+            }
+          >
+            Registrar
+          </AppButton>
+        </>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+        {contrato.processoSei && (
+          <span style={{ ...carteiraDetalhe, marginTop: 0 }} data-testid="fisc-processo-sei-do-contrato">
+            SEI do contrato: {contrato.processoSei}
+          </span>
+        )}
+        <AppInput label="Processo SEI" value={nup} onChange={(ev) => setNup(mascaraProcessoSei(ev.target.value))} inputMode="numeric" placeholder="08020.000000/2026-00" hint="Acompanhamento Contratual." data-testid="fisc-processo-nup" />
+        <AppDateInput label="Data da autuação" value={data} onValueChange={setData} max={hoje} />
+      </div>
+    </Modal>
+  );
+};
+
+/** Fiscal ou coordenador: número SEI do contrato (documento) e a data do contrato (migration 266). */
+export const RegistrarSeiDoContratoModal: React.FC<{ contrato: ContratoFiscalizacao; onClose: () => void }> = ({ contrato, onClose }) => {
   const toast = useToast();
   const registrar = useRegistrarProcessoFiscalizacao();
   const [sei, setSei] = useState(contrato.processoSei ?? '');
@@ -135,7 +210,7 @@ export const RegistrarProcessoModal: React.FC<{ contrato: ContratoFiscalizacao; 
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-        <AppInput label="Número SEI do contrato" value={sei} onChange={(ev) => setSei(mascaraDocumentoSei(ev.target.value))} inputMode="numeric" placeholder="ex.: 25410220" hint="Número do documento do contrato no SEI: é ele que vale para a autuação." data-testid="fisc-processo-sei" />
+        <AppInput label="Número SEI do contrato" value={sei} onChange={(ev) => setSei(mascaraDocumentoSei(ev.target.value))} inputMode="numeric" placeholder="ex.: 25410220" hint="Número do documento do contrato no SEI: ajuda a achar o processo de acompanhamento." data-testid="fisc-processo-sei" />
         <AppDateInput label="Data do contrato" value={data} onValueChange={setData} max={hoje} />
       </div>
     </Modal>
@@ -210,7 +285,7 @@ export const TransferirFiscalModal: React.FC<{
           ))}
         </AppSelect>
         <NoticeBar tone="info">
-          {nomeDestino || 'Quem receber'} passa a ser o fiscal desses contratos. Portaria e processo ficam como estão: se precisar de portaria nova, registre no contrato.
+          {nomeDestino || 'Quem receber'} passa a ser o fiscal desses contratos. O NUP fica como está.
         </NoticeBar>
       </div>
     </Modal>
@@ -277,7 +352,7 @@ export const TransferirFiscalTemporariamenteModal: React.FC<{ carga: CargaDoFisc
             <option key={f.id} value={f.id}>{f.nome}</option>
           ))}
         </AppSelect>
-        <AppInput label="Documento SEI (opcional)" value={sei} onChange={(ev) => setSei(ev.target.value)} placeholder="ex.: portaria de designação" />
+        <AppInput label="Documento SEI (opcional)" value={sei} onChange={(ev) => setSei(ev.target.value)} placeholder="ex.: 34152364" />
         <NoticeBar tone="info">
           No retorno, o Desfazer devolve os contratos que ainda estiverem com {nomeDestino || 'quem assumir'}.
         </NoticeBar>

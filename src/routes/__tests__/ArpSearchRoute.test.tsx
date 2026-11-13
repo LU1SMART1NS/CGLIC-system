@@ -182,7 +182,9 @@ describe('ArpSearch & Componentes — FASE 9-G: Carteira de Atas', () => {
 
     expect(html).toContain('00001/2025');
     expect(html).toContain('Proteção Tática Brasil Ltda');
-    expect(html).toContain('1 item');
+    // Sem coluna "Itens": a contagem foi para baixo da barra de consumo (atas com mais de um item).
+    expect(html).not.toContain('sort-itens');
+    expect(html).toContain('Valor SENASP');
     expect(html).toContain('Ver detalhes da ata 00001/2025');
     // Itens ficam recolhidos por padrão: só aparecem ao expandir a linha.
     expect(html).not.toContain('Colete Balístico Nível III-A');
