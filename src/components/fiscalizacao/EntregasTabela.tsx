@@ -14,7 +14,12 @@ import { NomeComSigla } from '../emendas/emendasPartes';
 import { chaveDeOrdem, ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
 import { cobrancaDaComissao, prazoDoRecebimento } from '../../utils/fiscalizacaoRecebimento';
 
-const VARIANTE_DA_FASE: Record<FaseEntrega, StatusBadgeVariant> = { PREPARACAO: 'neutral', EXECUCAO: 'info', RECEBIMENTO: 'warning', PAGAMENTO: 'success', FINALIZADO: 'success' };
+/**
+ * Cor da etiqueta da etapa por fase, a mesma das telas de Emendas (parecer de UX, 13/11/2026): azul enquanto o
+ * fornecedor trabalha, roxo no recebimento, verde no pagamento e no fim. Amarelo e vermelho ficam só para alertas
+ * (prazo, aviso da entrega); o Exército é etapa normal, com o "prazo suspenso" no texto e a régua do item em vermelho.
+ */
+const VARIANTE_DA_FASE: Record<FaseEntrega, StatusBadgeVariant> = { PREPARACAO: 'info', EXECUCAO: 'info', RECEBIMENTO: 'purple', PAGAMENTO: 'success', FINALIZADO: 'success' };
 const COR_DO_PRAZO = { danger: 'var(--color-danger-text)', warning: 'var(--color-warning-text)', success: 'var(--color-success-text)', neutral: '#64748b' } as const;
 
 export const CelulaEtapa: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
@@ -36,7 +41,7 @@ export const CelulaEtapa: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
     );
   return (
     <>
-      <StatusBadge label={d.nome} variant={e.etapa === 'CONTROLADO' ? 'danger' : VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
+      <StatusBadge label={d.nome} variant={VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
       {e.etapaEm && <div style={carteiraDetalhe}>desde {dataBR(e.etapaEm)}</div>}
       {e.pagoEm ? <div style={carteiraDetalhe}>pago em {dataBR(e.pagoEm)}</div> : e.faturadoEm ? <div style={carteiraDetalhe}>faturado em {dataBR(e.faturadoEm)}</div> : null}
     </>
@@ -66,7 +71,7 @@ export const EtapaEmLinha: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
   const p = prazoDaEntrega(e);
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-      <StatusBadge label={d.nome} variant={e.etapa === 'CONTROLADO' ? 'danger' : VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
+      <StatusBadge label={d.nome} variant={VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
       {!e.entregueEm && p.tom === 'danger' && <span style={{ color: COR_DO_PRAZO.danger, fontWeight: 700, fontSize: '0.78rem' }}>{p.texto.toLowerCase()}</span>}
     </span>
   );
@@ -83,7 +88,7 @@ export const CelulaSituacaoDoItem: React.FC<{ e: EntregaFiscalizacao }> = ({ e }
   const comissao = cobrancaDaComissao(e, hojeEmBrasilia());
   return (
     <>
-      <StatusBadge label={d.nome} variant={e.etapa === 'CONTROLADO' ? 'danger' : VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
+      <StatusBadge label={d.nome} variant={VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
       {r && !comissao && (
         <div style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }} data-testid="prazo-recebimento">
           <span style={{ color: COR_DO_PRAZO[r.tom], fontWeight: r.tom === 'neutral' ? 400 : 700 }}>{r.texto}</span>
