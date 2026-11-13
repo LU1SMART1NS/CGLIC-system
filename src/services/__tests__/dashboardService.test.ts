@@ -56,6 +56,10 @@ vi.mock('../fornecedorAtaPncpService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../fornecedorAtaPncpService')>()),
   fetchRegistrosFornecedorPncp: vi.fn(async () => [])
 }));
+vi.mock('../ataPrazoEntregaService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../ataPrazoEntregaService')>()),
+  fetchPrazosAConfirmar: vi.fn(async () => [])
+}));
 vi.mock('../vinculosAConferirService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../vinculosAConferirService')>()),
   fetchVinculosAConferir: vi.fn(async () => [])

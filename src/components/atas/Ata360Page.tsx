@@ -101,15 +101,17 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   const queue = useAtaActionQueue(arp, saldos, taskPlan, { registro: registroFornecedor, itensNoBanco: itens.length });
 
   const { role, user } = useAuth();
-  // Prazo de entrega do TR (migration 301): só nas atas da SENASP; o gestor da ata ou o coordenador confirmam.
-  const prazoQuery = usePrazoDaAta(chaveGestao, Boolean(arp && !ataDeOutroOrgao(arp)));
+  // Prazo de entrega do TR (migrations 301 e 302): o gestor da ata ou o coordenador confirmam; nas atas de outro órgão
+  // (participante), o TR é o da gerenciadora e o prazo vale para os contratos da SENASP.
+  const prazoQuery = usePrazoDaAta(chaveGestao, Boolean(arp));
   const prazoDaAta = prazoQuery.data ?? null;
-  const podeConfirmarPrazo = Boolean(arp && !ataDeOutroOrgao(arp)) && (role === 'admin' || (role === 'gestor' && Boolean(user?.id) && gestorQuery.data?.gestorUserId === user?.id));
+  const podeConfirmarPrazo = Boolean(arp) && (role === 'admin' || (role === 'gestor' && Boolean(user?.id) && gestorQuery.data?.gestorUserId === user?.id));
   const [prazoAberto, setPrazoAberto] = React.useState(false);
   const filaComPrazo = React.useMemo(() => {
-    const item = itemDoPrazoDaAta(prazoDaAta);
+    const comPrazoNaAta = Boolean(arp) && !prazoQuery.isLoading && !prazoQuery.isError;
+    const item = comPrazoNaAta ? itemDoPrazoDaAta(prazoDaAta, linkedContracts.length > 0, chaveGestao) : null;
     return item ? { ...queue, items: [...queue.items, item], counts: { ...queue.counts, [item.severity]: queue.counts[item.severity] + 1 } } : queue;
-  }, [queue, prazoDaAta]);
+  }, [queue, prazoDaAta, arp, prazoQuery.isLoading, prazoQuery.isError, linkedContracts.length, chaveGestao]);
   const saldosOnly = semContratos(role);
   const abasDoPerfil = role === 'gestor_emendas' ? EMENDAS_TAB_IDS : SALDOS_TAB_IDS;
   // Reajuste dos preços registrados (migrations 158 e 159): só nas atas gerenciadas pela SENASP, fora do gestor de saldo.
@@ -317,7 +319,7 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
           return q ? { ...q, indice: reajusteQuery.data.parametros?.indice } : null;
         })() : null}
         onOpenReajuste={() => goToTab('reajuste')}
-        prazoEntrega={arp && !ataDeOutroOrgao(arp) ? <PrazoNoCartaoDaAta prazo={prazoDaAta} carregando={prazoQuery.isLoading} podeConfirmar={podeConfirmarPrazo} onAbrir={() => setPrazoAberto(true)} /> : undefined}
+        prazoEntrega={arp ? <PrazoNoCartaoDaAta prazo={prazoDaAta} carregando={prazoQuery.isLoading} podeConfirmar={podeConfirmarPrazo} onAbrir={() => setPrazoAberto(true)} /> : undefined}
       />
 
       {/* Gaveta entre o cartão e as abas; some junto com o cartão quando ele encolhe ao rolar. */}

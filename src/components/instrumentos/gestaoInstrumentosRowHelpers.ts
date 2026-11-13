@@ -68,6 +68,7 @@ const MOTIVO_POR_CATEGORIA: Record<DashboardAttentionCategory, MotivoInfo> = {
   ATA_CRITICA: { label: 'Saldo em atenção', color: 'var(--color-success)', bg: '#ecfdf5' },
   UNIDADE_PENDENTE: { label: 'Unidades do contratado', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
   FORNECEDOR_PNCP: { label: 'Fornecedor da ata', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
+  PRAZO_ENTREGA: { label: 'Prazo de entrega', color: 'var(--color-info-text)', bg: 'var(--color-info-bg)' },
   VINCULO_A_CONFERIR: { label: 'Vínculo a conferir', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   FONTE_A_CONFERIR: { label: 'Fonte a conferir', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
   EMPENHO_ACIMA: { label: 'Empenhado acima', color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)' },
@@ -214,6 +215,8 @@ function acaoDoItem(item: DashboardAttentionItem & { uasg?: string }): AcaoInfo 
       };
     case 'FORNECEDOR_PNCP':
       return { label: item.badgeLabel === 'conferir itens' ? 'Conferir Fornecedor' : 'Indicar Fornecedor', targetUrl: item.targetUrl || ataItemUrl(item) };
+    case 'PRAZO_ENTREGA':
+      return { label: item.badgeLabel === 'a informar' ? 'Informar prazo' : 'Conferir prazo', targetUrl: item.targetUrl || ataItemUrl(item) };
     case 'FONTE_A_CONFERIR':
       return { label: 'Conferir no contrato', targetUrl: contractItemUrl(item) };
     case 'EMPENHO_ACIMA':

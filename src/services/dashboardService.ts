@@ -19,6 +19,8 @@ import { formatContractNumber, formatContractKey } from '../utils/contractNumber
 import { fetchResumoReajusteAtas, type ResumoReajusteAta } from './reajusteAtasService';
 import { avisosDoReajusteDasAtas } from './reajusteAtasAvisos';
 import { fetchRegistrosFornecedorPncp, type RegistroFornecedorPncp } from './fornecedorAtaPncpService';
+import { fetchPrazosAConfirmar, type PrazoDaAta } from './ataPrazoEntregaService';
+import { textoDaRegra } from '../utils/fiscalizacaoPrazo';
 import { fetchAusentesDaFonte, rotuloAusente, trabalhoNaFonte, type AusenteDaFonte } from './ausentesDaFonteService';
 import { fetchEmpenhadoAcima, textoDaOrigem, type EmpenhadoAcima } from './empenhadoAcimaService';
 import { fetchVinculosAConferir, numeroDoContrato, textoDoMotivoVinculo, trabalhoDoGestor, type VinculoAConferir } from './vinculosAConferirService';
@@ -340,6 +342,8 @@ export function calculateAttentionSummary(params: {
   arpItems?: Array<{ percentual_consumido?: number }>;
   /** Atas publicadas no PNCP sem fornecedor (atas_fornecedor_pncp, migration 107). */
   fornecedoresPncp?: RegistroFornecedorPncp[];
+  /** Prazos de entrega do TR a confirmar (ata_prazo_entrega, migration 301). */
+  prazosAta?: PrazoDaAta[];
   /** Vínculos automáticos desmentidos pela fonte com trabalho do gestor (vinculo_automatico_a_conferir, migration 112). */
   vinculosAConferir?: VinculoAConferir[];
   /** Notas e faturas que a fonte deixou de listar e têm trabalho da equipe (migration 113). */
@@ -363,6 +367,7 @@ export function calculateAttentionSummary(params: {
     paymentCycles = [],
     arpItems = [],
     fornecedoresPncp = [],
+    prazosAta = [],
     vinculosAConferir = [],
     ausentesDaFonte = [],
     empenhadoAcima = [],
@@ -454,6 +459,28 @@ export function calculateAttentionSummary(params: {
     });
   }
 
+
+  // 0a. Prazo de entrega lido do TR ainda não confirmado (migration 301): o gestor da ata (ou o coordenador) confere
+  // na Ata 360. Sem "Resolvido": some ao confirmar.
+  const prazoPorAta = new Map(prazosAta.filter((p) => !p.confirmadoEm).map((p) => [p.ataKey, p]));
+  for (const arp of arps) {
+    const p = prazoPorAta.get(chaveGestaoDaArp(arp));
+    if (!p) continue;
+    const sugerido = p.sugeridoDias && p.sugeridoInicio ? textoDaRegra({ dias: p.sugeridoDias, contagem: p.sugeridoContagem ?? 'CORRIDOS', inicio: p.sugeridoInicio }) : null;
+    const arpKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
+    items.push({
+      id: `ATT-PRAZO-${arpKey}`,
+      category: 'PRAZO_ENTREGA',
+      severity: p.leitura === 'CLARO' ? 'INFO' : 'ATENCAO',
+      title: p.leitura === 'CLARO' ? 'Confirmar o prazo de entrega lido do TR' : p.leitura === 'CONFERIR' ? 'Conferir o prazo de entrega no TR' : 'Informar o prazo de entrega',
+      description: `Ata ${arp.numeroAtaRegistroPreco} — ${p.leitura === 'CLARO' && sugerido ? sugerido : p.leitura === 'CONFERIR' ? p.leituraMotivo ?? 'trechos do TR a conferir' : p.leitura ? 'o TR publicado no PNCP não traz a cláusula' : 'ata nova: informe o prazo do TR'}; os contratos da ata herdam o prazo`,
+      arpKey,
+      numeroAta: arp.numeroAtaRegistroPreco,
+      objetoItem: arp.objeto,
+      targetUrl: `/atas/detalhe/${encodeURIComponent(arpKey)}?aba=acoes`,
+      badgeLabel: p.leitura === 'CLARO' ? 'a confirmar' : p.leitura === 'CONFERIR' ? 'a conferir' : 'a informar'
+    });
+  }
 
   // 0b. Vínculo automático desmentido pela fonte com trabalho do gestor (migration 112): o cron não o apaga, e o
   // gestor da ata e do contrato precisa saber. O coordenador decide manter ou retirar; o gestor pode marcar o aviso
@@ -1462,6 +1489,7 @@ export function buildManagementDashboardReadModel(params: {
   itemsSaldo?: Array<any>;
   paymentCycles?: PaymentFollowUpCycle[];
   fornecedoresPncp?: RegistroFornecedorPncp[];
+  prazosAta?: PrazoDaAta[];
   vinculosAConferir?: VinculoAConferir[];
   ausentesDaFonte?: AusenteDaFonte[];
   empenhadoAcima?: EmpenhadoAcima[];
@@ -1725,6 +1753,7 @@ export function buildManagementDashboardReadModel(params: {
     paymentCycles: filteredPaymentCycles,
     arpItems: filteredItemsSaldo,
     fornecedoresPncp: params.fornecedoresPncp,
+    prazosAta: params.prazosAta,
     vinculosAConferir: params.vinculosAConferir,
     ausentesDaFonte: params.ausentesDaFonte,
     empenhadoAcima: params.empenhadoAcima,
@@ -1802,6 +1831,7 @@ export async function fetchManagementDashboardData(
     arpItemsSaldo,
     itensComAlocacao,
     fornecedoresPncp,
+    prazosAta,
     vinculosAConferir,
     ausentesDaFonte,
     empenhadoAcima,
@@ -1820,6 +1850,7 @@ export async function fetchManagementDashboardData(
     ler('saldoItens', 'saldo dos itens', fetchArpItemSaldosFromDb(cleanUasg), [] as any[]),
     lerSemUasg('alocacao', 'alocação interna dos itens', fetchItensComAlocacao, new Set<string>()),
     lerSemUasg('fornecedorPncp', 'atas sem fornecedor no PNCP', fetchRegistrosFornecedorPncp, [] as RegistroFornecedorPncp[]),
+    lerSemUasg('prazosAta', 'prazo de entrega das atas', fetchPrazosAConfirmar, [] as PrazoDaAta[]),
     lerSemUasg('vinculos', 'vínculos a conferir', fetchVinculosAConferir, [] as VinculoAConferir[]),
     lerSemUasg('ausentes', 'notas e faturas a conferir', fetchAusentesDaFonte, [] as AusenteDaFonte[]),
     lerSemUasg('empenhadoAcima', 'empenhado acima do contratado', fetchEmpenhadoAcima, [] as EmpenhadoAcima[]),
@@ -1844,6 +1875,7 @@ export async function fetchManagementDashboardData(
     itemsSaldo: arpItemsSaldoComAlocacao,
     paymentCycles,
     fornecedoresPncp,
+    prazosAta,
     vinculosAConferir,
     ausentesDaFonte,
     empenhadoAcima,

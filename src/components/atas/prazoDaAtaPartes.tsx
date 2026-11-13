@@ -7,8 +7,14 @@ import type { PrazoDaAta } from '../../services/ataPrazoEntregaService';
 import { textoDaRegra } from '../../utils/fiscalizacaoPrazo';
 
 /** Item da aba Ações enquanto o prazo do TR não foi confirmado (migration 301). */
-export function itemDoPrazoDaAta(p: PrazoDaAta | null): AtaActionItem | null {
-  if (!p || p.confirmadoEm) return null;
+export function itemDoPrazoDaAta(p: PrazoDaAta | null, temContratos = false, ataKey = ''): AtaActionItem | null {
+  // Ata fora da leitura dos editais (ata nova): com contrato, o gestor informa o prazo.
+  if (!p) {
+    return temContratos && ataKey
+      ? { id: `prazo-${ataKey}`, kind: 'PRAZO', severity: 'ATENCAO', title: 'Informar o prazo de entrega', description: 'os contratos da ata herdam o prazo do TR', badgeLabel: 'informar' }
+      : null;
+  }
+  if (p.confirmadoEm) return null;
   const sugerido = p.sugeridoDias && p.sugeridoInicio ? textoDaRegra({ dias: p.sugeridoDias, contagem: p.sugeridoContagem ?? 'CORRIDOS', inicio: p.sugeridoInicio }) : null;
   return {
     id: `prazo-${p.ataKey}`,

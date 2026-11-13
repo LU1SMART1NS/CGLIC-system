@@ -64,6 +64,8 @@ export type DashboardAttentionCategory =
   | 'UNIDADE_PENDENTE'
   /** Ata publicada no PNCP sem fornecedor: o coordenador indica, ou a indicação diverge do Compras.gov.br (migration 107). */
   | 'FORNECEDOR_PNCP'
+  /** Prazo de entrega lido do TR da ata ainda não confirmado (migration 301): pendência do gestor da ata e do coordenador. */
+  | 'PRAZO_ENTREGA'
   /** Nota ou fatura que a fonte deixou de listar e que tem trabalho da equipe: a sincronização não a apaga e o coordenador decide (migration 113). */
   | 'FONTE_A_CONFERIR'
   /** Contrato × item com a soma da quantidade real das notas (informada ou da nota no SIAFI) acima do contratado. Só
