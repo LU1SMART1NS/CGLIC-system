@@ -49,7 +49,8 @@ export function linhasDoContrato(es: EntregaFiscalizacao[], semProcesso: boolean
   const hoje = hojeEmBrasilia();
   const recebimento: Array<[string, (e: EntregaFiscalizacao) => boolean, string, string]> = [
     ['provisorio', (e) => e.etapa === 'ENTREGUE' && Boolean(e.entregueEm) && !e.comissaoEnviadaEm, 'Enviar à comissão de recebimento', 'Registrar o envio à comissão'],
-    ['definitivo', (e) => e.etapa === 'TRP', 'Emitir o TRD', 'Registrar o TRD'],
+    // Com a comissão (enviado a ela para o TRP), o TRD também é dela: vai para as linhas da comissão abaixo.
+    ['definitivo', (e) => e.etapa === 'TRP' && !cobrancaDaComissao(e, hoje), 'Emitir o TRD', 'Registrar o TRD'],
     ['pagamento', (e) => e.etapa === 'TRD', 'Enviar para pagamento e doação', 'Registrar o envio']
   ];
   for (const [chave, f, titulo, botao] of recebimento) {
@@ -70,28 +71,33 @@ export function linhasDoContrato(es: EntregaFiscalizacao[], semProcesso: boolean
       acoes: chave === 'provisorio' ? [{ rotulo: botao, principal: true, faz: () => abrir('comissao', x) }, { rotulo: 'Registrar o TRP', faz: () => abrir('etapa', x) }] : [mudar(botao, x)]
     });
   }
-  // Com a comissão de recebimento: espera o TRP; passados os dias da regra sem TRP, volta ao fiscal para cobrar.
-  const naComissao = de((e) => Boolean(cobrancaDaComissao(e, hoje)));
-  const cobrar = naComissao.filter((e) => cobrancaDaComissao(e, hoje)!.vencida);
-  const aguardando = naComissao.filter((e) => !cobrancaDaComissao(e, hoje)!.vencida);
-  if (cobrar.length) {
-    const maisAntigo = Math.max(...cobrar.map((e) => cobrancaDaComissao(e, hoje)!.dias));
-    const cobrados = Math.max(...cobrar.map((e) => e.comissaoCobrancas ?? 0));
-    const limite = cobrar.map((e) => cobrancaDaComissao(e, hoje)!.cobrarEm).sort()[0];
-    comVoce.push({
-      chave: 'cobrar-comissao',
-      tom: 'vencido',
-      titulo: `Cobrar a comissão de recebimento · ${itens(cobrar.length)} sem TRP`,
-      detalhe: `${quem(cobrar)} · enviado${cobrar.length === 1 ? '' : 's'} há ${maisAntigo} dias${cobrados ? ` · já cobrada ${cobrados === 1 ? '1 vez' : `${cobrados} vezes`}` : ''}`,
-      prazo: dataBR(limite),
-      vencido: true,
-      limite,
-      acoes: [{ rotulo: 'Registrar a cobrança', principal: true, faz: () => abrir('cobranca', cobrar) }, { rotulo: 'Registrar o TRP', faz: () => abrir('etapa', cobrar) }]
-    });
-  }
-  if (aguardando.length) {
-    const limite = aguardando.map((e) => cobrancaDaComissao(e, hoje)!.cobrarEm).sort()[0];
-    comOutros.push({ chave: 'comissao', tom: 'espera', quem: 'Comissão de recebimento', titulo: `Emitir o TRP · ${itens(aguardando.length)}`, detalhe: `${quem(aguardando)} · cobrar em ${dataBR(limite)} se não vier`, prazo: dataBR(limite), limite, acoes: [{ rotulo: 'Registrar o TRP', faz: () => abrir('etapa', aguardando) }] });
+  // Com a comissão de recebimento: espera o TRP e depois o TRD; passados os dias da regra sem o termo, volta ao fiscal
+  // para cobrar (a conta recomeça no TRP e a cada cobrança).
+  for (const passo of ['TRP', 'TRD'] as const) {
+    const naComissao = de((e) => cobrancaDaComissao(e, hoje)?.passo === passo);
+    const cobrar = naComissao.filter((e) => cobrancaDaComissao(e, hoje)!.vencida);
+    const aguardando = naComissao.filter((e) => !cobrancaDaComissao(e, hoje)!.vencida);
+    const registrar = { rotulo: `Registrar o ${passo}` };
+    if (cobrar.length) {
+      const cs = cobrar.map((e) => cobrancaDaComissao(e, hoje)!);
+      const maisAntigo = Math.max(...cs.map((c) => c.dias));
+      const cobrados = Math.max(...cs.map((c) => c.cobrancas));
+      const limite = cs.map((c) => c.cobrarEm).sort()[0];
+      comVoce.push({
+        chave: `cobrar-comissao-${passo.toLowerCase()}`,
+        tom: 'vencido',
+        titulo: `Cobrar a comissão de recebimento · ${itens(cobrar.length)} sem ${passo}`,
+        detalhe: `${quem(cobrar)} · ${passo === 'TRP' ? `enviado${cobrar.length === 1 ? '' : 's'}` : 'TRP'} há ${maisAntigo} dias${cobrados ? ` · já cobrada ${cobrados === 1 ? '1 vez' : `${cobrados} vezes`}` : ''}`,
+        prazo: dataBR(limite),
+        vencido: true,
+        limite,
+        acoes: [{ rotulo: 'Registrar a cobrança', principal: true, faz: () => abrir('cobranca', cobrar) }, { ...registrar, faz: () => abrir('etapa', cobrar) }]
+      });
+    }
+    if (aguardando.length) {
+      const limite = aguardando.map((e) => cobrancaDaComissao(e, hoje)!.cobrarEm).sort()[0];
+      comOutros.push({ chave: `comissao-${passo.toLowerCase()}`, tom: 'espera', quem: 'Comissão de recebimento', titulo: `Emitir o ${passo} · ${itens(aguardando.length)}`, detalhe: `${quem(aguardando)} · cobrar em ${dataBR(limite)} se não vier`, prazo: dataBR(limite), limite, acoes: [{ ...registrar, faz: () => abrir('etapa', aguardando) }] });
+    }
   }
   const passos: Array<[string, (e: EntregaFiscalizacao) => boolean, string, string]> = [
     ['sal', (e) => e.etapa === 'PAGAMENTO' && Boolean(e.pagoEm) && e.origem === 'EMENDA', 'Enviar o Ofício à SAL', 'Registrar o ofício'],

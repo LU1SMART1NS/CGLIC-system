@@ -209,7 +209,7 @@ export function isLembreteNaJanela(params: { diasRestantes: number; atrasado: bo
 export const FISCALIZACAO_RULES = {
   /** Prazo interno da CGLIC para mandar o processo ao pagamento depois do TRD (cabe nos 10 da liquidação, IN 77). */
   envioPagamentoDiasUteis: 5,
-  /** Enviado à comissão de recebimento sem TRP: cobrar de novo depois de N dias do envio (ou da última cobrança). */
+  /** Com a comissão de recebimento: cobrar depois de N dias do envio sem TRP, ou do TRP sem TRD (ou da última cobrança). */
   cobrarComissaoDias: 10,
   /** O aviso do TRP, do TRD e do envio fica em atenção quando faltar até N dias. */
   avisoAntesDias: 3
@@ -299,7 +299,7 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
   { key: 'emendas.semPedidoDiasSemContato', group: 'emendas', label: 'Emenda sem pedido fica urgente após', hint: 'Dias sem contato registrado com a assessoria do parlamentar ou com a ASPAR dos órgãos. O aviso aparece desde o dia em que a emenda é registrada.', unit: 'dias', min: 1, max: 60 },
 
   { key: 'fiscalizacao.envioPagamentoDiasUteis', group: 'fiscalizacao', label: 'Enviar para pagamento até', hint: 'Dias úteis depois do TRD. Precisa caber nos 10 dias úteis da liquidação (IN SEGES 77/2022, art. 7º, I).', unit: 'dias úteis', min: 1, max: 10 },
-  { key: 'fiscalizacao.cobrarComissaoDias', group: 'fiscalizacao', label: 'Cobrar a comissão de recebimento após', hint: 'Dias desde o envio à comissão (ou desde a última cobrança) sem o TRP.', unit: 'dias', min: 1, max: 60 },
+  { key: 'fiscalizacao.cobrarComissaoDias', group: 'fiscalizacao', label: 'Cobrar a comissão de recebimento após', hint: 'Dias desde o envio à comissão sem o TRP, ou desde o TRP sem o TRD (ou desde a última cobrança).', unit: 'dias', min: 1, max: 60 },
   { key: 'fiscalizacao.avisoAntesDias', group: 'fiscalizacao', label: 'Avisar o TRP, o TRD e o envio quando faltar', hint: 'Antes disso o item mostra só a data; vencido, o aviso fica urgente.', unit: 'dias', min: 0, max: 30 },
 
   { key: 'sincronizacao.quantidadeContratadaVencidaEmHoras', group: 'sincronizacao', label: 'Reler a quantidade contratada após', unit: 'horas', min: 1, max: 168 }
