@@ -446,7 +446,6 @@ export const ItensUnidadesPage: React.FC = () => {
               <CarteiraSortHeader label="Quantitativo SENASP" sortKey="senasp" align="right" {...sortItem} />
               <CarteiraSortHeader label="Alocado" sortKey="alocado" {...sortItem} />
               <th style={carteiraTh}>Unidades</th>
-              <th style={carteiraTh}>Programas</th>
               <th style={{ ...carteiraTh, textAlign: 'right' }}>Contratado</th>
               <CarteiraSortHeader label="Falta alocar" sortKey="falta" align="right" {...sortItem} />
               <th style={carteiraTh}>Situação</th>
@@ -620,7 +619,7 @@ export const ItensUnidadesPage: React.FC = () => {
                                 <th style={{ ...carteiraTh, textAlign: 'right' }}>Quantitativo SENASP</th>
                                 <th style={carteiraTh}>Alocado</th>
                                 <th style={carteiraTh}>Unidades</th>
-                                                <th style={{ ...carteiraTh, textAlign: 'right' }}>Contratado</th>
+                                <th style={{ ...carteiraTh, textAlign: 'right' }}>Contratado</th>
                                 <th style={{ ...carteiraTh, textAlign: 'right' }}>{semDiv ? 'Livre' : 'Falta alocar'}</th>
                                 <th style={carteiraTh}>Situação</th>
                                 {podeAlocar && <th style={{ ...carteiraTh, textAlign: 'right' }}>Ação</th>}
