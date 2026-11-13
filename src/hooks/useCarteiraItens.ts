@@ -14,6 +14,7 @@ import {
   type CarteiraItemRow
 } from '../utils/carteiraItens';
 import type { ArpItemRecord, ArpRecord } from '../types';
+import { ROTULO_DIVISAO_NA_ATA, useDivisoesNaAta } from './useDivisaoNaAta';
 
 const STALE = 2 * 60 * 1000;
 
@@ -69,6 +70,10 @@ export function useCarteiraItens(params?: {
   const empenhos = leEmpenhado ? empenhosQuery.data : undefined;
   const saldosA = saldos200330.data;
   const saldosB = saldos200331.data;
+  // Atas que não dividem entre as unidades (migration 297): o item sem unidade não é pendência. Falhou = a conferir (cobra como antes).
+  const divisoes = useDivisoesNaAta({ enabled: !apenasUnidadesDeContratos });
+  const mapaDivisoes = divisoes.mapa;
+  const atasSemDivisao = useMemo(() => new Set([...(mapaDivisoes ?? new Map()).entries()].filter(([, d]) => d.situacao === 'NAO_DIVIDE').map(([k]) => k)), [mapaDivisoes]);
 
   const rows = useMemo<CarteiraItemRow[]>(() => {
     if (apenasUnidadesDeContratos || !arps || !itemsByAta) return [];
@@ -80,9 +85,10 @@ export function useCarteiraItens(params?: {
       allocations: allocations ?? [],
       links: links ?? [],
       empenhos: empenhos ?? [],
-      prazoOf: getArpPrazo
+      prazoOf: getArpPrazo,
+      atasSemDivisao
     });
-  }, [apenasUnidadesDeContratos, arps, itemsByAta, gestorByAta, saldosA, saldosB, allocations, links, empenhos]);
+  }, [apenasUnidadesDeContratos, arps, itemsByAta, gestorByAta, saldosA, saldosB, allocations, links, empenhos, atasSemDivisao]);
 
   const resumoPorAta = useMemo(() => resumirAtas(rows), [rows]);
   const unidades = useMemo(() => listarUnidades(allocations ?? []), [allocations]);
@@ -116,6 +122,7 @@ export function useCarteiraItens(params?: {
     { rotulo: ROTULOS_CARTEIRA_ITENS.alocacoes, query: allocationsQuery },
     { rotulo: ROTULOS_CARTEIRA_ITENS.vinculos, query: linksQuery },
     ...(leEmpenhado ? [{ rotulo: ROTULOS_CARTEIRA_ITENS.empenhos, query: empenhosQuery }] : []),
+    ...(apenasUnidadesDeContratos ? [] : [{ rotulo: ROTULO_DIVISAO_NA_ATA, query: divisoes.query }]),
     ...(apenasUnidadesDeContratos
       ? []
       : [

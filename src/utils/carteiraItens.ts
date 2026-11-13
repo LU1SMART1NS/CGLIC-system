@@ -44,6 +44,8 @@ export interface CarteiraItemRow {
   ataAssinada: SituacaoAtaAssinada | null;
   /** Outros órgãos registrados quando o limite da alocação é provisório (ata da CGLIC sem a ata assinada); senão 0. */
   limiteProvisorioOutrosOrgaos: number;
+  /** A ata marcou que não divide o quantitativo SENASP entre as unidades (migration 297): alocar é opcional, não é pendência. */
+  semDivisaoNaAta?: boolean;
 }
 
 /** Resumo de uma ata a partir dos itens: usado pelos filtros de alocação, empenho e unidade na carteira de Atas. */
@@ -77,6 +79,8 @@ export interface CarteiraItensInput {
   links: CarteiraItemLink[];
   empenhos: CarteiraItemEmpenho[];
   prazoOf: (arp: ArpRecord) => { dias: number | null; faixa: PrazoFaixa };
+  /** Atas ("{numeroAta}-{uasg}") marcadas como "não divide entre as unidades". */
+  atasSemDivisao?: Set<string>;
 }
 
 /** Nome de unidade comparável: sem diferença de caixa ou espaços. */
@@ -184,7 +188,8 @@ export function buildCarteiraItemRows(input: CarteiraItensInput): CarteiraItemRo
         empenhado,
         nivelEmpenho: nivelEmpenho(empenhado, contratada),
         ataAssinada: saldo ? situacaoAtaAssinada(saldo) : null,
-        limiteProvisorioOutrosOrgaos: saldo && limiteProvisorio(saldo) ? Number(saldo.outros_orgaos_registrados) || 0 : 0
+        limiteProvisorioOutrosOrgaos: saldo && limiteProvisorio(saldo) ? Number(saldo.outros_orgaos_registrados) || 0 : 0,
+        semDivisaoNaAta: input.atasSemDivisao?.has(ataKey) ?? false
       });
     }
   }

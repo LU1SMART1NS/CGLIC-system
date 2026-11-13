@@ -32,6 +32,8 @@ export interface ItemParaAlocar {
    * provisório até informar a ata assinada (migration 116; a alocação não é bloqueada). Número de outros órgãos.
    */
   limiteProvisorioOutrosOrgaos?: number;
+  /** A ata não divide o quantitativo SENASP entre as unidades (migration 297): alocar é opcional. */
+  semDivisaoNaAta?: boolean;
 }
 
 interface AlocarUnidadeModalProps {
@@ -239,6 +241,12 @@ const JanelaAlocacao: React.FC<Omit<AlocarUnidadeModalProps, 'item'> & { item: I
         <p style={{ margin: 0, fontSize: '0.85rem', color: CINZA }}>Carregando as alocações do item…</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+          {item.semDivisaoNaAta && (
+            <NoticeBar tone="info" testId="alocar-sem-divisao">
+              <strong>A ata não divide o quantitativo SENASP entre as unidades internas.</strong> Alocar a uma unidade é opcional e o
+              que fica sem unidade não é pendência.
+            </NoticeBar>
+          )}
           {item.quantitativoSenasp < 0 && (
             <NoticeBar tone="warning" testId="alocar-limite-negativo">
               <strong>Quantitativo SENASP negativo ({formatNumber(item.quantitativoSenasp)}).</strong> O registrado da SENASP no Compras.gov.br é menor que o que

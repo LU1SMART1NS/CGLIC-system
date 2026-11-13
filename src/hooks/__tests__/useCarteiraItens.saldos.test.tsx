@@ -34,6 +34,7 @@ import { COLUNAS_SALDO_CARTEIRA } from '../../services/dashboardService';
 import { AlocacoesFalhaNotice } from '../../components/carteira/AlocacoesFalhaNotice';
 import { CARTEIRA_ALOCACOES_KEY, ROTULOS_CARTEIRA_ITENS } from '../useCarteiraItens';
 import { falhasDasLeituras } from '../../components/fonte/useLeiturasComFalha';
+import { ROTULO_DIVISAO_NA_ATA } from '../useDivisaoNaAta';
 
 function consulta(over: Record<string, unknown> = {}) {
   return { data: [], isPending: false, isError: false, isFetching: false, refetch: vi.fn(), ...over };
@@ -104,6 +105,7 @@ describe('useCarteiraItens — leituras para a faixa "não carregou"', () => {
       ROTULOS_CARTEIRA_ITENS.alocacoes,
       ROTULOS_CARTEIRA_ITENS.vinculos,
       ROTULOS_CARTEIRA_ITENS.empenhos,
+      ROTULO_DIVISAO_NA_ATA,
       ROTULOS_CARTEIRA_ITENS.saldos,
       ROTULOS_CARTEIRA_ITENS.saldos
     ]);
