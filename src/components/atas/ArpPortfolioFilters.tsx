@@ -132,6 +132,7 @@ export const ArpPortfolioFilters: React.FC<ArpPortfolioFiltersProps> = ({
         value={filters.unidade}
         unidades={unidades}
         onChange={(value) => onChangeFilter('unidade', value)}
+        comSemUnidade
         testId="arp-filter-unidade"
       />
 

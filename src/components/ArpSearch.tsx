@@ -12,7 +12,7 @@ import { FontesComFalhaAviso } from './fonte/FontesComFalhaAviso';
 import { useLeiturasComFalha } from './fonte/useLeiturasComFalha';
 import { ListaNaoCarregou } from './fonte/ListaNaoCarregou';
 import { passaFiltroNivel, type NivelAtendimento } from '../utils/itemAtendimento';
-import { TODAS_UNIDADES } from './carteira/CarteiraExecucaoSelects';
+import { NOME_SEM_UNIDADE, SEM_UNIDADE, TODAS_UNIDADES } from './carteira/CarteiraExecucaoSelects';
 import { canAssignManager } from './carteira/ManagerAssign';
 import { ArpPortfolioFilters, ARP_FILTER_SCHEMA } from './atas/ArpPortfolioFilters';
 import { useCarteiraFilters } from './carteira/carteiraFilters';
@@ -27,6 +27,8 @@ import { chaveGestaoDaArp, contarPorPapel, passaFiltroPapel } from '../utils/ata
 import { ROTULO_GTI_ATAS, useFatiasGtiLeitura } from '../hooks/useGruposGti';
 import { chaveAtaGti, contarPorGti, passaFiltroGti, pctDoGti } from '../config/gruposGti';
 import type { ArpPortfolioFilterState } from './atas/ArpPortfolioFilters';
+import { somarValorDasAtas } from './atas/valorDasAtas';
+import { FaixaDaUnidade, FaixaDoGti } from './atas/FaixaDoFiltro';
 
 interface ArpSearchProps {
   onSelectArp: (arp: ArpRecord) => void;
@@ -178,7 +180,10 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
 
       // 3. Empenho
       if (!passaFiltroNivel(execucao?.nivelEmpenho ?? null, filterState.filtroEmpenho)) return false;
-      if (filterState.unidade !== TODAS_UNIDADES && !execucao?.unidades.has(filterState.unidade)) return false;
+      if (filterState.unidade === SEM_UNIDADE) {
+        // "Sem unidade": atas com parte da SENASP ainda não alocada.
+        if (!((execucao?.valorSemUnidade ?? 0) > 0)) return false;
+      } else if (filterState.unidade !== TODAS_UNIDADES && !execucao?.unidades.has(filterState.unidade)) return false;
       // Qtd. da ata assinada (migration 116): ata em que informar não muda nada (adesão, só a SENASP) fica de fora.
       if (filtroAtaAssinada !== 'TODOS' && execucao?.ataAssinada?.situacao !== filtroAtaAssinada) return false;
 
@@ -223,6 +228,19 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
       return comparePrazo(getArpPrazo(a).dias, getArpPrazo(b).dias);
     });
   }, [scopedArps, filterState, filtroAtaAssinada, resumoPorAta, itemsByAta, showGestorFilter, gestorByAta, fatiasDaArp]);
+
+  // Com GTI ou unidade filtrados: quanto o GTI registrou / quanto foi alocado à unidade nas atas exibidas (faixas acima da lista).
+  const totaisDasAtas = useMemo(
+    () =>
+      somarValorDasAtas(
+        filteredArps,
+        (arp) => resumoPorAta.get(`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`),
+        fatiasDaArp,
+        filterState.gti,
+        filterState.unidade !== TODAS_UNIDADES ? filterState.unidade : null
+      ),
+    [filteredArps, resumoPorAta, fatiasDaArp, filterState.gti, filterState.unidade]
+  );
 
   // A atribuição de gestor é só na Central de Distribuição; aqui o coordenador tem o atalho até lá.
   const canAssign = canAssignManager(role);
@@ -306,6 +324,15 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         totalFiltered={filteredArps.length}
         totalAtas={scopedArps.length}
       />
+
+      {filterState.gti !== 'TODOS' && filteredArps.length > 0 && <FaixaDoGti gti={filterState.gti} totais={totaisDasAtas} />}
+      {filterState.unidade !== TODAS_UNIDADES && filteredArps.length > 0 && (
+        <FaixaDaUnidade
+          nome={filterState.unidade === SEM_UNIDADE ? NOME_SEM_UNIDADE : (unidades.find((u) => u.chave === filterState.unidade)?.nome ?? filterState.unidade)}
+          semUnidade={filterState.unidade === SEM_UNIDADE}
+          totais={totaisDasAtas}
+        />
+      )}
 
       {scopedArps.length === 0 && atasNaoCarregaram ? (
         <ListaNaoCarregou titulo="As atas não carregaram." testId="atas-nao-carregou" />

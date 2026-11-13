@@ -5,7 +5,9 @@ import {
   chaveItemDeItemKey,
   listarUnidades,
   resumirAtas,
-  unidadesPorContrato
+  unidadesPorContrato,
+  valoresDaAta,
+  type CarteiraItemRow
 } from '../carteiraItens';
 import type { ArpItemRecord, ArpRecord } from '../../types';
 
@@ -114,5 +116,39 @@ describe('resumirAtas e unidadesPorContrato', () => {
 
   it('lista as unidades pela grafia da primeira alocação, em ordem alfabética', () => {
     expect(listarUnidades(allocations).map((u) => u.nome)).toEqual(['CGLIC', 'DIOP']);
+  });
+});
+
+describe('valoresDaAta', () => {
+  const linha = (senasp: number, preco: number, consumido: number | null, homologada = senasp, alocadoPorUnidade: Record<string, number> = {}) =>
+    ({
+      quantitativoSenasp: senasp,
+      consumido,
+      alocadoPorUnidade,
+      alocado: Object.values(alocadoPorUnidade).reduce((s, q) => s + q, 0),
+      item: { valorUnitario: preco, quantidadeHomologadaItem: homologada }
+    }) as unknown as CarteiraItemRow;
+
+  it('valor total (todos os órgãos), parte SENASP e consumido em R$ pelo preço de cada item', () => {
+    expect(valoresDaAta([linha(1084, 751.98, 817, 5000), linha(10, 100, null, 30)])).toEqual({
+      valorTotal: 5000 * 751.98 + 3000,
+      valorSenasp: 1084 * 751.98 + 1000,
+      valorConsumido: 817 * 751.98,
+      valorAlocadoPorUnidade: {},
+      valorSemUnidade: 1084 * 751.98 + 1000
+    });
+  });
+
+  it('consumido nulo quando nenhum item tem o consumo lido; quantidade negativa não abate o valor', () => {
+    expect(valoresDaAta([linha(-424, 50, null, 10), linha(2, 50, null, 10)])).toEqual({ valorTotal: 1000, valorSenasp: 100, valorConsumido: null, valorAlocadoPorUnidade: {}, valorSemUnidade: 100 });
+  });
+
+  it('alocado em R$ por unidade, pelo preço de cada item', () => {
+    expect(valoresDaAta([linha(10, 100, null, 10, { caep: 6, diopi: 2 }), linha(5, 10, null, 5, { caep: 5 })]).valorAlocadoPorUnidade).toEqual({ caep: 650, diopi: 200 });
+  });
+
+  it('a alocar item a item: item alocado acima da cota não esconde o que falta nos outros', () => {
+    // item 1: 10 de cota, 14 alocados (sobra 0); item 2: 10 de cota, 4 alocados (faltam 6 × R$ 10)
+    expect(valoresDaAta([linha(10, 100, null, 10, { caep: 14 }), linha(10, 10, null, 10, { caep: 4 })]).valorSemUnidade).toBe(60);
   });
 });
