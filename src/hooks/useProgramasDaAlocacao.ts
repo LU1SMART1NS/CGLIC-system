@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  EXTRA_VAZIO, fetchAlocacaoExtraDoItem, fetchProgramasParaAlocacao, fetchReservasDaCarteira, remanejarEntreUnidades, reservarParaPrograma
+  EXTRA_VAZIO, fetchAlocacaoExtraDoItem, fetchProgramasDaDivisao, fetchProgramasParaAlocacao, fetchReservasDaCarteira, ligarContratoAoPrograma, remanejarEntreUnidades, reservarParaPrograma
 } from '../services/programasAlocacaoService';
 import { CARTEIRA_ALOCACOES_KEY } from './useCarteiraItens';
 
@@ -62,5 +62,32 @@ export function useRemanejarEntreUnidades() {
   return useMutation({
     mutationFn: remanejarEntreUnidades,
     onSettled: (_d, _e, v) => reler(v.itemKey)
+  });
+}
+
+export const PROGRAMAS_DA_DIVISAO_KEY = (itemKey: string, contractKey: string) => ['programas-da-divisao', itemKey, contractKey] as const;
+
+/** Programa de cada unidade na divisão do contrato no item. */
+export function useProgramasDaDivisao(itemKey: string, contractKey: string | null) {
+  return useQuery({
+    queryKey: PROGRAMAS_DA_DIVISAO_KEY(itemKey, contractKey ?? ''),
+    queryFn: () => fetchProgramasDaDivisao(itemKey, contractKey!),
+    enabled: Boolean(itemKey && contractKey),
+    staleTime: 30_000
+  });
+}
+
+/** Grava o programa de várias unidades do contrato (uma chamada por unidade) e relê o item. */
+export function useLigarContratoAosProgramas() {
+  const reler = useReleituraDoItem();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { itemKey: string; contractKey: string; ligacoes: Array<{ unidade: string; programaId: string | null }> }) => {
+      for (const l of v.ligacoes) await ligarContratoAoPrograma(v.itemKey, v.contractKey, l.unidade, l.programaId);
+    },
+    onSettled: (_d, _e, v) => {
+      reler(v.itemKey);
+      void qc.invalidateQueries({ queryKey: PROGRAMAS_DA_DIVISAO_KEY(v.itemKey, v.contractKey) });
+    }
   });
 }

@@ -589,8 +589,9 @@ export async function fetchProgramasFiscalizacao(): Promise<ProgramaFiscalizacao
   return (data || []).map(linhaParaPrograma);
 }
 
-export async function salvarProgramaFiscalizacao(input: { id: string | null; nome: string; unidadeId: string; origem: OrigemDoRecurso; ativo: boolean }): Promise<string> {
-  const { data, error } = await cliente().rpc('salvar_fisc_programa', { p_id: input.id, p_nome: input.nome.trim(), p_unidade: input.unidadeId, p_origem: input.origem, p_ativo: input.ativo });
+/** Cria ou edita o programa. A origem do recurso saiu da tela (migration 297): sem ela, o banco mantém a gravada. */
+export async function salvarProgramaFiscalizacao(input: { id: string | null; nome: string; unidadeId: string; origem?: OrigemDoRecurso | null; ativo: boolean }): Promise<string> {
+  const { data, error } = await cliente().rpc('salvar_fisc_programa', { p_id: input.id, p_nome: input.nome.trim(), p_unidade: input.unidadeId, p_origem: input.origem ?? null, p_ativo: input.ativo });
   if (error) throw mapPostgresErrorToAppError(error);
   return data as string;
 }
