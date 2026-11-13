@@ -17,7 +17,7 @@ vi.mock('../useFaturasDoContrato', async (orig) => ({
   ...(await orig<typeof import('../useFaturasDoContrato')>()),
   useFaturasDoContrato: () => mocks.faturas
 }));
-vi.mock('../useExpectativasPagamento', () => ({ useExpectativasPagamento: () => mocks.expectativas }));
+vi.mock('../useExpectativasPagamento', () => ({ useExpectativasPagamento: () => mocks.expectativas, useEntregasParaPagamento: () => ({ entregas: [], isLoading: false }) }));
 vi.mock('../../components/financeiro/useContratosDoFinanceiro', () => ({ useContratosDoFinanceiro: vi.fn() }));
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }) }));
 vi.mock('../../services/cicloPagamentoApoioService', async (orig) => ({

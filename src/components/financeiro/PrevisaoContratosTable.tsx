@@ -124,10 +124,10 @@ export const PrevisaoContratosTable: React.FC<{
                     {l.entregas.length > 0 ? (
                       <div>
                         <div style={{ fontWeight: 700 }}>
-                          {l.entregas.length} {l.entregas.length === 1 ? 'entrega' : 'entregas'}
+                          {(() => { const n = l.entregas.reduce((t, e) => t + e.itens, 0); return `${n} ${n === 1 ? 'item' : 'itens'} a entregar`; })()}
                         </div>
                         <div style={subtle}>
-                          próxima {dataBR(l.entregas[0].dataPrevista)} · {formatCurrency(l.entregas[0].valor)}
+                          próxima {dataBR(l.entregas[0].data)} · {formatCurrency(l.entregas[0].valor)} · da Fiscalização
                         </div>
                       </div>
                     ) : (
