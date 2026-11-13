@@ -7,6 +7,7 @@ import { fetchCiclosEmAberto, fetchLigacoesCicloFatura } from '../services/finan
 import { historicoDePagamentos, ultimosMesesFechados } from '../services/expectativaPagamentoService';
 import {
   fetchAjustesPrevisao,
+  fetchEntregasDaFiscalizacao,
   fetchEnvioPrevisao,
   fetchPrazosEmendas,
   montarPrevisao,
@@ -48,6 +49,7 @@ export function usePrevisaoMensal(mes: string, contratosVigentes: Set<string>) {
   const expectativas = useExpectativasPagamento();
   const ajustes = useQuery({ queryKey: ['previsao-ajustes', mes], queryFn: () => fetchAjustesPrevisao(mes), ...OPCOES });
   const envio = useQuery({ queryKey: ['previsao-envio', mes], queryFn: () => fetchEnvioPrevisao(mes), ...OPCOES });
+  const entregasFisc = useQuery({ queryKey: ['previsao-entregas-fiscalizacao', mes], queryFn: () => fetchEntregasDaFiscalizacao(mes), ...OPCOES });
   const prazosEmendas = usePrazosEmendas();
 
   const meses = useMemo(() => ultimosMesesFechados(), []);
@@ -63,11 +65,12 @@ export function usePrevisaoMensal(mes: string, contratosVigentes: Set<string>) {
         empenhos: empenhos.rows,
         marcas: expectativas.marcas,
         entregas: expectativas.entregas,
+        entregasFiscalizacao: entregasFisc.data ?? [],
         historicos,
         ajustes: ajustes.data ?? [],
         contratosVigentes
       }),
-    [mes, faturas.data, ciclos.data, ligacoes.data, empenhos.rows, expectativas.marcas, expectativas.entregas, historicos, ajustes.data, contratosVigentes]
+    [mes, faturas.data, ciclos.data, ligacoes.data, empenhos.rows, expectativas.marcas, expectativas.entregas, entregasFisc.data, historicos, ajustes.data, contratosVigentes]
   );
 
   const [ano, mesNum] = mes.split('-').map(Number);
@@ -102,7 +105,7 @@ export function usePrevisaoMensal(mes: string, contratosVigentes: Set<string>) {
     envio: envio.data ?? null,
     prazoEmenda,
     sugeridosSemMarca: [...historicos.entries()].filter(([k, h]) => h.mesesComPagamento >= meses.length && !expectativas.marcas.has(k) && contratosVigentes.has(k)).length,
-    isLoading: faturas.isLoading || empenhos.isLoading || ciclos.isLoading || ligacoes.isLoading || expectativas.isLoading || ajustes.isLoading || envio.isLoading,
+    isLoading: faturas.isLoading || empenhos.isLoading || ciclos.isLoading || ligacoes.isLoading || expectativas.isLoading || ajustes.isLoading || envio.isLoading || entregasFisc.isLoading,
     /** Cada fonte da previsão: se uma falhar, a tela avisa em vez de dizer "nada a pagar". */
     leituras: [
       ...leiturasDasFaturas(faturas),
@@ -112,6 +115,7 @@ export function usePrevisaoMensal(mes: string, contratosVigentes: Set<string>) {
       { rotulo: ROTULO_EXPECTATIVAS, query: expectativas.consulta },
       { rotulo: 'ajustes da previsão do mês', query: ajustes },
       { rotulo: 'envio da previsão do mês', query: envio },
+      { rotulo: 'entregas previstas pela Fiscalização', query: entregasFisc },
       { rotulo: 'prazos das emendas', query: prazosEmendas.consulta }
     ] as LeituraDaTela[],
     ajustar,

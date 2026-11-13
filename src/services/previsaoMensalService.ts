@@ -6,7 +6,8 @@
  *            ("Sem como confirmar": antigas ou pagas por outro documento; sem NP não há como saber se falta pagar);
  *   CICLO    ciclos de pagamento em aberto (um por nota fiscal do item "DO PAGAMENTO");
  *   MENSAL   contratos marcados como mensais sem fatura nem ciclo em aberto (valor mensal informado ou média de 3 meses);
- *   ENTREGA  entregas previstas para o mês da previsão;
+ *   ENTREGA  entregas previstas para o mês da previsão e, nos contratos acompanhados pela Fiscalização, os itens com
+ *            entrega prevista no mês anterior ao da previsão (migration 304; vencidos ficam de fora);
  *   MANUAL   linhas incluídas à mão.
  * Os ajustes do mês (retirar, corrigir valor/subitem, marcar emenda) ficam em previsao_pagamentos_ajustes (migration 90).
  */
@@ -117,6 +118,18 @@ export function ehEmendaPeloPlanoInterno(planoInterno?: string | null): boolean 
 // Montagem
 // -----------------------------------------------------------------------------------------------------
 
+/** Itens da Fiscalização com entrega prevista no mês anterior ao da previsão, por contrato × nota (migration 304). */
+export interface EntregasDaFiscalizacaoNaPrevisao {
+  contractKey: string;
+  /** Nota de empenho da linha do pedido de emenda (ex.: 2026NE000157); sem ela, a nota do contrato com mais saldo. */
+  nota: string | null;
+  itens: number;
+  valor: number;
+  semPreco: number;
+  primeira: string;
+  ultima: string;
+}
+
 export interface DadosDaPrevisao {
   mesAlvo: string;
   faturas: FaturaCarteira[];
@@ -125,6 +138,8 @@ export interface DadosDaPrevisao {
   empenhos: EmpenhoCarteiraRow[];
   marcas: Map<string, ExpectativaPagamento>;
   entregas: EntregaPrevista[];
+  /** Entregas previstas pela Fiscalização (migration 304). */
+  entregasFiscalizacao?: EntregasDaFiscalizacaoNaPrevisao[];
   historicos: Map<string, HistoricoPagamentos>;
   ajustes: AjustePrevisao[];
   /** Contratos vigentes no escopo (os mensais só entram se estiverem aqui). */
@@ -244,6 +259,26 @@ export function montarPrevisao(d: DadosDaPrevisao): LinhaPrevisao[] {
     });
   }
 
+  // Itens da Fiscalização com entrega prevista no mês anterior: o pagamento vem no mês seguinte à entrega.
+  const diaMes = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  for (const f of d.entregasFiscalizacao ?? []) {
+    const e = acharEmpenho(f.contractKey, f.nota) ?? [...(empenhosDoContrato.get(f.contractKey) ?? [])].sort((a, b) => (b.saldo ?? 0) - (a.saldo ?? 0))[0];
+    const quando = f.primeira === f.ultima ? `em ${diaMes(f.primeira)}` : `de ${diaMes(f.primeira)} a ${diaMes(f.ultima)}`;
+    base.push({
+      chave: `fisc-${f.contractKey}-${f.nota ?? 'sem-nota'}`,
+      origem: 'ENTREGA',
+      contractKey: f.contractKey,
+      ug: e?.uasgEmitente ?? f.contractKey.slice(0, 6),
+      empenho: e?.numero ?? f.nota,
+      empenhoKey: e?.canonicalKey ?? null,
+      subitem: null,
+      valorOriginal: f.valor,
+      emendaAutomatica: f.nota ? true : emendaDe(e),
+      detalhe: `Fiscalização: ${f.itens} ${f.itens === 1 ? 'item' : 'itens'} com entrega prevista ${quando}${f.semPreco ? ` · ${f.semPreco} sem preço no contrato` : ''}`,
+      semValor: f.valor <= 0
+    });
+  }
+
   // Linhas incluídas à mão.
   for (const a of d.ajustes) {
     if (!a.chave.startsWith('manual-') || !a.contractKey) continue;
@@ -345,6 +380,22 @@ export function textoParaSei(
 // -----------------------------------------------------------------------------------------------------
 
 const primeiroDia = (mes: string) => `${mes}-01`;
+
+/** Entregas da Fiscalização que entram na previsão do mês (migration 304). */
+export async function fetchEntregasDaFiscalizacao(mes: string): Promise<EntregasDaFiscalizacaoNaPrevisao[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase.rpc('fisc_previsao_de_entregas', { p_mes: mes });
+  if (error) throw mapPostgresErrorToAppError(error);
+  return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+    contractKey: String(r.contract_key),
+    nota: r.nota ? String(r.nota) : null,
+    itens: Number(r.itens) || 0,
+    valor: Number(r.valor) || 0,
+    semPreco: Number(r.sem_preco) || 0,
+    primeira: String(r.primeira),
+    ultima: String(r.ultima)
+  }));
+}
 
 export async function fetchAjustesPrevisao(mes: string): Promise<AjustePrevisao[]> {
   if (!isSupabaseConfigured || !supabase) return [];
