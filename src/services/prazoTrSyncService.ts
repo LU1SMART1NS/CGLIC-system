@@ -14,7 +14,7 @@ import { supabase } from './supabaseClient';
 import { executarComReserva, mensagemDeErro, UASG_TODAS, type ResultadoSincronizacao } from './sincronizacaoFontesService';
 import { baixar, pedirLista, textosDoArquivo, type LeitorDeArquivos } from './reajusteAtasSyncService';
 import { enderecoDoArquivo } from './atasAMontarSyncService';
-import { lerPrazoDoTr, type PrazoLidoDoTr } from './trPrazoParser';
+import { lerPrazoDoTr, lerRecebimentoDoTr, type PrazoLidoDoTr, type RecebimentoLidoDoTr } from './trPrazoParser';
 
 export const RECURSO_PRAZO_TR = 'prazo_tr' as const;
 export const FONTE_PNCP_PRAZO_TR = 'PNCP (edital e Termo de Referência)';
@@ -44,6 +44,9 @@ export interface LeituraParaGravar extends PrazoLidoDoTr {
   numero_controle_compra: string;
   documento: string | null;
   url: string;
+  /** Prazos do TRP e do TRD lidos do mesmo texto (migration 305); null quando o TR não traz o recebimento definitivo. */
+  recebimento?: RecebimentoLidoDoTr | null;
+  recebimentoTrechos?: string[];
 }
 
 export interface OpcoesPrazoTr {
@@ -98,7 +101,8 @@ const bancoDeVerdade: BancoDoPrazoTr = {
     const { data, error } = await supabase.rpc('gravar_leitura_prazo_tr', {
       p_payload: {
         numero_controle_compra: l.numero_controle_compra, leitura: l.leitura, motivo: l.motivo, dias: l.dias, contagem: l.contagem,
-        contagem_dita: l.contagemDita, inicio: l.inicio, trechos: l.trechos, documento: l.documento, url: l.url
+        contagem_dita: l.contagemDita, inicio: l.inicio, trechos: l.trechos, documento: l.documento, url: l.url,
+        recebimento: l.recebimento ?? null, recebimento_trechos: l.recebimentoTrechos ?? []
       }
     });
     if (error) throw new Error(mensagemDeErro(error));
@@ -128,8 +132,10 @@ export async function lerPrazoDaCompra(
     const bytes = await baixar(enderecoDoArquivo(a.url), ctx.fetcher, ctx.esperar);
     const documento = a.tipoDocumentoNome === 'Termo de Referência' ? `Termo de Referência (${a.titulo ?? 'PNCP'})` : `${a.tipoDocumentoNome} e anexos`;
     const textos = bytes ? await textosDoArquivo(bytes, ctx.leitor, { soPartesDoEdital: true, maxBytesPdf: MAX_BYTES_PDF, parar: (t) => lerPrazoDoTr(t).leitura === 'CLARO' }) : [];
-    const lido = lerPrazoDoTr(textos.join('\n'));
-    const leitura: LeituraParaGravar = { ...lido, numero_controle_compra: controle, documento, url };
+    const texto = textos.join('\n');
+    const lido = lerPrazoDoTr(texto);
+    const rec = lerRecebimentoDoTr(texto);
+    const leitura: LeituraParaGravar = { ...lido, numero_controle_compra: controle, documento, url, recebimento: rec.recebimento, recebimentoTrechos: rec.trechos };
     if (!melhor || (melhor.leitura === 'SEM_CLAUSULA' && lido.leitura !== 'SEM_CLAUSULA')) melhor = leitura;
     if (lido.leitura !== 'SEM_CLAUSULA') break;
   }

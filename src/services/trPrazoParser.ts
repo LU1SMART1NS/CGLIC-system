@@ -124,3 +124,71 @@ export function lerPrazoDoTr(textoBruto: string): PrazoLidoDoTr {
   if (!trechos.length) trechos.push(limparTrecho(cands[0].trecho) || cands[0].trecho.slice(0, 280));
   return { leitura, motivo, dias: d, contagem: contagem ?? 'CORRIDOS', contagemDita: Boolean(contagem), inicio, trechos: trechos.slice(0, 3) };
 }
+
+// ── Recebimento (TRP e TRD) ─────────────────────────────────────────────────────────────────────────────
+
+/** Prazos do recebimento lidos do TR: TRP (0 = no ato da entrega) e TRD, da entrega (nota fiscal) ou do TRP. */
+export interface RecebimentoLidoDoTr {
+  trpDias: number;
+  trpContagem: ContagemPrazo;
+  trdDias: number;
+  trdContagem: ContagemPrazo;
+  trdInicio: 'ENTREGA' | 'TRP';
+}
+
+const FRASE_TRP = /recebid[oa]s?\s+provisoriamente[^.;]{0,240}/giu;
+const FRASE_TRD = /(?:recebimento\s+definitivo\s+(?:ocorrer[aá]|ser[aá]\s+(?:realizado|efetuado|feito))|recebid[oa]s?\s+definitivamente)[^.;]{0,280}/giu;
+/** "10 (dez) dias", "quinze (15) dias", "8 (dias) úteis", "30 (trinta dias)": o texto do PDF às vezes embaralha a ordem. */
+const NUMERO = /(\d{1,3})\s*\([^)]{0,20}\)\s*(?:dias)?|\((\d{1,3})\)\s*dias|(\d{1,3})\s*dias/iu;
+const ATO_DA_ENTREGA = /no\s+ato\s+da\s+entrega/iu;
+
+interface Achado { dias: number; contagem: ContagemPrazo; peso: number; trecho: string; doTrp: boolean }
+
+function numeroDe(s: string): number | null {
+  const m = NUMERO.exec(s);
+  const n = m ? Number(m[1] ?? m[2] ?? m[3]) : NaN;
+  return Number.isInteger(n) && n >= 1 && n <= 90 ? n : null;
+}
+/** O modelo de serviço da AGU também vem no TR de compra: o trecho de material (nota fiscal, bens) pesa mais. */
+const pesoDe = (s: string) => (/nota\s+fiscal|material|\bbens\b/iu.test(s) ? 2 : 0) - (/servi[cç]o/iu.test(s) && !/material/iu.test(s) ? 2 : 0);
+const contagemDoTrecho = (s: string): ContagemPrazo => (/[uú]teis/iu.test(s) ? 'UTEIS' : 'CORRIDOS');
+
+function escolher(achados: Achado[]): Achado | null {
+  if (!achados.length) return null;
+  const topo = Math.max(...achados.map((a) => a.peso));
+  const melhores = achados.filter((a) => a.peso === topo);
+  const chave = maisFrequente(melhores.map((a) => `${a.dias}|${a.contagem}|${a.doTrp}`));
+  return melhores.find((a) => `${a.dias}|${a.contagem}|${a.doTrp}` === chave) ?? null;
+}
+
+/**
+ * Lê os prazos do recebimento (modelo da AGU: "recebidos provisoriamente ... no ato da entrega, juntamente com a nota
+ * fiscal"; "o recebimento definitivo ocorrerá no prazo de 10 dias úteis, a contar do recebimento da nota fiscal").
+ * Sem a cláusula do recebimento definitivo, não sugere nada (o gestor informa). Sem a do provisório, vale no ato da
+ * entrega, como no modelo. Só sugere: o gestor da ata confirma.
+ */
+export function lerRecebimentoDoTr(textoBruto: string): { recebimento: RecebimentoLidoDoTr | null; trechos: string[] } {
+  const texto = textoBruto.replace(/[\u0000-\u001f]/gu, ' ').replace(/\s+/gu, ' ');
+  const trd: Achado[] = [];
+  for (const m of texto.matchAll(FRASE_TRD)) {
+    const s = m[0];
+    const dias = numeroDe(s);
+    if (!dias) continue;
+    trd.push({ dias, contagem: contagemDoTrecho(s), peso: pesoDe(s), trecho: s, doTrp: /provis/iu.test(s) && !/nota\s+fiscal/iu.test(s) });
+  }
+  const d = escolher(trd);
+  if (!d) return { recebimento: null, trechos: [] };
+  const trp: Achado[] = [];
+  for (const m of texto.matchAll(FRASE_TRP)) {
+    const s = m[0];
+    if (ATO_DA_ENTREGA.test(s)) { trp.push({ dias: 0, contagem: 'CORRIDOS', peso: pesoDe(s) + 1, trecho: s, doTrp: false }); continue; }
+    const dias = numeroDe(s);
+    if (dias) trp.push({ dias, contagem: contagemDoTrecho(s), peso: pesoDe(s), trecho: s, doTrp: false });
+  }
+  const p = escolher(trp);
+  const limpo = (s: string) => limparTrecho(s.charAt(0).toUpperCase() + s.slice(1));
+  return {
+    recebimento: { trpDias: p?.dias ?? 0, trpContagem: p?.contagem ?? 'CORRIDOS', trdDias: d.dias, trdContagem: d.contagem, trdInicio: d.doTrp ? 'TRP' : 'ENTREGA' },
+    trechos: [...(p ? [limpo(p.trecho)] : []), limpo(d.trecho)]
+  };
+}

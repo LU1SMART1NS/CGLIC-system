@@ -21,6 +21,7 @@ import { avisosDoReajusteDasAtas } from './reajusteAtasAvisos';
 import { fetchRegistrosFornecedorPncp, type RegistroFornecedorPncp } from './fornecedorAtaPncpService';
 import { fetchPrazosAConfirmar, type PrazoDaAta } from './ataPrazoEntregaService';
 import { textoDaRegra } from '../utils/fiscalizacaoPrazo';
+import { textoDaRegraDeRecebimento, type RegraDoRecebimento } from '../utils/fiscalizacaoRecebimento';
 import { fetchAusentesDaFonte, rotuloAusente, trabalhoNaFonte, type AusenteDaFonte } from './ausentesDaFonteService';
 import { fetchEmpenhadoAcima, textoDaOrigem, type EmpenhadoAcima } from './empenhadoAcimaService';
 import { fetchVinculosAConferir, numeroDoContrato, textoDoMotivoVinculo, trabalhoDoGestor, type VinculoAConferir } from './vinculosAConferirService';
@@ -462,10 +463,28 @@ export function calculateAttentionSummary(params: {
 
   // 0a. Prazo de entrega lido do TR ainda não confirmado (migration 301): o gestor da ata (ou o coordenador) confere
   // na Ata 360. Sem "Resolvido": some ao confirmar.
-  const prazoPorAta = new Map(prazosAta.filter((p) => !p.confirmadoEm).map((p) => [p.ataKey, p]));
+  const prazoPorAta = new Map(prazosAta.filter((p) => !p.confirmadoEm || !p.recebimentoConfirmadoEm).map((p) => [p.ataKey, p]));
   for (const arp of arps) {
     const p = prazoPorAta.get(chaveGestaoDaArp(arp));
     if (!p) continue;
+    // Prazo de entrega já confirmado: falta o do recebimento (TRP e TRD, migration 305).
+    if (p.confirmadoEm) {
+      const arpKeyR = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
+      const rec = p.recebimentoSugerido ? textoDaRegraDeRecebimento(p.recebimentoSugerido as RegraDoRecebimento) : null;
+      items.push({
+        id: `ATT-PRAZO-RECEB-${arpKeyR}`,
+        category: 'PRAZO_ENTREGA',
+        severity: rec ? 'INFO' : 'ATENCAO',
+        title: rec ? 'Confirmar o prazo de recebimento lido do TR' : 'Informar o prazo de recebimento',
+        description: `Ata ${arp.numeroAtaRegistroPreco} — ${rec ?? 'o TR não traz o TRP e o TRD, ou não foi lido'}; os contratos da ata herdam o prazo`,
+        arpKey: arpKeyR,
+        numeroAta: arp.numeroAtaRegistroPreco,
+        objetoItem: arp.objeto,
+        targetUrl: `/atas/detalhe/${encodeURIComponent(arpKeyR)}?aba=acoes`,
+        badgeLabel: rec ? 'a confirmar' : 'a informar'
+      });
+      continue;
+    }
     const sugerido = p.sugeridoDias && p.sugeridoInicio ? textoDaRegra({ dias: p.sugeridoDias, contagem: p.sugeridoContagem ?? 'CORRIDOS', inicio: p.sugeridoInicio }) : null;
     const arpKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
     items.push({

@@ -25,6 +25,8 @@ import {
   registrarRecebimentoOrdem,
   prorrogarPrazoEntregas,
   definirPrazoDoContrato,
+  definirPrazoDeRecebimento,
+  registrarComissaoRecebimento,
   type ContratoFiscalizacao,
   type DefinirFiscalizacaoInput,
   desfazerTransferenciaFiscal,
@@ -149,11 +151,23 @@ export const useDefinirResponsavelEntregas = () => useMutacaoDeEntregas(definirR
 export const useEncerrarEntregas = () => useMutacaoDeEntregas(encerrarEntregas);
 export const useRegistrarRecebimentoOrdem = () => useMutacaoDeEntregas(registrarRecebimentoOrdem);
 export const useProrrogarPrazoEntregas = () => useMutacaoDeEntregas(prorrogarPrazoEntregas);
+export const useRegistrarComissaoRecebimento = () => useMutacaoDeEntregas(registrarComissaoRecebimento);
 export function useDefinirPrazoDoContrato() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: definirPrazoDoContrato,
     onSuccess: () => qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY })
+  });
+}
+
+export function useDefinirPrazoDeRecebimento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: definirPrazoDeRecebimento,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: FISCALIZACAO_CONTRATOS_KEY });
+      qc.invalidateQueries({ queryKey: ['fiscalizacao'] });
+    }
   });
 }
 

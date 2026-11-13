@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lerPrazoDoTr } from '../trPrazoParser';
+import { lerPrazoDoTr, lerRecebimentoDoTr } from '../trPrazoParser';
 
 // Trechos dos editais do PNCP lidos na carga de 13/11/2026 (texto do unpdf).
 describe('prazo de entrega no TR', () => {
@@ -40,5 +40,37 @@ describe('prazo de entrega no TR', () => {
   });
   it('ignora prazos que não são de entrega (amostra, recolhimento)', () => {
     expect(lerPrazoDoTr('As amostras entregues deverão ser recolhidas pelos fornecedores no prazo de 30 (trinta) dias.').leitura).toBe('SEM_CLAUSULA');
+  });
+});
+
+describe('lerRecebimentoDoTr (TRP e TRD)', () => {
+  const AGU_TRP = 'Os bens serão recebidos provisoriamente, de forma sumária, no ato da entrega, juntamente com a nota fiscal ou instrumento de cobrança equivalente, pelo(a) responsável pelo acompanhamento e fiscalização do contrato.';
+  const AGU_TRD = 'O recebimento definitivo ocorrerá no prazo de 10 (dez) dias úteis, a contar do recebimento da nota fiscal ou instrumento de cobrança equivalente pela Administração, após a verificação da qualidade e quantidade do material.';
+  const SERVICO = 'Os serviços serão recebidos definitivamente no prazo de 30 (trinta) dias, contados do recebimento provisório, por servidor ou comissão designada pela autoridade competente, após a verificação da qualidade e quantidade do serviço.';
+
+  it('modelo da AGU: TRP no ato da entrega, TRD em 10 dias úteis da nota fiscal', () => {
+    const r = lerRecebimentoDoTr(`${AGU_TRP} ${AGU_TRD}`);
+    expect(r.recebimento).toEqual({ trpDias: 0, trpContagem: 'CORRIDOS', trdDias: 10, trdContagem: 'UTEIS', trdInicio: 'ENTREGA' });
+    expect(r.trechos).toHaveLength(2);
+    expect(r.trechos[0]).toMatch(/^Recebidos provisoriamente/);
+  });
+
+  it('o trecho de material vence o modelo de serviço que vem junto no TR', () => {
+    expect(lerRecebimentoDoTr(`${SERVICO} ${AGU_TRP} ${AGU_TRD}`).recebimento?.trdDias).toBe(10);
+  });
+
+  it('só o modelo de serviço: conta do recebimento provisório', () => {
+    expect(lerRecebimentoDoTr(SERVICO).recebimento).toMatchObject({ trdDias: 30, trdContagem: 'CORRIDOS', trdInicio: 'TRP' });
+  });
+
+  it('texto do PDF embaralhado: "quinze (15) dias" e o número depois da vírgula', () => {
+    expect(lerRecebimentoDoTr('O recebimento definitivo ocorrerá no prazo de quinze (15) dias úteis, a contar do cumprimento das etapas de entrega.').recebimento?.trdDias).toBe(15);
+    expect(lerRecebimentoDoTr('O recebimento definitivo ocorrerá no prazo de , a contar do recebimento da nota fiscal ou15 (quinze) dias corridos instrumento de cobrança.').recebimento).toMatchObject({ trdDias: 15, trdContagem: 'CORRIDOS', trdInicio: 'ENTREGA' });
+  });
+
+  it('TRP em dias e sem a cláusula do definitivo', () => {
+    expect(lerRecebimentoDoTr(`Os bens serão recebidos provisoriamente no prazo de 5 (cinco) dias úteis da entrega. ${AGU_TRD}`).recebimento).toMatchObject({ trpDias: 5, trpContagem: 'UTEIS' });
+    expect(lerRecebimentoDoTr(AGU_TRP)).toEqual({ recebimento: null, trechos: [] });
+    expect(lerRecebimentoDoTr('')).toEqual({ recebimento: null, trechos: [] });
   });
 });

@@ -13,7 +13,8 @@ import { AdminListShell } from '../admin/shared/AdminListShell';
 import { useAuth } from '../../context/AuthContext';
 import { useEntregasFiscalizacao, useFiscaisAtivos } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, fiscaisVisiveis } from '../../utils/fiscalizacao';
+import { NOME_SFC, fiscaisVisiveis, hojeEmBrasilia } from '../../utils/fiscalizacao';
+import { prazoDoItemNoRecebimento } from '../../utils/fiscalizacaoRecebimento';
 import { FASES_ENTREGA, etapaDef, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
 import { comQuemEstaOItem } from '../../utils/fiscalizacaoMesa';
 import { EntregasTabela } from './EntregasTabela';
@@ -25,9 +26,19 @@ const SEGMENTOS: Segmento[] = ['VOCE', 'OUTROS', 'TODAS', 'FINALIZADO'];
 const LADO: Record<'VOCE' | 'OUTROS' | 'FIM', Segmento> = { VOCE: 'VOCE', OUTROS: 'OUTROS', FIM: 'FINALIZADO' };
 /** Prazo do item como na aba Contratos: vencido, vence em 15 dias, em dia ou sem prazo, entregue. */
 const faixaDoPrazo = (e: EntregaFiscalizacao): string => {
-  if (e.entregueEm || e.responsavel === 'AREA') return 'entregue';
+  if (e.responsavel === 'AREA') return 'entregue';
+  // Entregue e ainda sem o envio para pagamento: vale o prazo do TRP, do TRD ou do envio (ou da cobrança à comissão).
+  const r = prazoDoItemNoRecebimento(e, hojeEmBrasilia());
+  if (r && r.dias != null) return r.dias < 0 ? 'danger' : r.tom === 'warning' || r.dias <= 15 ? 'warning' : 'neutral';
+  if (e.entregueEm) return 'entregue';
   const d = prazoDaEntrega(e).dias;
   return d == null ? 'neutral' : d < 0 ? 'danger' : d <= 15 ? 'warning' : 'neutral';
+};
+
+/** Dias até o prazo que vale agora (entrega, ou TRP/TRD/envio depois da entrega), para ordenar. */
+const diasDoPrazo = (e: EntregaFiscalizacao): number => {
+  const r = prazoDoItemNoRecebimento(e, hojeEmBrasilia());
+  return (r ? r.dias : prazoDaEntrega(e).dias) ?? 99999;
 };
 
 /** Fase da entrega no trilho; a da área requisitante não tem etapa e só aparece em Todas. */
@@ -74,8 +85,8 @@ export const FiscalizacaoEntregasPage: React.FC = () => {
         return true;
       })
       .sort((a, b) => {
-        const pa = prazoDaEntrega(a).dias ?? 99999;
-        const pb = prazoDaEntrega(b).dias ?? 99999;
+        const pa = diasDoPrazo(a);
+        const pb = diasDoPrazo(b);
         return pa - pb || a.contratoNumero.localeCompare(b.contratoNumero);
       });
   }, [doSeg, busca, prazo, quem, uf, fase, programa, itemAta]);

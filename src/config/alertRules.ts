@@ -197,9 +197,23 @@ export function isLembreteNaJanela(params: { diasRestantes: number; atrasado: bo
 // Parametrização (Administração > Regras de Alertas)
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// Fiscalização: recebimento (TRP e TRD) e envio para pagamento
+// Os dias do TRP e do TRD vêm do TR de cada ata (janela do prazo da ata) e podem ser corrigidos no contrato.
+// Aqui ficam só os números que valem para todos os contratos.
+// -----------------------------------------------------------------------------
+export const FISCALIZACAO_RULES = {
+  /** Prazo interno da CGLIC para mandar o processo ao pagamento depois do TRD (cabe nos 10 da liquidação, IN 77). */
+  envioPagamentoDiasUteis: 5,
+  /** Enviado à comissão de recebimento sem TRP: cobrar de novo depois de N dias do envio (ou da última cobrança). */
+  cobrarComissaoDias: 10,
+  /** O aviso do TRP, do TRD e do envio fica em atenção quando faltar até N dias. */
+  avisoAntesDias: 3
+};
+
 export type AlertRuleUnit = '%' | 'dias' | 'dias úteis' | 'dia do mês' | 'horas';
 
-export type AlertRuleGroupId = 'saldo' | 'tarefas' | 'vigencia' | 'motor' | 'reajuste' | 'prorrogacao' | 'pagamentos' | 'emendas' | 'sincronizacao';
+export type AlertRuleGroupId = 'saldo' | 'tarefas' | 'vigencia' | 'motor' | 'reajuste' | 'prorrogacao' | 'pagamentos' | 'emendas' | 'fiscalizacao' | 'sincronizacao';
 
 export interface AlertRuleDefinition {
   /** Chave estável gravada em alert_settings.key (caminho no objeto de regras). */
@@ -221,6 +235,7 @@ export const ALERT_RULE_GROUPS: Array<{ id: AlertRuleGroupId; label: string; des
   { id: 'prorrogacao', label: 'Prorrogação contratual', description: 'Faixas usadas nas orientações de prorrogação.' },
   { id: 'pagamentos', label: 'Acompanhamento de pagamentos', description: 'Prazos em dias úteis das faturas e do processo na CGOFI.' },
   { id: 'emendas', label: 'Emendas parlamentares', description: 'Prazo para receber a indicação do parlamentar antes do fim da ata: depois do empenho ainda é preciso assinar o contrato, e isso tem de acontecer antes do vencimento. Também o prazo da emenda sem pedido.' },
+  { id: 'fiscalizacao', label: 'Fiscalização: recebimento', description: 'Cobrança da comissão de recebimento, prazo do envio para pagamento e antecedência dos avisos de TRP, TRD e envio. Os dias do TRP e do TRD vêm do Termo de Referência de cada ata e podem ser corrigidos no contrato.' },
   { id: 'sincronizacao', label: 'Atualização dos dados da API', description: 'Quando a quantidade contratada lida da API é relida.' }
 ];
 
@@ -277,6 +292,10 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
   { key: 'emendas.validadeMinutaDiasUteis', group: 'emendas', label: 'Validade da minuta', hint: 'Prazo para o gabinete devolver o ofício. Depois dele, o pedido volta para nova minuta com o preço do dia.', unit: 'dias úteis', min: 1, max: 60 },
   { key: 'emendas.semPedidoDiasSemContato', group: 'emendas', label: 'Emenda sem pedido fica urgente após', hint: 'Dias sem contato registrado com a assessoria do parlamentar ou com a ASPAR dos órgãos. O aviso aparece desde o dia em que a emenda é registrada.', unit: 'dias', min: 1, max: 60 },
 
+  { key: 'fiscalizacao.envioPagamentoDiasUteis', group: 'fiscalizacao', label: 'Enviar para pagamento até', hint: 'Dias úteis depois do TRD. Precisa caber nos 10 dias úteis da liquidação (IN SEGES 77/2022, art. 7º, I).', unit: 'dias úteis', min: 1, max: 10 },
+  { key: 'fiscalizacao.cobrarComissaoDias', group: 'fiscalizacao', label: 'Cobrar a comissão de recebimento após', hint: 'Dias desde o envio à comissão (ou desde a última cobrança) sem o TRP.', unit: 'dias', min: 1, max: 60 },
+  { key: 'fiscalizacao.avisoAntesDias', group: 'fiscalizacao', label: 'Avisar o TRP, o TRD e o envio quando faltar', hint: 'Antes disso o item mostra só a data; vencido, o aviso fica urgente.', unit: 'dias', min: 0, max: 30 },
+
   { key: 'sincronizacao.quantidadeContratadaVencidaEmHoras', group: 'sincronizacao', label: 'Reler a quantidade contratada após', unit: 'horas', min: 1, max: 168 }
 ];
 
@@ -290,6 +309,7 @@ const RULE_TARGETS: Record<string, Record<string, any>> = {
   prorrogacao: PRORROGACAO_RULES,
   pagamento: PAGAMENTO_RULES,
   emendas: EMENDAS_RULES,
+  fiscalizacao: FISCALIZACAO_RULES,
   sincronizacao: SINCRONIZACAO_RULES
 };
 

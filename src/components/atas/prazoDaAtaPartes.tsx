@@ -5,6 +5,7 @@ import { carteiraDetalhe } from '../carteira/carteiraStyles';
 import type { AtaActionItem } from '../../services/ataActionQueueService';
 import type { PrazoDaAta } from '../../services/ataPrazoEntregaService';
 import { textoDaRegra } from '../../utils/fiscalizacaoPrazo';
+import { textoDaRegraDeRecebimento, type RegraDoRecebimento } from '../../utils/fiscalizacaoRecebimento';
 
 /** Item da aba Ações enquanto o prazo do TR não foi confirmado (migration 301). */
 export function itemDoPrazoDaAta(p: PrazoDaAta | null, temContratos = false, ataKey = ''): AtaActionItem | null {
@@ -14,7 +15,19 @@ export function itemDoPrazoDaAta(p: PrazoDaAta | null, temContratos = false, ata
       ? { id: `prazo-${ataKey}`, kind: 'PRAZO', severity: 'ATENCAO', title: 'Informar o prazo de entrega', description: 'os contratos da ata herdam o prazo do TR', badgeLabel: 'informar' }
       : null;
   }
-  if (p.confirmadoEm) return null;
+  // Prazo de entrega confirmado e o do recebimento ainda não (migration 305): o mesmo item, para o recebimento.
+  if (p.confirmadoEm) {
+    if (p.recebimentoConfirmadoEm) return null;
+    const rec = p.recebimentoSugerido ? textoDaRegraDeRecebimento(p.recebimentoSugerido as RegraDoRecebimento) : null;
+    return {
+      id: `prazo-receb-${p.ataKey}`,
+      kind: 'PRAZO',
+      severity: rec ? 'INFO' : 'ATENCAO',
+      title: rec ? 'Confirmar o prazo de recebimento lido do TR' : 'Informar o prazo de recebimento',
+      description: rec ?? 'o TR não traz o TRP e o TRD, ou não foi lido',
+      badgeLabel: rec ? undefined : 'informar'
+    };
+  }
   const sugerido = p.sugeridoDias && p.sugeridoInicio ? textoDaRegra({ dias: p.sugeridoDias, contagem: p.sugeridoContagem ?? 'CORRIDOS', inicio: p.sugeridoInicio }) : null;
   return {
     id: `prazo-${p.ataKey}`,
@@ -44,6 +57,13 @@ export const PrazoNoCartaoDaAta: React.FC<{ prazo: PrazoDaAta | null; carregando
         <span style={{ ...carteiraDetalhe, display: 'block', marginTop: 0 }}>
           {p.leitura ? 'do TR, ' : ''}confirmado por {p.confirmadoPorNome ?? '—'} em {quando}
           {itens ? ` · ${itens} ${itens === 1 ? 'item' : 'itens'} com prazo próprio` : ''} {corrigir}
+        </span>
+        <span style={{ ...carteiraDetalhe, display: 'block', marginTop: 0 }} data-testid="ata-prazo-cartao-recebimento">
+          {p.recebimentoConfirmadoEm ? (
+            p.recebimento ? `Recebimento: ${textoDaRegraDeRecebimento(p.recebimento as RegraDoRecebimento)}` : 'Recebimento: o TR não traz o prazo'
+          ) : (
+            <>Recebimento <StatusBadge label="a confirmar" variant="warning" size="sm" dot={false} /></>
+          )}
         </span>
       </span>
     );

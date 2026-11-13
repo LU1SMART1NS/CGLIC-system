@@ -1,5 +1,6 @@
 import type { EntregaFiscalizacao, EtapaEntrega } from '../services/fiscalizacaoService';
-import { NOME_SFC, dataBR } from './fiscalizacao';
+import { NOME_SFC, dataBR, hojeEmBrasilia } from './fiscalizacao';
+import { cobrancaDaComissao, prazoDoRecebimento } from './fiscalizacaoRecebimento';
 import { itemConcluido, prazoDaEntrega, rotuloDoBeneficiario, textoDoAviso } from './fiscalizacaoEntregas';
 import { gruposALigar } from './fiscalizacaoLigacao';
 import { gruposSemCadastro } from './fiscalizacaoBeneficiarioLigacao';
@@ -18,7 +19,7 @@ const quem = (es: EntregaFiscalizacao[]) => {
 const menorData = (es: EntregaFiscalizacao[]) => es.map((e) => e.prevista).filter((d): d is string => Boolean(d)).sort()[0] ?? null;
 export const EM_EXECUCAO = new Set(['ORDEM', 'PRODUCAO', 'TRANSITO', 'RETIRADA']);
 
-type Abrir = (tipo: 'etapa' | 'encerrar' | 'recebimento' | 'prorrogar', itens: EntregaFiscalizacao[], inicial?: EtapaEntrega) => void;
+type Abrir = (tipo: 'etapa' | 'encerrar' | 'recebimento' | 'prorrogar' | 'comissao' | 'cobranca', itens: EntregaFiscalizacao[], inicial?: EtapaEntrega) => void;
 
 /** O que fazer agora no contrato, juntando os itens que estão no mesmo passo (o status anda em bloco). */
 export function linhasDoContrato(es: EntregaFiscalizacao[], semProcesso: boolean, abrir: Abrir, processo: () => void): { comVoce: Linha[]; comOutros: Linha[] } {
@@ -42,10 +43,57 @@ export function linhasDoContrato(es: EntregaFiscalizacao[], semProcesso: boolean
   // Prazo pela Ordem (migration 294): sem o recebimento da Ordem pelo fornecedor, não há prazo pela regra.
   const semData = de((e) => EM_EXECUCAO.has(e.etapa) && !e.prevista && e.prazoInicio !== 'EXERCITO');
   if (semData.length) comVoce.push({ chave: 'data', tom: 'eu', titulo: `Informar o recebimento da Ordem · ${itens(semData.length)} sem prazo`, detalhe: `${quem(semData)} · o prazo corre do dia em que o fornecedor recebeu a Ordem`, acoes: [{ rotulo: 'Informar o recebimento', principal: true, faz: () => abrir('recebimento', semData) }] });
+  // Recebimento (TRP, TRD) e envio para pagamento: prazo pela regra do TR (ou do contrato); a menor data do grupo.
+  const semEntrega = de((e) => e.etapa === 'ENTREGUE' && !e.entregueEm);
+  if (semEntrega.length) comVoce.push({ chave: 'entrega', tom: 'eu', titulo: `Registrar a data da entrega · ${itens(semEntrega.length)}`, detalhe: `${quem(semEntrega)} · o prazo do TRP e do TRD conta dela`, acoes: [mudar('Registrar a entrega', semEntrega)] });
+  const hoje = hojeEmBrasilia();
+  const recebimento: Array<[string, (e: EntregaFiscalizacao) => boolean, string, string]> = [
+    ['provisorio', (e) => e.etapa === 'ENTREGUE' && Boolean(e.entregueEm) && !e.comissaoEnviadaEm, 'Enviar à comissão de recebimento', 'Registrar o envio à comissão'],
+    ['definitivo', (e) => e.etapa === 'TRP', 'Emitir o TRD', 'Registrar o TRD'],
+    ['pagamento', (e) => e.etapa === 'TRD', 'Enviar para pagamento e doação', 'Registrar o envio']
+  ];
+  for (const [chave, f, titulo, botao] of recebimento) {
+    const x = de(f);
+    if (!x.length) continue;
+    const prazos = x.map((e) => prazoDoRecebimento(e, hoje)).filter((p) => p?.limite).sort((a, b) => a!.limite!.localeCompare(b!.limite!));
+    const p = prazos[0];
+    const vencidos = prazos.filter((q) => q!.tom === 'danger').length;
+    const semRegra = !p && x.some((e) => e.regraDeRecebimento === false);
+    comVoce.push({
+      chave,
+      tom: p?.tom === 'danger' ? 'vencido' : 'eu',
+      titulo: `${titulo} · ${itens(x.length)}${p?.tom === 'danger' ? ` · vencido há ${-p.dias!} ${p.dias === -1 ? 'dia' : 'dias'}` : p?.dias === 0 ? ' · vence hoje' : ''}`,
+      detalhe: `${quem(x)}${vencidos && vencidos < x.length ? ` · ${vencidos} vencido${vencidos === 1 ? '' : 's'}` : ''}${semRegra ? ' · prazo de recebimento a informar' : ''}`,
+      prazo: p ? dataBR(p.limite) : undefined,
+      vencido: p?.tom === 'danger',
+      limite: p?.limite ?? null,
+      acoes: chave === 'provisorio' ? [{ rotulo: botao, principal: true, faz: () => abrir('comissao', x) }, { rotulo: 'Registrar o TRP', faz: () => abrir('etapa', x) }] : [mudar(botao, x)]
+    });
+  }
+  // Com a comissão de recebimento: espera o TRP; passados os dias da regra sem TRP, volta ao fiscal para cobrar.
+  const naComissao = de((e) => Boolean(cobrancaDaComissao(e, hoje)));
+  const cobrar = naComissao.filter((e) => cobrancaDaComissao(e, hoje)!.vencida);
+  const aguardando = naComissao.filter((e) => !cobrancaDaComissao(e, hoje)!.vencida);
+  if (cobrar.length) {
+    const maisAntigo = Math.max(...cobrar.map((e) => cobrancaDaComissao(e, hoje)!.dias));
+    const cobrados = Math.max(...cobrar.map((e) => e.comissaoCobrancas ?? 0));
+    const limite = cobrar.map((e) => cobrancaDaComissao(e, hoje)!.cobrarEm).sort()[0];
+    comVoce.push({
+      chave: 'cobrar-comissao',
+      tom: 'vencido',
+      titulo: `Cobrar a comissão de recebimento · ${itens(cobrar.length)} sem TRP`,
+      detalhe: `${quem(cobrar)} · enviado${cobrar.length === 1 ? '' : 's'} há ${maisAntigo} dias${cobrados ? ` · já cobrada ${cobrados === 1 ? '1 vez' : `${cobrados} vezes`}` : ''}`,
+      prazo: dataBR(limite),
+      vencido: true,
+      limite,
+      acoes: [{ rotulo: 'Registrar a cobrança', principal: true, faz: () => abrir('cobranca', cobrar) }, { rotulo: 'Registrar o TRP', faz: () => abrir('etapa', cobrar) }]
+    });
+  }
+  if (aguardando.length) {
+    const limite = aguardando.map((e) => cobrancaDaComissao(e, hoje)!.cobrarEm).sort()[0];
+    comOutros.push({ chave: 'comissao', tom: 'espera', quem: 'Comissão de recebimento', titulo: `Emitir o TRP · ${itens(aguardando.length)}`, detalhe: `${quem(aguardando)} · cobrar em ${dataBR(limite)} se não vier`, prazo: dataBR(limite), limite, acoes: [{ rotulo: 'Registrar o TRP', faz: () => abrir('etapa', aguardando) }] });
+  }
   const passos: Array<[string, (e: EntregaFiscalizacao) => boolean, string, string]> = [
-    ['provisorio', (e) => e.etapa === 'ENTREGUE', 'Receber provisoriamente', 'Registrar o recebimento'],
-    ['definitivo', (e) => e.etapa === 'TRP', 'Receber em definitivo', 'Registrar o recebimento'],
-    ['pagamento', (e) => e.etapa === 'TRD', 'Enviar para pagamento e doação', 'Registrar o envio'],
     ['sal', (e) => e.etapa === 'PAGAMENTO' && Boolean(e.pagoEm) && e.origem === 'EMENDA', 'Enviar o Ofício à SAL', 'Registrar o ofício'],
     ['finalizar', (e) => e.etapa === 'PAGAMENTO' && Boolean(e.pagoEm) && e.origem !== 'EMENDA', 'Finalizar a fiscalização', 'Finalizar']
   ];
@@ -74,6 +122,8 @@ export function comQuemEstaOItem(e: EntregaFiscalizacao): 'VOCE' | 'OUTROS' | 'F
   if (e.etapa === 'INFO_PEDIDA' || e.etapa === 'CONTROLADO') return 'OUTROS';
   if (EM_EXECUCAO.has(e.etapa)) return (!e.prevista && e.prazoInicio !== 'EXERCITO') || prazoDaEntrega(e).tom === 'danger' ? 'VOCE' : 'OUTROS';
   if (e.etapa === 'PAGAMENTO') return e.pagoEm ? 'VOCE' : 'OUTROS';
+  const comissao = cobrancaDaComissao(e, hojeEmBrasilia());
+  if (comissao) return comissao.vencida ? 'VOCE' : 'OUTROS';
   return 'VOCE';
 }
 
