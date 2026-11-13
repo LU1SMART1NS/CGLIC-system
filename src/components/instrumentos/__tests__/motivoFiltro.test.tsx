@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { motivoDoEndereco, motivoNoFiltro } from '../gestaoInstrumentosRowHelpers';
 import { GestaoInstrumentosCompactFilters } from '../GestaoInstrumentosCompactFilters';
-import { chaveDoMotivo, motivoDoLembrete, motivoDoReajuste } from '../../../utils/motivoDetalhe';
+import { MOTIVO_CONTRATADO_ACIMA_DA_COTA, MOTIVO_QUANTITATIVOS_A_CONFERIR, chaveDoMotivo, motivoDoLembrete, motivoDoReajuste } from '../../../utils/motivoDetalhe';
 
 describe('Motivo detalhado (lembrete e reajuste)', () => {
   it('lembrete: o motivo é a regra, com chave sem o prazo entre parênteses', () => {
@@ -33,6 +33,14 @@ describe('Motivo no filtro conforme a aba', () => {
     expect(motivoNoFiltro(reajuste, true)).toEqual({ value: 'REAJUSTE_RADAR.VENCIDA', label: 'Data-base vencida' });
     expect(motivoNoFiltro(reajuste, false).value).toBe('REAJUSTE_RADAR');
     expect(motivoNoFiltro({ category: 'ATA_CRITICA' }, true).value).toBe('ATA_CRITICA');
+  });
+
+  it('Quantitativos separa o remanejamento mesmo na aba Saldos, que tem várias categorias', () => {
+    const remanejar = { category: 'QUANTITATIVOS' as const, motivoDetalhe: MOTIVO_CONTRATADO_ACIMA_DA_COTA };
+    const conferir = { category: 'QUANTITATIVOS' as const, motivoDetalhe: MOTIVO_QUANTITATIVOS_A_CONFERIR };
+    expect(motivoNoFiltro(remanejar, false)).toEqual({ value: 'QUANTITATIVOS.remanejamento', label: 'Contratado acima da cota (pedir remanejamento)' });
+    expect(motivoNoFiltro(conferir, false)).toEqual({ value: 'QUANTITATIVOS.a-conferir', label: 'Quantitativos a conferir' });
+    expect(motivoDoEndereco('QUANTITATIVOS.remanejamento')).toBe('QUANTITATIVOS.remanejamento');
   });
 
   it('endereço: aceita categoria conhecida, com ou sem detalhe; o resto vira TODAS', () => {

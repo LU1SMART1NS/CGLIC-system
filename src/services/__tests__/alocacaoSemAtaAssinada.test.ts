@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { calculateAttentionSummary, motivosDosQuantitativos } from '../dashboardService';
-import { alocadoAcimaDoLimite, limiteProvisorio, resumirAtaAssinada, situacaoAtaAssinada } from '../../utils/ataAssinadaPendente';
+import { alocadoAcimaDoLimite, contratadoAcimaDoLimite, limiteProvisorio, resumirAtaAssinada, situacaoAtaAssinada } from '../../utils/ataAssinadaPendente';
 
 // Linha de v_arp_item_saldo_detalhado com as colunas da migration 116. Números reais do tablet 00059/2025 item 1
 // (registrado da SENASP 801, alocado 690, 22 outros órgãos), sem a ata assinada informada.
@@ -74,6 +74,43 @@ describe('Início — alocado acima do limite', () => {
 
   it('dentro do limite e sem a ata assinada: nenhum aviso de quantitativos', () => {
     expect(avisos([linha()])).toEqual([]);
+  });
+
+  it('só alocado acima (contratado dentro da cota): diminuir a alocação, motivo "a conferir"', () => {
+    const [a] = avisos([linha({ ata_assinada_informada: true, quantidade_base_senasp: 650, quantidade_consumida: 600 })]);
+    expect(a).toMatchObject({ title: 'Quantitativos do item a conferir', badgeLabel: 'alocado acima', motivoDetalhe: { chave: 'a-conferir' } });
+  });
+});
+
+// Tablet 00059/2025 item 1 em 13/11/2026: cota 400, contratado 690, alocado 690.
+describe('Início — contratado acima da cota', () => {
+  const avisos = (arpItems: any[]) =>
+    calculateAttentionSummary({ arpItems, currentDate: new Date('2026-11-13T12:00:00') } as any).items.filter((i) => i.category === 'QUANTITATIVOS');
+  const tablet = (over: Record<string, unknown> = {}) =>
+    linha({ ata_assinada_informada: true, quantidade_base_senasp: 400, quantidade_consumida: 690, total_alocado_unidades: 690, ...over });
+
+  it('pede remanejamento do que passou e não manda diminuir a alocação', () => {
+    expect(contratadoAcimaDoLimite(tablet())).toBe(290);
+    const [a] = avisos([tablet()]);
+    expect(a).toMatchObject({
+      severity: 'ATENCAO',
+      title: 'Contratado acima da cota: pedir remanejamento',
+      badgeLabel: 'pedir remanejamento',
+      motivoDetalhe: { chave: 'remanejamento', label: 'Contratado acima da cota (pedir remanejamento)' }
+    });
+    expect(a.description).toBe('Ata 00059/2025 — Item 00001: contratado (690) acima da cota própria da SENASP (400): peça remanejamento de 290');
+    expect(a.description).not.toContain('diminua');
+  });
+
+  it('alocado ainda mais acima que o contratado: continua só o remanejamento', () => {
+    const m = motivosDosQuantitativos(tablet({ total_alocado_unidades: 746 }));
+    expect(m.map((x) => x.selo)).toEqual(['pedir remanejamento']);
+  });
+
+  it('cota negativa fica com o aviso crítico próprio', () => {
+    const m = motivosDosQuantitativos(tablet({ quantidade_base_senasp: -15 }));
+    expect(m.map((x) => x.selo)).not.toContain('pedir remanejamento');
+    expect(m[0].critico).toBe(true);
   });
 });
 
