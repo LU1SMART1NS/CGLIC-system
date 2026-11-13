@@ -34,6 +34,7 @@ import {
   GESTOR_SALDO_ROLE_ID,
   GESTOR_SALDO_PERMISSIONS_DESCRIPTION
 } from '../../types/user';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 export const UsersManagement: React.FC = () => {
   const { data: users = [], isLoading, isError, error: erroUsuarios, refetch: recarregarUsuarios } = useUsers();
@@ -313,11 +314,11 @@ export const UsersManagement: React.FC = () => {
               render: (user) => {
                 const isInactive = user.status === 'inativo' || user.ativo === false;
                 return user.status === 'pendente' ? (
-                  <StatusBadge variant="warning" label="Convite pendente" />
+                  <StatusBadge variant={COR_DA_SITUACAO.ANDAMENTO} label="Convite pendente" />
                 ) : isInactive ? (
-                  <StatusBadge variant="neutral" label="Inativo" />
+                  <StatusBadge variant={COR_DA_SITUACAO.NEUTRO} label="Inativo" />
                 ) : (
-                  <StatusBadge variant="success" label="Ativo" />
+                  <StatusBadge variant={COR_DA_SITUACAO.CONCLUIDO} label="Ativo" />
                 );
               }
             }

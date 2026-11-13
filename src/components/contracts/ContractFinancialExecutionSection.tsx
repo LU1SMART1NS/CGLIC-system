@@ -51,6 +51,7 @@ import {
   type Column
 } from '../../design-system';
 import { formatCurrencyOrDash, formatDateBR } from '../../utils/format';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 interface ContractFinancialExecutionSectionProps {
   contract: ContractDashboardRecord;
@@ -252,7 +253,7 @@ export const EmpenhoDetalhe: React.FC<{
                 dot={false}
               />
             ) : (
-              <StatusBadge label={d.situacao === 'REVISAR' ? 'Revisar o vínculo aos itens' : 'A vincular aos itens'} variant="warning" size="sm" dot={false} />
+              <StatusBadge label={d.situacao === 'REVISAR' ? 'Revisar o vínculo aos itens' : 'A vincular aos itens'} variant={d.situacao === 'REVISAR' ? COR_DA_SITUACAO.ATENCAO : COR_DA_SITUACAO.ANDAMENTO} size="sm" dot={false} />
             )}
             {sugestao && <span style={{ color: 'var(--text-muted)' }}>sugestão: {sugestao}</span>}
             {fechada && d.origem === 'VALOR' && (

@@ -3,6 +3,7 @@ import { AppButton, StatusBadge } from '../../design-system';
 import { legendaDaQuantidade } from '../../utils/contratadoPorUnidade';
 import type { QuantidadeDoContrato } from '../../services/contratadoUnidadeService';
 import { formatNumber } from './itemBalanceUtils';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 const sub: React.CSSProperties = { display: 'block', fontFamily: 'var(--font-family)', fontWeight: 500, fontSize: '0.75rem', color: 'var(--text-muted)' };
 
@@ -28,7 +29,7 @@ export const QuantidadeContratadaCelula: React.FC<{
       )}{' '}
       {q.ajustada && (
         <span style={{ fontFamily: 'var(--font-family)' }}>
-          <StatusBadge label="Ajustada" variant="warning" size="sm" dot={false} testId={`qtd-ajustada-${q.contractKey}`} />
+          <StatusBadge label="Ajustada" variant={COR_DA_SITUACAO.NEUTRO} size="sm" dot={false} testId={`qtd-ajustada-${q.contractKey}`} />
         </span>
       )}
       {mostrarLegenda && <span style={sub}>{legenda.linha}</span>}

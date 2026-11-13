@@ -45,6 +45,7 @@ import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
 import { naoCarregou, useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
 import { ListaNaoCarregou } from '../fonte/ListaNaoCarregou';
 import { ROTULOS_CARTEIRA_ITENS } from '../../hooks/useCarteiraItens';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 
 interface Filtros {
@@ -72,9 +73,9 @@ const SCHEMA: CarteiraFilterSchema<Filtros> = {
 const CINZA = '#94a3b8';
 /** Selo da divisão na ata, abaixo do número. */
 const SELO_DIVISAO: Record<SituacaoDivisao, { label: string; variant: 'info' | 'neutral' | 'warning'; title: string }> = {
-  DIVIDE: { label: 'Divisão pela ata', variant: 'info', title: 'A ata assinada divide o quantitativo SENASP entre as unidades internas: a alocação é a da ata.' },
-  NAO_DIVIDE: { label: 'Ata sem divisão', variant: 'neutral', title: 'A ata assinada não divide o quantitativo SENASP: alocar às unidades é opcional, sem pendência.' },
-  A_CONFERIR: { label: 'Divisão a conferir', variant: 'warning', title: 'Ninguém conferiu ainda se a ata divide o quantitativo SENASP entre as unidades internas.' }
+  DIVIDE: { label: 'Divisão pela ata', variant: COR_DA_SITUACAO.ANDAMENTO, title: 'A ata assinada divide o quantitativo SENASP entre as unidades internas: a alocação é a da ata.' },
+  NAO_DIVIDE: { label: 'Ata sem divisão', variant: COR_DA_SITUACAO.NEUTRO, title: 'A ata assinada não divide o quantitativo SENASP: alocar às unidades é opcional, sem pendência.' },
+  A_CONFERIR: { label: 'Divisão a conferir', variant: COR_DA_SITUACAO.ATENCAO, title: 'Ninguém conferiu ainda se a ata divide o quantitativo SENASP entre as unidades internas.' }
 };
 const origemDaDivisao = (d: DivisaoNaAta) =>
   d.situacao === 'A_CONFERIR' ? 'Ainda não conferida.' : d.fonte === 'PESSOA' && d.marcadoEm ? `Marcado por ${d.marcadoPorNome ?? 'alguém'} em ${formatDateBR(d.marcadoEm.slice(0, 10))}.` : '';

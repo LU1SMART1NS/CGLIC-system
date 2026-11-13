@@ -74,7 +74,7 @@ describe('textos da distribuição', () => {
   it('rótulo da situação: vínculo automático e manual aparecem diferentes', () => {
     expect(rotuloDaSituacao(dist({ situacao: 'DISTRIBUIDA', origem: 'AUTO' })).label).toBe('Vinculada automaticamente');
     expect(rotuloDaSituacao(dist({ situacao: 'DISTRIBUIDA', origem: 'USUARIO' })).label).toBe('Vinculada');
-    expect(rotuloDaSituacao(dist({ situacao: 'REVISAR' })).variant).toBe('danger');
+    expect(rotuloDaSituacao(dist({ situacao: 'REVISAR' })).variant).toBe('warning');
   });
 
   it('vínculo pela nota no SIAFI: rótulo próprio, edita mas não desfaz; a quantidade da nota vale antes da calculada', () => {
