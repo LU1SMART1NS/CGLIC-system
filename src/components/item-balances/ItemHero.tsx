@@ -160,7 +160,7 @@ export const ItemHero: React.FC<ItemHeroProps> = ({
             onClick={handleAction}
             disabled={busy}
             isLoading={busy}
-            title="Recarrega os dados desta tela e, para gestores, relê da API a quantidade do item nos contratos vinculados (as notas de empenho vêm da sincronização do servidor)"
+            title="Recarrega os dados desta tela e, para gestores, relê no Contratos.gov.br a quantidade do item nos contratos vinculados"
           >
             {busy ? 'Atualizando...' : 'Atualizar'}
           </ActionButton>

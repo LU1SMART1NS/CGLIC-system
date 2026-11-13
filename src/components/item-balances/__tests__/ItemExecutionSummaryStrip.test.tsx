@@ -53,7 +53,7 @@ describe('ItemExecutionSummaryStrip', () => {
   });
 
   it('avisa quando faltam quantidades de contratos ainda não lidas', () => {
-    expect(html({ summary: { ...summary, contratosSemQuantidade: 2 } })).toContain('2 contratos sem quantidade lida da API');
+    expect(html({ summary: { ...summary, contratosSemQuantidade: 2 } })).toContain('2 contratos sem quantidade no Contratos.gov.br');
   });
 
   it('o Compras.gov acima do contratado vira aviso, sem alterar o saldo', () => {
