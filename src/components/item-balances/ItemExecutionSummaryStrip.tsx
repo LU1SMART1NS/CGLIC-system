@@ -49,7 +49,7 @@ export const ItemExecutionSummaryStrip: React.FC<ItemExecutionSummaryStripProps>
       extra={
         s.contratosSemQuantidade > 0 ? (
           <StatusBadge
-            label={`${s.contratosSemQuantidade} ${s.contratosSemQuantidade === 1 ? 'contrato' : 'contratos'} sem quantidade lida da API`}
+            label={`${s.contratosSemQuantidade} ${s.contratosSemQuantidade === 1 ? 'contrato' : 'contratos'} sem quantidade no Contratos.gov.br`}
             variant="warning"
             size="sm"
             dot={false}

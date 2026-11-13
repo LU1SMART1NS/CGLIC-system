@@ -272,7 +272,7 @@ export const GruposUasgsPage: React.FC = () => {
 
       {consulta.data === null ? (
         <NoticeBar tone="warning" testId="grupos-uasgs-sem-migration">
-          O banco ainda não tem os grupos das UASGs (migration 139). A tela funciona depois que ela for aplicada.
+          Os grupos das UASGs ainda não estão disponíveis.
         </NoticeBar>
       ) : (
         <>

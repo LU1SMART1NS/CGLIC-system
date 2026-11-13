@@ -352,7 +352,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
       const { total, falhas } = await syncLinkedContracts();
       if (total === 0) return;
       if (falhas > 0) {
-        toast.error(`${falhas} de ${total} ${total === 1 ? 'contrato não pôde ser atualizado' : 'contratos não puderam ser atualizados'} a partir da API. Tente novamente em instantes.`);
+        toast.error(`${falhas} de ${total} ${total === 1 ? 'contrato não pôde ser atualizado' : 'contratos não puderam ser atualizados'} pelo Contratos.gov.br. Tente novamente em instantes.`);
       } else {
         toast.success(total === 1 ? 'Contrato e empenhos atualizados.' : `${total} contratos e seus empenhos atualizados.`);
       }
