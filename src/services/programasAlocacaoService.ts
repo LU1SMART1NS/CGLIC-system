@@ -120,3 +120,25 @@ export async function remanejarEntreUnidades(v: { itemKey: string; de: string; p
   });
   if (error) throw Object.assign(new Error(semPrefixo(mensagemDeErro(error))), { sqlState: error.code });
 }
+
+/** Programa de cada unidade na divisão de UM contrato no item (contrato_item_divisao_unidades.programa_id). */
+export async function fetchProgramasDaDivisao(itemKey: string, contractKey: string): Promise<Map<string, string | null>> {
+  if (!supabase) return new Map();
+  const { data, error } = await supabase
+    .from('contrato_item_divisao_unidades')
+    .select('unit_name, programa_id')
+    .eq('item_key', itemKey)
+    .eq('contract_key', contractKey);
+  if (error) {
+    // Banco sem a migration 297: sem programa.
+    if (error.code === '42703') return new Map();
+    throw new Error(semPrefixo(mensagemDeErro(error)));
+  }
+  return new Map(((data ?? []) as Array<Record<string, any>>).map((r) => [String(r.unit_name), r.programa_id ?? null]));
+}
+
+/** Liga (ou desliga, com null) a parte de uma unidade no contrato a um programa da unidade. */
+export async function ligarContratoAoPrograma(itemKey: string, contractKey: string, unidade: string, programaId: string | null): Promise<void> {
+  const { error } = await banco().rpc('ligar_contrato_ao_programa', { p_item_key: itemKey, p_contract_key: contractKey, p_unit: unidade, p_programa: programaId });
+  if (error) throw new Error(semPrefixo(mensagemDeErro(error)));
+}

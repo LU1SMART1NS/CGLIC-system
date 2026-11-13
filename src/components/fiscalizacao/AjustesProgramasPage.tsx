@@ -13,7 +13,7 @@ import { carteiraDetalhe, carteiraIdentificacao, carteiraValor } from '../cartei
 import { useAuth } from '../../context/AuthContext';
 import { useExcluirProgramaFiscalizacao, useProgramasFiscalizacao, useSalvarProgramaFiscalizacao } from '../../hooks/useFiscalizacao';
 import type { ProgramaFiscalizacao } from '../../services/fiscalizacaoService';
-import { numero, ROTULO_ORIGEM } from '../../utils/fiscalizacaoResumo';
+import { numero } from '../../utils/fiscalizacaoResumo';
 import { ProgramaModal } from './ProgramaModal';
 
 /**
@@ -41,7 +41,7 @@ export const AjustesProgramasPage: React.FC = () => {
       if (!ok) return;
     }
     try {
-      await salvar.mutateAsync({ id: p.id, nome: p.nome, unidadeId: p.unidadeId ?? '', origem: p.origemRecurso ?? 'OUTRO', ativo: !p.ativo });
+      await salvar.mutateAsync({ id: p.id, nome: p.nome, unidadeId: p.unidadeId ?? '', ativo: !p.ativo });
       toast.success(`Programa "${p.nome}" ${p.ativo ? 'inativado' : 'ativado'}.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Não foi possível mudar a situação do programa.');
@@ -64,7 +64,6 @@ export const AjustesProgramasPage: React.FC = () => {
   const colunas: Column<ProgramaFiscalizacao>[] = [
     { key: 'nome', header: 'Programa', minWidth: '220px', priority: 'primary', sortValue: (p) => p.nome, render: (p) => <span style={carteiraIdentificacao}>{p.nome}</span> },
     { key: 'area', header: 'Área responsável', sortValue: (p) => p.unidadeSigla ?? '', render: (p) => <span style={carteiraValor}>{p.unidadeSigla ?? '—'}</span> },
-    { key: 'origem', header: 'Origem do recurso', sortValue: (p) => (p.origemRecurso ? ROTULO_ORIGEM[p.origemRecurso] : ''), render: (p) => <span>{p.origemRecurso ? ROTULO_ORIGEM[p.origemRecurso] : '—'}</span> },
     { key: 'itens', header: 'Itens no programa', sortValue: (p) => p.itens, sortFirstDir: 'desc', render: (p) => (p.itens ? <span style={carteiraValor}>{numero(p.itens)} {p.itens === 1 ? 'item' : 'itens'}</span> : <span style={{ ...carteiraDetalhe, marginTop: 0 }}>nenhum item</span>) },
     { key: 'situacao', header: 'Situação', sortValue: (p) => (p.ativo ? 0 : 1), render: (p) => <StatusBadge label={p.ativo ? 'Ativo' : 'Inativo'} variant={p.ativo ? 'success' : 'neutral'} size="sm" dot={false} /> }
   ];
@@ -73,8 +72,8 @@ export const AjustesProgramasPage: React.FC = () => {
     <PageContainer style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <PageHeader
         title="Programas"
-        subtitle="Cadastro dos programas acompanhados pela Fiscalização."
-        hint="Aqui se criam, editam, inativam e excluem os programas. Os itens dos contratos entram pela tela do programa (Fiscalização › Programas › Incluir itens no programa). Programa com itens não se exclui, só se inativa: sai das listas da Fiscalização e o histórico fica, como em Usuários e Unidades Internas."
+        subtitle="Cadastro dos programas e projetos da SENASP: Fiscalização e reservas na Alocação."
+        hint="A área responsável é a unidade interna dona do programa: as reservas dele na Alocação ficam na cota dela. A fonte do recurso não é registrada no programa. Aqui se criam, editam, inativam e excluem os programas. Os itens dos contratos entram pela tela do programa (Fiscalização › Programas › Incluir itens no programa). Programa com itens não se exclui, só se inativa: sai das listas da Fiscalização e o histórico fica, como em Usuários e Unidades Internas."
         icon={<Network size={26} color="var(--primary)" aria-hidden="true" />}
         actions={podeCadastrar ? <ActionButton action="novo" size="sm" label="Novo programa" onClick={() => setEditando('novo')} data-testid="ajustes-programas-novo" /> : undefined}
       />
