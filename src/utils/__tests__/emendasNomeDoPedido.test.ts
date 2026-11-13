@@ -16,7 +16,7 @@ describe('nome do pedido nas telas (migration 217): o sequencial do banco não a
   it('antes da emenda é uma reserva, pela data; da planilha, sem data; endereço interno', () => {
     expect(nomeDoPedido(base)).toBe('Reserva de 02/09/2026');
     expect(pedidoEmTexto(base)).toBe('pedido reservado em 02/09/2026');
-    expect(nomeDoPedido({ ...base, origem: 'PLANILHA' })).toBe('Reserva da planilha');
+    expect(nomeDoPedido({ ...base, origem: 'PLANILHA' })).toBe('Reserva sem data');
     expect(rotaDoPedido(base)).toBe('/emendas/pedidos/id/uuid-1');
   });
 

@@ -39,18 +39,18 @@ export function nomeDoPedido(p: Pick<IdentidadeDoPedido, 'numeroNoAno' | 'anoDoN
   const numero = numeroDoPedido(p);
   if (numero) return `Pedido ${numero}`;
   if (p.siopEmenda) return `Pedido da emenda ${emendaEmTexto(p.siopEmenda)}`;
-  return p.origem === 'PLANILHA' ? 'Reserva da planilha' : `Reserva de ${dataCurta(p.reservadoEm)}`;
+  return p.origem === 'PLANILHA' ? 'Reserva sem data' : `Reserva de ${dataCurta(p.reservadoEm)}`;
 }
 
 /**
  * O pedido no meio de uma frase, sempre começando por "pedido" (concorda com "o ... foi cancelado"): "pedido 1/2026",
- * "pedido da emenda 4014 0004", "pedido da planilha" ou "pedido reservado em 02/09/2026".
+ * "pedido da emenda 4014 0004", "pedido sem data de reserva" ou "pedido reservado em 02/09/2026".
  */
 export function pedidoEmTexto(p: Pick<IdentidadeDoPedido, 'numeroNoAno' | 'anoDoNumero' | 'siopEmenda' | 'reservadoEm' | 'origem'>): string {
   const numero = numeroDoPedido(p);
   if (numero) return `pedido ${numero}`;
   if (p.siopEmenda) return `pedido da emenda ${emendaEmTexto(p.siopEmenda)}`;
-  return p.origem === 'PLANILHA' ? 'pedido da planilha' : `pedido reservado em ${dataCurta(p.reservadoEm)}`;
+  return p.origem === 'PLANILHA' ? 'pedido sem data de reserva' : `pedido reservado em ${dataCurta(p.reservadoEm)}`;
 }
 
 /**
