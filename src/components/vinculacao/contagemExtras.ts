@@ -1,9 +1,12 @@
 import { useSyncExternalStore } from 'react';
 import type { CarteiraItemRow } from '../../utils/carteiraItens';
 
-/** Itens da carteira que ainda pedem alocação: sem alocação ou parcialmente alocados, em atas vigentes e com quantitativo SENASP. */
-export function contarItensAAlocar(rows: Pick<CarteiraItemRow, 'quantitativoSenasp' | 'faixa' | 'nivelAlocacao'>[]): number {
-  return rows.filter((r) => r.quantitativoSenasp > 0 && r.faixa !== 'EXPIRADO' && r.nivelAlocacao !== 'TOTAL').length;
+/**
+ * Itens da carteira que ainda pedem alocação: sem alocação ou parcialmente alocados, em atas vigentes e com quantitativo
+ * SENASP. Itens de ata que não divide entre as unidades (migration 297) não contam: alocar ali é opcional.
+ */
+export function contarItensAAlocar(rows: Pick<CarteiraItemRow, 'quantitativoSenasp' | 'faixa' | 'nivelAlocacao' | 'semDivisaoNaAta'>[]): number {
+  return rows.filter((r) => r.quantitativoSenasp > 0 && r.faixa !== 'EXPIRADO' && r.nivelAlocacao !== 'TOTAL' && !r.semDivisaoNaAta).length;
 }
 
 /**

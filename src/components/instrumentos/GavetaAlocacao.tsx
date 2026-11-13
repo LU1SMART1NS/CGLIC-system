@@ -18,7 +18,8 @@ export const GavetaAlocacao: React.FC<{ onAbrir: (destino: string) => void }> = 
   const faixas = useMemo<FaixaDaBarra[]>(() => {
     const conta = { TOTAL: 0, PARCIAL: 0, SEM: 0 };
     for (const r of rows) {
-      if (r.quantitativoSenasp > 0 && r.faixa !== 'EXPIRADO') conta[r.nivelAlocacao]++;
+      // Ata que não divide entre as unidades: alocar é opcional, fica fora da gaveta (como no número do menu).
+      if (r.quantitativoSenasp > 0 && r.faixa !== 'EXPIRADO' && !r.semDivisaoNaAta) conta[r.nivelAlocacao]++;
     }
     return [
       { rotulo: 'Alocados', valor: conta.TOTAL, cor: 'pn-cor-ok', destino: `${ROTA_ALOCACAO}?alocacao=TOTAL` },
