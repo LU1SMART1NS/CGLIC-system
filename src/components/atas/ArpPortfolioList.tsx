@@ -10,7 +10,8 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { CarteiraNoResults } from '../carteira/CarteiraNoResults';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { ActionButton } from '../../design-system/components/ActionButton';
-import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTdBarra, carteiraTh } from '../carteira/carteiraStyles';
+import { carteiraDetalhe, carteiraFornecedor, carteiraNumero, carteiraTableShell, carteiraTd, carteiraTdBarra, carteiraTh, carteiraValor } from '../carteira/carteiraStyles';
+import { formatCurrency } from '../../utils/format';
 import { classifyPrazo, situacaoDaFaixa } from '../carteira/carteiraPrazo';
 import { CarteiraSortHeader } from '../carteira/CarteiraSortHeader';
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
@@ -30,9 +31,10 @@ import { AvisoCarregando } from '../../design-system';
 import { ConsumoItensCelula, type ConsumoItem } from './ConsumoItensCelula';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
 import { GtiCelulaAta } from '../gti/GtiVisual';
-import { chaveAtaGti, type FatiasDaAta } from '../../config/gruposGti';
+import { chaveAtaGti, GRUPO_GTI_INFO, type FatiasDaAta } from '../../config/gruposGti';
 import { CarteiraNovoBadge } from '../carteira/CarteiraNovoBadge';
 import { ataEhNova } from '../carteira/carteiraNovidade';
+import type { TotaisDasAtas } from './valorDasAtas';
 
 interface ArpPortfolioListProps {
   cards: AtaGroupedCard[];
@@ -48,10 +50,12 @@ interface ArpPortfolioListProps {
   mostrarEmpenhoDosItens?: boolean;
   /** Fatia de cada GTI do ComprasSUSP por ata (chave "{numeroAta}-{uasg}", migration 139). */
   fatiasGti?: Map<string, FatiasDaAta>;
+  /** Soma das atas exibidas (todas as páginas): linha de total no rodapé. */
+  totais?: TotaisDasAtas;
   /** Unidades internas (para exibir o nome da unidade filtrada). */
   unidades?: Array<{ chave: string; nome: string }>;
   /** Filtros ativos: alocação, empenho e unidade ganham uma coluna quando filtrados. */
-  filters?: Pick<ArpPortfolioFilterState, 'filtroAlocacao' | 'filtroEmpenho' | 'unidade' | 'ataAssinada'>;
+  filters?: Pick<ArpPortfolioFilterState, 'filtroAlocacao' | 'filtroEmpenho' | 'unidade' | 'ataAssinada'> & Partial<Pick<ArpPortfolioFilterState, 'gti'>>;
   /** Nome do gestor por número de ata. */
   gestorByAta?: Record<string, string>;
   /** Texto da busca — quando algum item da ata casa com ela, a linha abre já mostrando esse item. */
@@ -67,6 +71,9 @@ interface ArpPortfolioListProps {
 }
 
 const MAX_ITENS_EXPANDIDOS = 5;
+/** Linha de total: fundo cinza e borda mais forte, para não se confundir com uma ata. */
+const rodape: React.CSSProperties = { ...carteiraTd, background: '#f8fafc', borderTop: '2px solid #e2e8f0', borderBottom: 'none', verticalAlign: 'top' };
+const pctDe = (parte: number, todo: number) => (todo > 0 ? Math.round((parte / todo) * 100) : 0);
 const cardNovo = (c: AtaGroupedCard) => ataEhNova(c.arp);
 
 function formatDateBR(dateStr?: string): string {
@@ -84,6 +91,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   linhasDosItens,
   mostrarEmpenhoDosItens = true,
   fatiasGti,
+  totais,
   unidades = [],
   filters,
   gestorByAta = {},
@@ -101,11 +109,11 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
     () => ({
       numero: { value: (c) => c.arp.numeroAtaRegistroPreco.split('/').reverse().join('/') },
       vigencia: { value: (c) => getArpVigenciaStatus(c.arp.dataVigenciaFinal)?.diasRestantes ?? null },
-      itens: { value: (c) => c.itens.length || c.arp.quantidadeItens || 0, firstDir: 'desc' },
+      valor: { value: (c) => execucaoPorAta?.get(`${c.arp.numeroAtaRegistroPreco}-${c.arp.codigoUnidadeGerenciadora}`)?.valorSenasp ?? null, firstDir: 'desc' },
       consumo: { value: (c) => saldoStatsByAta[chaveGestaoDaArp(c.arp)]?.maxPct ?? null, firstDir: 'desc' },
       gestor: { value: (c) => gestorByAta[chaveGestaoDaArp(c.arp)] }
     }),
-    [saldoStatsByAta, gestorByAta]
+    [saldoStatsByAta, gestorByAta, execucaoPorAta]
   );
   const { sorted, sortKey, sortDir, toggle } = useCarteiraSort(cards, sortColumns, cardNovo);
   const sortProps = { activeKey: sortKey, activeDir: sortDir, onSort: toggle };
@@ -127,7 +135,9 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   const colEmpenho = filters != null && filters.filtroEmpenho !== 'TODOS';
   const colUnidade = filters != null && filters.unidade !== TODAS_UNIDADES;
   const colAtaAssinada = filters != null && filters.ataAssinada !== 'TODOS';
-  const totalColunas = 7 + Number(colAlocacao) + Number(colEmpenho) + Number(colUnidade) + Number(colAtaAssinada);
+  // Com um GTI filtrado, a coluna do valor registrado pelos órgãos desse GTI em cada ata.
+  const gtiFiltrado = filters?.gti && filters.gti !== 'TODOS' ? filters.gti : null;
+  const totalColunas = 7 + Number(Boolean(gtiFiltrado)) + Number(colAlocacao) + Number(colEmpenho) + Number(colUnidade) + Number(colAtaAssinada);
 
   if (isLoading && totalAtas === 0) {
     return (
@@ -168,9 +178,19 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               <th style={{ ...carteiraTh, width: '32px', padding: '0.65rem 0.4rem' }} aria-label="Expandir" />
               <CarteiraSortHeader label="Ata" sortKey="numero" {...sortProps} />
               <CarteiraSortHeader label="Vigência" sortKey="vigencia" {...sortProps} />
-              <CarteiraSortHeader label="Itens" sortKey="itens" {...sortProps} />
+              <CarteiraSortHeader
+                label="Valor SENASP"
+                sortKey="valor"
+                hint="Parte da SENASP na ata: quantidade SENASP de cada item × preço vigente (o apostilado, quando houver). Embaixo, quanto já foi consumido em R$."
+                {...sortProps}
+              />
               <CarteiraSortHeader label="Consumo dos itens" sortKey="consumo" {...sortProps} />
               <th style={carteiraTh} title="GTI com a maior fatia e a fatia de cada Grupo de Trabalho Integrado no valor registrado dos participantes (quantidade × valor unitário de cada item)">Interesse principal</th>
+              {gtiFiltrado && (
+                <th style={carteiraTh} title={`Valor registrado pelos órgãos do ${GRUPO_GTI_INFO[gtiFiltrado].rotulo} na ata (quantidade registrada × valor unitário de cada item) e a fatia dele no registrado pelos participantes`}>
+                  Registrado {GRUPO_GTI_INFO[gtiFiltrado].rotulo}
+                </th>
+              )}
               {colAlocacao && <th style={carteiraTh}>Alocação interna</th>}
               {colEmpenho && <th style={carteiraTh}>Empenho</th>}
               {colAtaAssinada && <th style={carteiraTh}>Qtd. assinada</th>}
@@ -263,19 +283,24 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         até {formatDateBR(arp.dataVigenciaFinal)}
                       </div>
                     </td>
-                    <td data-label="Itens" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
-                      <div style={{ fontWeight: 700 }}>{totalItens} {totalItens === 1 ? 'item' : 'itens'}</div>
-                      {stats && (stats.criticos > 0 || stats.atencao > 0) ? (
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: stats.criticos > 0 ? 'var(--color-danger-text)' : 'var(--color-warning-text)' }}>
-                          {[
-                            stats.criticos > 0 ? `${stats.criticos} ${stats.criticos === 1 ? 'crítico' : 'críticos'}` : null,
-                            stats.atencao > 0 ? `${stats.atencao} em atenção` : null
-                          ].filter(Boolean).join(' · ')}
-                        </div>
-                      ) : null}
+                    <td data-label="Valor SENASP" style={{ ...carteiraTd, whiteSpace: 'nowrap' }} data-testid={`arp-valor-${numeroAta}`}>
+                      {(() => {
+                        const exec = execucaoPorAta?.get(ataKey);
+                        if (!exec || exec.valorSenasp <= 0) return <span style={carteiraDetalhe}>—</span>;
+                        return (
+                          <>
+                            <div style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(exec.valorSenasp)}</div>
+                            {exec.valorConsumido != null && (
+                              <div style={{ ...carteiraDetalhe, ...carteiraNumero }}>
+                                {exec.valorConsumido > 0 ? `${formatCurrency(exec.valorConsumido)} consumidos` : 'nada consumido'}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </td>
                     <td data-label="Consumo dos itens" style={carteiraTdBarra}>
-                      <ConsumoItensCelula itens={consumoItens} testId={`arp-consumo-${numeroAta}`} />
+                      <ConsumoItensCelula itens={consumoItens} resumo={{ total: totalItens, criticos: stats?.criticos ?? 0, atencao: stats?.atencao ?? 0 }} testId={`arp-consumo-${numeroAta}`} />
                     </td>
                     <td data-label="GTI" style={carteiraTdBarra}>
                       {(() => {
@@ -292,6 +317,21 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                         );
                       })()}
                     </td>
+                    {gtiFiltrado && (
+                      <td data-label={`Registrado ${GRUPO_GTI_INFO[gtiFiltrado].rotulo}`} style={{ ...carteiraTd, whiteSpace: 'nowrap' }} data-testid={`arp-gti-valor-${numeroAta}`}>
+                        {(() => {
+                          const fatias = fatiasGti?.get(chaveAtaGti(numeroAta, arp.codigoUnidadeGerenciadora));
+                          const f = fatias?.fatias.find((x) => x.grupo === gtiFiltrado);
+                          if (!f || f.quantidade <= 0) return <span style={carteiraDetalhe}>—</span>;
+                          return (
+                            <>
+                              <div style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(f.quantidade)}</div>
+                              <div style={carteiraDetalhe}>{f.pct}% · {f.orgaos} {f.orgaos === 1 ? 'órgão' : 'órgãos'}</div>
+                            </>
+                          );
+                        })()}
+                      </td>
+                    )}
                     {colAlocacao && (
                       <td data-label="Alocação interna" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                         <CarteiraCellFilter
@@ -363,6 +403,33 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
               );
             })}
           </tbody>
+          {totais && totais.atas > 0 && (
+            <tfoot className="carteira-total" data-testid="arp-total">
+              <tr>
+                <td colSpan={3} style={{ ...rodape, fontWeight: 800, color: '#334155' }}>
+                  Total {totais.atas === 1 ? 'da ata exibida' : `das ${totais.atas} atas exibidas`}
+                </td>
+                <td data-label="Valor SENASP" style={{ ...rodape, whiteSpace: 'nowrap' }} data-testid="arp-total-senasp">
+                  <div>
+                    <div style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(totais.valorSenasp)}</div>
+                    <div style={{ ...carteiraDetalhe, ...carteiraNumero }}>
+                      {formatCurrency(totais.valorConsumido)} consumidos ({pctDe(totais.valorConsumido, totais.valorSenasp)}%)
+                    </div>
+                  </div>
+                </td>
+                <td colSpan={2} style={rodape} />
+                {gtiFiltrado && (
+                  <td data-label={`Registrado ${GRUPO_GTI_INFO[gtiFiltrado].rotulo}`} style={{ ...rodape, whiteSpace: 'nowrap' }} data-testid="arp-total-gti">
+                    <div title={`${formatCurrency(totais.registradoParticipantes)} registrados por todos os participantes dessas atas`}>
+                      <div style={{ ...carteiraValor, ...carteiraNumero }}>{formatCurrency(totais.registradoGti)}</div>
+                      <div style={carteiraDetalhe}>{pctDe(totais.registradoGti, totais.registradoParticipantes)}% do registrado pelos participantes</div>
+                    </div>
+                  </td>
+                )}
+                <td colSpan={1 + Number(colAlocacao) + Number(colEmpenho) + Number(colUnidade) + Number(colAtaAssinada)} style={rodape} />
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 

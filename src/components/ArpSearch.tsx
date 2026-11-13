@@ -27,6 +27,7 @@ import { chaveGestaoDaArp, contarPorPapel, passaFiltroPapel } from '../utils/ata
 import { ROTULO_GTI_ATAS, useFatiasGtiLeitura } from '../hooks/useGruposGti';
 import { chaveAtaGti, contarPorGti, passaFiltroGti, pctDoGti } from '../config/gruposGti';
 import type { ArpPortfolioFilterState } from './atas/ArpPortfolioFilters';
+import { somarValorDasAtas } from './atas/valorDasAtas';
 
 interface ArpSearchProps {
   onSelectArp: (arp: ArpRecord) => void;
@@ -224,6 +225,18 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     });
   }, [scopedArps, filterState, filtroAtaAssinada, resumoPorAta, itemsByAta, showGestorFilter, gestorByAta, fatiasDaArp]);
 
+  // Valor das atas exibidas (parte SENASP, consumido e, com GTI filtrado, o registrado por ele).
+  const totaisDasAtas = useMemo(
+    () =>
+      somarValorDasAtas(
+        filteredArps,
+        (arp) => resumoPorAta.get(`${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`),
+        fatiasDaArp,
+        filterState.gti
+      ),
+    [filteredArps, resumoPorAta, fatiasDaArp, filterState.gti]
+  );
+
   // A atribuição de gestor é só na Central de Distribuição; aqui o coordenador tem o atalho até lá.
   const canAssign = canAssignManager(role);
 
@@ -321,6 +334,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         linhasDosItens={linhasDosItens}
         mostrarEmpenhoDosItens={!semContratos(role)}
         fatiasGti={fatiasGti}
+        totais={totaisDasAtas}
         unidades={unidades}
         filters={filterState}
         gestorByAta={gestorByAta}

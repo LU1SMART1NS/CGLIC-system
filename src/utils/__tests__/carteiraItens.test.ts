@@ -5,7 +5,9 @@ import {
   chaveItemDeItemKey,
   listarUnidades,
   resumirAtas,
-  unidadesPorContrato
+  unidadesPorContrato,
+  valoresDaAta,
+  type CarteiraItemRow
 } from '../carteiraItens';
 import type { ArpItemRecord, ArpRecord } from '../../types';
 
@@ -114,5 +116,21 @@ describe('resumirAtas e unidadesPorContrato', () => {
 
   it('lista as unidades pela grafia da primeira alocação, em ordem alfabética', () => {
     expect(listarUnidades(allocations).map((u) => u.nome)).toEqual(['CGLIC', 'DIOP']);
+  });
+});
+
+describe('valoresDaAta', () => {
+  const linha = (senasp: number, preco: number, consumido: number | null) =>
+    ({ quantitativoSenasp: senasp, consumido, item: { valorUnitario: preco } }) as unknown as CarteiraItemRow;
+
+  it('parte SENASP e consumido em R$ pelo preço de cada item', () => {
+    expect(valoresDaAta([linha(1084, 751.98, 817), linha(10, 100, null)])).toEqual({
+      valorSenasp: 1084 * 751.98 + 1000,
+      valorConsumido: 817 * 751.98
+    });
+  });
+
+  it('consumido nulo quando nenhum item tem o consumo lido; quantidade negativa não abate o valor', () => {
+    expect(valoresDaAta([linha(-424, 50, null), linha(2, 50, null)])).toEqual({ valorSenasp: 100, valorConsumido: null });
   });
 });

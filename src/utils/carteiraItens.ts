@@ -55,6 +55,10 @@ export interface CarteiraAtaExecucao {
   unidades: Set<string>;
   /** Qtd. da ata assinada: itens em que informar importa e quantos já foram informados (nula quando nenhum importa). */
   ataAssinada: AtaAssinadaDaAta | null;
+  /** Parte da SENASP em R$: quantidade SENASP × preço vigente de cada item (o mesmo preço da linha do item). */
+  valorSenasp: number;
+  /** Consumido em R$ (consumido × preço); nulo quando nenhum item tem o consumo lido. */
+  valorConsumido: number | null;
 }
 
 export interface CarteiraItensInput {
@@ -182,6 +186,18 @@ export function buildCarteiraItemRows(input: CarteiraItensInput): CarteiraItemRo
 }
 
 /** Resumo por ata (chave "{numeroAta}-{uasg}") a partir das linhas de itens. */
+/** Parte da SENASP e consumido, em R$, somados dos itens (quantidade × preço vigente do item). */
+export function valoresDaAta(itens: CarteiraItemRow[]): { valorSenasp: number; valorConsumido: number | null } {
+  let valorSenasp = 0;
+  let valorConsumido: number | null = null;
+  for (const r of itens) {
+    const preco = Number(r.item.valorUnitario) || 0;
+    valorSenasp += Math.max(r.quantitativoSenasp, 0) * preco;
+    if (r.consumido != null) valorConsumido = (valorConsumido ?? 0) + r.consumido * preco;
+  }
+  return { valorSenasp, valorConsumido };
+}
+
 export function resumirAtas(rows: CarteiraItemRow[]): Map<string, CarteiraAtaExecucao> {
   const porAta = new Map<string, CarteiraItemRow[]>();
   for (const r of rows) somar(porAta, r.ataKey, r);
@@ -195,7 +211,8 @@ export function resumirAtas(rows: CarteiraItemRow[]): Map<string, CarteiraAtaExe
       nivelAlocacao: agregarNivel(itens.map((r) => r.nivelAlocacao)),
       nivelEmpenho: agregarNivel(itens.map((r) => r.nivelEmpenho)),
       unidades,
-      ataAssinada: resumirAtaAssinada(itens.map((r) => r.ataAssinada))
+      ataAssinada: resumirAtaAssinada(itens.map((r) => r.ataAssinada)),
+      ...valoresDaAta(itens)
     });
   }
   return resumo;
