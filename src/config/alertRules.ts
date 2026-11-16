@@ -211,6 +211,8 @@ export const FISCALIZACAO_RULES = {
   envioPagamentoDiasUteis: 5,
   /** Com a comissão de recebimento: cobrar depois de N dias do envio sem TRP, ou do TRP sem TRD (ou da última cobrança). */
   cobrarComissaoDias: 10,
+  /** Item atrasado e cobrado: espera o fornecedor por N dias; depois volta ao fiscal para cobrar de novo (entrega B). */
+  cobrarFornecedorDias: 10,
   /** O aviso do TRP, do TRD e do envio fica em atenção quando faltar até N dias. */
   avisoAntesDias: 3
 };
@@ -300,6 +302,7 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
 
   { key: 'fiscalizacao.envioPagamentoDiasUteis', group: 'fiscalizacao', label: 'Enviar para pagamento até', hint: 'Dias úteis depois do TRD. Precisa caber nos 10 dias úteis da liquidação (IN SEGES 77/2022, art. 7º, I).', unit: 'dias úteis', min: 1, max: 10 },
   { key: 'fiscalizacao.cobrarComissaoDias', group: 'fiscalizacao', label: 'Cobrar a comissão de recebimento após', hint: 'Dias desde o envio à comissão sem o TRP, ou desde o TRP sem o TRD (ou desde a última cobrança).', unit: 'dias', min: 1, max: 60 },
+  { key: 'fiscalizacao.cobrarFornecedorDias', group: 'fiscalizacao', label: 'Cobrar de novo o fornecedor após', hint: 'Dias desde a última cobrança de item atrasado. Sem cobrança registrada, o item atrasado fica com o fiscal.', unit: 'dias', min: 1, max: 60 },
   { key: 'fiscalizacao.avisoAntesDias', group: 'fiscalizacao', label: 'Avisar o TRP, o TRD e o envio quando faltar', hint: 'Antes disso o item mostra só a data; vencido, o aviso fica urgente.', unit: 'dias', min: 0, max: 30 },
 
   { key: 'sincronizacao.quantidadeContratadaVencidaEmHoras', group: 'sincronizacao', label: 'Reler a quantidade contratada após', unit: 'horas', min: 1, max: 168 }

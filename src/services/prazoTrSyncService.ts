@@ -14,7 +14,7 @@ import { supabase } from './supabaseClient';
 import { executarComReserva, mensagemDeErro, UASG_TODAS, type ResultadoSincronizacao } from './sincronizacaoFontesService';
 import { baixar, pedirLista, textosDoArquivo, type LeitorDeArquivos } from './reajusteAtasSyncService';
 import { enderecoDoArquivo } from './atasAMontarSyncService';
-import { lerPrazoDoTr, lerRecebimentoDoTr, type PrazoLidoDoTr, type RecebimentoLidoDoTr } from './trPrazoParser';
+import { lerPrazoDoTr, lerRecebimentoDoTr, lerSubstituicaoDoTr, type PrazoLidoDoTr, type RecebimentoLidoDoTr, type SubstituicaoLidaDoTr } from './trPrazoParser';
 
 export const RECURSO_PRAZO_TR = 'prazo_tr' as const;
 export const FONTE_PNCP_PRAZO_TR = 'PNCP (edital e Termo de Referência)';
@@ -49,6 +49,10 @@ export interface LeituraParaGravar extends PrazoLidoDoTr {
   recebimentoTrechos?: string[];
   /** Leitura clara do recebimento: vale sem a confirmação do gestor da ata (migration 309). */
   recebimentoClaro?: boolean;
+  /** Prazo de substituição do item recusado (migration 311); a leitura clara vale sozinha. */
+  substituicao?: SubstituicaoLidaDoTr | null;
+  substituicaoTrecho?: string | null;
+  substituicaoClara?: boolean;
 }
 
 export interface OpcoesPrazoTr {
@@ -104,7 +108,8 @@ const bancoDeVerdade: BancoDoPrazoTr = {
       p_payload: {
         numero_controle_compra: l.numero_controle_compra, leitura: l.leitura, motivo: l.motivo, dias: l.dias, contagem: l.contagem,
         contagem_dita: l.contagemDita, inicio: l.inicio, trechos: l.trechos, documento: l.documento, url: l.url,
-        recebimento: l.recebimento ?? null, recebimento_trechos: l.recebimentoTrechos ?? [], recebimento_claro: Boolean(l.recebimentoClaro)
+        recebimento: l.recebimento ?? null, recebimento_trechos: l.recebimentoTrechos ?? [], recebimento_claro: Boolean(l.recebimentoClaro),
+        substituicao: l.substituicao ?? null, substituicao_trecho: l.substituicaoTrecho ?? null, substituicao_clara: Boolean(l.substituicaoClara)
       }
     });
     if (error) throw new Error(mensagemDeErro(error));
@@ -137,7 +142,8 @@ export async function lerPrazoDaCompra(
     const texto = textos.join('\n');
     const lido = lerPrazoDoTr(texto);
     const rec = lerRecebimentoDoTr(texto);
-    const leitura: LeituraParaGravar = { ...lido, numero_controle_compra: controle, documento, url, recebimento: rec.recebimento, recebimentoTrechos: rec.trechos, recebimentoClaro: rec.clara };
+    const sub = lerSubstituicaoDoTr(texto);
+    const leitura: LeituraParaGravar = { ...lido, numero_controle_compra: controle, documento, url, recebimento: rec.recebimento, recebimentoTrechos: rec.trechos, recebimentoClaro: rec.clara, substituicao: sub.substituicao, substituicaoTrecho: sub.trecho, substituicaoClara: sub.clara };
     if (!melhor || (melhor.leitura === 'SEM_CLAUSULA' && lido.leitura !== 'SEM_CLAUSULA')) melhor = leitura;
     if (lido.leitura !== 'SEM_CLAUSULA') break;
   }

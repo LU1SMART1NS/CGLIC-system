@@ -1,4 +1,5 @@
 import { FISCALIZACAO_RULES } from '../config/alertRules';
+import { situacaoDaSubstituicao } from './fiscalizacaoOcorrencias';
 import type { EntregaFiscalizacao } from '../services/fiscalizacaoService';
 import { dataBR } from './fiscalizacao';
 import { previstaPelaRegra, textoDosDias, type ContagemPrazo } from './fiscalizacaoPrazo';
@@ -116,9 +117,12 @@ export function cobrancaDaComissao(
  * passou): com a comissão, a data da cobrança; senão, o TRP, o TRD ou o envio. null fora dessas etapas.
  */
 export function prazoDoItemNoRecebimento(
-  e: Parameters<typeof prazoDoRecebimento>[0] & Partial<Pick<EntregaFiscalizacao, 'comissaoEnviadaEm' | 'comissaoCobradaEm'>>,
+  e: Parameters<typeof prazoDoRecebimento>[0] & Partial<Pick<EntregaFiscalizacao, 'comissaoEnviadaEm' | 'comissaoCobradaEm' | 'ocorrencias'>>,
   hoje: string
 ): { dias: number | null; tom: 'danger' | 'warning' | 'neutral' } | null {
+  // Recusado à espera da troca (entrega B): vale o prazo da substituição.
+  const subst = situacaoDaSubstituicao(e.ocorrencias, hoje);
+  if (subst) return { dias: subst.dias, tom: subst.vencida ? 'danger' : subst.dias <= FISCALIZACAO_RULES.avisoAntesDias ? 'warning' : 'neutral' };
   const c = cobrancaDaComissao(e, hoje);
   if (c) {
     const d = Math.round((Date.parse(`${c.cobrarEm}T12:00:00Z`) - Date.parse(`${hoje}T12:00:00Z`)) / 864e5);

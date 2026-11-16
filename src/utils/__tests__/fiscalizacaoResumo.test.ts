@@ -89,7 +89,7 @@ describe('próximo passo do contrato (mesa)', () => {
     );
     // Item entregue sem a data: primeiro registrar a data (o prazo do TRP e do TRD conta dela).
     expect(comVoce.map((l) => l.chave)).toEqual(['processo', 'cobrar', 'entrega']);
-    expect(comVoce[1].titulo).toBe('Cobrar o fornecedor · 2 itens atrasados');
+    expect(comVoce[1].titulo).toBe('Cobrar o fornecedor · 2 itens atrasados sem cobrança');
     expect(comVoce[1].limite).toBe(PASSADO);
     expect(comOutros.map((l) => l.quem)).toEqual(['CAEP', 'Exército (DFPC)']);
   });
@@ -111,6 +111,27 @@ describe('próximo passo do contrato (mesa)', () => {
     expect(trd.comVoce.map((l) => l.chave)).toEqual(['definitivo', 'cobrar-comissao-trd']);
     expect(trd.comVoce[1].titulo).toBe('Cobrar a comissão de recebimento · 1 item sem TRD');
     expect(trd.comOutros.map((l) => l.chave)).toEqual(['comissao-trd']);
+  });
+  it('ocorrências: sem cobrança e cobrar de novo com o fiscal; cobrado, notificado e recusado com o fornecedor', () => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const antes = (d: number) => new Date(Date.parse(`${hoje}T12:00:00Z`) - d * 864e5).toISOString().slice(0, 10);
+    const oc = (x = {}) => ({ ultimaCobranca: null, cobrancas: 0, notificacao: null, pedido: null, substituicao: null, ...x });
+    const r = linhasDoContrato(
+      [
+        e({ etapa: 'PRODUCAO', prevista: antes(20), ocorrencias: oc() }),
+        e({ etapa: 'PRODUCAO', prevista: antes(30), ocorrencias: oc({ ultimaCobranca: antes(3), cobrancas: 1 }) }),
+        e({ etapa: 'PRODUCAO', prevista: antes(40), ocorrencias: oc({ ultimaCobranca: antes(15), cobrancas: 2 }) }),
+        e({ etapa: 'PRODUCAO', prevista: antes(50), ocorrencias: oc({ notificacao: { em: antes(2), ate: antes(-3), sei: '35000001' } }) }),
+        e({ etapa: 'PRODUCAO', prevista: antes(5), ocorrencias: oc({ pedido: { em: antes(1), sei: null, novaData: null } }) }),
+        e({ etapa: 'ENTREGUE', entregueEm: antes(9), ocorrencias: oc({ substituicao: { recusadoEm: antes(8), notificadoEm: antes(8), ate: antes(-22), motivo: 'viseira trincada' } }) })
+      ],
+      false,
+      nada,
+      nada
+    );
+    expect(r.comVoce.map((l) => l.chave)).toEqual(['pedido', 'cobrar', 'cobrar-de-novo']);
+    expect(r.comVoce[1].titulo).toBe('Cobrar o fornecedor · 1 item atrasado sem cobrança');
+    expect(r.comOutros.map((l) => l.chave)).toEqual(['cobrado', 'notificado', 'substituir']);
   });
   it('item pago de emenda pede o Ofício à SAL; sem emenda, finalizar', () => {
     expect(linhasDoContrato([e({ etapa: 'PAGAMENTO', pagoEm: '2026-05-01', origem: 'EMENDA' })], false, nada, nada).comVoce[0].chave).toBe('sal');

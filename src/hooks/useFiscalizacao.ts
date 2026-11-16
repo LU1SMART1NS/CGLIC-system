@@ -28,6 +28,8 @@ import {
   definirPrazoDoContrato,
   definirPrazoDeRecebimento,
   registrarComissaoRecebimento,
+  registrarOcorrencia,
+  fetchPrazoDeSubstituicao,
   type ContratoFiscalizacao,
   type DefinirFiscalizacaoInput,
   desfazerTransferenciaFiscal,
@@ -153,6 +155,16 @@ export const useEncerrarEntregas = () => useMutacaoDeEntregas(encerrarEntregas);
 export const useRegistrarRecebimentoOrdem = () => useMutacaoDeEntregas(registrarRecebimentoOrdem);
 export const useProrrogarPrazoEntregas = () => useMutacaoDeEntregas(prorrogarPrazoEntregas);
 export const useRegistrarComissaoRecebimento = () => useMutacaoDeEntregas(registrarComissaoRecebimento);
+export const useRegistrarOcorrencia = () => useMutacaoDeEntregas(registrarOcorrencia);
+/** Prazo de substituição do contrato (TR das atas), para a faixa do Contrato 360 e a recusa. */
+export function usePrazoDeSubstituicao(contractKey: string | null | undefined) {
+  return useQuery({
+    queryKey: [...FISCALIZACAO_CONTRATOS_KEY, 'substituicao', contractKey],
+    queryFn: () => fetchPrazoDeSubstituicao(contractKey!),
+    enabled: Boolean(contractKey),
+    staleTime: 10 * 60 * 1000
+  });
+}
 export function useDefinirPrazoDoContrato() {
   const qc = useQueryClient();
   return useMutation({

@@ -1,5 +1,6 @@
 import type { ContagemPrazo, InicioPrazo, RegraDoPrazo } from '../utils/fiscalizacaoPrazo';
 import type { RegraDoRecebimento } from '../utils/fiscalizacaoRecebimento';
+import type { OcorrenciasDoItem, PrazoDeSubstituicao, TipoOcorrencia } from '../utils/fiscalizacaoOcorrencias';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 import { lerTodasAsPaginas } from './lerTodasAsPaginas';
@@ -204,6 +205,8 @@ export interface EntregaFiscalizacao {
   trdAte?: string | null;
   envioAte?: string | null;
   /** Enviado à comissão de recebimento para o TRP, e a última cobrança (a próxima conta dela). */
+  /** O que está em aberto nas ocorrências do item: cobrança, notificação, pedido de prorrogação, substituição. */
+  ocorrencias?: OcorrenciasDoItem | null;
   comissaoEnviadaEm?: string | null;
   comissaoCobradaEm?: string | null;
   comissaoCobrancas?: number;
@@ -282,6 +285,7 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
     trpAte: r.trp_ate || null,
     trdAte: r.trd_ate || null,
     envioAte: r.envio_ate || null,
+    ocorrencias: r.ocorrencias || null,
     comissaoEnviadaEm: r.comissao_enviada_em || null,
     comissaoCobradaEm: r.comissao_cobrada_em || null,
     comissaoCobrancas: Number(r.comissao_cobrancas) || 0,
@@ -308,7 +312,7 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
 
 export interface MovimentoEntrega {
   id: string;
-  tipo: 'CRIADA' | 'ETAPA' | 'VOLTA' | 'DESFEITO' | 'CORRECAO' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM' | 'BENEFICIARIO' | 'RECEBIMENTO' | 'PRORROGACAO' | 'SUSPENSAO' | 'COMISSAO' | 'COBRANCA';
+  tipo: 'CRIADA' | 'ETAPA' | 'VOLTA' | 'DESFEITO' | 'CORRECAO' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM' | 'BENEFICIARIO' | 'RECEBIMENTO' | 'PRORROGACAO' | 'SUSPENSAO' | 'COMISSAO' | 'COBRANCA' | 'OCORRENCIA';
   etapa: EtapaEntrega | null;
   data: string | null;
   documentoSei: string | null;
@@ -452,6 +456,32 @@ export async function definirPrazoDeRecebimento(input: { contractKey: string; re
 export async function registrarComissaoRecebimento(input: { ids: string[]; tipo: 'ENVIO' | 'COBRANCA'; data: string; documentoSei: string | null }): Promise<void> {
   const { error } = await cliente().rpc('registrar_comissao_recebimento', { p_ids: input.ids, p_tipo: input.tipo, p_data: input.data, p_documento_sei: input.documentoSei?.replace(/\D/g, '') || null });
   if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/**
+ * Ocorrência em um ou mais itens (entrega B): cobrança, notificação (com prazo de resposta), resposta, pedido de
+ * prorrogação (com a data pedida), pedido negado, recusa (abre o prazo de substituição) e substituição recebida.
+ */
+export async function registrarOcorrencia(input: { ids: string[]; tipo: TipoOcorrencia; data: string; documentoSei: string | null; texto: string | null; prazoDias?: number | null; novaData?: string | null; notificadoEm?: string | null }): Promise<void> {
+  const { error } = await cliente().rpc('registrar_ocorrencia_entregas', {
+    p_ids: input.ids,
+    p_tipo: input.tipo,
+    p_data: input.data,
+    p_documento_sei: input.documentoSei?.replace(/\D/g, '') || null,
+    p_texto: input.texto?.trim() || null,
+    p_prazo_dias: input.prazoDias ?? null,
+    p_nova_data: input.novaData ?? null,
+    p_notificado_em: input.notificadoEm ?? null
+  });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Prazo de substituição do item recusado, pelo TR das atas do contrato (migration 311); null sem prazo ou com atas que divergem. */
+export async function fetchPrazoDeSubstituicao(contractKey: string): Promise<PrazoDeSubstituicao | null> {
+  const { data, error } = await cliente().rpc('fisc_regra_de_substituicao', { p_contrato: contractKey });
+  if (error) throw mapPostgresErrorToAppError(error);
+  const r = data as (PrazoDeSubstituicao & { conflito?: boolean }) | null;
+  return r && !r.conflito && r.dias ? r : null;
 }
 
 /** Encerra entregas (migration 274): saem das listas de trabalho e o motivo fica no histórico. */

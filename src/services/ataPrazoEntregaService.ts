@@ -36,6 +36,12 @@ export interface PrazoDaAta {
   /** Valem pela leitura clara do TR, sem confirmação do gestor (migration 309). */
   confirmadoAutomatico?: boolean;
   recebimentoAutomatico?: boolean;
+  /** Prazo de substituição do item recusado (migration 311): sugestão do TR, trecho e o que vale. */
+  substituicaoSugerida?: { dias: number; contagem: ContagemPrazo } | null;
+  substituicaoTrecho?: string | null;
+  substituicao?: { dias: number; contagem: ContagemPrazo } | null;
+  substituicaoConfirmadaEm?: string | null;
+  substituicaoAutomatico?: boolean;
 }
 
 export type RegraDoRecebimentoDaAta = Pick<RegraDoRecebimento, 'trpDias' | 'trpContagem' | 'trdDias' | 'trdContagem' | 'trdInicio'>;
@@ -72,7 +78,12 @@ export function linhaParaPrazoDaAta(r: any): PrazoDaAta {
     recebimento: r.recebimento || null,
     recebimentoConfirmadoEm: r.recebimento_confirmado_em || null,
     confirmadoAutomatico: Boolean(r.confirmado_automatico),
-    recebimentoAutomatico: Boolean(r.recebimento_automatico)
+    recebimentoAutomatico: Boolean(r.recebimento_automatico),
+    substituicaoSugerida: r.substituicao_sugerida || null,
+    substituicaoTrecho: r.substituicao_trecho || null,
+    substituicao: r.substituicao || null,
+    substituicaoConfirmadaEm: r.substituicao_confirmada_em || null,
+    substituicaoAutomatico: Boolean(r.substituicao_automatico)
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -104,6 +115,8 @@ export async function confirmarPrazoDaAta(input: {
   motivo: string | null;
   /** Prazos do TRP e do TRD como estão no TR; null = o TR não diz. */
   recebimento?: RegraDoRecebimentoDaAta | null;
+  /** Dias para substituir o item recusado (da notificação); undefined não mexe, null = o TR não diz. */
+  substituicao?: { dias: number; contagem: ContagemPrazo } | null;
 }): Promise<{ contratos: number; itensComData: number }> {
   const { data, error } = await cliente().rpc('confirmar_prazo_entrega_ata', {
     p_ata_key: input.ataKey,
@@ -114,7 +127,8 @@ export async function confirmarPrazoDaAta(input: {
     p_por_item: input.semPrazo ? {} : input.porItem,
     p_motivo: (input.motivo || '').trim() || null,
     // undefined: não mexe no recebimento; null: o TR não traz o prazo (migration 305).
-    p_recebimento: input.recebimento === undefined ? null : input.recebimento ?? { naoDiz: true }
+    p_recebimento: input.recebimento === undefined ? null : input.recebimento ?? { naoDiz: true },
+    p_substituicao: input.substituicao === undefined ? null : input.substituicao ?? { naoDiz: true }
   });
   if (error) throw mapPostgresErrorToAppError(error);
   const r = (data ?? {}) as { contratos?: number; itens_com_data?: number };

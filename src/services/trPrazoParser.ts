@@ -200,3 +200,36 @@ export function lerRecebimentoDoTr(textoBruto: string): { recebimento: Recebimen
     clara: d.peso >= 2 && td.unanime && (!tp || tp.unanime)
   };
 }
+
+// ── Substituição do item recusado ───────────────────────────────────────────────────────────────────────
+
+/** Prazo para o fornecedor substituir o item recusado (modelo da AGU: "substituídos no prazo de 30 dias, a contar da notificação"). */
+export interface SubstituicaoLidaDoTr {
+  dias: number;
+  contagem: ContagemPrazo;
+}
+
+const FRASE_SUBSTITUICAO = /substitu[ií]d[oa]s?[^.;]{0,60}?no\s+prazo\s+(?:m[aá]ximo\s+)?de\s+(?:at[eé]\s+)?[^.;]{0,200}/giu;
+const NUMERO_SUBST = /(\d{1,3})\s*\([^)]{0,25}\)\s*(?:dias)?|\((\d{1,3})\)\s*dias|(\d{1,3})\s*dias/iu;
+
+/**
+ * Lê o prazo de substituição do item recusado. Clara quando todos os trechos dizem o mesmo prazo e contam da
+ * notificação (a leitura clara vale sozinha, migration 311); senão, fica para o gestor da ata conferir.
+ */
+export function lerSubstituicaoDoTr(textoBruto: string): { substituicao: SubstituicaoLidaDoTr | null; trecho: string | null; clara: boolean } {
+  const texto = textoBruto.replace(/[\u0000-\u001f]/gu, ' ').replace(/\s+/gu, ' ');
+  const achados: Array<{ dias: number; contagem: ContagemPrazo; trecho: string; daNotificacao: boolean }> = [];
+  for (const m of texto.matchAll(FRASE_SUBSTITUICAO)) {
+    const s = m[0];
+    const n = NUMERO_SUBST.exec(s);
+    const dias = n ? Number(n[1] ?? n[2] ?? n[3]) : NaN;
+    if (!Number.isInteger(dias) || dias < 1 || dias > 180) continue;
+    achados.push({ dias, contagem: /[uú]teis/iu.test(s) ? 'UTEIS' : 'CORRIDOS', trecho: s, daNotificacao: /notifica/iu.test(s) });
+  }
+  if (!achados.length) return { substituicao: null, trecho: null, clara: false };
+  const chave = maisFrequente(achados.map((a) => `${a.dias}|${a.contagem}`))!;
+  const a = achados.find((x) => `${x.dias}|${x.contagem}` === chave)!;
+  const unanime = achados.every((x) => `${x.dias}|${x.contagem}` === chave);
+  const trecho = limparTrecho(a.trecho.charAt(0).toUpperCase() + a.trecho.slice(1));
+  return { substituicao: { dias: a.dias, contagem: a.contagem }, trecho, clara: unanime && achados.some((x) => x.daNotificacao) };
+}

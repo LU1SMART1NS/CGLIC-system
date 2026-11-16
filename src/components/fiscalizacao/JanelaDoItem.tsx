@@ -3,6 +3,7 @@ import { useItensDaAtaDoContrato } from '../../hooks/useFiscalizacao';
 import { MapPin } from 'lucide-react';
 import { enderecoDeEntrega } from '../../utils/fiscalizacaoResumo';
 import { Modal } from '../../design-system/components/Modal';
+import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { AppButton } from '../../design-system/components/AppButton';
 import { ActionButton } from '../../design-system/components/ActionButton';
 import { carteiraDetalhe, carteiraIdentificacao, carteiraValor } from '../carteira/carteiraStyles';
@@ -189,6 +190,16 @@ export const JanelaDoItem: React.FC<{ e: EntregaFiscalizacao; onClose: () => voi
             )}
           </Campo>
         </div>
+        {e.ocorrencias?.substituicao && (
+          <NoticeBar tone="warning" testId="fisc-janela-substituicao">
+            Recusado em {dataBR(e.ocorrencias.substituicao.recusadoEm)} ({e.ocorrencias.substituicao.motivo}): o fornecedor substitui até <b>{dataBR(e.ocorrencias.substituicao.ate)}</b>. O recebimento espera a substituição.
+          </NoticeBar>
+        )}
+        {e.ocorrencias?.notificacao && (
+          <NoticeBar tone="warning" testId="fisc-janela-notificacao">
+            Notificado em {dataBR(e.ocorrencias.notificacao.em)}: resposta até <b>{dataBR(e.ocorrencias.notificacao.ate)}</b>.
+          </NoticeBar>
+        )}
         <div>
           <CarteiraDetailLabel>Histórico</CarteiraDetailLabel>
           <div style={{ marginTop: '0.35rem' }}><HistoricoDaEntrega entregaId={e.id} /></div>
