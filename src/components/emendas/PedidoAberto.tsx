@@ -230,7 +230,7 @@ export const LinhasPorAta: React.FC<BlocosProps> = ({ p, itens, beneficiarios, n
                 ) : (
                   <strong>Kits</strong>
                 )}
-                {g.fornecedor && <span className="emendas-bloco-ata__forn"> · {g.fornecedor}</span>}
+                {g.fornecedor && <span className="emendas-bloco-ata__forn"> · {g.fornecedor.toUpperCase()}</span>}
                 {g.vigenciaFinal && <span className="emendas-bloco-ata__forn"> · até {dataBR(g.vigenciaFinal)}</span>}
               </span>
               <span className="emendas-bloco-ata__num">
