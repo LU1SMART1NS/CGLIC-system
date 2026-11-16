@@ -129,6 +129,7 @@ export const ContractsRoute: React.FC = () => {
         const { contract, contractKey, faixa, gestorNome, atas } = row;
         if (!matchesStatusFilter(faixa, filterState.status, executado(row))) return false;
         if (filterState.pendencia === 'COM_PENDENCIA' && !temPendencia(row)) return false;
+        if (filterState.pendencia === 'ESCOPO_CUMPRIDO' && !sugerido(row)) return false;
         if (filterState.unidade !== TODAS_UNIDADES && !unidadesDoContrato.get(contractKey)?.has(filterState.unidade)) return false;
         if (showGestorFilter && !matchesGestorFilter(gestorNome, filterState.gestor)) return false;
 
@@ -214,7 +215,7 @@ export const ContractsRoute: React.FC = () => {
                   variant="outline"
                   onClick={() => {
                     handleFilterChange('status', 'VIGENTES');
-                    handleFilterChange('pendencia', 'COM_PENDENCIA');
+                    handleFilterChange('pendencia', 'ESCOPO_CUMPRIDO');
                   }}
                 >
                   Ver quais
@@ -243,6 +244,7 @@ export const ContractsRoute: React.FC = () => {
             gestores={gestoresDisponiveis}
             unidades={unidades}
             comPendencia={allRows.filter((r) => temPendencia(r) && matchesStatusFilter(r.faixa, filterState.status, executado(r))).length}
+            escopoCumprido={allRows.filter((r) => sugerido(r) && matchesStatusFilter(r.faixa, filterState.status, executado(r))).length}
             showGestorFilter={showGestorFilter}
             onChangeFilter={handleFilterChange}
             onResetFilters={handleResetFilters}
