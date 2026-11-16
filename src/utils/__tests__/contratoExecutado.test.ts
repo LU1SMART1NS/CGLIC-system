@@ -17,7 +17,7 @@ const base: ExecucaoDoContrato = {
   decisaoSuperada: false
 };
 
-describe('escopo cumprido do contrato (migration 313)', () => {
+describe('escopo cumprido do contrato (migration 314)', () => {
   it('conferência: tudo cumprido não deixa pendência de fechamento', () => {
     expect(conferirExecucao(base).every((c) => c.resultado === 'ok')).toBe(true);
     expect(pendenciasDoFechamento(base)).toEqual([]);

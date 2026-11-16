@@ -1,5 +1,5 @@
 /**
- * Contrato com escopo cumprido (extinção ordinária, art. 140 da Lei 14.133/2021), migration 313. O banco
+ * Contrato com escopo cumprido (extinção ordinária, art. 140 da Lei 14.133/2021), migration 314. O banco
  * (v_contrato_execucao) SUGERE pelos fatos das fontes e o gestor CONFIRMA com o documento SEI do recebimento
  * definitivo. Confirmado, o contrato sai de Vigentes e dos avisos de prorrogação; volta sozinho se chegar fatura,
  * nota de empenho ou aditivo novos.

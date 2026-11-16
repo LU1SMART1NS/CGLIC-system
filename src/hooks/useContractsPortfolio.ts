@@ -131,7 +131,7 @@ export function useContractsPortfolio({ pendencias: comPendencias = true, enable
     return map;
   }, [attentionItems]);
 
-  // Escopo cumprido (migration 313): sugestão do banco e confirmação do gestor, por contrato.
+  // Escopo cumprido (migration 314): sugestão do banco e confirmação do gestor, por contrato.
   const execucaoQuery = useContratosExecucao({ enabled });
   const execucaoPorContrato = execucaoQuery.porContrato;
 

@@ -3,7 +3,7 @@ import { lerTodasAsPaginas } from './lerTodasAsPaginas';
 import type { ExecucaoDoContrato } from '../utils/contratoExecutado';
 
 /**
- * Escopo cumprido dos contratos (migration 313): leitura de v_contrato_execucao (só os contratos vigentes que
+ * Escopo cumprido dos contratos (migration 314): leitura de v_contrato_execucao (só os contratos vigentes que
  * cumprem a regra ou têm decisão gravada) e as decisões do gestor (confirmar, "ainda não terminou", desfazer).
  */
 

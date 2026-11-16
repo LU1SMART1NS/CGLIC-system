@@ -165,7 +165,7 @@ export function calculateExecutiveKPIs(
 export function calculateDeadlinesSummary(
   contracts: ContractDashboardRecord[] = [],
   currentDate?: Date,
-  /** Escopo cumprido confirmado (migration 313): fora das contas de vencimento. */
+  /** Escopo cumprido confirmado (migration 314): fora das contas de vencimento. */
   contratosExecutados: ReadonlySet<string> = new Set<string>()
 ): ManagementDashboardDeadlinesSummary {
   let vencendo30Dias = 0;
@@ -359,7 +359,7 @@ export function calculateAttentionSummary(params: {
   atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
   /** Chaves dos avisos "registrado acima" com decisão do gestor da ata (migration 223): saem da fila. */
   registradoAcimaDecididos?: ReadonlySet<string>;
-  /** Contratos com escopo cumprido confirmado (migration 313): sem lembretes de prorrogação e término. */
+  /** Contratos com escopo cumprido confirmado (migration 314): sem lembretes de prorrogação e término. */
   contratosExecutados?: ReadonlySet<string>;
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
@@ -1523,7 +1523,7 @@ export function buildManagementDashboardReadModel(params: {
   reajustesAtas?: ResumoReajusteAta[];
   atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
   registradoAcimaDecididos?: ReadonlySet<string>;
-  /** Contratos com escopo cumprido confirmado (migration 313). */
+  /** Contratos com escopo cumprido confirmado (migration 314). */
   contratosExecutados?: ReadonlySet<string>;
   syncInfo?: SyncMetadata;
   currentDate?: Date;

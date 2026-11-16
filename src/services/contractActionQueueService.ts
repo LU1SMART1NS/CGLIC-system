@@ -84,7 +84,7 @@ export function buildContractActionQueue(params: {
   vinculosAConferir?: VinculoAConferir[];
   /** Notas e faturas a conferir (qualquer contrato; o funil pega as deste). */
   ausentesDaFonte?: AusenteDaFonte[];
-  /** Escopo cumprido confirmado pelo gestor (migration 313): sem lembretes de prorrogação e término. */
+  /** Escopo cumprido confirmado pelo gestor (migration 314): sem lembretes de prorrogação e término. */
   executado?: boolean;
   currentDate?: Date;
 }): ContractActionQueue {

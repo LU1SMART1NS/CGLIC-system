@@ -6,7 +6,7 @@ import { useContratosExecucao } from '../../hooks/useContratosExecucao';
 import { pendenciasDoFechamento } from '../../utils/contratoExecutado';
 import { ConfirmarExecucaoModal } from './portfolio/ConfirmarExecucaoModal';
 
-/** Faixa do Contrato 360 (migration 313): escopo cumprido a confirmar, ou já confirmado com o SEI do recebimento. */
+/** Faixa do Contrato 360 (migration 314): escopo cumprido a confirmar, ou já confirmado com o SEI do recebimento. */
 export const EscopoCumpridoAviso: React.FC<{ contractKey: string; numero: string; fornecedor?: string }> = ({ contractKey, numero, fornecedor }) => {
   const { porContrato, podeDecidir } = useContratosExecucao();
   const [aberta, setAberta] = useState(false);

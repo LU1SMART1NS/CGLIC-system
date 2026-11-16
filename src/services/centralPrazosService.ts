@@ -54,7 +54,7 @@ export function generateIdempotentItemId(params: {
 
 export interface BuildCentralPrazosOptions {
   contracts?: ContractDashboardRecord[];
-  /** Contratos com escopo cumprido confirmado (migration 313): sem os gatilhos de prorrogação e término da vigência. */
+  /** Contratos com escopo cumprido confirmado (migration 314): sem os gatilhos de prorrogação e término da vigência. */
   contratosExecutados?: ReadonlySet<string>;
   arps?: ArpRecord[];
   managers?: Record<string, ContractManager>;
@@ -215,7 +215,7 @@ export function buildCentralPrazosItems(
     }
 
     // B) Gatilhos Operacionais em Memória sobre Vigência Oficial (Prorrogação/Término)
-    // Escopo cumprido confirmado pelo gestor (migration 313): não há o que prorrogar.
+    // Escopo cumprido confirmado pelo gestor (migration 314): não há o que prorrogar.
     if (contract.dataVigenciaFim && !contratosExecutados.has(contractKey)) {
       const cicloVigencia = contract.dataVigenciaFim.replace(/\D/g, '');
 

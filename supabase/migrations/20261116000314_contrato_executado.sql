@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MIGRATION 313: contrato com escopo cumprido ("Executado")
+-- MIGRATION 314: contrato com escopo cumprido ("Executado")
 -- ==============================================================================
 -- Protótipo aprovado em 16/11/2026. A vigência sozinha deixava contratos já
 -- entregues e pagos em "Vigentes" e com avisos de prorrogação (127 de 444 em

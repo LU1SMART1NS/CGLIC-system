@@ -29,7 +29,7 @@ const ICONE = {
 const somenteDigitos = (v: string) => v.replace(/\D/g, '').slice(0, 12);
 
 /**
- * Escopo cumprido (migration 313): o banco sugere pelos fatos das fontes e o gestor confirma com a data do
+ * Escopo cumprido (migration 314): o banco sugere pelos fatos das fontes e o gestor confirma com a data do
  * recebimento definitivo e o documento SEI. Confirmado, mostra quem confirmou e permite desfazer.
  */
 export const ConfirmarExecucaoModal: React.FC<ConfirmarExecucaoModalProps> = ({ isOpen, numero, fornecedor, execucao, onClose }) => {
