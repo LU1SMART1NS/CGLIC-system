@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchUnidadesItem } from '../services/api';
-import { lerCopiaUnidadesItem } from '../services/unidadesItensSyncService';
+import { lerCopiaDoItem, lerCopiaUnidadesItem, type CopiaDoItem } from '../services/unidadesItensSyncService';
 import { normalizeItemKey } from '../utils/itemKeyUtils';
 import type { UnidadeItemRecord } from '../types';
 
@@ -17,6 +17,8 @@ export interface UnidadesDoItem {
   origem: OrigemUnidadesItem;
   /** Quando a cópia foi lida do Compras.gov.br (só na origem COPIA). */
   copiadoEm: string | null;
+  /** A cópia está na tela enquanto o Compras.gov.br ainda responde; a lista de agora a substitui ao chegar. */
+  conferindo?: boolean;
 }
 
 /**
@@ -57,6 +59,27 @@ export function getItemUnidadesQueryOptions(numeroAta?: string, uasg?: string, n
   };
 }
 
+/** Cópia de órgãos e adesões guardada pelo servidor (uma leitura por item, compartilhada pelas duas consultas). */
+export function getCopiaDoItemQueryOptions(itemKey: string) {
+  return {
+    queryKey: ['item-copia', itemKey] as const,
+    queryFn: () => lerCopiaDoItem(itemKey),
+    enabled: Boolean(itemKey),
+    staleTime: 5 * 60 * 1000,
+    retry: 1
+  };
+}
+
+/**
+ * Lista da tela: a do Compras.gov.br quando já respondeu; antes disso, a cópia do servidor marcada como "conferindo".
+ * Sem nenhuma das duas, ainda não há lista (carregando).
+ */
+export function escolherUnidades(aoVivo: UnidadesDoItem | undefined, copia: CopiaDoItem | undefined): UnidadesDoItem | undefined {
+  if (aoVivo) return aoVivo;
+  if (copia?.unidades) return { unidades: copia.unidades.unidades, origem: 'COPIA', copiadoEm: copia.unidades.copiadoEm, conferindo: true };
+  return undefined;
+}
+
 /**
  * Hook canônico do React Query para consulta de Unidades Participantes e Gerenciadora do Item de ARP.
  *
@@ -65,7 +88,21 @@ export function getItemUnidadesQueryOptions(numeroAta?: string, uasg?: string, n
  * Arquitetura:
  * UI / Component -> useItemUnidades() -> fetchUnidadesItem() -> API Compras.gov.br / Proxy
  *                                     -> (API vazia) itens_ata_unidades_copia (migration 91)
+ * A cópia é lida também em paralelo (['item-copia', itemKey]): a aba abre com ela e troca pela lista de agora quando
+ * o Compras.gov.br responde. `copia` leva também as adesões guardadas, para a aba Adesões fazer o mesmo.
  */
 export function useItemUnidades(numeroAta?: string, uasg?: string, numeroItem?: string) {
-  return useQuery<UnidadesDoItem, Error>(getItemUnidadesQueryOptions(numeroAta, uasg, numeroItem));
+  const aoVivo = useQuery<UnidadesDoItem, Error>(getItemUnidadesQueryOptions(numeroAta, uasg, numeroItem));
+  const itemKey = numeroAta && uasg && numeroItem ? normalizeItemKey(numeroAta.trim(), uasg.trim(), numeroItem.trim()) : '';
+  const copia = useQuery<CopiaDoItem, Error>(getCopiaDoItemQueryOptions(itemKey));
+  // A cópia que falhou não atrapalha: a tela espera o Compras.gov.br, como antes.
+  const copiaLida = copia.isError ? undefined : copia.data;
+  const data = escolherUnidades(aoVivo.data, copiaLida);
+  return {
+    data,
+    isLoading: aoVivo.isLoading && !data,
+    conferindo: Boolean(data?.conferindo),
+    error: aoVivo.error,
+    copia: copiaLida
+  };
 }

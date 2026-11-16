@@ -151,4 +151,21 @@ describe('escolherAdesoes', () => {
     expect(escolherAdesoes({ aoVivo: [], copia: null }, 'SEM_DADOS')).toEqual({ adesoes: [], origem: 'SEM_DADOS', copiadoEm: null });
     expect(escolherAdesoes(undefined, undefined).origem).toBe('SEM_DADOS');
   });
+
+  describe('cópia enquanto o Compras.gov.br responde', () => {
+    const copia = { adesoes: [{ quantidadeAprovada: 10 }] as any[], copiadoEm: '2026-11-16T01:43:00Z' };
+
+    it('sem leitura ainda: usa a cópia, marcada como conferindo', () => {
+      expect(escolherAdesoes(undefined, undefined, copia)).toEqual({ adesoes: copia.adesoes, origem: 'COPIA', copiadoEm: copia.copiadoEm, conferindo: true });
+    });
+
+    it('com a leitura de agora: a cópia não é usada', () => {
+      const r = escolherAdesoes({ aoVivo: [], copia: null }, 'API', copia);
+      expect(r).toEqual({ adesoes: [], origem: 'API', copiadoEm: null });
+    });
+
+    it('sem leitura e sem cópia: sem dados, como antes', () => {
+      expect(escolherAdesoes(undefined, undefined, null).origem).toBe('SEM_DADOS');
+    });
+  });
 });

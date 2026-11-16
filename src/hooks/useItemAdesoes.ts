@@ -19,6 +19,8 @@ export interface AdesoesDoItem {
   /** API: lista de agora (vazia = sem adesão); COPIA: lista guardada; SEM_DADOS: não dá para saber. */
   origem: OrigemUnidadesItem;
   copiadoEm: string | null;
+  /** A cópia está na tela enquanto o Compras.gov.br ainda responde. */
+  conferindo?: boolean;
 }
 
 /**
@@ -26,7 +28,15 @@ export interface AdesoesDoItem {
  * vazia só vale como "nenhuma adesão" quando a consulta de órgãos do mesmo item respondeu agora
  * (`origemUnidades` = API). Com a API fora do ar, vale a cópia guardada; sem cópia, fica sem dados.
  */
-export function escolherAdesoes(leitura: LeituraAdesoesItem | undefined, origemUnidades: OrigemUnidadesItem | undefined): AdesoesDoItem {
+export function escolherAdesoes(
+  leitura: LeituraAdesoesItem | undefined,
+  origemUnidades: OrigemUnidadesItem | undefined,
+  copiaEnquantoConfere: CopiaAdesoesItem | null = null
+): AdesoesDoItem {
+  // Compras.gov.br ainda sem resposta: vale a cópia do servidor, com a data, até a lista de agora chegar.
+  if (!leitura && copiaEnquantoConfere) {
+    return { adesoes: copiaEnquantoConfere.adesoes, origem: 'COPIA', copiadoEm: copiaEnquantoConfere.copiadoEm, conferindo: true };
+  }
   const aoVivo = leitura?.aoVivo ?? [];
   if (aoVivo.length > 0 || (origemUnidades === 'API' && !leitura?.falhaAoVivo)) return { adesoes: aoVivo, origem: 'API', copiadoEm: null };
   if (leitura?.copia) return { adesoes: leitura.copia.adesoes, origem: 'COPIA', copiadoEm: leitura.copia.copiadoEm };

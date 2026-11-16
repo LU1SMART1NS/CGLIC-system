@@ -322,3 +322,29 @@ export async function lerCopiaAdesoesItem(itemKey: string): Promise<CopiaAdesoes
   if (!data?.adesoes_copiado_em || !Array.isArray(data.adesoes)) return null;
   return { adesoes: data.adesoes as AdesaoItemRecord[], copiadoEm: data.adesoes_copiado_em };
 }
+
+export interface CopiaDoItem {
+  unidades: CopiaUnidadesItem | null;
+  adesoes: CopiaAdesoesItem | null;
+}
+
+/**
+ * Órgãos e adesões guardados pelo servidor numa só leitura (uma linha por item, ~1 ms no banco). A tela do Item abre
+ * com ela enquanto confere o Compras.gov.br, que leva até 17 s na primeira consulta do item (medido em 16/11/2026).
+ */
+export async function lerCopiaDoItem(itemKey: string): Promise<CopiaDoItem> {
+  if (!supabase || !itemKey) return { unidades: null, adesoes: null };
+  const { data, error } = await supabase
+    .from('itens_ata_unidades_copia')
+    .select('unidades, copiado_em, adesoes, adesoes_copiado_em')
+    .eq('item_key', itemKey)
+    .maybeSingle();
+  if (error) throw error;
+  const unidades = data?.copiado_em && Array.isArray(data.unidades) && data.unidades.length > 0
+    ? { unidades: juntarUnidadesRepetidas(data.unidades as UnidadeItemRecord[]).unidades, copiadoEm: data.copiado_em as string }
+    : null;
+  const adesoes = data?.adesoes_copiado_em && Array.isArray(data.adesoes)
+    ? { adesoes: data.adesoes as AdesaoItemRecord[], copiadoEm: data.adesoes_copiado_em as string }
+    : null;
+  return { unidades, adesoes };
+}
