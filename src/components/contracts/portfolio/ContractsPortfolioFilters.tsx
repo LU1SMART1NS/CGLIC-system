@@ -10,7 +10,7 @@ export { SEM_GESTOR } from '../../carteira/carteiraGestor';
 
 export interface ContractsPortfolioFilterState {
   status: ContractStatusFilterOption;
-  pendencia: 'TODOS' | 'COM_PENDENCIA';
+  pendencia: 'TODOS' | 'COM_PENDENCIA' | 'ESCOPO_CUMPRIDO';
   /** Unidade interna (nome normalizado; 'TODAS' = sem filtro): contratos cujos itens receberam alocação dela. */
   unidade: string;
   /** Nome do gestor ('TODOS' = sem filtro; '__SEM_GESTOR__' = contratos sem gestor atribuído). */
@@ -20,7 +20,7 @@ export interface ContractsPortfolioFilterState {
 
 export const CONTRACTS_FILTER_SCHEMA: CarteiraFilterSchema<ContractsPortfolioFilterState> = {
   status: { param: 'situacao', default: 'VIGENTES', values: ['TODOS', 'VIGENTES', 'CRITICO', 'ATENCAO', 'EXECUTADOS', 'HISTORICO'] },
-  pendencia: { param: 'pendencia', default: 'TODOS', values: ['TODOS', 'COM_PENDENCIA'] },
+  pendencia: { param: 'pendencia', default: 'TODOS', values: ['TODOS', 'COM_PENDENCIA', 'ESCOPO_CUMPRIDO'] },
   unidade: { param: 'unidade', default: TODAS_UNIDADES },
   gestor: { param: 'gestor', default: TODOS_GESTORES },
   busca: { param: 'busca', default: '' }
@@ -41,6 +41,8 @@ interface ContractsPortfolioFiltersProps {
   unidades?: Array<{ chave: string; nome: string }>;
   /** Quantos contratos têm pendência (aparece no menu do filtro). */
   comPendencia?: number;
+  /** Vigentes sugeridos como escopo cumprido (a confirmar); o filtro só aparece quando há algum. */
+  escopoCumprido?: number;
   /** Esconde o seletor de gestor (perfil "gestor", que já vê só os próprios contratos). */
   showGestorFilter?: boolean;
   onChangeFilter: <K extends keyof ContractsPortfolioFilterState>(key: K, value: ContractsPortfolioFilterState[K]) => void;
@@ -54,6 +56,7 @@ export const ContractsPortfolioFilters: React.FC<ContractsPortfolioFiltersProps>
   gestores,
   unidades = [],
   comPendencia,
+  escopoCumprido = 0,
   showGestorFilter = true,
   onChangeFilter,
   onResetFilters,
@@ -79,6 +82,16 @@ export const ContractsPortfolioFilters: React.FC<ContractsPortfolioFiltersProps>
         onChange={(on) => onChangeFilter('pendencia', (on ? 'COM_PENDENCIA' : 'TODOS') as ContractsPortfolioFilterState['pendencia'])}
         testId="contracts-filter-pendencia"
       />
+
+      {(escopoCumprido > 0 || filters.pendencia === 'ESCOPO_CUMPRIDO') && (
+        <CarteiraFilterToggle
+          label="Escopo cumprido"
+          active={filters.pendencia === 'ESCOPO_CUMPRIDO'}
+          count={escopoCumprido}
+          onChange={(on) => onChangeFilter('pendencia', (on ? 'ESCOPO_CUMPRIDO' : 'TODOS') as ContractsPortfolioFilterState['pendencia'])}
+          testId="contracts-filter-escopo-cumprido"
+        />
+      )}
 
       <CarteiraUnidadeSelect
         value={filters.unidade}
