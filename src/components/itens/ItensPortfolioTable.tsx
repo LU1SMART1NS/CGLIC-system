@@ -38,7 +38,7 @@ interface ItensPortfolioTableProps {
   canFilterGestor?: boolean;
   /** Fatia de cada GTI do ComprasSUSP no item (migration 139). */
   fatiasDaLinha?: (row: CarteiraItemRow) => FatiasDaAta | undefined;
-  /** Nome curto do item (nome na ata assinada, gravado pela CAEP); sem ele, a descrição fica como linha principal. */
+  /** Nome curto do item (o da CAEP ou, sem ele, o da tabela da ata assinada); sem ele, a descrição fica como linha principal. */
   nomeDaLinha?: (row: CarteiraItemRow) => string | undefined;
 }
 

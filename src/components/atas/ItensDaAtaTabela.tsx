@@ -98,7 +98,7 @@ interface ItensDaAtaTabelaProps {
   /** Gestor de saldo não vê empenho (fica fora dos contratos). */
   mostrarEmpenho: boolean;
   onSelectItem: (item: ArpItemRecord) => void;
-  /** Nome curto do item (nome na ata assinada, gravado pela CAEP); sem ele, só a descrição. */
+  /** Nome curto do item (o da CAEP ou, sem ele, o da tabela da ata assinada); sem ele, só a descrição. */
   nomeDoItem?: (item: ArpItemRecord) => string | undefined;
 }
 
