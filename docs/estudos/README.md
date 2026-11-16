@@ -10,6 +10,7 @@ Levantamentos e medições feitos antes de mudar o sistema. Nenhum estudo altera
 | [modelo-gestao-cplcga-sei.md](modelo-gestao-cplcga-sei.md) | 25/10/2026 | Como a CCGA (ex-CPLCGA) organiza o trabalho: os cinco Planos e os modelos lidos no SEI. |
 | [auditoria-duplicacao-modulos.md](auditoria-duplicacao-modulos.md) | 11/11/2026 | Onde a mesma informação é guardada em dois lugares e quais ligações faltam entre os módulos. |
 | [projecao-reajuste-atas.md](projecao-reajuste-atas.md) e [projecao-reajuste-itens.csv](projecao-reajuste-itens.csv) | 23/10/2026 | Quanto cada item das atas pode reajustar. |
+| [nome-do-item-na-ata-assinada.md](nome-do-item-na-ata-assinada.md) | 16/11/2026 | A leitura automática do nome do item no PDF da ata assinada acerta? Medição nos 145 PDFs da carga. |
 
 ## Financeiro
 
