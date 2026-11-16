@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { prepareContractEmpenhosList } from '../../../hooks/useContractFinancialSummary';
+import { saldoAExecutar } from '../../../utils/saldoAExecutar';
 import { aggregateContractFinancialExecution } from '../../../services/financialExecutionService';
 import type { ContractDashboardRecord } from '../../../types';
 
@@ -115,5 +116,30 @@ describe('ContractFinancialExecutionSection — Testes de Domínio e Integraçã
     expect(list[0].valor_empenhado).toBe(2788);
     expect(list[0].valor_pago).toBe(1000.5);
     expect(list[0].canonical_key).toBe('200330-2026-2026NE262');
+  });
+
+  it('usa liquidado e pago do Tesouro quando a nota está no saldo contábil (2025NE000038: fonte zerada, paga no SIAFI)', () => {
+    const dashboardEmpenhos = [
+      {
+        empenho_id: 'ne38',
+        canonical_key: '200330-2025-2025NE38',
+        numero_oficial: '2025NE000038',
+        valor_empenhado: 549790,
+        valor_liquidado: 0,
+        valor_pago: 0,
+        tesouro: { pago: 549790, liquidado: 549790, saldo: 0, atualizadoEm: '2026-11-13T17:03:26' }
+      },
+      { empenho_id: 'sem', canonical_key: '200331-2024-2024NE5', numero_oficial: '2024NE000005', valor_empenhado: 1000, valor_liquidado: 300, valor_pago: 200 }
+    ];
+    const [ne38, sem] = prepareContractEmpenhosList(mockContract, [], dashboardEmpenhos);
+    expect(ne38).toMatchObject({ valor_liquidado: 549790, valor_pago: 549790, fonte_execucao: 'TESOURO', saldo_tesouro: 0, tesouro_atualizado_em: '2026-11-13T17:03:26' });
+    expect(saldoAExecutar(ne38)).toBe(0);
+    // Sem o Tesouro, fica o número da fonte e o saldo é empenhado menos pago.
+    expect(sem).toMatchObject({ valor_liquidado: 300, valor_pago: 200, fonte_execucao: 'FONTE', saldo_tesouro: undefined });
+    expect(saldoAExecutar(sem)).toBe(800);
+
+    const summary = aggregateContractFinancialExecution('200330-00019-2025', [ne38, sem]);
+    expect(summary.totalValorPagoGlobal).toBe(549990);
+    expect(summary.totalValorLiquidadoGlobal).toBe(550090);
   });
 });
