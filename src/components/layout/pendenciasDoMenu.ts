@@ -29,13 +29,15 @@ export interface FontesDoMenu {
   emendasAContratar?: number | null;
   /** Itens com as informações da CAEP recebidas e a Ordem a emitir (envio à SFC): só o gestor de fiscalização. */
   ordemAEmitir?: number | null;
+  /** Contratos "Com você" da Fiscalização e, deles, os com o passo vencido: só o gestor de fiscalização. */
+  fiscalizacao?: { total: number; vencidos: number } | null;
 }
 
 /**
  * Regras dos números do menu (só pendências que o perfil resolve; quem calcula cada parte já filtra pelo perfil). Com
  * número, a área abre direto na página e no segmento da pendência; sem número, o menu volta à última página usada.
  */
-export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar, emendasAContratar, ordemAEmitir }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
+export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar, emendasAContratar, ordemAEmitir, fiscalizacao }: FontesDoMenu): Record<string, PendenciaDaArea | undefined> {
   const r: Record<string, PendenciaDaArea | undefined> = {};
 
   // Início: as filas da Central de Distribuição (coordenador) e os pedidos de emenda a contratar (gestor e coordenador).
@@ -90,6 +92,11 @@ export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gr
       // Só emendas sem pedido: o clique abre a lista delas; com pedidos com aviso, Pedidos sem filtro.
       destino: emendas.semPedido && emendas.semPedido === emendas.total ? '/emendas/emendas?situacao=sem&ano=todos' : '/emendas/pedidos?ano=todos'
     };
+
+  // Fiscalização (padrão do Financeiro): contratos com o próximo passo do fiscal; vermelho com passo vencido. Abre
+  // Contratos, que para o fiscal já começa em "Com você".
+  if (fiscalizacao && fiscalizacao.total > 0)
+    r.fiscalizacao = { contagem: fiscalizacao.total, vermelho: fiscalizacao.vencidos > 0, motivoVermelho: 'com passo vencido', destino: '/fiscalizacao/contratos' };
 
   // Ajustes: UASGs (coordenador) e beneficiários de emenda (coordenador e gestor de emendas) sem grupo confirmado. Abre
   // na primeira tela com pendência, na ordem das abas (Grupos das UASGs antes de Grupos dos beneficiários), em "A

@@ -13,6 +13,7 @@ import { useContagemAtasAMontar } from '../atas/montar/useContagemAtasAMontar';
 import { pendenciasDoMenu, type PendenciaDaArea } from './pendenciasDoMenu';
 import { useContagemEmendasAContratar } from '../emendas/useContagemEmendasAContratar';
 import { useContagemOrdemAEmitir } from '../fiscalizacao/useContagemOrdemAEmitir';
+import { useContagemFiscalizacao } from '../fiscalizacao/useContagemFiscalizacao';
 
 interface SidebarProps {
   /** 'rail' = trilha de ícones à esquerda (desktop); 'bottom' = barra inferior (celular). */
@@ -112,9 +113,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'rail' }) => {
   const atasAMontar = useContagemAtasAMontar();
   const emendasAContratar = useContagemEmendasAContratar();
   const ordemAEmitir = useContagemOrdemAEmitir();
+  const fiscalizacao = useContagemFiscalizacao();
   const pendencias = useMemo(
-    () => pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar, emendasAContratar, ordemAEmitir }),
-    [empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar, emendasAContratar, ordemAEmitir]
+    () => pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar, emendasAContratar, ordemAEmitir, fiscalizacao }),
+    [empenhos, financeiro, extras, gruposUasgs, gruposBeneficiarios, emendas, atasAMontar, emendasAContratar, ordemAEmitir, fiscalizacao]
   );
 
   // Registra antes de montar os links, para o da área atual já apontar para a página aberta (idempotente).
