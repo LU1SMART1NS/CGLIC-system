@@ -77,6 +77,22 @@ describe('ItensPortfolioTable', () => {
     expect(html).not.toContain('VANGUARDA INFORMATICA LTDA');
   });
 
+  it('mostra o nome curto em negrito e a descrição em uma linha quando o item tem nome', () => {
+    const r = row({ item: { ...row().item, descricaoItem: 'ACESSÓRIO / PEÇA MERGULHO, TIPO COMPUTADOR DE MERGULHO' } as ArpItemRecord });
+    const html = renderToStaticMarkup(
+      <ItensPortfolioTable rows={[r]} totalItens={1} unidade="TODAS" onSelectItem={noop} onResetFilters={noop} nomeDaLinha={() => 'Computador de Mergulho'} />
+    );
+    expect(html).toContain(`data-testid="itens-nome-${r.key}"`);
+    expect(html).toContain('>Computador de Mergulho<');
+    expect(html).toContain('Acessório / peça mergulho, tipo computador de mergulho');
+  });
+
+  it('sem nome curto, a descrição segue como linha principal', () => {
+    const r = row();
+    const html = renderToStaticMarkup(<ItensPortfolioTable rows={[r]} totalItens={1} unidade="TODAS" onSelectItem={noop} onResetFilters={noop} nomeDaLinha={() => undefined} />);
+    expect(html).not.toContain('itens-nome-');
+  });
+
   it('avisa quando o item não tem quantidade contratada', () => {
     const html = renderToStaticMarkup(
       <ItensPortfolioTable

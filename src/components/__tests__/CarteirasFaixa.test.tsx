@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
  * Carteira de Atas e Carteira de Itens quando uma leitura falha (passo 2 da auditoria das telas, achados 3a, 3b, 3f e
  * 3i): a faixa diz o que não carregou, os números das outras fontes ficam e a lista vazia por falha diz "não carregou".
  */
+vi.mock('../../hooks/useNomesCurtosItens', () => ({ ROTULO_NOMES_CURTOS: 'nome curto dos itens', useNomesCurtosItensLeitura: () => ({ nomes: new Map(), consulta: { isError: false, isLoading: false, data: new Map() } }) }));
 vi.mock('../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'admin' })) }));
 vi.mock('../../hooks/useDetailOrigin', () => ({ useNavigateWithOrigin: () => vi.fn() }));
 vi.mock('../../hooks/useAtasPortfolio', async (orig) => ({ ...(await orig<typeof import('../../hooks/useAtasPortfolio')>()), useAtasPortfolio: vi.fn() }));

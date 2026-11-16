@@ -28,6 +28,7 @@ const linha = (extra: Partial<CarteiraItemRow>): CarteiraItemRow =>
 
 let rows: CarteiraItemRow[] = [];
 
+vi.mock('../../../hooks/useNomesCurtosItens', () => ({ ROTULO_NOMES_CURTOS: 'nome curto dos itens', useNomesCurtosItensLeitura: () => ({ nomes: new Map(), consulta: { isError: false, isLoading: false, data: new Map() } }) }));
 vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }) }));
 vi.mock('../../../hooks/useDetailOrigin', () => ({ useNavigateWithOrigin: () => () => {} }));
 vi.mock('../../../hooks/useAtasPortfolio', () => ({

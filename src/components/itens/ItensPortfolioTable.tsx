@@ -15,7 +15,7 @@ import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { useCarteiraSort, type CarteiraSortColumn } from '../carteira/useCarteiraSort';
 import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLink';
 import { situacaoDaFaixa } from '../carteira/carteiraPrazo';
-import { descricaoItemEmFrase } from '../../utils/textCase';
+import { NomeEDescricaoItem } from './NomeEDescricaoItem';
 import { NIVEL_ALOCACAO_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
 import type { CarteiraItemRow } from '../../utils/carteiraItens';
 import type { ItensPortfolioFilterState } from './ItensPortfolioFilters';
@@ -38,6 +38,8 @@ interface ItensPortfolioTableProps {
   canFilterGestor?: boolean;
   /** Fatia de cada GTI do ComprasSUSP no item (migration 139). */
   fatiasDaLinha?: (row: CarteiraItemRow) => FatiasDaAta | undefined;
+  /** Nome curto do item (nome na ata assinada, gravado pela CAEP); sem ele, a descrição fica como linha principal. */
+  nomeDaLinha?: (row: CarteiraItemRow) => string | undefined;
 }
 
 /** Item novo = item de ata nova (o item não tem data própria na fonte). */
@@ -67,7 +69,6 @@ const ConsumoBar: React.FC<{ pct: number | null }> = ({ pct }) => {
 };
 
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
-const clamp = (lines: number): React.CSSProperties => ({ display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical', overflow: 'hidden' });
 const execLine: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' };
 
 export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
@@ -80,7 +81,8 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
   pageSize = 20,
   onFilter,
   canFilterGestor = true,
-  fatiasDaLinha
+  fatiasDaLinha,
+  nomeDaLinha
 }) => {
   const comUnidade = unidade !== TODAS_UNIDADES;
   const sortColumns = useMemo<Record<string, CarteiraSortColumn<CarteiraItemRow>>>(
@@ -156,6 +158,7 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
             {pageItems.map((row) => {
               const { arp, item } = row;
               const alocadoUnidade = row.alocadoPorUnidade[unidade] ?? 0;
+              const nome = nomeDaLinha?.(row);
               return (
                 <tr key={row.key} data-testid={`itens-row-${row.key}`} className="carteira-row-link" onClick={abrirAoClicarNaLinha(() => onSelectItem(row))}>
                   <td data-role="id" style={{ ...carteiraTd, minWidth: '240px', maxWidth: '380px' }}>
@@ -176,9 +179,7 @@ export const ItensPortfolioTable: React.FC<ItensPortfolioTableProps> = ({
                       </CarteiraCellFilter>
                       {itemNovo(row) && <CarteiraNovoBadge genero="m" testId={`itens-novo-${row.key}`} />}
                     </div>
-                    <div title={item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', ...clamp(2) }}>
-                      {descricaoItemEmFrase(item.descricaoItem)}
-                    </div>
+                    <NomeEDescricaoItem nome={nome} descricao={item.descricaoItem} testId={`itens-nome-${row.key}`} />
                   </td>
                   <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
                     <CarteiraCellFilter

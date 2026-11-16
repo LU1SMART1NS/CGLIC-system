@@ -3,7 +3,7 @@ import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLin
 import { CarteiraNivelPill } from '../carteira/CarteiraNivelPill';
 import { carteiraTd, carteiraTh, LARGURA_BARRA_CARTEIRA } from '../carteira/carteiraStyles';
 import { saldoBarColor } from './ataSaldoStats';
-import { descricaoItemEmFrase } from '../../utils/textCase';
+import { NomeEDescricaoItem } from '../itens/NomeEDescricaoItem';
 import { formatCurrency, formatNumber } from '../../utils/format';
 import { NIVEL_ALOCACAO_LABEL, NIVEL_EMPENHO_LABEL } from '../../utils/itemAtendimento';
 import type { CarteiraItemRow } from '../../utils/carteiraItens';
@@ -98,13 +98,15 @@ interface ItensDaAtaTabelaProps {
   /** Gestor de saldo não vê empenho (fica fora dos contratos). */
   mostrarEmpenho: boolean;
   onSelectItem: (item: ArpItemRecord) => void;
+  /** Nome curto do item (nome na ata assinada, gravado pela CAEP); sem ele, só a descrição. */
+  nomeDoItem?: (item: ArpItemRecord) => string | undefined;
 }
 
 /**
  * Itens da ata, na linha expandida da Carteira de Atas: quantidade SENASP, saldo SENASP, alocação nas unidades
  * internas e empenho, com os mesmos números da Carteira de Itens. A linha abre o Item 360.
  */
-export const ItensDaAtaTabela: React.FC<ItensDaAtaTabelaProps> = ({ numeroAta, itens, linhaDoItem, pctDoItem, nomeDaUnidade, mostrarEmpenho, onSelectItem }) => (
+export const ItensDaAtaTabela: React.FC<ItensDaAtaTabelaProps> = ({ numeroAta, itens, linhaDoItem, pctDoItem, nomeDaUnidade, mostrarEmpenho, onSelectItem, nomeDoItem }) => (
   <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
     <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
       <thead>
@@ -132,9 +134,7 @@ export const ItensDaAtaTabela: React.FC<ItensDaAtaTabelaProps> = ({ numeroAta, i
                 <CarteiraIdLink onClick={() => onSelectItem(item)} label={`Ver saldo do item ${item.numeroItem} da ata ${numeroAta}`} title="Ver o saldo do item">
                   {item.numeroItem}
                 </CarteiraIdLink>
-                <div title={item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {descricaoItemEmFrase(item.descricaoItem) || '—'}
-                </div>
+                <NomeEDescricaoItem nome={nomeDoItem?.(item)} descricao={item.descricaoItem} testId={`arp-item-nome-${numeroAta}-${item.numeroItem}`} />
               </td>
               <td data-label="Qtd. SENASP" style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                 {linha ? (
