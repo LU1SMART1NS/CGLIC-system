@@ -25,6 +25,8 @@ export interface AdesoesTabProps {
   origem?: OrigemUnidadesItem;
   /** Quando a cópia foi lida do Compras.gov.br (origem COPIA). */
   copiadoEm?: string | null;
+  /** A lista é a cópia do servidor enquanto o Compras.gov.br ainda responde. */
+  conferindo?: boolean;
   /** Remanejamentos a não participantes e decisões sobre adesões a conferir (migration 219). */
   itemKey?: string;
   quantitativos?: QuantitativosDoItem;
@@ -53,6 +55,7 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
   limiteAdesao,
   origem = 'API',
   copiadoEm = null,
+  conferindo = false,
   itemKey = '',
   quantitativos,
   adesoesNoLimite,
@@ -186,8 +189,8 @@ export const AdesoesTab: React.FC<AdesoesTabProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} data-testid="adesoes-tab">
       {!adesoesLoading && origem === 'COPIA' && copiadoEm && (
-        <NoticeBar tone="info" testId="adesoes-copia">
-          O Compras.gov.br não respondeu agora.{' '}
+        <NoticeBar tone="info" testId={conferindo ? 'adesoes-conferindo' : 'adesoes-copia'}>
+          {conferindo ? `Conferindo com o Compras.gov.br agora; a lista se atualiza sozinha se algo mudou. ` : `O Compras.gov.br não respondeu agora. `}
           {adesoes.length > 0
             ? `A lista abaixo é a última cópia guardada, lida em ${formatDataHoraBR(copiadoEm)}.`
             : `Na última leitura, em ${formatDataHoraBR(copiadoEm)}, o item não tinha adesões.`}

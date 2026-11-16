@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getItemUnidadesQueryOptions } from '../useItemUnidades';
+import { escolherUnidades, getCopiaDoItemQueryOptions, getItemUnidadesQueryOptions } from '../useItemUnidades';
 import * as api from '../../services/api';
 import * as copia from '../../services/unidadesItensSyncService';
 
@@ -99,5 +99,33 @@ describe('useItemUnidades Hook / Query Options - Testes Unitários de Contrato e
     expect(result).toEqual({ unidades: [], origem: 'SEM_DADOS', copiadoEm: null });
     expect(api.fetchUnidadesItem).not.toHaveBeenCalled();
   });
-});
 
+  describe('cópia primeiro, enquanto o Compras.gov.br responde', () => {
+    const copiaUnidades = [{ codigoUnidade: '200331', quantidadeRegistrada: 89 }] as any[];
+    const copia = { unidades: { unidades: copiaUnidades, copiadoEm: '2026-11-16T01:43:00Z' }, adesoes: null };
+
+    it('sem resposta da API: mostra a cópia marcada como conferindo', () => {
+      expect(escolherUnidades(undefined, copia)).toEqual({
+        unidades: copiaUnidades,
+        origem: 'COPIA',
+        copiadoEm: '2026-11-16T01:43:00Z',
+        conferindo: true
+      });
+    });
+
+    it('a API respondeu: a lista de agora substitui a cópia', () => {
+      const aoVivo = { unidades: [{ codigoUnidade: '200331', quantidadeRegistrada: 90 }] as any[], origem: 'API' as const, copiadoEm: null };
+      expect(escolherUnidades(aoVivo, copia)).toBe(aoVivo);
+    });
+
+    it('sem API e sem cópia: ainda carregando (nenhuma lista)', () => {
+      expect(escolherUnidades(undefined, { unidades: null, adesoes: null })).toBeUndefined();
+      expect(escolherUnidades(undefined, undefined)).toBeUndefined();
+    });
+
+    it('consulta da cópia só com a chave do item', () => {
+      expect(getCopiaDoItemQueryOptions('').enabled).toBe(false);
+      expect(getCopiaDoItemQueryOptions('00067/2024-200331-00010').queryKey).toEqual(['item-copia', '00067/2024-200331-00010']);
+    });
+  });
+});

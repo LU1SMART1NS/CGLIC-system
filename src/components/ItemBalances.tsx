@@ -122,6 +122,8 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
   const {
     data: unidadesDoItem,
     isLoading: loading,
+    conferindo: conferindoUnidades,
+    copia: copiaDoItem,
     error: unidadesQueryError
   } = useItemUnidades(
     arp.numeroAtaRegistroPreco,
@@ -139,12 +141,15 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     arp.codigoUnidadeGerenciadora,
     item.numeroItem
   );
-  const { data: leituraAdesoes, isLoading: adesoesLoading, error: adesoesQueryError } = adesoesQuery;
-  // A resposta vazia só vale como "nenhuma adesão" quando os órgãos do item vieram da API agora.
+  const { data: leituraAdesoes, isLoading: adesoesAoVivoLoading, error: adesoesQueryError } = adesoesQuery;
+  // A resposta vazia só vale como "nenhuma adesão" quando os órgãos do item vieram da API agora. Enquanto o
+  // Compras.gov.br não responde, vale a cópia do servidor (com a data), como nos órgãos.
+  const copiaAdesoes = copiaDoItem?.adesoes ?? null;
   const adesoesDoItem = React.useMemo(
-    () => escolherAdesoes(leituraAdesoes, loading ? undefined : unidadesDoItem?.origem),
-    [leituraAdesoes, loading, unidadesDoItem?.origem]
+    () => escolherAdesoes(leituraAdesoes, loading ? undefined : unidadesDoItem?.origem, copiaAdesoes),
+    [leituraAdesoes, loading, unidadesDoItem?.origem, copiaAdesoes]
   );
+  const adesoesLoading = adesoesAoVivoLoading && !adesoesDoItem.conferindo;
   const adesoes = adesoesDoItem.adesoes;
   const adesoesError = adesoesQueryError ? (adesoesQueryError.message || 'Falha ao buscar as adesões do item.') : null;
 
@@ -770,7 +775,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
         item={item}
         onBack={onBack}
         backLabel={backLabel}
-        isRefreshing={loading || contractsLoading || syncingContracts}
+        isRefreshing={loading || conferindoUnidades || Boolean(adesoesDoItem.conferindo) || contractsLoading || syncingContracts}
         onRefresh={handleRefresh}
         metrics={{
           officialSaldo: officialCalculatedSaldo,
@@ -828,6 +833,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               error={error}
               origem={unidadesDoItem?.origem ?? 'API'}
               copiadoEm={unidadesDoItem?.copiadoEm ?? null}
+              conferindo={conferindoUnidades}
               registradoSenasp={totalUGQty}
               baseSaldo={baseSaldo}
               contratadoSenasp={executionSummary.contratado}
@@ -859,6 +865,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               error={error}
               origem={unidadesDoItem?.origem ?? 'API'}
               copiadoEm={unidadesDoItem?.copiadoEm ?? null}
+              conferindo={conferindoUnidades}
               quantidadeSenasp={totalUGQty}
               contratadoSenasp={executionSummary.contratado}
               quantitativos={quantitativos}
@@ -1256,6 +1263,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
             adesoes={adesoes}
             origem={adesoesDoItem.origem}
             copiadoEm={adesoesDoItem.copiadoEm}
+            conferindo={Boolean(adesoesDoItem.conferindo)}
             item={item}
             totalAdesaoAprovada={totalAdesaoAprovada}
             limiteAdesao={totalLimiteAdesao}
