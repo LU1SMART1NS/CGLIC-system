@@ -14,6 +14,8 @@ interface CarteiraSituacaoTabsProps {
   criticos: number;
   atencao: number;
   historico: number;
+  /** Contratos com escopo cumprido confirmado (sem a prop, o segmento não aparece: atas e itens). */
+  executados?: number;
   total: number;
   active: CarteiraSituacao;
   onSelect: (situacao: CarteiraSituacao) => void;
@@ -32,6 +34,7 @@ export const CarteiraSituacaoTabs: React.FC<CarteiraSituacaoTabsProps> = ({
   criticos,
   atencao,
   historico,
+  executados,
   total,
   active,
   onSelect,
@@ -47,6 +50,9 @@ export const CarteiraSituacaoTabs: React.FC<CarteiraSituacaoTabsProps> = ({
       title: `Vencem entre ${VIGENCIA_RULES.faixaCriticoAteDias + 1} e ${VIGENCIA_RULES.faixaAtencaoAteDias} dias`
     },
     { id: 'CRITICO', label: 'Crítico', count: criticos, dot: 'var(--color-danger)', title: `Vencem em até ${VIGENCIA_RULES.faixaCriticoAteDias} dias` },
+    ...(executados === undefined
+      ? []
+      : [{ id: 'EXECUTADOS' as const, label: 'Executados', count: executados, title: 'Escopo cumprido e pago, confirmado pelo gestor: fora dos avisos de prorrogação' }]),
     { id: 'HISTORICO', label: genero === 'm' ? 'Encerrados' : 'Encerradas', count: historico, title: 'Expirados ou cancelados' },
     { id: 'TODOS', label: genero === 'm' ? 'Todos' : 'Todas', count: total }
   ];

@@ -26,6 +26,10 @@ import type { DashboardAttentionItem } from '../../../types/managementDashboard'
 import type { ContractDashboardRecord } from '../../../types';
 import { CarteiraNovoBadge } from '../../carteira/CarteiraNovoBadge';
 import { contratoEhNovo } from '../../carteira/carteiraNovidade';
+import { StatusBadge } from '../../../design-system/components/StatusBadge';
+import { AppButton } from '../../../design-system/components/AppButton';
+import { COR_DA_SITUACAO } from '../../../design-system/coresDaSituacao';
+import { estadoDaExecucao, pendenciasDoFechamento, type ExecucaoDoContrato } from '../../../utils/contratoExecutado';
 
 /** Contrato já enriquecido com o que a tabela precisa exibir (prazo, gestor e pendências). */
 export interface ContractPortfolioRow {
@@ -37,6 +41,8 @@ export interface ContractPortfolioRow {
   pendencias: DashboardAttentionItem[];
   /** Números das atas de que o contrato se originou (vínculo por item); vazio = contrato sem ata. */
   atas?: string[];
+  /** Fatos da execução (faturas, notas, fiscalização) e a confirmação do gestor, quando houver. */
+  execucao?: ExecucaoDoContrato;
 }
 
 interface ContractsPortfolioTableProps {
@@ -50,6 +56,8 @@ interface ContractsPortfolioTableProps {
   destinoSemGestor?: (row: ContractPortfolioRow) => DestinoSemGestor;
   /** Clique num valor da célula aplica o filtro correspondente (prazo → situação, pendências, fornecedor → busca). */
   onFilter?: <K extends keyof ContractsPortfolioFilterState>(key: K, value: ContractsPortfolioFilterState[K]) => void;
+  /** Abre a confirmação de escopo cumprido (gestor do contrato e coordenador). */
+  onConfirmarExecucao?: (row: ContractPortfolioRow) => void;
 }
 
 const SORT_COLUMNS: Record<string, CarteiraSortColumn<ContractPortfolioRow>> = {
@@ -105,7 +113,8 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
   pageSize = 15,
   canAssign = false,
   destinoSemGestor,
-  onFilter
+  onFilter,
+  onConfirmarExecucao
 }) => {
   const navigate = useNavigateWithOrigin();
   // A consulta lê as pendências com rótulos "Ver …" (não informa nem indica nada).
@@ -168,6 +177,8 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                   ? ((contract.valorGlobal - contract.valorInicial) / contract.valorInicial) * 100
                   : 0;
               const worst = pendencias.length > 0 ? PENDENCIA_COLORS[worstSeverity(pendencias)] : null;
+              const estado = estadoDaExecucao(row.execucao);
+              const fechamento = estado === 'EXECUTADO' ? pendenciasDoFechamento(row.execucao) : [];
 
               return (
                 <React.Fragment key={contractKey}>
@@ -222,12 +233,18 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                       </div>
                     </td>
                     <td data-label="Vigência" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
+                      {estado === 'EXECUTADO' && faixa !== 'EXPIRADO' ? (
+                        <CarteiraCellFilter descricao="contratos executados" onFilter={onFilter && (() => onFilter('status', 'EXECUTADOS'))}>
+                          <StatusBadge label="Executado" variant={COR_DA_SITUACAO.CONCLUIDO} size="sm" testId={`contracts-executado-${contractKey}`} />
+                        </CarteiraCellFilter>
+                      ) : (
                       <CarteiraCellFilter
                         descricao="esta situação de prazo"
                         onFilter={onFilter && situacaoDaFaixa(faixa) ? () => onFilter('status', situacaoDaFaixa(faixa)!) : undefined}
                       >
                         <CarteiraPrazoPill faixa={faixa} diasRestantes={diasRestantes} />
                       </CarteiraCellFilter>
+                      )}
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
                         até {formatDateBR(contract.dataVigenciaFim)}
                       </div>
@@ -236,7 +253,36 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                       {formatCurrency(valorVigente)}
                     </td>
                     <td data-label="Pendências" style={carteiraTd}>
-                      {worst ? (
+                      {estado === 'SUGERIDO' ? (
+                        <AppButton
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => onConfirmarExecucao?.(row)}
+                          disabled={!onConfirmarExecucao}
+                          data-testid={`contracts-confirmar-execucao-${contractKey}`}
+                          title={
+                            row.execucao?.decisaoSuperada
+                              ? 'Chegou fatura, nota ou aditivo depois da última decisão: confira de novo'
+                              : 'Faturas pagas somam o valor do contrato: confirme o escopo cumprido'
+                          }
+                          style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-purple-text, #6b21a8)', background: 'var(--color-purple-bg, #f3e8ff)', padding: '0.2rem 0.55rem', minHeight: 0, borderRadius: '4px', whiteSpace: 'nowrap', border: 'none', opacity: 1, cursor: onConfirmarExecucao ? 'pointer' : 'default' }}
+                        >
+                          {onConfirmarExecucao ? 'Escopo cumprido? Confirmar' : 'Escopo cumprido a confirmar'}
+                        </AppButton>
+                      ) : estado === 'EXECUTADO' ? (
+                        fechamento.length > 0 ? (
+                          <span
+                            data-testid={`contracts-fechamento-${contractKey}`}
+                            title={fechamento.map((f) => `${f.rotulo}: ${f.detalhe}`).join('\n')}
+                            style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-warning-text)', background: 'var(--color-warning-bg)', padding: '0.2rem 0.55rem', borderRadius: '4px', whiteSpace: 'nowrap' }}
+                          >
+                            Anular saldo de empenho
+                          </span>
+                        ) : (
+                          <span style={{ color: '#94a3b8' }}>—</span>
+                        )
+                      ) : worst ? (
                         <CarteiraCellFilter descricao="contratos com pendência" onFilter={onFilter && (() => onFilter('pendencia', 'COM_PENDENCIA'))}>
                         <span
                           data-testid={`contracts-pendencias-${contractKey}`}
@@ -298,6 +344,21 @@ export const ContractsPortfolioTable: React.FC<ContractsPortfolioTableProps> = (
                             </div>
                           </div>
                         </div>
+
+                        {row.execucao?.confirmado && (
+                          <div style={{ marginTop: '0.9rem', fontSize: '0.82rem' }} data-testid={`contracts-execucao-confirmada-${contractKey}`}>
+                            <CarteiraDetailLabel>Escopo cumprido</CarteiraDetailLabel>
+                            <div>
+                              Confirmado por {row.execucao.confirmado.por} em {formatDateBR(row.execucao.confirmado.em)} · recebimento definitivo em{' '}
+                              {formatDateBR(row.execucao.confirmado.dataRecebimento)} · SEI {row.execucao.confirmado.sei}
+                            </div>
+                            {onConfirmarExecucao && (
+                              <AppButton type="button" variant="link" size="xs" onClick={() => onConfirmarExecucao(row)} style={{ marginTop: '0.3rem', padding: 0 }}>
+                                Ver conferência ou desfazer
+                              </AppButton>
+                            )}
+                          </div>
+                        )}
 
                         <div style={{ marginTop: '0.9rem' }}>
                           <CarteiraDetailLabel>Pendências abertas</CarteiraDetailLabel>

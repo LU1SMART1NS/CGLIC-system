@@ -84,6 +84,8 @@ export function buildContractActionQueue(params: {
   vinculosAConferir?: VinculoAConferir[];
   /** Notas e faturas a conferir (qualquer contrato; o funil pega as deste). */
   ausentesDaFonte?: AusenteDaFonte[];
+  /** Escopo cumprido confirmado pelo gestor (migration 314): sem lembretes de prorrogação e término. */
+  executado?: boolean;
   currentDate?: Date;
 }): ContractActionQueue {
   const { contractKey, plan, paymentCycles = [], avisosPagamento = [], avisosResolvidos = new Set<string>(), vinculosAConferir = [], ausentesDaFonte = [], currentDate } = params;
@@ -118,6 +120,7 @@ export function buildContractActionQueue(params: {
 
   const { items: funnelItems, resolvidos = [] } = calculateAttentionSummary({
     contracts: [contract],
+    contratosExecutados: params.executado ? new Set([contract.id]) : undefined,
     plans,
     paymentCycles,
     avisosResolvidos,
@@ -144,7 +147,12 @@ export function buildContractActionQueue(params: {
     );
   }
 
-  const prazos = buildCentralPrazosItems({ contracts: [contract], plans, currentDate });
+  const prazos = buildCentralPrazosItems({
+    contracts: [contract],
+    plans,
+    contratosExecutados: params.executado ? new Set([contract.id]) : undefined,
+    currentDate
+  });
   for (const p of prazos) {
     // Tarefas de 8 a 30 dias já vêm do funil (calculateAttentionSummary) como ATENÇÃO.
     if (p.tipoItem === 'GATILHO_OPERACIONAL') {

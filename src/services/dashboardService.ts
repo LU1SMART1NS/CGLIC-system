@@ -78,6 +78,7 @@ import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
 import { alocadoAcimaDoLimite, contratadoAcimaDoLimite, limiteComPreposicao, limiteProvisorio } from '../utils/ataAssinadaPendente';
 import { VIGENCIA_RULES, PAGAMENTO_RULES, TAREFA_RULES, classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
+import { fetchContratosExecutados } from './contratoExecucaoService';
 import { MOTIVO_CONTRATADO_ACIMA_DA_COTA, MOTIVO_QUANTITATIVOS_A_CONFERIR, motivoDoLembrete, motivoDoReajuste } from '../utils/motivoDetalhe';
 import { aguardandoResposta, COBRAR_CRITICO_DIAS, prazoEfetivo, textoCobrarResposta } from '../utils/modeloGestao';
 
@@ -163,7 +164,9 @@ export function calculateExecutiveKPIs(
  */
 export function calculateDeadlinesSummary(
   contracts: ContractDashboardRecord[] = [],
-  currentDate?: Date
+  currentDate?: Date,
+  /** Escopo cumprido confirmado (migration 314): fora das contas de vencimento. */
+  contratosExecutados: ReadonlySet<string> = new Set<string>()
 ): ManagementDashboardDeadlinesSummary {
   let vencendo30Dias = 0;
   let vencendo60Dias = 0;
@@ -178,6 +181,7 @@ export function calculateDeadlinesSummary(
     const dias = getContractDaysRemaining(contract.dataVigenciaFim, currentDate);
 
     if (dias === null) continue;
+    if (dias >= 0 && contratosExecutados.has(contractKey)) continue;
 
     let faixa: '30D' | '60D' | '90D' | 'VENCIDO' | null = null;
 
@@ -355,6 +359,8 @@ export function calculateAttentionSummary(params: {
   atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
   /** Chaves dos avisos "registrado acima" com decisão do gestor da ata (migration 223): saem da fila. */
   registradoAcimaDecididos?: ReadonlySet<string>;
+  /** Contratos com escopo cumprido confirmado (migration 314): sem lembretes de prorrogação e término. */
+  contratosExecutados?: ReadonlySet<string>;
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
   const {
@@ -373,6 +379,7 @@ export function calculateAttentionSummary(params: {
     ausentesDaFonte = [],
     empenhadoAcima = [],
     reajustesAtas = [],
+    contratosExecutados,
     currentDate
   } = params;
 
@@ -407,6 +414,7 @@ export function calculateAttentionSummary(params: {
     arps,
     managers,
     plans,
+    contratosExecutados,
     currentDate
   });
   const prazosKpis = calculateCentralPrazosKPIs(prazosItems);
@@ -1515,6 +1523,8 @@ export function buildManagementDashboardReadModel(params: {
   reajustesAtas?: ResumoReajusteAta[];
   atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
   registradoAcimaDecididos?: ReadonlySet<string>;
+  /** Contratos com escopo cumprido confirmado (migration 314). */
+  contratosExecutados?: ReadonlySet<string>;
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1760,7 +1770,7 @@ export function buildManagementDashboardReadModel(params: {
   );
 
   const executive = calculateExecutiveKPIs(filteredContracts, filteredEventsMap);
-  const deadlines = calculateDeadlinesSummary(filteredContracts, currentDate);
+  const deadlines = calculateDeadlinesSummary(filteredContracts, currentDate, params.contratosExecutados);
   const attention = calculateAttentionSummary({
     contracts: filteredContracts,
     arps: filteredArps,
@@ -1779,6 +1789,7 @@ export function buildManagementDashboardReadModel(params: {
     reajustesAtas: params.reajustesAtas,
     atasComProrrogacaoSoSaldo: params.atasComProrrogacaoSoSaldo,
     registradoAcimaDecididos: params.registradoAcimaDecididos,
+    contratosExecutados: params.contratosExecutados,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1856,7 +1867,8 @@ export async function fetchManagementDashboardData(
     empenhadoAcima,
     reajustesAtas,
     atasComProrrogacaoSoSaldo,
-    registradoAcimaDecididos
+    registradoAcimaDecididos,
+    contratosExecutados
   ] = await Promise.all([
     ler('contratos', 'contratos', cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg), [] as ContractDashboardRecord[]),
     ler('arps', 'atas (ARPs)', cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
@@ -1875,7 +1887,8 @@ export async function fetchManagementDashboardData(
     lerSemUasg('empenhadoAcima', 'empenhado acima do contratado', fetchEmpenhadoAcima, [] as EmpenhadoAcima[]),
     lerSemUasg('reajusteAtas', 'reajuste das atas', fetchResumoReajusteAtas, [] as ResumoReajusteAta[]),
     lerSemUasg('termosProrrogacao', 'termos de prorrogação das atas', fetchAtasComProrrogacaoSoSaldo, new Set<string>()),
-    lerSemUasg('decisoesRegistradoAcima', 'decisões do registrado acima do homologado', () => fetchDecisoesRegistradoAcima().then((l) => new Set(l.map((d) => d.chave))), new Set<string>())
+    lerSemUasg('decisoesRegistradoAcima', 'decisões do registrado acima do homologado', () => fetchDecisoesRegistradoAcima().then((l) => new Set(l.map((d) => d.chave))), new Set<string>()),
+    lerSemUasg('contratosExecutados', 'contratos com escopo cumprido', fetchContratosExecutados, new Set<string>())
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
   const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
@@ -1901,6 +1914,7 @@ export async function fetchManagementDashboardData(
     reajustesAtas,
     atasComProrrogacaoSoSaldo,
     registradoAcimaDecididos,
+    contratosExecutados,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate

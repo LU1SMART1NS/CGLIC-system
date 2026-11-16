@@ -13,6 +13,7 @@ import type { ContractPortfolioRow } from '../components/contracts/portfolio/Con
 import type { DashboardAttentionItem } from '../types/managementDashboard';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
 import { atribuicaoValida, useIdsGestoresAtivos } from './useGestoresAtivos';
+import { ROTULO_CONTRATOS_EXECUCAO, useContratosExecucao } from './useContratosExecucao';
 
 /** UASGs consolidadas — mesmo escopo já usado no Início (/instrumentos), para que os painéis reportem os mesmos números. */
 const UASGS = UASGS_CGLIC;
@@ -130,6 +131,10 @@ export function useContractsPortfolio({ pendencias: comPendencias = true, enable
     return map;
   }, [attentionItems]);
 
+  // Escopo cumprido (migration 314): sugestão do banco e confirmação do gestor, por contrato.
+  const execucaoQuery = useContratosExecucao({ enabled });
+  const execucaoPorContrato = execucaoQuery.porContrato;
+
   const contractsByKey = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
 
   // Atas de origem de cada contrato: o vínculo é por item, então um contrato pode vir de 0, 1 ou várias atas.
@@ -159,10 +164,11 @@ export function useContractsPortfolio({ pendencias: comPendencias = true, enable
         faixa,
         gestorNome: gestorByContractKey.get(contractKey),
         pendencias: pendenciasByContractKey.get(contractKey) || [],
-        atas: atasByContractKey.get(contractKey) || []
+        atas: atasByContractKey.get(contractKey) || [],
+        execucao: execucaoPorContrato.get(contractKey)
       };
     });
-  }, [contracts, gestorByContractKey, pendenciasByContractKey, atasByContractKey]);
+  }, [contracts, gestorByContractKey, pendenciasByContractKey, atasByContractKey, execucaoPorContrato]);
 
   /**
    * Leituras de que número, fornecedor, gestor e o recorte do perfil gestor dependem, para a faixa "não carregou"
@@ -176,6 +182,8 @@ export function useContractsPortfolio({ pendencias: comPendencias = true, enable
     ...(scope200330.leituras ?? []),
     ...(scope200331.leituras ?? [])
   ];
+  /** Sem ela, os executados voltariam a Vigentes: a Carteira avisa que não carregou. */
+  const leituraDaExecucao: LeituraDaTela = { rotulo: ROTULO_CONTRATOS_EXECUCAO, query: execucaoQuery.consulta };
   const leituraDosVinculos: LeituraDaTela = { rotulo: ROTULO_VINCULOS_ITEM_CONTRATO, query: ataLinksQuery };
 
   return {
@@ -183,6 +191,7 @@ export function useContractsPortfolio({ pendencias: comPendencias = true, enable
     rows,
     leiturasDosContratos,
     leituraDosVinculos,
+    leituraDaExecucao,
     contractsByKey,
     attentionItems,
     pendenciasCarregando,
