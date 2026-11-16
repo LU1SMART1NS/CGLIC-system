@@ -10,7 +10,7 @@ export const prazoAtencaoDias = () => VIGENCIA_RULES.faixaAtencaoAteDias;
 export type PrazoFaixa = 'EXPIRADO' | 'CRITICO' | 'ATENCAO' | 'REGULAR' | 'SEM_DATA';
 
 /** Filtro de situação compartilhado pelos cards de resumo das duas carteiras. */
-export type CarteiraStatusFilter = 'VIGENTES' | 'CRITICO' | 'ATENCAO' | 'HISTORICO';
+export type CarteiraStatusFilter = 'VIGENTES' | 'CRITICO' | 'ATENCAO' | 'EXECUTADOS' | 'HISTORICO';
 
 export function classifyPrazo(diasRestantes: number | null, expirado = false): PrazoFaixa {
   if (expirado || (diasRestantes !== null && diasRestantes < 0)) return 'EXPIRADO';
@@ -20,7 +20,13 @@ export function classifyPrazo(diasRestantes: number | null, expirado = false): P
   return 'REGULAR';
 }
 
-export function matchesStatusFilter(faixa: PrazoFaixa, filter: CarteiraStatusFilter | 'TODOS'): boolean {
+/**
+ * `executado`: contrato com escopo cumprido confirmado pelo gestor. Sai de Vigentes, Atenção e Crítico e fica em
+ * Executados; depois do fim da vigência vai para Encerrados como os demais.
+ */
+export function matchesStatusFilter(faixa: PrazoFaixa, filter: CarteiraStatusFilter | 'TODOS', executado = false): boolean {
+  if (filter === 'EXECUTADOS') return executado && faixa !== 'EXPIRADO';
+  if (executado && filter !== 'TODOS' && filter !== 'HISTORICO') return false;
   switch (filter) {
     case 'VIGENTES':
       // Sem data de vigência não conta como vigente (mesmo critério do Início); segue visível em "Todas as Situações".

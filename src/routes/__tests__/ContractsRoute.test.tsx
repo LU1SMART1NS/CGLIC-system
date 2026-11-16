@@ -22,6 +22,16 @@ vi.mock('react-router-dom', () => ({
 
 // Situação da sincronização dos contratos (consulta ao banco): fora do teste, carteira em dia.
 vi.mock('../../hooks/useUsers', () => ({ useUsers: () => ({ data: undefined }) }));
+vi.mock('../../hooks/useContratosExecucao', () => ({
+  ROTULO_CONTRATOS_EXECUCAO: 'contratos com escopo cumprido',
+  podeDecidirExecucao: () => false,
+  useContratosExecucao: () => ({
+    porContrato: new Map(),
+    executados: new Set(),
+    podeDecidir: false,
+    consulta: { data: new Map(), isError: false, isFetching: false, error: null, refetch: async () => undefined }
+  })
+}));
 vi.mock('../../hooks/useSincronizacaoContratos', () => ({
   useSincronizacaoContratos: () => ({
     ultimoSucessoEm: null,

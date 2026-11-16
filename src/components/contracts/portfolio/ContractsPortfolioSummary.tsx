@@ -9,6 +9,7 @@ interface ContractsPortfolioSummaryProps {
   criticos: number;
   atencao: number;
   historico: number;
+  executados?: number;
   totalContratos: number;
   /** Valor vigente da carteira: aparece uma vez, ao lado dos segmentos. */
   valorVigenteTotal?: number;
@@ -22,6 +23,7 @@ export const ContractsPortfolioSummary: React.FC<ContractsPortfolioSummaryProps>
   criticos,
   atencao,
   historico,
+  executados,
   totalContratos,
   valorVigenteTotal,
   activeStatus,
@@ -34,6 +36,7 @@ export const ContractsPortfolioSummary: React.FC<ContractsPortfolioSummaryProps>
     criticos={criticos}
     atencao={atencao}
     historico={historico}
+    executados={executados}
     total={totalContratos}
     meta={typeof valorVigenteTotal === 'number' ? `${formatCurrencyCompact(valorVigenteTotal)} em valor vigente` : undefined}
     active={activeStatus}

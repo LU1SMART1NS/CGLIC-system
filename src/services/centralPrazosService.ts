@@ -54,6 +54,8 @@ export function generateIdempotentItemId(params: {
 
 export interface BuildCentralPrazosOptions {
   contracts?: ContractDashboardRecord[];
+  /** Contratos com escopo cumprido confirmado (migration 313): sem os gatilhos de prorrogação e término da vigência. */
+  contratosExecutados?: ReadonlySet<string>;
   arps?: ArpRecord[];
   managers?: Record<string, ContractManager>;
   managersMap?: Record<string, ContractManager>;
@@ -104,6 +106,7 @@ export function buildCentralPrazosItems(
   let taskPlansMap: Record<string, ContractTaskPlan> = {};
   let arpItems: BuildCentralPrazosOptions['arpItems'] = [];
   let currentDate: Date | undefined;
+  let contratosExecutados: ReadonlySet<string> = new Set<string>();
 
   if (Array.isArray(contractsOrOptions)) {
     contracts = contractsOrOptions;
@@ -118,6 +121,7 @@ export function buildCentralPrazosItems(
     taskPlansMap = contractsOrOptions.plans || contractsOrOptions.taskPlansMap || {};
     arpItems = contractsOrOptions.arpItems || [];
     currentDate = contractsOrOptions.currentDate;
+    contratosExecutados = contractsOrOptions.contratosExecutados ?? contratosExecutados;
   }
 
   const items: CentralPrazosItem[] = [];
@@ -211,7 +215,8 @@ export function buildCentralPrazosItems(
     }
 
     // B) Gatilhos Operacionais em Memória sobre Vigência Oficial (Prorrogação/Término)
-    if (contract.dataVigenciaFim) {
+    // Escopo cumprido confirmado pelo gestor (migration 313): não há o que prorrogar.
+    if (contract.dataVigenciaFim && !contratosExecutados.has(contractKey)) {
       const cicloVigencia = contract.dataVigenciaFim.replace(/\D/g, '');
 
       // Regra de Instrumentos Substitutivos (Art. 95 da Lei 14.133/2021):

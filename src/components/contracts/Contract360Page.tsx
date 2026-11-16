@@ -22,6 +22,8 @@ import { Instrument360TabPanel } from '../instrument360/Instrument360TabPanel';
 import { useInstrumentTab } from '../instrument360/useInstrumentTab';
 import { ContractActionQueue, type Contract360Tab } from './ContractActionQueue';
 import { ContractHealthStrip } from './ContractHealthStrip';
+import { EscopoCumpridoAviso } from './EscopoCumpridoAviso';
+import { formatContractNumber } from '../../utils/contractNumber';
 import { useContractActionQueue } from '../../hooks/useContractActionQueue';
 import { ContractPagamentosSection } from './ContractPagamentosSection';
 import { ContractFinancialExecutionSection } from './ContractFinancialExecutionSection';
@@ -214,6 +216,8 @@ export const Contract360Page: React.FC<Contract360PageProps> = ({
       </Instrument360Head>
 
       <FontesComFalhaAviso falhas={leituras.falhas} onTentar={() => void leituras.tentarDeNovo()} tentando={leituras.tentando} onde="do contrato" testIdPrefix="contrato360-fontes" />
+
+      <EscopoCumpridoAviso contractKey={resolvedContractKey} numero={formatContractNumber(contract)} fornecedor={contract.fornecedorNome} />
 
       <Instrument360TabPanel idPrefix="contract" activeTab={activeTab}>
         {activeTab === 'acoes' && (

@@ -19,7 +19,7 @@ export interface ContractsPortfolioFilterState {
 }
 
 export const CONTRACTS_FILTER_SCHEMA: CarteiraFilterSchema<ContractsPortfolioFilterState> = {
-  status: { param: 'situacao', default: 'VIGENTES', values: ['TODOS', 'VIGENTES', 'CRITICO', 'ATENCAO', 'HISTORICO'] },
+  status: { param: 'situacao', default: 'VIGENTES', values: ['TODOS', 'VIGENTES', 'CRITICO', 'ATENCAO', 'EXECUTADOS', 'HISTORICO'] },
   pendencia: { param: 'pendencia', default: 'TODOS', values: ['TODOS', 'COM_PENDENCIA'] },
   unidade: { param: 'unidade', default: TODAS_UNIDADES },
   gestor: { param: 'gestor', default: TODOS_GESTORES },
