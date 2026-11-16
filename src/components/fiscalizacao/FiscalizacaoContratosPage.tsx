@@ -12,20 +12,19 @@ import { CarteiraFilterButton } from '../carteira/CarteiraFilterButton';
 import { carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { CelulaContrato, CelulaFiscal, CelulaProcesso } from './ContratosFiscalizacaoTabela';
-import { COR, linhasDoContrato, type Linha } from '../../utils/fiscalizacaoMesa';
+import { COR } from '../../utils/fiscalizacaoMesa';
+import { linhasDosContratos, type LinhaContrato, type SegContrato } from '../../utils/fiscalizacaoContratosLista';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigateWithOrigin } from '../../hooks/useDetailOrigin';
 import { useContratosFiscalizacao, useEntregasFiscalizacao, useFiscaisAtivos } from '../../hooks/useFiscalizacao';
-import type { ContratoFiscalizacao, EntregaFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, autuado, dataBR, fiscaisVisiveis, hojeEmBrasilia, idsDosFiscaisComContrato, rotaDoContrato } from '../../utils/fiscalizacao';
+import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
+import { NOME_SFC, dataBR, fiscaisVisiveis, hojeEmBrasilia, idsDosFiscaisComContrato, rotaDoContrato } from '../../utils/fiscalizacao';
 import { FASES_ENTREGA, foiEntregue } from '../../utils/fiscalizacaoEntregas';
-import { agrupar, chaveDeOrdem, diasAte, numero, pct, programasDe, qtdTexto, resumir, type Resumo } from '../../utils/fiscalizacaoResumo';
+import { chaveDeOrdem, diasAte, numero, pct, programasDe, qtdTexto } from '../../utils/fiscalizacaoResumo';
 const POR_PAGINA = 25;
 
 // ── Fiscalização › Contratos ─────────────────────────────────────────────────────────────────────
 
-type SegContrato = 'VOCE' | 'OUTROS' | 'FINALIZADO' | 'TODOS';
-interface LinhaContrato { c: ContratoFiscalizacao; es: EntregaFiscalizacao[]; r: Resumo; agora: Linha | null; mais: number; dias: number | null; seg: Exclude<SegContrato, 'TODOS'> }
 
 /** Vigência só aparece na lista quando falta pouco (90 dias) e ainda há item a entregar. */
 const vigenciaPerto = (l: LinhaContrato, hoje: string) => Boolean(l.c.vigenciaFim && diasAte(l.c.vigenciaFim, hoje) <= 90 && l.es.some((e) => e.responsavel === 'SFC' && !foiEntregue(e)));
@@ -100,21 +99,7 @@ export const FiscalizacaoContratosPage: React.FC = () => {
   const [fase, setFase] = useState('');
   const [programa, setPrograma] = useState('');
 
-  const linhas = useMemo<LinhaContrato[]>(() => {
-    const porContrato = agrupar(entregas, (e) => e.contractKey);
-    return contratos
-      .filter((c) => c.situacao === 'SFC' || c.situacao === 'MISTA')
-      .map((c) => {
-        const es = porContrato.get(c.contractKey) ?? [];
-        const r = resumir(es);
-        const { comVoce, comOutros } = linhasDoContrato(es, !autuado(c), () => {}, () => {});
-        const agora = comVoce[0] ?? comOutros[0] ?? null;
-        const mais = comVoce.length ? comVoce.length - 1 : 0;
-        const dias = agora?.limite ? diasAte(agora.limite, hoje) : null;
-        const segDe: LinhaContrato['seg'] = r.fase === 'FINALIZADO' ? 'FINALIZADO' : comVoce.length ? 'VOCE' : 'OUTROS';
-        return { c, es, r, agora, mais, dias, seg: segDe };
-      });
-  }, [contratos, entregas, hoje]);
+  const linhas = useMemo(() => linhasDosContratos(contratos, entregas, hoje), [contratos, entregas, hoje]);
   const doFiscal = linhas.filter((l) => !fiscal || l.c.fiscalUserId === fiscal);
   const conta = (s: SegContrato) => doFiscal.filter((l) => s === 'TODOS' || l.seg === s).length;
   const doSeg = doFiscal.filter((l) => seg === 'TODOS' || l.seg === seg);
