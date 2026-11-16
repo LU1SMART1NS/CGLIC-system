@@ -141,6 +141,8 @@ export function passoDoItem(e: Pick<EntregaFiscalizacao, 'etapa' | 'pagoEm' | 'o
 export function observacaoDoHistorico(tipo: string, observacao: string | null | undefined): string | null {
   if (!observacao) return null;
   if (tipo === 'CARGA' && /planilha|carga/i.test(observacao)) return null;
+  // Ocorrência (entrega B): o nome vai em negrito; aqui fica o resto ("Cobrança ao fornecedor: E-mail · …").
+  if (tipo === 'OCORRENCIA') return observacao.split(': ').slice(1).join(': ') || null;
   const limpa = observacao
     .replace(/\s*\(na planilha:\s*"[^"]*"\)/gi, '')
     .replace(/\s*pela conferência da planilha/gi, '')

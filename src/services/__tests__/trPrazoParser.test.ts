@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lerPrazoDoTr, lerRecebimentoDoTr } from '../trPrazoParser';
+import { lerPrazoDoTr, lerRecebimentoDoTr, lerSubstituicaoDoTr } from '../trPrazoParser';
 
 // Trechos dos editais do PNCP lidos na carga de 13/11/2026 (texto do unpdf).
 describe('prazo de entrega no TR', () => {
@@ -79,5 +79,22 @@ describe('lerRecebimentoDoTr (TRP e TRD)', () => {
     expect(lerRecebimentoDoTr(`Os bens serão recebidos provisoriamente no prazo de 5 (cinco) dias úteis da entrega. ${AGU_TRD}`).recebimento).toMatchObject({ trpDias: 5, trpContagem: 'UTEIS' });
     expect(lerRecebimentoDoTr(AGU_TRP)).toEqual({ recebimento: null, trechos: [], clara: false });
     expect(lerRecebimentoDoTr('')).toEqual({ recebimento: null, trechos: [], clara: false });
+  });
+});
+
+describe('lerSubstituicaoDoTr (item recusado)', () => {
+  const AGU = 'Os bens poderão ser rejeitados, no todo ou em parte, quando em desacordo com as especificações, devendo ser substituídos no prazo de 30 (trinta) dias, a contar da notificação da contratada, às suas custas, sem prejuízo da aplicação das penalidades.';
+  it('modelo da AGU: 30 dias corridos da notificação, leitura clara', () => {
+    const r = lerSubstituicaoDoTr(AGU);
+    expect(r.substituicao).toEqual({ dias: 30, contagem: 'CORRIDOS' });
+    expect(r.clara).toBe(true);
+    expect(r.trecho).toMatch(/^Substituídos no prazo de 30/);
+  });
+  it('prazos diferentes no TR: a conferir', () => {
+    expect(lerSubstituicaoDoTr(`${AGU} Os itens deverão ser substituídos no prazo de 10 (dez) dias, a contar da notificação.`).clara).toBe(false);
+  });
+  it('dias úteis e sem cláusula', () => {
+    expect(lerSubstituicaoDoTr('O material será substituído no prazo de 20 (vinte) dias úteis, a contar da notificação.').substituicao).toEqual({ dias: 20, contagem: 'UTEIS' });
+    expect(lerSubstituicaoDoTr('O prazo de entrega é de 60 dias.')).toEqual({ substituicao: null, trecho: null, clara: false });
   });
 });

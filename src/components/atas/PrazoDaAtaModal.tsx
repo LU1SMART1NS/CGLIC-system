@@ -55,6 +55,11 @@ export const PrazoDaAtaModal: React.FC<{
   const [temRecebimento, setTemRecebimento] = useState(Boolean(recebimentoInicial));
   const [recebimento, setRecebimento] = useState<CamposDaRegra>(recebimentoInicial ?? { trpDias: 0, trpContagem: 'CORRIDOS', trdDias: 10, trdContagem: 'UTEIS', trdInicio: 'ENTREGA' });
   const recebimentoFinal = temRecebimento ? recebimento : null;
+  // Substituição do item recusado (migration 311): dias da notificação; vazio = o TR não diz.
+  const substInicial = p?.substituicaoConfirmadaEm ? p?.substituicao : p?.substituicaoSugerida;
+  const [diasSubst, setDiasSubst] = useState<string>(substInicial?.dias ? String(substInicial.dias) : '');
+  const [contagemSubst, setContagemSubst] = useState<ContagemPrazo>(substInicial?.contagem ?? 'CORRIDOS');
+  const substOk = !diasSubst || (Number.isInteger(Number(diasSubst)) && Number(diasSubst) >= 1 && Number(diasSubst) <= 180);
   const recebimentoMudou = recebimentoConfirmado && JSON.stringify(recebimentoFinal) !== JSON.stringify(p?.recebimento ?? null);
   // Prazo de entrega já confirmado e recebimento ainda não: confirma só o recebimento, sem motivo.
   const soRecebimento = confirmado && !recebimentoConfirmado;
@@ -71,11 +76,12 @@ export const PrazoDaAtaModal: React.FC<{
   const ok =
     (semPrazo || diasValidos(dias)) &&
     (!temRecebimento || regraValida(recebimento)) &&
+    substOk &&
     (!confirmado || mudou || soRecebimento || entregaAuto || recebimentoAuto) &&
     (!precisaMotivo || motivo.trim().length >= MOTIVO_MINIMO);
   const confirmar = () =>
     salvar.mutate(
-      { ataKey, semPrazo, dias: semPrazo ? null : dias, contagem, inicio, porItem: semPrazo ? {} : excecoes, motivo: precisaMotivo || mudou ? motivo || null : null, recebimento: recebimentoFinal },
+      { ataKey, semPrazo, dias: semPrazo ? null : dias, contagem, inicio, porItem: semPrazo ? {} : excecoes, motivo: precisaMotivo || mudou ? motivo || null : null, recebimento: recebimentoFinal, substituicao: diasSubst ? { dias: Number(diasSubst), contagem: contagemSubst } : null },
       {
         onSuccess: (r) => {
           toast.success(
@@ -218,6 +224,20 @@ export const PrazoDaAtaModal: React.FC<{
           ) : (
             <span style={{ ...carteiraDetalhe, marginTop: 0 }}>Os itens entregues ficam com "prazo de recebimento a informar", sem aviso. O fiscal pode informar o prazo no contrato.</span>
           )}
+          <CarteiraDetailLabel>Substituição do item recusado</CarteiraDetailLabel>
+          {p?.substituicaoTrecho && (
+            <blockquote style={{ margin: 0, padding: '0.5rem 0.75rem', borderLeft: '3px solid var(--primary)', background: 'var(--bg-subtle, #f8fafc)', fontSize: '0.85rem', borderRadius: 4 }}>
+              “{p.substituicaoTrecho}”
+            </blockquote>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: '0.75rem' }}>
+            <AppInput label="Dias para substituir" type="number" min={1} value={diasSubst} onChange={(ev) => setDiasSubst(ev.target.value)} hint="Contados da notificação ao fornecedor. Vazio: o TR não diz." error={substOk ? undefined : 'De 1 a 180 dias.'} data-testid="ata-subst-dias" />
+            <AppSelect label="Contagem" value={contagemSubst} onChange={(ev) => setContagemSubst(ev.target.value as ContagemPrazo)}>
+              <option value="CORRIDOS">Dias corridos</option>
+              <option value="UTEIS">Dias úteis</option>
+            </AppSelect>
+          </div>
+          {p?.substituicaoAutomatico && <span style={{ ...carteiraDetalhe, marginTop: 0 }}>Lido do TR automaticamente (leitura clara). Na recusa, o fiscal ainda pode mudar os dias.</span>}
         </div>
 
         {precisaMotivo && (
