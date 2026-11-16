@@ -25,6 +25,7 @@ import type { ArpRecord, ArpItemRecord } from '../types';
 import { AvisoCarregando } from '../design-system';
 import { chaveGestaoDaArp, contarPorPapel, passaFiltroPapel } from '../utils/ataIdentidade';
 import { ROTULO_GTI_ATAS, useFatiasGtiLeitura } from '../hooks/useGruposGti';
+import { ROTULO_NOMES_CURTOS, useNomesCurtosItensLeitura } from '../hooks/useNomesCurtosItens';
 import { chaveAtaGti, contarPorGti, passaFiltroGti, pctDoGti } from '../config/gruposGti';
 import type { ArpPortfolioFilterState } from './atas/ArpPortfolioFilters';
 import { somarValorDasAtas } from './atas/valorDasAtas';
@@ -92,6 +93,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
 
   // Fatia de cada GTI do ComprasSUSP nas atas (migration 139): coluna e filtro "GTI".
   const { fatias: fatiasGti, consulta: fatiasGtiQuery } = useFatiasGtiLeitura();
+  const { nomes: nomesCurtos, consulta: nomesCurtosQuery } = useNomesCurtosItensLeitura();
   // Uma fonte que falha não some calada: a carteira mostra o que carregou e a faixa diz o que ficou de fora (atas,
   // gestores, recorte do gestor, saldo, alocação, contratado, empenhado, GTI e itens buscados nas fontes oficiais).
   const leituras = useLeiturasComFalha([
@@ -99,6 +101,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
     ...(leiturasDosSaldos ?? []),
     ...(leiturasDosItens ?? []),
     { rotulo: ROTULO_GTI_ATAS, query: fatiasGtiQuery },
+    { rotulo: ROTULO_NOMES_CURTOS, query: nomesCurtosQuery },
     ...(leituraDosItensNasFontes ? [leituraDosItensNasFontes] : [])
   ]);
   const fatiasDaArp = useCallback(
@@ -348,6 +351,7 @@ export const ArpSearch: React.FC<ArpSearchProps> = ({
         linhasDosItens={linhasDosItens}
         mostrarEmpenhoDosItens={!semContratos(role)}
         fatiasGti={fatiasGti}
+        nomesCurtos={nomesCurtos}
         unidades={unidades}
         filters={filterState}
         gestorByAta={gestorByAta}

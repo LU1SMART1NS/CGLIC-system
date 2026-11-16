@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { mapDistribuicao } from '../../../services/distribuicaoEmpenhoService';
 
+vi.mock('../../../hooks/useNomesCurtosItens', () => ({ ROTULO_NOMES_CURTOS: 'nome curto dos itens', useNomesCurtosItensLeitura: () => ({ nomes: new Map(), consulta: { isError: false, isLoading: false, data: new Map() } }) }));
 vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'gestor' })) }));
 vi.mock('../../../hooks/useDetailOrigin', () => ({ useNavigateWithOrigin: () => vi.fn() }));
 vi.mock('../../../hooks/useVinculacaoEmpenhos', () => ({ useEmpenhosParaVincularAosItens: vi.fn() }));

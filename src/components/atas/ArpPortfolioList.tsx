@@ -31,7 +31,7 @@ import { AvisoCarregando } from '../../design-system';
 import { ConsumoItensCelula, type ConsumoItem } from './ConsumoItensCelula';
 import { SeloPapelSenasp } from './SeloPapelSenasp';
 import { GtiCelulaAta } from '../gti/GtiVisual';
-import { chaveAtaGti, GRUPO_GTI_INFO, type FatiasDaAta } from '../../config/gruposGti';
+import { chaveAtaGti, chaveItemGti, GRUPO_GTI_INFO, type FatiasDaAta } from '../../config/gruposGti';
 import { CarteiraNovoBadge } from '../carteira/CarteiraNovoBadge';
 import { ataEhNova } from '../carteira/carteiraNovidade';
 
@@ -49,6 +49,8 @@ interface ArpPortfolioListProps {
   mostrarEmpenhoDosItens?: boolean;
   /** Fatia de cada GTI do ComprasSUSP por ata (chave "{numeroAta}-{uasg}", migration 139). */
   fatiasGti?: Map<string, FatiasDaAta>;
+  /** Nome curto por item (chave "{numeroAta}-{uasg}-{00001}"), mostrado nos itens da ata aberta. */
+  nomesCurtos?: Map<string, string>;
   /** Unidades internas (para exibir o nome da unidade filtrada). */
   unidades?: Array<{ chave: string; nome: string }>;
   /** Filtros ativos: alocação, empenho e unidade ganham uma coluna quando filtrados. */
@@ -85,6 +87,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
   linhasDosItens,
   mostrarEmpenhoDosItens = true,
   fatiasGti,
+  nomesCurtos,
   unidades = [],
   filters,
   gestorByAta = {},
@@ -415,6 +418,7 @@ export const ArpPortfolioList: React.FC<ArpPortfolioListProps> = ({
                               nomeDaUnidade={nomeDaUnidade}
                               mostrarEmpenho={mostrarEmpenhoDosItens}
                               onSelectItem={(item) => onSelectItem(arp, item)}
+                              nomeDoItem={(item) => nomesCurtos?.get(chaveItemGti(numeroAta, arp.codigoUnidadeGerenciadora, item.numeroItem))}
                             />
                             {hiddenCount > 0 && (
                               <div style={{ fontSize: '0.76rem', color: 'var(--primary)', fontWeight: 700, paddingTop: '0.5rem' }}>
