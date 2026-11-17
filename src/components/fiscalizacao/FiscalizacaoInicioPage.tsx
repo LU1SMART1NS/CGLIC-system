@@ -148,7 +148,7 @@ export const FiscalizacaoInicioPage: React.FC = () => {
     rolarParaGaveta.current = false;
     scrollToDock(dockRef.current);
   }, [gavetaAberta]);
-  const foraDaCarga = useMemo(() => contratosForaDaCarga(data ?? [], entregasConsulta.data ?? []), [data, entregasConsulta.data]);
+  const foraDaCarga = useMemo(() => contratosForaDaCarga(data ?? [], entregasConsulta.data), [data, entregasConsulta.data]);
   const carga = useMemo(() => cargaPorFiscal(data ?? [], servidores, foraDaCarga), [data, servidores, foraDaCarga]);
   const fiscaisDoFiltro = useMemo(() => fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos)), [servidores, contratos]);
   const ausentes = transferencias.data ?? [];
