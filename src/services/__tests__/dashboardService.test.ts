@@ -1161,12 +1161,12 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
         { id: 'c1', numero: '01/2026', ano: 2026, uasg: '209995', objeto: 'X', fornecedorNome: 'F', statusVigencia: 'Vigente', dataVigenciaFim: '2027-06-30', fonteDados: 'PNCP' } as any
       ]);
       const timeout = () => new Error('canceling statement due to statement timeout');
-      vi.mocked(dbCacheService.fetchArpsFromDb).mockRejectedValueOnce(timeout());
-      vi.mocked(contractManagementService.fetchAllContractManagers).mockRejectedValueOnce(timeout());
-      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockRejectedValueOnce(timeout());
-      vi.mocked(ataManagementService.fetchAllAtaTaskPlans).mockRejectedValueOnce(timeout());
-      vi.mocked(avisosResolvidosService.fetchAvisosResolvidos).mockRejectedValueOnce(timeout());
-      vi.mocked(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).mockRejectedValueOnce(timeout());
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockRejectedValueOnce(timeout()).mockRejectedValueOnce(timeout());
+      vi.mocked(contractManagementService.fetchAllContractManagers).mockRejectedValueOnce(timeout()).mockRejectedValueOnce(timeout());
+      vi.mocked(contractManagementService.fetchAllContractTaskPlans).mockRejectedValueOnce(timeout()).mockRejectedValueOnce(timeout());
+      vi.mocked(ataManagementService.fetchAllAtaTaskPlans).mockRejectedValueOnce(timeout()).mockRejectedValueOnce(timeout());
+      vi.mocked(avisosResolvidosService.fetchAvisosResolvidos).mockRejectedValueOnce(timeout()).mockRejectedValueOnce(timeout());
+      vi.mocked(paymentCycleRpcAdapter.fetchPaymentCyclesForContracts).mockRejectedValueOnce(timeout()).mockRejectedValueOnce(timeout());
 
       const result = await fetchManagementDashboardData('209995', referenceDate);
       expect(result.executive.totalContratos).toBe(1);
@@ -1205,7 +1205,7 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
       const primeira = await fetchManagementDashboardData('209992', referenceDate);
       expect(primeira.arp.totalAtas).toBe(1);
 
-      vi.mocked(dbCacheService.fetchArpsFromDb).mockRejectedValueOnce(new Error('canceling statement due to statement timeout'));
+      vi.mocked(dbCacheService.fetchArpsFromDb).mockRejectedValueOnce(new Error('canceling statement due to statement timeout')).mockRejectedValueOnce(new Error('canceling statement due to statement timeout'));
       const segunda = await fetchManagementDashboardData('209992', referenceDate);
       expect(segunda.arp.totalAtas).toBe(1);
       expect(segunda.fontesComFalha?.[0]).toMatchObject({ rotulo: 'atas (ARPs)', situacao: 'DESATUALIZADA' });
@@ -1289,11 +1289,12 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
     it('falha numa fonte sem UASG: lida 1 vez, as duas usam a mesma última leitura boa e avisam igual', async () => {
       await abrirInicio();
       vi.mocked(empenhadoAcimaService.fetchEmpenhadoAcima).mockClear();
-      vi.mocked(empenhadoAcimaService.fetchEmpenhadoAcima).mockRejectedValueOnce(new Error('canceling statement due to statement timeout'));
+      vi.mocked(empenhadoAcimaService.fetchEmpenhadoAcima).mockRejectedValueOnce(new Error('canceling statement due to statement timeout')).mockRejectedValueOnce(new Error('canceling statement due to statement timeout'));
 
       const [r330, r331] = await abrirInicio();
 
-      expect(empenhadoAcimaService.fetchEmpenhadoAcima).toHaveBeenCalledTimes(1);
+      // Uma leitura para as duas UASGs, mais a repetição do tempo esgotado (que esgota de novo).
+      expect(empenhadoAcimaService.fetchEmpenhadoAcima).toHaveBeenCalledTimes(2);
       const falha = { rotulo: 'empenhado acima do contratado', situacao: 'DESATUALIZADA', mensagem: 'canceling statement due to statement timeout' };
       expect(r330.fontesComFalha).toEqual([falha]);
       expect(r331.fontesComFalha).toEqual([falha]);
@@ -1364,7 +1365,8 @@ describe('dashboardService (CGLIC 3.0 — Fase 8-B)', () => {
 
       const [r330, r331] = await abrirInicio();
 
-      expect(leituras('v_empenhos_resumo')).toBe(2);
+      // Duas páginas, e de novo as duas na repetição do tempo esgotado.
+      expect(leituras('v_empenhos_resumo')).toBe(4);
       for (const r of [r330, r331]) {
         expect(r.fontesComFalha).toEqual([
           { rotulo: 'empenhos', situacao: 'DESATUALIZADA', mensagem: 'Não foi possível ler os empenhos: canceling statement due to statement timeout' }

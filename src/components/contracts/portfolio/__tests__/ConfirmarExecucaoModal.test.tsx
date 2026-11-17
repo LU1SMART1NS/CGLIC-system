@@ -33,7 +33,7 @@ vi.mock('../../../../hooks/useContratosExecucao', () => ({
 let entregas: EntregaDaExecucao[] = [];
 vi.mock('@tanstack/react-query', async (orig) => ({
   ...(await orig<typeof import('@tanstack/react-query')>()),
-  useQuery: ({ enabled }: { enabled: boolean }) => ({ data: enabled ? entregas : undefined, isLoading: false, isError: false })
+  useQuery: () => ({ data: entregas, isLoading: false, isError: false })
 }));
 import { ConfirmarExecucaoModal } from '../ConfirmarExecucaoModal';
 

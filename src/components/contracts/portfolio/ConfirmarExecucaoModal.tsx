@@ -38,6 +38,66 @@ const TITULO_SECAO: React.CSSProperties = {
   marginBottom: '0.4rem'
 };
 
+/** Entregas do contrato na Fiscalização, com o TRD que o fiscal registrou. Só lê o banco com a janela aberta. */
+const EntregasNaFiscalizacao: React.FC<{ contractKey: string }> = ({ contractKey }) => {
+  const entregas = useQuery({
+    queryKey: ['execucao-entregas', contractKey],
+    queryFn: () => fetchEntregasDaExecucao(contractKey),
+    staleTime: 60 * 1000
+  });
+  const lista = entregas.data ?? [];
+  const comTrd = lista.filter((e) => e.trdSei).length;
+  return (
+    <div data-testid="execucao-entregas">
+      <div style={{ ...TITULO_SECAO, display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <span>Entregas na Fiscalização</span>
+        {lista.length > 0 && (
+          <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
+            {comTrd} de {lista.length} com recebimento definitivo registrado
+          </span>
+        )}
+      </div>
+      {entregas.isLoading ? (
+        <div style={{ fontSize: '0.86rem', color: '#64748b' }}>Carregando as entregas…</div>
+      ) : entregas.isError ? (
+        <NoticeBar tone="warning">Não foi possível ler as entregas da Fiscalização: {entregas.error instanceof Error ? entregas.error.message : ''}</NoticeBar>
+      ) : lista.length === 0 ? (
+        <div style={{ fontSize: '0.86rem', color: '#64748b' }}>Nenhuma entrega cadastrada na Fiscalização.</div>
+      ) : (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, border: '1px solid #e2e8f0', borderRadius: 8, maxHeight: 260, overflowY: 'auto' }}>
+          {lista.map((e, i) => (
+            <li
+              key={e.id}
+              data-testid="execucao-entrega"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.75rem', borderTop: i ? '1px solid #e2e8f0' : 'none', fontSize: '0.84rem', flexWrap: 'wrap' }}
+            >
+              <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                <div style={{ fontWeight: 700 }}>
+                  {e.quantidade > 0 ? `${e.quantidade.toLocaleString('pt-BR')} × ` : ''}
+                  {e.item}
+                </div>
+                {(e.beneficiario || e.municipio) && (
+                  <div style={{ color: '#475569' }}>
+                    {[e.beneficiario, [e.municipio, e.uf].filter(Boolean).join('/')].filter(Boolean).join(' · ')}
+                  </div>
+                )}
+              </div>
+              {e.trdSei ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <span style={{ color: '#475569' }}>TRD{e.trdEm ? ` em ${formatDateBR(e.trdEm)}` : ''}</span>
+                  <NumeroSeiEtiqueta numero={e.trdSei} testId="execucao-entrega-trd" />
+                </span>
+              ) : (
+                <span style={{ color: '#475569' }}>{etapaDef(e.etapa as EtapaEntrega).nome}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
 /**
  * Escopo cumprido (migrations 314 e 320): o banco sugere pelos fatos das fontes e o gestor confere o que já está
  * registrado (faturas pagas e, se o contrato está na Fiscalização, as entregas com o TRD que o fiscal gravou) e confirma.
@@ -54,14 +114,8 @@ export const ConfirmarExecucaoModal: React.FC<ConfirmarExecucaoModalProps> = ({ 
       setErro(null);
     }
   }, [isOpen]);
-  const naFiscalizacao = Boolean(execucao && execucao.fiscalizacao !== 'SEM');
-  const entregas = useQuery({
-    queryKey: ['execucao-entregas', execucao?.contractKey],
-    queryFn: () => fetchEntregasDaExecucao(execucao!.contractKey),
-    enabled: isOpen && naFiscalizacao,
-    staleTime: 60 * 1000
-  });
   if (!execucao) return null;
+  const naFiscalizacao = execucao.fiscalizacao !== 'SEM';
 
   const contractKey = execucao.contractKey;
   const confirmado = execucao.estado === 'EXECUTADO' && execucao.confirmado;
@@ -69,8 +123,6 @@ export const ConfirmarExecucaoModal: React.FC<ConfirmarExecucaoModalProps> = ({ 
   const avisos = conferencia.filter((c) => c.resultado === 'aviso');
   const gravando = confirmar.isPending || naoTerminou.isPending || desfazer.isPending;
   const podeConfirmar = !gravando;
-  const lista = entregas.data ?? [];
-  const comTrd = lista.filter((e) => e.trdSei).length;
 
   const executar = async (acao: () => Promise<unknown>, mensagem: string) => {
     setErro(null);
@@ -153,55 +205,7 @@ export const ConfirmarExecucaoModal: React.FC<ConfirmarExecucaoModalProps> = ({ 
           </ul>
         </div>
 
-        {naFiscalizacao && (
-          <div data-testid="execucao-entregas">
-            <div style={{ ...TITULO_SECAO, display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span>Entregas na Fiscalização</span>
-              {lista.length > 0 && (
-                <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
-                  {comTrd} de {lista.length} com recebimento definitivo registrado
-                </span>
-              )}
-            </div>
-            {entregas.isLoading ? (
-              <div style={{ fontSize: '0.86rem', color: '#64748b' }}>Carregando as entregas…</div>
-            ) : entregas.isError ? (
-              <NoticeBar tone="warning">Não foi possível ler as entregas da Fiscalização: {entregas.error instanceof Error ? entregas.error.message : ''}</NoticeBar>
-            ) : lista.length === 0 ? (
-              <div style={{ fontSize: '0.86rem', color: '#64748b' }}>Nenhuma entrega cadastrada na Fiscalização.</div>
-            ) : (
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, border: '1px solid #e2e8f0', borderRadius: 8, maxHeight: 260, overflowY: 'auto' }}>
-                {lista.map((e, i) => (
-                  <li
-                    key={e.id}
-                    data-testid="execucao-entrega"
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.75rem', borderTop: i ? '1px solid #e2e8f0' : 'none', fontSize: '0.84rem', flexWrap: 'wrap' }}
-                  >
-                    <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                      <div style={{ fontWeight: 700 }}>
-                        {e.quantidade > 0 ? `${e.quantidade.toLocaleString('pt-BR')} × ` : ''}
-                        {e.item}
-                      </div>
-                      {(e.beneficiario || e.municipio) && (
-                        <div style={{ color: '#475569' }}>
-                          {[e.beneficiario, [e.municipio, e.uf].filter(Boolean).join('/')].filter(Boolean).join(' · ')}
-                        </div>
-                      )}
-                    </div>
-                    {e.trdSei ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        <span style={{ color: '#475569' }}>TRD{e.trdEm ? ` em ${formatDateBR(e.trdEm)}` : ''}</span>
-                        <NumeroSeiEtiqueta numero={e.trdSei} testId="execucao-entrega-trd" />
-                      </span>
-                    ) : (
-                      <span style={{ color: '#475569' }}>{etapaDef(e.etapa as EtapaEntrega).nome}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+        {isOpen && naFiscalizacao && <EntregasNaFiscalizacao contractKey={contractKey} />}
 
         {confirmado ? (
           <div style={{ fontSize: '0.86rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
