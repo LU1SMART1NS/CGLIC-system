@@ -45,6 +45,8 @@ import { useGruposDasUasgs } from '../../hooks/useGruposGti';
 import { GtiTag } from '../gti/GtiVisual';
 import type { GrupoDaFatia } from '../../config/gruposGti';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
+import { ImportarRelatorioContratosModal } from './ImportarRelatorioContratosModal';
+import type { OrgaoDoRelatorioImportado } from '../../services/relatorioAtaContratosService';
 
 export interface QuantitativosTabProps {
   itemKey: string;
@@ -89,6 +91,12 @@ export interface QuantitativosTabProps {
   /** Adesões do item e o limite de adesão: base dos limites do remanejamento a não participante (migration 219). */
   adesoes: AdesaoItemRecord[];
   limiteAdesao: number;
+  /** Número do item na ata (relatório do Contratos.gov.br, migration 325). */
+  numeroItem?: number;
+  /** Relatório do Contratos.gov.br já importado para o item. */
+  relatorioContratos?: OrgaoDoRelatorioImportado[];
+  /** Gestor da ata ou coordenador: importa o relatório do Contratos.gov.br. */
+  podeImportarRelatorio?: boolean;
 }
 
 interface Linha {
@@ -127,6 +135,7 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
   const [continuando, setContinuando] = React.useState<OrgaoQuantitativo | null>(null);
   const [remanejandoNp, setRemanejandoNp] = React.useState<OrigemDoRemanejamento | null>(null);
   const [desfazendoNp, setDesfazendoNp] = React.useState<RemanejamentoNaoParticipante | null>(null);
+  const [importandoRelatorio, setImportandoRelatorio] = React.useState(false);
 
   const nomesVivos = React.useMemo(() => new Map(p.unidades.map((u) => [digitos(u.codigoUnidade), u.nomeUnidade])), [p.unidades]);
   const cadastro = useCadastroUasgs([...q.orgaos.map((o) => o.uasg), ...p.unidades.map((u) => digitos(u.codigoUnidade)), ...q.remanejamentosNaoParticipante.map((r) => r.uasgDestino)]);
@@ -536,6 +545,9 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       ];
 
   const semOrgaos = !p.loading && linhas.length === 0;
+  // Relatório do Contratos.gov.br (migration 325): só com a ata e o número do item conhecidos.
+  const podeImportar = Boolean(p.podeImportarRelatorio && p.numeroAta && p.uasgAta && p.numeroItem);
+  const relatorioInfo = (p.relatorioContratos ?? [])[0] ?? null;
   const foraDaAta = q.orgaos.filter((o) => o.situacao === 'FORA_DA_ATA').length;
 
   return (
@@ -545,6 +557,17 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
           {p.conferindo
             ? <>Órgãos lidos do Compras.gov.br em {formatDataHoraBR(p.copiadoEm)}. Conferindo com a fonte agora; a lista se atualiza sozinha se algo mudou.</>
             : <>O Compras.gov.br não devolveu os órgãos deste item agora. A lista abaixo é a última cópia guardada, lida em {formatDataHoraBR(p.copiadoEm)}.</>}
+        </NoticeBar>
+      )}
+      {relatorioInfo && (
+        <NoticeBar
+          tone="info"
+          testId="relatorio-contratos-importado"
+          action={podeImportar ? <AppButton variant="outline" size="sm" onClick={() => setImportandoRelatorio(true)} data-testid="importar-outro-relatorio">Importar relatório mais novo</AppButton> : undefined}
+        >
+          Quantidades pelo relatório do Contratos.gov.br gerado em <b>{formatDataHoraBR(relatorioInfo.geradoEm)}</b>
+          {relatorioInfo.importadoPorNome ? <>, importado por {relatorioInfo.importadoPorNome} em {formatDataHoraBR(relatorioInfo.importadoEm)}</> : null}.
+          {' '}Cada órgão volta a seguir o Compras.gov.br quando ele publicar uma atualização mais nova.
         </NoticeBar>
       )}
       {cabecalho}
@@ -595,6 +618,11 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
           subtitle={semOrgaos ? undefined : `A linha da SENASP abre as unidades internas.${q.informado ? ' Nas linhas dos participantes, compare a ata assinada com o registrado no Compras.gov.br.' : ''}`}
           icon={<Users size={16} />}
           countBadge={semOrgaos ? undefined : linhas.length}
+          actions={podeImportar && !relatorioInfo ? (
+            <AppButton variant="outline" size="sm" onClick={() => setImportandoRelatorio(true)} data-testid="importar-relatorio-contratos">
+              Importar relatório do Contratos.gov.br
+            </AppButton>
+          ) : undefined}
         />
         {semOrgaos ? (
           <>
@@ -620,6 +648,19 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
         )}
       </div>
 
+      {podeImportar && importandoRelatorio && (
+        <ImportarRelatorioContratosModal
+          aberto
+          onFechar={() => setImportandoRelatorio(false)}
+          itemKey={p.itemKey}
+          tituloItem={p.tituloItem}
+          numeroAta={p.numeroAta ?? ''}
+          uasgAta={p.uasgAta ?? ''}
+          numeroItem={p.numeroItem ?? 0}
+          unidades={p.unidades}
+          nomeDe={nomeDe}
+        />
+      )}
       <InformarAtaAssinadaModal
         aberto={informando}
         itemKey={p.itemKey}

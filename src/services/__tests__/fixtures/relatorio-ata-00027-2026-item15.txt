@@ -1,0 +1,139 @@
+Relatório Ata de Registro de Preços
+Unidade Gerenciadora 200331 - SECRETARIA NACIONAL DE SEGURANCA PUBLICA - SENASP
+INFORMAÇÕES DA ATA
+Ata: Última Atualização: Link da ata no PNCP:
+nº 00027/2026 18/09/2026 https://pncp.gov.br/app/atas/003944
+94000136/2025/1313/2
+Vigência Órgão: Unidade gerenciadora:
+de 15/06/2026 a 15/06/2027 SECRETARIA NACIONAL DE SEGURANCA
+PUBLICA
+200331 - SENASP
+Valor Contratado:
+R$ 222.495,00
+Fornecedor
+26.786.305/0001-64 - M&B AUTOMACAO LTDA
+Objeto:
+A presente Ata tem por objeto o registro de preços para a eventual contratação de Material de Comunicação Social, Bandeiras e
+Correlatos para atender às demandas da Diretoria da Força Nacional de Segurança Pública e demais órgãos participantes, especificados
+no item 15 do Termo de Referência (33465601), anexo do Edital do Pregão Eletrônico nº 90027/2025, que é parte integrante desta Ata,
+assim como as propostas cujos preços tenham sido registrados, independentemente de transcrição.
+1/6Ata de Registro de Preços nº 00027/2026 - 200331 - P.Relatório gerado através do Contratos.gov.br em 17/11/2026 11:35:58
+INFORMAÇÕES DA COMPRA
+Número da compra / Ano: Modalidade da compra: Data da assinatura:
+90027/2025 05 - Pregão 03/06/2026
+ITENS DA ATA
+Número Item Aceita
+Adesão
+Qtd.
+Limite
+Adesão
+Qtd. Limite
+Informado na
+Compra
+Código Tipo Qtd.
+Homologada
+00015
+MICROFONE DIRECIONAL, TIPO SHOTGUN,
+FINALIDADE APOIO AUDIO, VIDEO E FOTO,
+RESPOSTA FREQÜÊNCIA 20 HZ A 20 KHZ KHZ,
+SENSIBILIDADE 32.0 DB DB, CONEXÃO XLR,
+PADRÃO SUPERCARÓIDE., IMPEDÂNCIA 200
+OHMS
+Sim 910 910 330472 Material 455
+2/6Ata de Registro de Preços nº 00027/2026 - 200331 - P.Relatório gerado através do Contratos.gov.br em 17/11/2026 11:35:58
+DETALHAMENTO DO ITEM 00015
+Descrição
+detalhada:
+MICROFONE DIRECIONAL, TIPO SHOTGUN, FINALIDADE APOIO AUDIO, VIDEO E FOTO, RESPOSTA
+FREQÜÊNCIA 20 HZ A 20 KHZ KHZ, SENSIBILIDADE 32.0 DB DB, CONEXÃO XLR, PADRÃO
+SUPERCARÓIDE., IMPEDÂNCIA 200 OHMS
+Código do item: 330472
+Tipo do item: Material
+Quantidade
+homologada: 455
+Vigência inicial: 15/06/2026
+Vigência final: 15/06/2027
+FORNECEDOR(ES) ITEM 00015:
+Classificação CNPJ Fornecedor Qtd. total Valor unitário
+001 26.786.305/0001-64 M&B AUTOMACAO LTDA 455 489,0000
+UNIDADE(S) ITEM 00015
+Código Unidade Tipo da
+unidade
+Qtd.
+registrada
+Qtd. disponível para
+remanejamento/empenho
+160148 B ADM AP/CMP Participante 1 1
+200331 SENASP Gerenciadora 15 14
+3/6Ata de Registro de Preços nº 00027/2026 - 200331 - P.Relatório gerado através do Contratos.gov.br em 17/11/2026 11:35:58
+Código Unidade Tipo da
+unidade
+Qtd.
+registrada
+Qtd. disponível para
+remanejamento/empenho
+450955 SECESTADO/MA Participante 3 3
+452105 SEJSP/MS Participante 11 11
+452386 SDS/PE Participante 6 6
+452984 SSP/CE Participante 3 3
+453079 SSP/PR Participante 104 104
+453129 CPBMEC - CE Participante 2 2
+458494 PM-AM Participante 10 10
+462492 21939771000119 Participante 8 8
+925794 POLíCIA MILITAR Participante 32 32
+925801 SECRETARIA DE E Participante 10 10
+925853 CBM/PA Participante 3 3
+925986 SECRET.DE ESTAD Participante 8 8
+926111 CORPO DE BOMBEI Participante 5 5
+926477 PMAP/AP Participante 20 20
+926857 BME/RS Participante 5 5
+926965 CBM-MG Participante 10 10
+926974 PMCE Participante 10 10
+4/6Ata de Registro de Preços nº 00027/2026 - 200331 - P.Relatório gerado através do Contratos.gov.br em 17/11/2026 11:35:58
+Código Unidade Tipo da
+unidade
+Qtd.
+registrada
+Qtd. disponível para
+remanejamento/empenho
+927042 SECRETARIA DA SEG. PÚBLICA DO EST. DA
+BAHIA Participante 14 14
+927056 POLÍCIA MILITAR Participante 45 45
+927082 SEF/MG Participante 4 4
+927115 POLICIA CIVIL Participante 1 1
+927134 CORPO DE BOMBEIROS MILITAR DO AMAPÁ Participante 2 2
+927139 CORPO DE BOMBEI Participante 2 2
+927586 FUNESP -SE Participante 80 80
+927619 POLÍCIA MILITAR Participante 2 2
+927916 FUNDO EST.DE SE Participante 17 17
+928441 PMEPE Participante 2 2
+929777 SECRETARIA DE EST.JUSTIÇA E
+SEGURANÇA PÚBLICA Participante 20 20
+ADESÕES(S) ITEM 00015
+Qtd. máxima para adesão 910
+Qtd. disponivel para adesão: 910
+5/6Ata de Registro de Preços nº 00027/2026 - 200331 - P.Relatório gerado através do Contratos.gov.br em 17/11/2026 11:35:58
+Quantidade aguardando análise: 0
+Aceita adesão Sim
+EMPENHO(S) ITEM 00015
+Qtd. Registrada / Autorizada: 15
+Saldo total para empenho: 14,00
+Unidade Tipo Quantidade registrada Quantidade empenhada Saldo para empenho
+200331 - SENASP Gerenciadora 15 1 14
+Número de
+empenho Unidade Fornecedor Data do
+empenho
+Quantidade
+incluída Reforço Anulação Quantidade
+empenhada Valor
+2026NE000582 200331 -
+SENASP
+26.786.305/0001-64 -
+M&B AUTOMACAO
+LTDA
+2026-08-04 1 0 0 1 489,00
+CONTRATO(S) ITEM 00015:
+Número do contrato Unidade Fornecedor Qtd. contratada
+2026NE000582 200331 - SENASP 26.786.305/0001-64 - M&B AUTOMACAO LTDA 1Relatório Ata de Registro de Preços
+Unidade Gerenciadora 200331 - SECRETARIA NACIONAL DE SEGURANCA PUBLICA - SENASP
+6/6Ata de Registro de Preços nº 00027/2026 - 200331 - P.Relatório gerado através do Contratos.gov.br em 17/11/2026 11:35:58
