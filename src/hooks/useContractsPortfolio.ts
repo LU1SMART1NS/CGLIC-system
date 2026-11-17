@@ -77,13 +77,16 @@ export function useContractsPortfolio({ pendencias: comPendencias = true, enable
   const managers200330 = useAllContractManagers(UASGS[0], { enabled });
   const managers200331 = useAllContractManagers(UASGS[1], { enabled });
   // Só consulta depois do escopo do gestor: a chave inclui o escopo, e consultar antes carregava tudo duas vezes.
+  // E só depois dos contratos (a lista na tela): o painel faz ~20 leituras que, juntas com as páginas dos contratos,
+  // passavam na fila do banco (filaDoBanco.ts) e atrasavam a lista em 3 s (medição de 17/11/2026). Depois, o painel
+  // ainda reaproveita os contratos já lidos pelo cache. Se os contratos falharem, o painel lê assim mesmo.
   const mgmt200330 = useManagementDashboard(
     { uasg: UASGS[0], assignedContractKeys: scope200330.contractKeys, assignedAtaKeys: scope200330.ataKeys },
-    { enabled: enabled && comPendencias && !scope200330.isLoading }
+    { enabled: enabled && comPendencias && !scope200330.isLoading && !isLoading }
   );
   const mgmt200331 = useManagementDashboard(
     { uasg: UASGS[1], assignedContractKeys: scope200331.contractKeys, assignedAtaKeys: scope200331.ataKeys },
-    { enabled: enabled && comPendencias && !scope200331.isLoading }
+    { enabled: enabled && comPendencias && !scope200331.isLoading && !isLoading }
   );
 
   // Atribuição a quem não é mais gestor ativo (virou coordenador, consulta ou foi inativado) vale como "Sem gestor":

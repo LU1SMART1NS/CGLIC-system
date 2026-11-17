@@ -10,8 +10,12 @@
  * funções do banco que podem gravar. Gravação nunca é repetida.
  */
 
-/** Quantas leituras vão ao banco ao mesmo tempo. */
-export const LEITURAS_SIMULTANEAS = 6;
+/**
+ * Quantas leituras vão ao banco ao mesmo tempo. Com 6 (PR #592) a Carteira de Contratos levou 11-12 s em vez de 5,7 s
+ * com o banco calmo: cada leitura não ficou mais rápida, a lista só esperava atrás das ~54 do menu. 12 ainda contém a
+ * rajada de ~55 sem segurar a tela.
+ */
+export const LEITURAS_SIMULTANEAS = 12;
 
 /** Pausa antes de repetir a leitura que esgotou o tempo. */
 export const PAUSA_ANTES_DE_REPETIR_MS = 300;
