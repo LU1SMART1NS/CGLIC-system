@@ -35,3 +35,20 @@ export function linhasDosContratos(contratos: ContratoFiscalizacao[], entregas: 
       return { c, es, r, agora, mais, dias, seg };
     });
 }
+
+/**
+ * Trabalho em aberto de cada contrato da SFC/CGLIC: quantos próximos passos da mesa estão com o fiscal (os mesmos da
+ * aba Contratos; um passo em lote conta uma vez). Sem os itens carregados (`undefined`), mapa vazio: a carga fica só
+ * pelos contratos, em vez de uma conta pela metade.
+ */
+export function passosComOFiscal(contratos: ContratoFiscalizacao[], entregas: EntregaFiscalizacao[] | undefined): Map<string, number> {
+  const mapa = new Map<string, number>();
+  if (!entregas) return mapa;
+  const porContrato = agrupar(entregas, (e) => e.contractKey);
+  for (const c of contratos) {
+    if (c.situacao !== 'SFC' && c.situacao !== 'MISTA') continue;
+    const { comVoce } = linhasDoContrato(porContrato.get(c.contractKey) ?? [], !autuado(c), () => {}, () => {});
+    if (comVoce.length) mapa.set(c.contractKey, comVoce.length);
+  }
+  return mapa;
+}

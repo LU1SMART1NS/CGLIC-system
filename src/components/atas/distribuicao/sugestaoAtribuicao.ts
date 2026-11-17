@@ -1,6 +1,6 @@
 import { resolveManagerPropagation, type ManagerTarget } from '../../../services/managerAssignmentService';
 import type { ArpItemContractLinkPair } from '../../../services/arpContractLinkService';
-import { PESO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
+import { pesoDoInstrumento, type NivelComplexidade } from './complexidade';
 import type { DistribuicaoItem, DistribuicaoLinha } from './distribuicaoEquipe';
 import { capacidadeDe, ocupacao, type NivelGestor } from './nivelGestor';
 
@@ -29,8 +29,10 @@ export interface LoteAtribuicao {
   /** Contratos/atas vigentes que entram só pela propagação (não estavam entre os alvos). */
   vinculados: number;
   complexidade: Record<NivelComplexidade, number>;
-  /** Carga equivalente do lote inteiro. */
+  /** Carga equivalente do lote inteiro (complexidade + tarefas abertas que vão junto). */
   equivalente: number;
+  /** Tarefas abertas que mudam de mãos com o lote. */
+  tarefas: number;
   /** Alvos encerrados (ex.: atas do histórico): mudam de gestor, mas ficam fora das contagens acima. */
   encerrados: number;
 }
@@ -40,7 +42,7 @@ export function montarLote(targets: ManagerTarget[], links: ArpItemContractLinkP
   const { ataKeys, contractKeys } = resolveManagerPropagation(targets, links);
   const chaves = [...ataKeys.map((k) => chaveItem('ATA', k)), ...contractKeys.map((k) => chaveItem('CONTRATO', k))];
 
-  const lote: LoteAtribuicao = { itens: [], atas: 0, contratos: 0, vinculados: 0, complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 0 }, equivalente: 0, encerrados: 0 };
+  const lote: LoteAtribuicao = { itens: [], atas: 0, contratos: 0, vinculados: 0, complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 0 }, equivalente: 0, tarefas: 0, encerrados: 0 };
   for (const alvo of alvos) if (!index.has(alvo)) lote.encerrados++;
   for (const chave of chaves) {
     const indexado = index.get(chave);
@@ -50,7 +52,8 @@ export function montarLote(targets: ManagerTarget[], links: ArpItemContractLinkP
     else lote.contratos++;
     if (!alvos.has(chave)) lote.vinculados++;
     lote.complexidade[indexado.item.complexidade.nivel]++;
-    lote.equivalente += PESO_COMPLEXIDADE[indexado.item.complexidade.nivel];
+    lote.equivalente += pesoDoInstrumento(indexado.item);
+    lote.tarefas += indexado.item.tarefas ?? 0;
   }
   return lote;
 }
@@ -99,7 +102,7 @@ export function avaliarCandidatos(
     const linha = linhaPorNome.get(c.nome);
     const cargaAtual = linha?.equivalente ?? 0;
     const novos = lote.itens.filter((i) => i.gestorNome !== c.nome);
-    const acrescimo = novos.reduce((soma, i) => soma + PESO_COMPLEXIDADE[i.item.complexidade.nivel], 0);
+    const acrescimo = novos.reduce((soma, i) => soma + pesoDoInstrumento(i.item), 0);
     const capacidade = capacidadeDe(c.nivel);
     return {
       ...c,

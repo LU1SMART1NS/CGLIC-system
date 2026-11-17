@@ -48,6 +48,7 @@ const CarteiraCell: React.FC<{ f: CargaDoFiscal; ausencia: TransferenciaFiscal |
 /** Pressão do momento, no desenho da Equipe de Atas e Contratos: o que falta fazer agora. */
 const PressaoCell: React.FC<{ f: CargaDoFiscal }> = ({ f }) => {
   const partes: Array<{ texto: string; cor: string }> = [];
+  if (f.passos) partes.push({ texto: plural(f.passos, 'passo com o fiscal', 'passos com o fiscal'), cor: '#475569' });
   if (f.aAutuar > 0) partes.push({ texto: `${f.aAutuar} a autuar`, cor: 'var(--color-warning-text)' });
   if (partes.length === 0) return <span style={{ color: '#94a3b8' }}>—</span>;
   return (

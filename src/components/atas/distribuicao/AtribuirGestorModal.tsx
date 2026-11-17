@@ -166,6 +166,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
           </div>
           <div style={{ color: '#475569' }}>
             Complexidade: {NIVEIS.map((n) => `${lote.complexidade[n]} ${ROTULO_COMPLEXIDADE[n]}`).join(' · ')}
+            {lote.tarefas > 0 && ` · ${plural(lote.tarefas, 'tarefa aberta vai junto', 'tarefas abertas vão junto')}`}
           </div>
           {provaveis > 0 && (
             <div data-testid="atribuir-gestor-provaveis" style={{ color: 'var(--color-warning-text)', fontWeight: 600 }}>

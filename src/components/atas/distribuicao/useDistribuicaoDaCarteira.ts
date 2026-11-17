@@ -25,8 +25,14 @@ export function useDistribuicaoDaCarteira({
   contratos,
   links,
   ajustes,
-  capacidadeDoGestor
-}: Carteira & { ajustes?: Record<string, ComplexidadeAjuste>; capacidadeDoGestor?: (gestorNome: string) => number }) {
+  capacidadeDoGestor,
+  tarefasAbertas
+}: Carteira & {
+  ajustes?: Record<string, ComplexidadeAjuste>;
+  capacidadeDoGestor?: (gestorNome: string) => number;
+  /** Fila de cada instrumento (useTarefasAbertas); sem ela, a carga fica só pela complexidade. */
+  tarefasAbertas?: Record<string, number>;
+}) {
   return useMemo(
     () =>
       buildDistribuicaoEquipe({
@@ -55,8 +61,9 @@ export function useDistribuicaoDaCarteira({
         links,
         attentionItems: contratos.attentionItems,
         ajustes,
-        capacidadeDoGestor
+        capacidadeDoGestor,
+        tarefasAbertas
       }),
-    [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes, capacidadeDoGestor]
+    [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes, capacidadeDoGestor, tarefasAbertas]
   );
 }

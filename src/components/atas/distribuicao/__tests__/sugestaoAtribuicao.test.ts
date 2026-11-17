@@ -151,3 +151,26 @@ describe('avaliarCandidatos com nível do gestor', () => {
     expect(r.sugestao).toBe('Carla');
   });
 });
+
+describe('fila de tarefas na atribuição', () => {
+  it('a ata leva as tarefas abertas junto e a sugestão vai para quem tem a fila menor', () => {
+    const distribuicao = buildDistribuicaoEquipe({
+      atas: [
+        { numeroAta: '00001/2025', gestorNome: 'Ana', faixa: 'REGULAR', valor: 1, itens: 1 },
+        { numeroAta: '00002/2025', gestorNome: 'Bruno', faixa: 'REGULAR', valor: 1, itens: 1 },
+        { numeroAta: '00003/2025', faixa: 'REGULAR', valor: 1, itens: 1 }
+      ],
+      contratos: [],
+      links: [],
+      attentionItems: [],
+      // Mesma carteira; Ana com 10 tarefas na fila, Bruno sem nenhuma.
+      tarefasAbertas: { 'ATA:00001/2025': 10, 'ATA:00003/2025': 4 }
+    });
+    const lote = montarLote([{ tipo: 'ATA', ataKey: '00003/2025' }], [], indexarItens(distribuicao.linhas));
+    expect(lote).toMatchObject({ tarefas: 4, equivalente: 3 });
+    const { opcoes, sugestao } = avaliarCandidatos(lote, [{ nome: 'Ana', userId: 'u1', ehGestor: true }, { nome: 'Bruno', userId: 'u2', ehGestor: true }], distribuicao.linhas);
+    expect(opcoes.find((o) => o.nome === 'Ana')).toMatchObject({ cargaAtual: 6, cargaDepois: 9 });
+    expect(opcoes.find((o) => o.nome === 'Bruno')).toMatchObject({ cargaAtual: 1, cargaDepois: 4 });
+    expect(sugestao).toBe('Bruno');
+  });
+});

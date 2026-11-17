@@ -19,6 +19,22 @@ const alerta = (fields: Partial<DashboardAttentionItem>): DashboardAttentionItem
   ({ id: Math.random().toString(), category: 'LEMBRETE', severity: 'ATENCAO', title: 'x', ...fields }) as DashboardAttentionItem;
 
 describe('buildDistribuicaoEquipe', () => {
+  it('soma meio ponto por tarefa aberta na carga; quem zera a fila fica mais leve', () => {
+    const { linhas } = buildDistribuicaoEquipe({
+      atas: [{ ...ata('00001/2025', 'Ana'), itens: 1 }],
+      contratos: [{ ...contrato('200331-00001-2025', 'Bruno'), categoria: 'Compras', mesesVigencia: 6 }],
+      links: [],
+      attentionItems: [],
+      tarefasAbertas: { 'ATA:00001/2025': 6, 'CONTRATO:200331-00001-2025': 0, 'CONTRATO:200331-99999-2025': 9 }
+    });
+    const ana = linhas.find((l) => l.gestorNome === 'Ana')!;
+    const bruno = linhas.find((l) => l.gestorNome === 'Bruno')!;
+    expect(ana).toMatchObject({ estrutural: 1, tarefas: 6, equivalente: 4, ocupacao: 4 });
+    expect(ana.itens[0].tarefas).toBe(6);
+    expect(bruno).toMatchObject({ estrutural: 1, tarefas: 0, equivalente: 1 });
+    expect(bruno.itens[0].tarefas).toBeUndefined();
+  });
+
   it('soma só instrumentos vigentes por gestor, com prazo e valor', () => {
     const { linhas, totais } = buildDistribuicaoEquipe({
       atas: [ata('00001/2025', 'Ana', 'CRITICO', 500), ata('00002/2025', 'Ana', 'ATENCAO', 300), ata('00003/2024', 'Ana', 'EXPIRADO'), ata('00004/2025', 'Bruno', 'SEM_DATA')],
