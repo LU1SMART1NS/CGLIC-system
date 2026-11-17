@@ -15,6 +15,15 @@ export function escalaDeOcupacao(linhas: DistribuicaoLinha[], media: number | nu
   return Math.max(0, ...linhas.map((l) => l.ocupacao), media ?? 0) * 1.1;
 }
 
+/** "40 tarefas e 3 faturas na fila"; vazio sem fila. */
+export function textoDaFila(tarefas: number, faturas: number): string {
+  const partes = [
+    tarefas ? `${tarefas} ${tarefas === 1 ? 'tarefa' : 'tarefas'}` : '',
+    faturas ? `${faturas} ${faturas === 1 ? 'fatura' : 'faturas'}` : ''
+  ].filter(Boolean);
+  return partes.length ? `${partes.join(' e ')} na fila` : '';
+}
+
 export type RelacaoComAEquipe = 'ACIMA' | 'NA_MEDIA' | 'ABAIXO';
 
 /**
@@ -71,13 +80,13 @@ export const OcupacaoBarra: React.FC<{ l: DistribuicaoLinha; escala: number; med
     media={media}
     partes={[
       ...NIVEIS.map((n) => ({ chave: n, peso: l.complexidade[n] * PESO_COMPLEXIDADE[n], cor: COR_COMPLEXIDADE[n] })),
-      { chave: 'FILA', peso: (l.tarefas ?? 0) * PESO_TAREFA_ABERTA, cor: COR_FILA }
+      { chave: 'FILA', peso: ((l.tarefas ?? 0) + (l.faturas ?? 0)) * PESO_TAREFA_ABERTA, cor: COR_FILA }
     ]}
     rodape={[
       ...NIVEIS.map((n) => `${l.complexidade[n]} ${ROTULO_COMPLEXIDADE[n]}`),
-      ...(l.tarefas ? [`${l.tarefas} ${l.tarefas === 1 ? 'tarefa' : 'tarefas'} na fila`] : [])
+      ...(textoDaFila(l.tarefas ?? 0, l.faturas ?? 0) ? [textoDaFila(l.tarefas ?? 0, l.faturas ?? 0)] : [])
     ].join(' · ')}
-    title={`A barra mostra a ocupação (carga ÷ capacidade ${percentual(l.capacidade)}): em azul, o peso de cada complexidade; em cinza, as tarefas abertas com prazo em até ${DIAS_DA_FILA} dias (meio ponto cada). O tracejado é a média da equipe.`}
+    title={`A barra mostra a ocupação (carga ÷ capacidade ${percentual(l.capacidade)}): em azul, o peso de cada complexidade; em cinza, a fila: tarefas abertas com prazo em até ${DIAS_DA_FILA} dias e faturas que precisam de ação no Financeiro (meio ponto cada). O tracejado é a média da equipe.`}
     testId={`distribuicao-relacao-${l.gestorNome}`}
     minWidth={minWidth}
   />

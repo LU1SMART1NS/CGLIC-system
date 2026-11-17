@@ -33,6 +33,8 @@ export interface LoteAtribuicao {
   equivalente: number;
   /** Tarefas abertas que mudam de mãos com o lote. */
   tarefas: number;
+  /** Faturas do Financeiro que precisam de ação e mudam de mãos com o lote. */
+  faturas: number;
   /** Alvos encerrados (ex.: atas do histórico): mudam de gestor, mas ficam fora das contagens acima. */
   encerrados: number;
 }
@@ -42,7 +44,7 @@ export function montarLote(targets: ManagerTarget[], links: ArpItemContractLinkP
   const { ataKeys, contractKeys } = resolveManagerPropagation(targets, links);
   const chaves = [...ataKeys.map((k) => chaveItem('ATA', k)), ...contractKeys.map((k) => chaveItem('CONTRATO', k))];
 
-  const lote: LoteAtribuicao = { itens: [], atas: 0, contratos: 0, vinculados: 0, complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 0 }, equivalente: 0, tarefas: 0, encerrados: 0 };
+  const lote: LoteAtribuicao = { itens: [], atas: 0, contratos: 0, vinculados: 0, complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 0 }, equivalente: 0, tarefas: 0, faturas: 0, encerrados: 0 };
   for (const alvo of alvos) if (!index.has(alvo)) lote.encerrados++;
   for (const chave of chaves) {
     const indexado = index.get(chave);
@@ -54,6 +56,7 @@ export function montarLote(targets: ManagerTarget[], links: ArpItemContractLinkP
     lote.complexidade[indexado.item.complexidade.nivel]++;
     lote.equivalente += pesoDoInstrumento(indexado.item);
     lote.tarefas += indexado.item.tarefas ?? 0;
+    lote.faturas += indexado.item.faturas ?? 0;
   }
   return lote;
 }

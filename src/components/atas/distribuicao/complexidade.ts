@@ -38,9 +38,12 @@ export const PESO_TAREFA_ABERTA = 0.5;
 /** Janela das tarefas que contam na carga (prazo até hoje + N dias, inclusive as vencidas). */
 export const DIAS_DA_FILA = 30;
 
-/** Carga de um instrumento: o peso da complexidade mais as tarefas abertas dele. Mudar de gestor leva as duas. */
-export const pesoDoInstrumento = (item: { complexidade: { nivel: NivelComplexidade }; tarefas?: number }): number =>
-  PESO_COMPLEXIDADE[item.complexidade.nivel] + PESO_TAREFA_ABERTA * (item.tarefas ?? 0);
+/**
+ * Carga de um instrumento: o peso da complexidade mais a fila dele (tarefas abertas e faturas do Financeiro que
+ * precisam de ação, meio ponto cada). Mudar de gestor leva tudo junto.
+ */
+export const pesoDoInstrumento = (item: { complexidade: { nivel: NivelComplexidade }; tarefas?: number; faturas?: number }): number =>
+  PESO_COMPLEXIDADE[item.complexidade.nivel] + PESO_TAREFA_ABERTA * ((item.tarefas ?? 0) + (item.faturas ?? 0));
 
 export const ROTULO_COMPLEXIDADE: Record<NivelComplexidade, string> = { ALTA: 'Alta', MEDIA: 'Média', BAIXA: 'Baixa' };
 
