@@ -1,7 +1,10 @@
 import React from 'react';
 import { formatNumber } from '../../utils/format';
 import { mediaDaEquipeFiscal, type CargaDoFiscal } from '../../utils/fiscalizacao';
-import { BarraDeOcupacao } from '../atas/distribuicao/OcupacaoBarra';
+import { BarraDeOcupacao, COR_FILA } from '../atas/distribuicao/OcupacaoBarra';
+import { PESO_TAREFA_ABERTA } from '../atas/distribuicao/complexidade';
+
+const TITULO_CARGA_FISCAL = 'A barra mostra a ocupação: em azul, os contratos em carga (1 ponto cada); em cinza, os próximos passos com o fiscal na mesa dos contratos (meio ponto cada).';
 
 const plural = (n: number, um: string, varios: string) => `${formatNumber(n)} ${n === 1 ? um : varios}`;
 
@@ -21,7 +24,7 @@ export const GavetaDistribuicaoFiscais: React.FC<{
   const comCarteira = carga.filter((f) => f.contratos > 0);
   const semCarteira = carga.filter((f) => f.contratos === 0).map((f) => f.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const maior = Math.max(0, ...comCarteira.map((f) => f.contratos));
-  const pendencias = (f: CargaDoFiscal) => f.aAutuar;
+  const pendencias = (f: CargaDoFiscal) => f.passos ?? f.aAutuar;
   const { media, porFiscal } = mediaDaEquipeFiscal(carga);
   // Régua comum: a maior ocupação (ou a média) ocupa quase toda a largura, como na Distribuição de Atas e Contratos.
   const escala = Math.max(0, ...[...porFiscal.values()].map((o) => o.ocupacao), media ?? 0) * 1.1;
@@ -81,11 +84,15 @@ export const GavetaDistribuicaoFiscais: React.FC<{
                   relacao={o.relacao}
                   escala={escala}
                   media={media}
-                  rodape={`${plural(f.contratos, 'contrato', 'contratos')}${f.contratos === maior && maior > 0 && fiscais.length > 1 ? ' · maior carteira' : ''}`}
+                  partes={[
+                    { chave: 'contratos', peso: f.contratos, cor: 'var(--primary)' },
+                    { chave: 'passos', peso: (f.passos ?? 0) * PESO_TAREFA_ABERTA, cor: COR_FILA }
+                  ]}
+                  rodape={`${plural(f.contratos, 'contrato', 'contratos')}${f.passos ? ` · ${plural(f.passos, 'passo', 'passos')} com o fiscal` : ''}${f.contratos === maior && maior > 0 && fiscais.length > 1 ? ' · maior carteira' : ''}`}
                   title={
                     f.outroPerfil === 'Coordenador'
-                      ? 'A barra mostra a ocupação: o coordenador entra na média com metade da capacidade (cada contrato pesa o dobro). O tracejado é a média da equipe.'
-                      : 'A barra mostra a ocupação (contratos do fiscal). O tracejado é a média da equipe.'
+                      ? `${TITULO_CARGA_FISCAL} O coordenador entra na média com metade da capacidade. O tracejado é a média da equipe.`
+                      : `${TITULO_CARGA_FISCAL} O tracejado é a média da equipe.`
                   }
                   testId="fisc-inicio-distribuicao-relacao"
                   minWidth="0"
