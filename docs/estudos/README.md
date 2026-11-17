@@ -17,6 +17,7 @@ Levantamentos e medições feitos antes de mudar o sistema. Nenhum estudo altera
 | Estudo | Data | Pergunta |
 |---|---|---|
 | [saldo-contabil-tesouro.md](saldo-contabil-tesouro.md) | 14/10/2026 | O saldo contábil do Tesouro (STA) serve de fonte do pago e dos restos a pagar? |
+| [pago-das-notas-fonte-x-tesouro.md](pago-das-notas-fonte-x-tesouro.md) | 17/11/2026 | Por que o pago das notas vindo do Contratos.gov.br fica abaixo do Tesouro, e o que as telas devem usar? |
 
 ## Emendas parlamentares
 
