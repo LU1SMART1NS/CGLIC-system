@@ -1,5 +1,6 @@
 import { useQuery, keepPreviousData, type QueryClient, type QueryFunctionContext } from '@tanstack/react-query';
 import { fetchManagementDashboardData, type FontesDoPainelNoCache } from '../services/dashboardService';
+import { ehErroDeTempoEsgotado } from '../services/filaDoBanco';
 import { getContractsDashboardQueryOptions } from './useContractsDashboard';
 import { getAllContractManagersQueryOptions } from './useAllContractManagers';
 import { getAtaSourceQueryOptions } from './useAta';
@@ -110,7 +111,7 @@ export function getManagementDashboardQueryOptions(
     // mantém o último Read Model bom na tela em vez de piscar contagens vazias,
     // enquanto o React Query tenta de novo. Evita os avisos "sumirem" da tela.
     placeholderData: keepPreviousData,
-    retry: 2,
+    retry: (falhas: number, erro: unknown) => falhas < 2 && !ehErroDeTempoEsgotado(erro),
     retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 8000)
   };
 }

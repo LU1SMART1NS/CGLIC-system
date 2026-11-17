@@ -87,6 +87,15 @@ describe('comprasParaLer', () => {
     expect(comprasParaLer([antiga], new Map([[antiga.idCompra, lido(AGORA - 31 * DIA, { atasEncontradas: 0 })]]), { agora: AGORA })).toEqual([antiga]);
   });
 
+  it('ata vencida há menos de 90 dias: relê depois de 24 horas, à espera da prorrogação', () => {
+    const diaDe = (ms: number) => iso(ms).slice(0, 10);
+    const venceuHa = (dias: number) => new Map([[VEICULOS, lido(AGORA - 25 * HORA, { fimDaUltimaAta: diaDe(AGORA - dias * DIA) })]]);
+    expect(comprasParaLer([veiculos], venceuHa(42), { agora: AGORA })).toEqual([veiculos]);
+    expect(comprasParaLer([veiculos], venceuHa(120), { agora: AGORA })).toEqual([]);
+    const lidaHaPouco = new Map([[VEICULOS, lido(AGORA - 5 * HORA, { fimDaUltimaAta: diaDe(AGORA - 42 * DIA) })]]);
+    expect(comprasParaLer([veiculos], lidaHaPouco, { agora: AGORA })).toEqual([]);
+  });
+
   it('atas encerradas: relê depois de 30 dias; forçar relê tudo', () => {
     const leituras = new Map([[VEICULOS, lido(AGORA - 10 * DIA)]]);
     expect(comprasParaLer([veiculos], leituras, { agora: AGORA })).toEqual([]);
