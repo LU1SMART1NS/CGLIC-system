@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { linhaParaContrato } from '../../services/fiscalizacaoService';
-import { UNIDADE_A_INDICAR, cargaPorArea, unidadeDaArea, unidadeSugerida, cargaPorFiscal, mediaDaEquipeFiscal, podeSerFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato } from '../fiscalizacao';
+import { UNIDADE_A_INDICAR, cargaPorArea, unidadeDaArea, unidadeSugerida, cargaPorFiscal,
+  cargaEmPontos, mediaDaEquipeFiscal, podeSerFiscal, decisaoPedeMotivo, decisaoSugerida, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato, segmentoDoContrato } from '../fiscalizacao';
 
 const base: ContratoFiscalizacao = {
   contractKey: '200331-00055-2026', uasg: '200331', numero: '00055/2026', fornecedor: 'CONDOR', objeto: null, assinatura: '2026-01-29', vigenciaFim: '2027-01-29',
@@ -59,8 +60,20 @@ describe('fiscalização do contrato', () => {
 
   it('contrato fora da carga continua no total do fiscal, mas não conta nem pede autuação', () => {
     const lista = [c({ contractKey: 'a', situacao: 'SFC', fiscalUserId: 'u1' }), c({ contractKey: 'b', situacao: 'SFC', fiscalUserId: 'u1' })];
-    const carga = cargaPorFiscal(lista, [{ id: 'u1', nome: 'Ana' }], new Set(['b']));
+    const carga = cargaPorFiscal(lista, [{ id: 'u1', nome: 'Ana' }], { foraDaCarga: new Set(['b']) });
     expect(carga[0]).toEqual({ userId: 'u1', nome: 'Ana', contratos: 1, total: 2, aAutuar: 1 });
+  });
+
+  it('passos com o fiscal somam meio ponto na ocupação, só nos contratos em carga', () => {
+    const lista = [c({ contractKey: 'a', situacao: 'SFC', fiscalUserId: 'u1' }), c({ contractKey: 'b', situacao: 'SFC', fiscalUserId: 'u1' }), c({ contractKey: 'x', situacao: 'SFC', fiscalUserId: 'u2' })];
+    const passos = new Map([['a', 4], ['b', 9], ['x', 0]]);
+    const carga = cargaPorFiscal(lista, [{ id: 'u1', nome: 'Ana' }, { id: 'u2', nome: 'Bia' }], { foraDaCarga: new Set(['b']), passos });
+    const ana = carga.find((f) => f.userId === 'u1')!;
+    expect(ana).toMatchObject({ contratos: 1, passos: 4 });
+    expect(cargaEmPontos(ana)).toBe(3);
+    const { porFiscal } = mediaDaEquipeFiscal(carga);
+    expect(porFiscal.get('u1')!.ocupacao).toBe(3);
+    expect(porFiscal.get('u2')!.ocupacao).toBe(1);
   });
 
   it('quem tem contrato como fiscal aparece, seja qual for o perfil; sem contrato, só o Gestor de Fiscalização', () => {
