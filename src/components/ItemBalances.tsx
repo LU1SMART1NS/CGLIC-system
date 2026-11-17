@@ -853,9 +853,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               unidadesAlocadas={alocacoesComErro ? undefined : allocationRows}
               adesoes={adesoes}
               limiteAdesao={totalLimiteAdesao}
-              numeroItem={Number(item.numeroItem) || 0}
               relatorioContratos={relatorioContratos}
-              podeImportarRelatorio={canEditData}
             />
           ) : (
             <QuantitativosOutroOrgaoTab

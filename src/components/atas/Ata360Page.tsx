@@ -32,7 +32,7 @@ import { Instrument360TabPanel } from '../instrument360/Instrument360TabPanel';
 import { useInstrumentTab } from '../instrument360/useInstrumentTab';
 import { LinkContractModal, type LinkableAtaItemOption } from '../modals/LinkContractModal';
 import { useUnlinkContractFromItem } from '../../hooks/useUnlinkContractFromItem';
-import { ActionButton, useToast, useConfirmDialog } from '../../design-system';
+import { ActionButton, AppButton, useToast, useConfirmDialog } from '../../design-system';
 import { normalizeItemKey } from '../../utils/itemKeyUtils';
 import type { EnrichedArpItemContract } from '../../types/arpContractLinks';
 import { UASG_LINK_LEGADO } from '../../config/unidadesGestoras';
@@ -47,6 +47,7 @@ import { ROTULO_REAJUSTE_ATAS, useReajusteDaAta } from '../../hooks/useReajusteA
 import { TrendingUp } from 'lucide-react';
 import { usePrazoDaAta } from '../../hooks/useAtaPrazoEntrega';
 import { PrazoDaAtaModal } from './PrazoDaAtaModal';
+import { ImportarRelatorioContratosModal } from './ImportarRelatorioContratosModal';
 import { PrazoNoCartaoDaAta, itemDoPrazoDaAta } from './prazoDaAtaPartes';
 
 const TAB_IDS: Ata360Tab[] = ['acoes', 'plano', 'itens', 'contratos', 'reajuste'];
@@ -130,6 +131,9 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
   const isOwnAta = Boolean(arp && assignedAtaKeys?.includes(chaveGestao));
   // Mesma regra das RPCs link/unlink_contract_to_item_atomic (has_role gestor/admin)
   const canEditLinks = role === 'admin' || role === 'gestor';
+  // Relatório da ata do Contratos.gov.br (migration 325): mesma regra da RPC importar_relatorio_ata (has_role gestor).
+  const podeImportarRelatorio = role === 'admin' || role === 'gestor';
+  const [importandoRelatorio, setImportandoRelatorio] = React.useState(false);
   // O quantitativo SENASP dos itens é gravado em segundo plano (pelo servidor, de hora em hora); a tela só lê.
 
   // Uma fonte que falha não vira "0% consumido", "sem plano" ou "nenhum contrato": a faixa diz o que não carregou.
@@ -376,6 +380,11 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
             title="Itens da ata"
             subtitle="Saldo físico por item: quantidade homologada, consumida e disponível"
             icon={Layers}
+            actions={podeImportarRelatorio && itens.length > 0 ? (
+              <AppButton variant="outline" size="sm" onClick={() => setImportandoRelatorio(true)} data-testid="importar-relatorio-contratos">
+                Importar relatório do Contratos.gov.br
+              </AppButton>
+            ) : undefined}
           >
             <AtaItemsTable
               itens={itens}
@@ -459,6 +468,13 @@ export const Ata360Page: React.FC<Ata360PageProps> = ({ ataKeyOverride, uasg: ua
         />
       )}
 
+      {importandoRelatorio && arp && (
+        <ImportarRelatorioContratosModal
+          onFechar={() => setImportandoRelatorio(false)}
+          numeroAta={arp.numeroAtaRegistroPreco}
+          uasgAta={arp.codigoUnidadeGerenciadora}
+        />
+      )}
       {canEditLinks && (
         <LinkContractModal
           isOpen={isLinkModalOpen}

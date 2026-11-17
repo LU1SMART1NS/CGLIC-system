@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../supabaseClient', () => ({ supabase: null, isSupabaseConfigured: false }));
 
-import { aplicarRelatorio, type OrgaoDoRelatorioImportado } from '../relatorioAtaContratosService';
+import { aplicarRelatorio, compararItem, type OrgaoDoRelatorioImportado } from '../relatorioAtaContratosService';
 import type { UnidadeItemRecord } from '../../types';
 
 const unidade = (codigo: string, qtd: number, atualizacao: string, extra: Partial<UnidadeItemRecord> = {}): UnidadeItemRecord => ({
@@ -50,5 +50,22 @@ describe('aplicarRelatorio', () => {
 
   it('sem relatório, devolve a lista como está', () => {
     expect(aplicarRelatorio(compras, []).unidades).toBe(compras);
+  });
+});
+
+describe('compararItem', () => {
+  it('mostra o que muda, o órgão novo e o que o relatório não traz', () => {
+    const agora = new Map([['200331', { quantidade: 1, nome: 'SENASP' }], ['925794', { quantidade: 46, nome: 'PM-ES' }], ['160148', { quantidade: 1, nome: 'CMP' }], ['999999', { quantidade: 3, nome: 'OUTRO' }]]);
+    const doRelatorio = [
+      { uasg: '200331', nome: 'SENASP', quantidade: 15, saldo: 14 },
+      { uasg: '925794', nome: 'POLÍCIA MILITAR', quantidade: 32, saldo: 32 },
+      { uasg: '452386', nome: 'SDS/PE', quantidade: 6, saldo: 6 },
+      { uasg: '160148', nome: 'B ADM', quantidade: 1, saldo: 1 }
+    ];
+    const l = compararItem(doRelatorio, agora, (u) => (u === '925794' ? 'POLÍCIA MILITAR DO ESPÍRITO SANTO' : null));
+    expect(l.filter((x) => x.muda).map((x) => x.uasg)).toEqual(['200331', '925794', '452386']);
+    expect(l.find((x) => x.uasg === '925794')?.nome).toBe('POLÍCIA MILITAR DO ESPÍRITO SANTO');
+    expect(l.find((x) => x.uasg === '452386')).toMatchObject({ agora: null, relatorio: 6, nome: 'SDS/PE' });
+    expect(l.find((x) => x.uasg === '999999')).toMatchObject({ agora: 3, relatorio: null, muda: false });
   });
 });

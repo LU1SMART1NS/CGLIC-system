@@ -172,3 +172,52 @@ export function aplicarRelatorio(
   }
   return { unidades: saida, trocados };
 }
+
+/** Registrado de cada órgão, por item, como está no banco agora (para a janela comparar com o relatório). */
+export interface RegistradoNoBanco { quantidade: number; nome: string | null }
+
+export async function lerRegistradoDosItens(itemKeys: string[]): Promise<Map<string, Map<string, RegistradoNoBanco>>> {
+  const saida = new Map<string, Map<string, RegistradoNoBanco>>();
+  if (itemKeys.length === 0) return saida;
+  const { data, error } = await requireSupabase()
+    .from('itens_ata_unidades_copia')
+    .select('item_key, registrado')
+    .in('item_key', itemKeys);
+  if (error) throw new Error(mensagem(error));
+  for (const linha of data ?? []) {
+    const porUasg = new Map<string, RegistradoNoBanco>();
+    for (const r of (Array.isArray((linha as any).registrado) ? (linha as any).registrado : []) as any[]) {
+      porUasg.set(String(r.uasg), { quantidade: Number(r.quantidade) || 0, nome: r.nome_orgao ?? null });
+    }
+    saida.set(String((linha as any).item_key), porUasg);
+  }
+  return saida;
+}
+
+export interface LinhaDaComparacao {
+  uasg: string;
+  nome: string;
+  /** Registrado no sistema agora; nulo = o órgão não está na lista. */
+  agora: number | null;
+  /** Nulo = o relatório não traz o órgão (fica como está). */
+  relatorio: number | null;
+  saldo: number | null;
+  muda: boolean;
+}
+
+/** Sistema agora × relatório, órgão a órgão, de um item. */
+export function compararItem(
+  doRelatorio: { uasg: string; nome: string; quantidade: number; saldo: number }[],
+  agora: Map<string, RegistradoNoBanco> | undefined,
+  nomeConhecido: (uasg: string) => string | null
+): LinhaDaComparacao[] {
+  const atual = agora ?? new Map<string, RegistradoNoBanco>();
+  const linhas: LinhaDaComparacao[] = doRelatorio.map((u) => {
+    const a = atual.get(u.uasg);
+    return { uasg: u.uasg, nome: nomeConhecido(u.uasg) ?? a?.nome ?? u.nome, agora: a ? a.quantidade : null, relatorio: u.quantidade, saldo: u.saldo, muda: !a || a.quantidade !== u.quantidade };
+  });
+  for (const [uasg, a] of atual) {
+    if (!doRelatorio.some((u) => u.uasg === uasg)) linhas.push({ uasg, nome: nomeConhecido(uasg) ?? a.nome ?? `UASG ${uasg}`, agora: a.quantidade, relatorio: null, saldo: null, muda: false });
+  }
+  return linhas;
+}
