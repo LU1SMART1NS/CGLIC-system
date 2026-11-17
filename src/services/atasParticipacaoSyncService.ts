@@ -61,7 +61,12 @@ export const RELEITURA_PARTICIPACAO = {
   recenteSemAtaEmHoras: 24,
   /** Leitura incompleta (falha ou unidades vazias): tenta de novo depois de 6 horas. */
   incompletaEmHoras: 6,
-  /** Demais (atas encerradas, compras antigas sem ata): uma vez por mês. */
+  /**
+   * Ata vencida há menos disto: relê uma vez por dia (como a vigente). A prorrogação costuma chegar ao PNCP depois
+   * do vencimento (00005/2025 da 200342 venceu em 06/10/2026 e só apareceu prorrogada em 10/11/2026).
+   */
+  vencidaHaPoucoEmDias: 90,
+  /** Demais (atas encerradas há mais tempo, compras antigas sem ata): uma vez por mês. */
   demaisEmDias: 30,
   /** Compra deste ano ou do anterior conta como recente. */
   anosRecentes: 1
@@ -85,6 +90,15 @@ export interface LeituraDaCompra {
   leituraCompleta: boolean;
   temAtaVigente: boolean;
   atasEncontradas: number;
+  /** Fim de vigência mais distante entre as atas desta compra já na carteira (AAAA-MM-DD); nulo se nenhuma. */
+  fimDaUltimaAta?: string | null;
+}
+
+/** Ata da compra vencida há pouco: a prorrogação ainda pode aparecer na fonte. */
+function vencidaHaPouco(leitura: LeituraDaCompra, agora: number): boolean {
+  const fim = leitura.fimDaUltimaAta ? Date.parse(`${leitura.fimDaUltimaAta.slice(0, 10)}T23:59:59-03:00`) : NaN;
+  if (Number.isNaN(fim) || fim >= agora) return false;
+  return agora - fim <= RELEITURA_PARTICIPACAO.vencidaHaPoucoEmDias * DIA_MS;
 }
 
 export interface ItemDaParticipacao {
@@ -181,7 +195,7 @@ export function comprasParaLer(
       const recente = Number(compra.ano) >= anoAtual - RELEITURA_PARTICIPACAO.anosRecentes;
       const validade = !leitura.leituraCompleta
         ? RELEITURA_PARTICIPACAO.incompletaEmHoras * HORA_MS
-        : leitura.temAtaVigente
+        : leitura.temAtaVigente || vencidaHaPouco(leitura, opts.agora)
           ? RELEITURA_PARTICIPACAO.comAtaVigenteEmHoras * HORA_MS
           : leitura.atasEncontradas === 0 && recente
             ? RELEITURA_PARTICIPACAO.recenteSemAtaEmHoras * HORA_MS
@@ -495,7 +509,34 @@ async function fetchLeituras(uasg: string): Promise<Map<string, LeituraDaCompra>
       atasEncontradas: Number(row.atas_encontradas) || 0
     });
   }
+  const fimPorCompra = await fetchFimDasAtas(uasg);
+  for (const [idCompra, leitura] of leituras) {
+    const c = decomporIdCompra(idCompra);
+    if (c) leitura.fimDaUltimaAta = fimPorCompra.get(chaveSemModalidade(c.uasgCompra, c.numero, c.ano)) ?? null;
+  }
   return leituras;
+}
+
+/** Chave da compra sem a modalidade (a tabela das atas guarda a modalidade por extenso). */
+const chaveSemModalidade = (uasg: string, numero: string, ano: string) => `${uasg}|${numero.replace(/\D/g, '').padStart(5, '0')}|${ano}`;
+
+/** Fim de vigência mais distante das atas de outros órgãos já na carteira, pela chave da compra sem a modalidade. */
+async function fetchFimDasAtas(uasg: string): Promise<Map<string, string>> {
+  const porChave = new Map<string, string>();
+  if (!supabase) return porChave;
+  const { data, error } = await supabase
+    .from('atas_registro_preco')
+    .select('codigo_uasg, numero_compra, ano_compra, data_vigencia_final')
+    .eq('uasg_carteira', uasg)
+    .in('papel_senasp', ['PARTICIPANTE', 'ADESAO']);
+  if (error) throw error;
+  for (const row of (data ?? []) as Array<{ codigo_uasg: string | null; numero_compra: string | null; ano_compra: string | null; data_vigencia_final: string | null }>) {
+    if (!row.codigo_uasg || !row.numero_compra || !row.ano_compra || !row.data_vigencia_final) continue;
+    const chave = chaveSemModalidade(row.codigo_uasg, row.numero_compra, row.ano_compra);
+    const fim = row.data_vigencia_final.slice(0, 10);
+    if (!porChave.has(chave) || fim > porChave.get(chave)!) porChave.set(chave, fim);
+  }
+  return porChave;
 }
 
 /** Corpo de gravar_atas_participacao (migration 105). */
