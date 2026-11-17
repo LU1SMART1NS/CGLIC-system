@@ -14,6 +14,7 @@ import { ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
 import { avaliarCandidatos, indexarItens, montarLote, type CandidatoAtribuicao } from './sugestaoAtribuicao';
 import { useGestorNiveis } from '../../../hooks/useGestorNiveis';
 import { SeloNivel } from './EquipeFila';
+import { textoDaFila } from './OcupacaoBarra';
 
 const NIVEIS: NivelComplexidade[] = ['ALTA', 'MEDIA', 'BAIXA'];
 const FICA = { ACIMA: 'Fica acima da média', NA_MEDIA: 'Fica na média', ABAIXO: 'Fica abaixo da média' } as const;
@@ -166,7 +167,7 @@ export const AtribuirGestorModal: React.FC<AtribuirGestorModalProps> = ({ target
           </div>
           <div style={{ color: '#475569' }}>
             Complexidade: {NIVEIS.map((n) => `${lote.complexidade[n]} ${ROTULO_COMPLEXIDADE[n]}`).join(' · ')}
-            {lote.tarefas > 0 && ` · ${plural(lote.tarefas, 'tarefa aberta vai junto', 'tarefas abertas vão junto')}`}
+            {lote.tarefas + lote.faturas > 0 && ` · ${textoDaFila(lote.tarefas, lote.faturas).replace(/ na fila$/, '')} ${lote.tarefas + lote.faturas === 1 ? 'vai' : 'vão'} junto`}
           </div>
           {provaveis > 0 && (
             <div data-testid="atribuir-gestor-provaveis" style={{ color: 'var(--color-warning-text)', fontWeight: 600 }}>

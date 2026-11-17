@@ -28,6 +28,7 @@ import { useAllContractManagers } from '../../../hooks/useAllContractManagers';
 import { UASGS_CGLIC } from '../../../config/unidadesGestoras';
 import { useCapacidadeDosGestores } from './useCapacidadeDosGestores';
 import { useTarefasAbertas } from '../../../hooks/useTarefasAbertas';
+import { useFaturasNaFila } from './useFaturasNaFila';
 import { useDistribuicaoDaCarteira } from './useDistribuicaoDaCarteira';
 import { ROTAS_VINCULACAO } from '../../vinculacao/vinculacaoConfig';
 import { chaveGestaoAta } from '../../../utils/ataIdentidade';
@@ -89,7 +90,8 @@ export const DistribuicaoEquipePage: React.FC = () => {
   const trocarAba = (nova: Fila) => setSearchParams(nova === FILA_INICIAL ? {} : { aba: nova }, { replace: true });
 
   const { data: tarefasAbertas } = useTarefasAbertas();
-  const distribuicao = useDistribuicaoDaCarteira({ atas, contratos, links, ajustes, capacidadeDoGestor, tarefasAbertas });
+  const faturasAbertas = useFaturasNaFila();
+  const distribuicao = useDistribuicaoDaCarteira({ atas, contratos, links, ajustes, capacidadeDoGestor, tarefasAbertas, faturasAbertas });
 
   const aVincularDe = (gestorNome: string): ContratoAVincular[] => pendencias.aVincularPorGestor.get(gestorNome) || [];
 

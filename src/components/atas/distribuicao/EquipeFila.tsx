@@ -133,7 +133,7 @@ const COLUNAS: Record<string, CarteiraSortColumn<DistribuicaoLinha>> = {
 const TITULO_OCUPACAO =
   `Carga ajustada ao nível. Pesos: Alta ${PESO_COMPLEXIDADE.ALTA} (serviço/TIC com 12+ meses, obra ou engenharia; ata com 6+ itens), ` +
   `Média ${PESO_COMPLEXIDADE.MEDIA}, Baixa ${PESO_COMPLEXIDADE.BAIXA} (compra de até 12 meses; ata com 1 item). ` +
-  `Cada tarefa aberta com o gestor e prazo em até ${DIAS_DA_FILA} dias (inclui as vencidas) soma meio ponto: quem zera a fila fica mais leve. ` +
+  `Cada tarefa aberta com o gestor e prazo em até ${DIAS_DA_FILA} dias (inclui as vencidas) e cada fatura que precisa de ação no Financeiro soma meio ponto: quem zera a fila fica mais leve. ` +
   `Capacidade: Iniciante 60%, Intermediário 85%, Avançado 100%.`;
 
 /** Nível de um gestor da linha: conta (para alterar) e nível gravado. */

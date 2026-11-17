@@ -60,6 +60,8 @@ export interface DistribuicaoItem {
   complexidade: Complexidade;
   /** Tarefas abertas com o gestor e prazo em até 30 dias (inclui as vencidas). */
   tarefas?: number;
+  /** Só contratos: linhas de "Precisa de ação" em Financeiro › Pagamentos (ciclo com a CGLIC, fatura com erro no SIAFI). */
+  faturas?: number;
 }
 
 export interface CargaInstrumentos {
@@ -87,7 +89,9 @@ export interface DistribuicaoLinha {
   estrutural: number;
   /** Tarefas abertas com o gestor e prazo em até 30 dias, somadas nos instrumentos vigentes dele. */
   tarefas: number;
-  /** Carga total: estrutural + tarefas × PESO_TAREFA_ABERTA. É ela que vira a ocupação. */
+  /** Faturas do Financeiro que precisam de ação, somadas nos contratos vigentes dele. */
+  faturas: number;
+  /** Carga total: estrutural + (tarefas + faturas) × PESO_TAREFA_ABERTA. É ela que vira a ocupação. */
   equivalente: number;
   /** Parte da carga cheia que o gestor aguenta, pelo nível (1 sem nível informado na entrada). */
   capacidade: number;
@@ -176,6 +180,8 @@ export function buildDistribuicaoEquipe(input: {
   capacidadeDoGestor?: (gestorNome: string) => number;
   /** Tarefas abertas por instrumento, por "TIPO:chave" (RPC tarefas_abertas_por_instrumento, migration 323). */
   tarefasAbertas?: Record<string, number>;
+  /** Faturas que precisam de ação, por chave do contrato (Financeiro › Pagamentos, segmento "Precisa de ação"). */
+  faturasAbertas?: Record<string, number>;
 }): DistribuicaoEquipe {
   const linhas = new Map<string | null, DistribuicaoLinha>();
   const linha = (gestorNome?: string) => {
@@ -193,6 +199,7 @@ export function buildDistribuicaoEquipe(input: {
         complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 0 },
         estrutural: 0,
         tarefas: 0,
+        faturas: 0,
         equivalente: 0,
         capacidade: 1,
         ocupacao: 0,
@@ -206,11 +213,14 @@ export function buildDistribuicaoEquipe(input: {
   const totais: DistribuicaoEquipe['totais'] = { atas: cargaVazia(), contratos: cargaVazia(), gestores: 0, mediaEquivalente: null, mediaOcupacao: null };
   const contarCarga = (l: DistribuicaoLinha, item: DistribuicaoItem) => {
     const tarefas = input.tarefasAbertas?.[`${item.tipo}:${item.chave}`] ?? 0;
+    const faturas = item.tipo === 'CONTRATO' ? input.faturasAbertas?.[item.chave] ?? 0 : 0;
     if (tarefas > 0) item.tarefas = tarefas;
+    if (faturas > 0) item.faturas = faturas;
     l.complexidade[item.complexidade.nivel]++;
     l.estrutural += PESO_COMPLEXIDADE[item.complexidade.nivel];
     l.tarefas += tarefas;
-    l.equivalente += PESO_COMPLEXIDADE[item.complexidade.nivel] + PESO_TAREFA_ABERTA * tarefas;
+    l.faturas += faturas;
+    l.equivalente += PESO_COMPLEXIDADE[item.complexidade.nivel] + PESO_TAREFA_ABERTA * (tarefas + faturas);
   };
   const ataPorNumero = new Map<string, DistribuicaoAta>();
   const contratoPorChave = new Map<string, DistribuicaoContrato>();
