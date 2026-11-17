@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { criarFetchComFila } from './filaDoBanco';
 
 const DEFAULT_SUPABASE_URL = 'https://bouutpmxexvwppcmmhdi.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_5nqKXMxqJnldoT4Wy5w-gg_T85JiyuT';
@@ -18,7 +19,8 @@ export const isSupabaseConfigured = !isTest && Boolean(supabaseUrl && supabaseAn
 export const ehServidor = false;
 
 export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? // Toda leitura do site passa por uma fila única (no máximo 6 de cada vez) e é repetida uma vez no tempo esgotado.
+    createClient(supabaseUrl, supabaseAnonKey, { global: { fetch: criarFetchComFila() } })
   : null;
 
 // Types for Supabase Tables
