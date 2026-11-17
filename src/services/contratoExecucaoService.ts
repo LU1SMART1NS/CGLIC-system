@@ -60,13 +60,54 @@ async function chamar(nome: string, args: Record<string, unknown>) {
   if (error) throw new Error(mensagemDoErroDaExecucao(error));
 }
 
-export const confirmarExecucaoContrato = (input: { contractKey: string; documentoSei: string; dataRecebimento: string; observacao?: string }) =>
+/**
+ * O gestor confirma sem SEI nem data (migration 320): o recebimento definitivo é da Fiscalização, e a janela só mostra o
+ * que o fiscal registrou. Os dois campos ficam no banco para as confirmações antigas.
+ */
+export const confirmarExecucaoContrato = (input: { contractKey: string; observacao?: string }) =>
   chamar('confirmar_execucao_contrato', {
     p_contract_key: input.contractKey,
-    p_documento_sei: input.documentoSei,
-    p_data_recebimento: input.dataRecebimento,
+    p_documento_sei: null,
+    p_data_recebimento: null,
     p_observacao: input.observacao?.trim() || null
   });
+
+/** Entrega da Fiscalização do contrato, para a conferência do gestor (migration 320). */
+export interface EntregaDaExecucao {
+  id: string;
+  item: string;
+  beneficiario: string | null;
+  municipio: string | null;
+  uf: string | null;
+  quantidade: number;
+  etapa: string;
+  etapaEm: string | null;
+  /** SEI do recebimento definitivo, quando o fiscal registrou. */
+  trdSei: string | null;
+  trdEm: string | null;
+}
+
+export function mapEntregaDaExecucao(r: any): EntregaDaExecucao {
+  return {
+    id: String(r.id),
+    item: r.item || 'Item sem nome',
+    beneficiario: r.beneficiario || null,
+    municipio: r.municipio || null,
+    uf: r.uf || null,
+    quantidade: num(r.quantidade),
+    etapa: String(r.etapa || ''),
+    etapaEm: r.etapa_em || null,
+    trdSei: r.trd_sei || null,
+    trdEm: r.trd_em || null
+  };
+}
+
+/** Entregas da Fiscalização (SFC) do contrato, com o TRD que o fiscal registrou. */
+export async function fetchEntregasDaExecucao(contractKey: string): Promise<EntregaDaExecucao[]> {
+  const { data, error } = await requireSupabase().rpc('execucao_entregas_do_contrato', { p_contract_key: contractKey });
+  if (error) throw new Error(mensagemDoErroDaExecucao(error));
+  return ((data || []) as any[]).map(mapEntregaDaExecucao);
+}
 
 export const marcarContratoNaoTerminou = (contractKey: string) => chamar('marcar_contrato_nao_terminou', { p_contract_key: contractKey });
 

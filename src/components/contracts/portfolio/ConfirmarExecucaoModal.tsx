@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { Modal } from '../../../design-system/components/Modal';
 import { AppButton } from '../../../design-system/components/AppButton';
 import { ActionButton } from '../../../design-system/components/ActionButton';
-import { AppInput, AppDateInput, AppTextarea } from '../../../design-system/components/FormFields';
+import { AppTextarea } from '../../../design-system/components/FormFields';
 import { NoticeBar } from '../../../design-system/components/NoticeBar';
 import { NumeroSeiEtiqueta } from '../../../design-system/components/NumeroSeiEtiqueta';
 import { useToast } from '../../../design-system';
 import { conferirExecucao, type ExecucaoDoContrato } from '../../../utils/contratoExecutado';
 import { formatDateBR } from '../../../services/temporalEngineService';
 import { useContratosExecucao } from '../../../hooks/useContratosExecucao';
-import { hojeEmBrasilia } from '../../../utils/fiscalizacao';
+import { fetchEntregasDaExecucao } from '../../../services/contratoExecucaoService';
+import { etapaDef } from '../../../utils/fiscalizacaoEntregas';
+import type { EtapaEntrega } from '../../../services/fiscalizacaoService';
 
 interface ConfirmarExecucaoModalProps {
   isOpen: boolean;
@@ -26,27 +29,38 @@ const ICONE = {
   bloqueia: <XCircle size={18} color="var(--color-danger)" aria-hidden="true" />
 };
 
-const somenteDigitos = (v: string) => v.replace(/\D/g, '').slice(0, 12);
+const TITULO_SECAO: React.CSSProperties = {
+  fontSize: '0.78rem',
+  fontWeight: 800,
+  color: '#64748b',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  marginBottom: '0.4rem'
+};
 
 /**
- * Escopo cumprido (migration 314): o banco sugere pelos fatos das fontes e o gestor confirma com a data do
- * recebimento definitivo e o documento SEI. Confirmado, mostra quem confirmou e permite desfazer.
+ * Escopo cumprido (migrations 314 e 320): o banco sugere pelos fatos das fontes e o gestor confere o que já está
+ * registrado (faturas pagas e, se o contrato está na Fiscalização, as entregas com o TRD que o fiscal gravou) e confirma.
+ * O TRD é da Fiscalização: a janela não pede SEI nem data. Confirmado, mostra quem confirmou e permite desfazer.
  */
 export const ConfirmarExecucaoModal: React.FC<ConfirmarExecucaoModalProps> = ({ isOpen, numero, fornecedor, execucao, onClose }) => {
   const toast = useToast();
   const { confirmar, naoTerminou, desfazer } = useContratosExecucao({ enabled: false });
-  const [sei, setSei] = useState('');
-  const [dataRecebimento, setDataRecebimento] = useState('');
   const [observacao, setObservacao] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => {
     if (isOpen) {
-      setSei('');
-      setDataRecebimento('');
       setObservacao('');
       setErro(null);
     }
   }, [isOpen]);
+  const naFiscalizacao = Boolean(execucao && execucao.fiscalizacao !== 'SEM');
+  const entregas = useQuery({
+    queryKey: ['execucao-entregas', execucao?.contractKey],
+    queryFn: () => fetchEntregasDaExecucao(execucao!.contractKey),
+    enabled: isOpen && naFiscalizacao,
+    staleTime: 60 * 1000
+  });
   if (!execucao) return null;
 
   const contractKey = execucao.contractKey;
@@ -54,7 +68,9 @@ export const ConfirmarExecucaoModal: React.FC<ConfirmarExecucaoModalProps> = ({ 
   const conferencia = conferirExecucao(execucao);
   const avisos = conferencia.filter((c) => c.resultado === 'aviso');
   const gravando = confirmar.isPending || naoTerminou.isPending || desfazer.isPending;
-  const podeConfirmar = sei.length >= 7 && Boolean(dataRecebimento) && !gravando;
+  const podeConfirmar = !gravando;
+  const lista = entregas.data ?? [];
+  const comTrd = lista.filter((e) => e.trdSei).length;
 
   const executar = async (acao: () => Promise<unknown>, mensagem: string) => {
     setErro(null);
@@ -102,13 +118,13 @@ export const ConfirmarExecucaoModal: React.FC<ConfirmarExecucaoModalProps> = ({ 
               disabled={!podeConfirmar}
               onClick={() =>
                 void executar(
-                  () => confirmar.mutateAsync({ contractKey, documentoSei: sei, dataRecebimento, observacao }),
+                  () => confirmar.mutateAsync({ contractKey, observacao }),
                   'Contrato marcado como executado: saiu de Vigentes e dos avisos de prorrogação.'
                 )
               }
               data-testid="execucao-confirmar"
             >
-              {confirmar.isPending ? 'Confirmando…' : 'Confirmar execução'}
+              {confirmar.isPending ? 'Confirmando…' : 'Confirmar escopo cumprido'}
             </AppButton>
           </>
         )
@@ -121,9 +137,7 @@ export const ConfirmarExecucaoModal: React.FC<ConfirmarExecucaoModalProps> = ({ 
         )}
 
         <div>
-          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem' }}>
-            O que o sistema conferiu nas fontes
-          </div>
+          <div style={TITULO_SECAO}>O que o sistema conferiu nas fontes</div>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, border: '1px solid #e2e8f0', borderRadius: 8 }}>
             {conferencia.map((c, i) => (
               <li
@@ -139,14 +153,67 @@ export const ConfirmarExecucaoModal: React.FC<ConfirmarExecucaoModalProps> = ({ 
           </ul>
         </div>
 
+        {naFiscalizacao && (
+          <div data-testid="execucao-entregas">
+            <div style={{ ...TITULO_SECAO, display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span>Entregas na Fiscalização</span>
+              {lista.length > 0 && (
+                <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
+                  {comTrd} de {lista.length} com recebimento definitivo registrado
+                </span>
+              )}
+            </div>
+            {entregas.isLoading ? (
+              <div style={{ fontSize: '0.86rem', color: '#64748b' }}>Carregando as entregas…</div>
+            ) : entregas.isError ? (
+              <NoticeBar tone="warning">Não foi possível ler as entregas da Fiscalização: {entregas.error instanceof Error ? entregas.error.message : ''}</NoticeBar>
+            ) : lista.length === 0 ? (
+              <div style={{ fontSize: '0.86rem', color: '#64748b' }}>Nenhuma entrega cadastrada na Fiscalização.</div>
+            ) : (
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0, border: '1px solid #e2e8f0', borderRadius: 8, maxHeight: 260, overflowY: 'auto' }}>
+                {lista.map((e, i) => (
+                  <li
+                    key={e.id}
+                    data-testid="execucao-entrega"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.75rem', borderTop: i ? '1px solid #e2e8f0' : 'none', fontSize: '0.84rem', flexWrap: 'wrap' }}
+                  >
+                    <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                      <div style={{ fontWeight: 700 }}>
+                        {e.quantidade > 0 ? `${e.quantidade.toLocaleString('pt-BR')} × ` : ''}
+                        {e.item}
+                      </div>
+                      {(e.beneficiario || e.municipio) && (
+                        <div style={{ color: '#475569' }}>
+                          {[e.beneficiario, [e.municipio, e.uf].filter(Boolean).join('/')].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                    {e.trdSei ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <span style={{ color: '#475569' }}>TRD{e.trdEm ? ` em ${formatDateBR(e.trdEm)}` : ''}</span>
+                        <NumeroSeiEtiqueta numero={e.trdSei} testId="execucao-entrega-trd" />
+                      </span>
+                    ) : (
+                      <span style={{ color: '#475569' }}>{etapaDef(e.etapa as EtapaEntrega).nome}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         {confirmado ? (
           <div style={{ fontSize: '0.86rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
             <div>
               Confirmado por <b>{confirmado.por}</b> em {formatDateBR(confirmado.em)}.
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              Recebimento definitivo em {formatDateBR(confirmado.dataRecebimento)} <NumeroSeiEtiqueta numero={confirmado.sei} />
-            </div>
+            {(confirmado.sei || confirmado.dataRecebimento) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                Recebimento definitivo{confirmado.dataRecebimento ? ` em ${formatDateBR(confirmado.dataRecebimento)}` : ''}
+                {confirmado.sei && <NumeroSeiEtiqueta numero={confirmado.sei} />}
+              </div>
+            )}
             {avisos.length > 0 && (
               <NoticeBar tone="warning">
                 Falta para fechar: {avisos.map((a) => `${a.rotulo.toLowerCase()} (${a.detalhe})`).join('; ')}.
@@ -155,24 +222,6 @@ export const ConfirmarExecucaoModal: React.FC<ConfirmarExecucaoModalProps> = ({ 
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.75rem' }}>
-              <AppDateInput
-                label="Recebimento definitivo"
-                value={dataRecebimento}
-                onValueChange={setDataRecebimento}
-                max={hojeEmBrasilia()}
-                hint="Data do TRD ou do último atesto."
-              />
-              <AppInput
-                label="Documento SEI"
-                value={sei}
-                onChange={(ev) => setSei(somenteDigitos(ev.target.value))}
-                inputMode="numeric"
-                placeholder="ex.: 34152364"
-                hint="TRD ou termo de encerramento."
-                data-testid="execucao-sei"
-              />
-            </div>
             <AppTextarea label="Observação (opcional)" value={observacao} onChange={(ev) => setObservacao(ev.target.value)} rows={2} maxLength={500} />
             <NoticeBar tone="info">
               O contrato sai de Vigentes e dos avisos de prorrogação e vencimento e vai para Executados. Volta sozinho se chegar
