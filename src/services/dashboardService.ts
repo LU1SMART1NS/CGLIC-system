@@ -1843,12 +1843,14 @@ export async function fetchManagementDashboardData(
   // estourando o tempo limite) não derruba o painel: usa a última leitura boa
   // dela, ou fica vazia, e entra em `fontesComFalha` para a tela avisar.
   const falhas: FonteComFalha[] = [];
-  const ler = <T,>(nome: string, rotulo: string, p: Promise<T>, vazio: T) =>
-    lerFonte(`${cleanUasg}:${nome}`, rotulo, p, vazio, falhas);
+  // Cada leitura entra na fila do painel (no máximo LEITURAS_SIMULTANEAS_DO_PAINEL de cada vez) e é repetida uma vez se o
+  // banco devolver tempo esgotado: as 18 leituras juntas faziam uma passar dos 8 s do banco (medição de 17/11/2026).
+  const ler = <T,>(nome: string, rotulo: string, buscar: () => Promise<T>, vazio: T) =>
+    lerFonte(`${cleanUasg}:${nome}`, rotulo, naFilaDoPainel(() => repetirNoTempoEsgotado(buscar)), vazio, falhas);
   // Fontes que não dependem da UASG: o Início abre as duas UASGs ao mesmo tempo e lia cada uma em dobro.
   // Agora as duas chamadas dividem a mesma leitura; o recorte por UASG é feito depois, no read model.
   const lerSemUasg = <T,>(nome: string, rotulo: string, buscar: () => Promise<T>, vazio: T) =>
-    lerFonte(`todas:${nome}`, rotulo, lerUmaVez(nome, buscar), vazio, falhas);
+    lerFonte(`todas:${nome}`, rotulo, lerUmaVez(nome, () => naFilaDoPainel(() => repetirNoTempoEsgotado(buscar))), vazio, falhas);
 
   const [
     contracts,
@@ -1870,15 +1872,15 @@ export async function fetchManagementDashboardData(
     registradoAcimaDecididos,
     contratosExecutados
   ] = await Promise.all([
-    ler('contratos', 'contratos', cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg), [] as ContractDashboardRecord[]),
-    ler('arps', 'atas (ARPs)', cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
+    ler('contratos', 'contratos', () => (cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg)), [] as ContractDashboardRecord[]),
+    ler('arps', 'atas (ARPs)', () => (cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg)), { arps: [], syncInfo: { isCachedInDb: false } }),
     // Rótulos iguais aos das leituras da tela (ROTULO_GESTORES_CONTRATOS, ROTULO_AVISOS_RESOLVIDOS): a faixa junta numa linha.
-    ler('gestores', 'gestores dos contratos', cache ? cache.gestores(cleanUasg) : fetchAllContractManagers(cleanUasg), {} as Record<string, ContractManager>),
-    ler('planos', 'planos de tarefas dos contratos', fetchAllContractTaskPlans(cleanUasg), {} as Record<string, ContractTaskPlan>),
+    ler('gestores', 'gestores dos contratos', () => (cache ? cache.gestores(cleanUasg) : fetchAllContractManagers(cleanUasg)), {} as Record<string, ContractManager>),
+    ler('planos', 'planos de tarefas dos contratos', () => fetchAllContractTaskPlans(cleanUasg), {} as Record<string, ContractTaskPlan>),
     lerSemUasg('planosAtas', 'planos de gestão das atas', fetchAllAtaTaskPlans, {} as Record<string, AtaTaskPlan>),
     lerSemUasg('avisosResolvidos', 'avisos resolvidos e notas deixadas como estão', () => fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))), new Set<string>()),
     lerSemUasg('empenhos', 'empenhos', fetchEmpenhosResumoFromDb, [] as any[]),
-    ler('saldoItens', 'saldo dos itens', fetchArpItemSaldosFromDb(cleanUasg), [] as any[]),
+    ler('saldoItens', 'saldo dos itens', () => fetchArpItemSaldosFromDb(cleanUasg), [] as any[]),
     lerSemUasg('alocacao', 'alocação interna dos itens', fetchItensComAlocacao, new Set<string>()),
     lerSemUasg('fornecedorPncp', 'atas sem fornecedor no PNCP', fetchRegistrosFornecedorPncp, [] as RegistroFornecedorPncp[]),
     lerSemUasg('prazosAta', 'prazo de entrega das atas', fetchPrazosAConfirmar, [] as PrazoDaAta[]),
@@ -1893,7 +1895,7 @@ export async function fetchManagementDashboardData(
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
   const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
 
-  const paymentCycles = await ler('ciclos', 'ciclos de pagamento', fetchAllPaymentCyclesForDashboard(contracts), [] as PaymentFollowUpCycle[]);
+  const paymentCycles = await ler('ciclos', 'ciclos de pagamento', () => fetchAllPaymentCyclesForDashboard(contracts), [] as PaymentFollowUpCycle[]);
 
   const readModel = buildManagementDashboardReadModel({
     uasg: cleanUasg,
@@ -1931,6 +1933,64 @@ const ultimaLeituraBoa = new Map<string, unknown>();
  * gravação (ex.: aviso resolvido) pegue a leitura antiga, que começou antes da gravação.
  */
 const JANELA_LEITURA_COMPARTILHADA_MS = 1000;
+
+/** Quantas leituras do painel vão ao banco ao mesmo tempo. */
+export const LEITURAS_SIMULTANEAS_DO_PAINEL = 4;
+
+/**
+ * Fila com no máximo `maximo` tarefas rodando de cada vez; as outras esperam a vez na ordem em que chegaram. Uma tarefa
+ * que falha libera a vaga do mesmo jeito.
+ */
+export function criarFila(maximo: number) {
+  let rodando = 0;
+  const esperando: Array<() => void> = [];
+  const liberar = () => {
+    rodando -= 1;
+    const proxima = esperando.shift();
+    if (proxima) proxima();
+  };
+  return function naFila<T>(tarefa: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const rodar = () => {
+        rodando += 1;
+        let p: Promise<T>;
+        try {
+          p = tarefa();
+        } catch (err) {
+          p = Promise.reject(err);
+        }
+        p.then(resolve, reject).finally(liberar);
+      };
+      if (rodando < maximo) rodar();
+      else esperando.push(rodar);
+    });
+  };
+}
+
+/** Fila das leituras do painel (todas as telas usam o mesmo painel; a fila é uma só para a página). */
+export const naFilaDoPainel = criarFila(LEITURAS_SIMULTANEAS_DO_PAINEL);
+
+/** Erro de tempo esgotado do banco (57014 "canceling statement due to statement timeout"), também quando vem embrulhado. */
+export function ehTempoEsgotado(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null;
+  if (e?.code === '57014') return true;
+  return /statement timeout|57014/i.test(String(e?.message ?? err ?? ''));
+}
+
+/** Pausa antes de repetir a leitura que esgotou o tempo. */
+export const PAUSA_ANTES_DE_REPETIR_MS = 300;
+
+/** Lê de novo uma vez quando o banco devolve tempo esgotado (pico passageiro); outros erros seguem direto. */
+export async function repetirNoTempoEsgotado<T>(buscar: () => Promise<T>, pausaMs = PAUSA_ANTES_DE_REPETIR_MS): Promise<T> {
+  try {
+    return await buscar();
+  } catch (err) {
+    if (!ehTempoEsgotado(err)) throw err;
+    console.warn('Leitura do painel esgotou o tempo do banco; lendo de novo.', err);
+    if (pausaMs > 0) await new Promise((r) => setTimeout(r, pausaMs));
+    return buscar();
+  }
+}
 const leiturasEmAndamento = new Map<string, { promessa: Promise<unknown>; inicio: number }>();
 
 /**
