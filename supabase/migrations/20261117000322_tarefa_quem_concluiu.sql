@@ -12,8 +12,8 @@
 ALTER TABLE public.ata_tasks ADD COLUMN IF NOT EXISTS concluido_por_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
 ALTER TABLE public.contract_tasks ADD COLUMN IF NOT EXISTS concluido_por_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
 
-COMMENT ON COLUMN public.ata_tasks.concluido_por_user_id IS 'Usuário que marcou a tarefa como concluída (vazio quando a fonte fechou). Migration 321.';
-COMMENT ON COLUMN public.contract_tasks.concluido_por_user_id IS 'Usuário que marcou a tarefa como concluída (vazio quando a fonte fechou). Migration 321.';
+COMMENT ON COLUMN public.ata_tasks.concluido_por_user_id IS 'Usuário que marcou a tarefa como concluída (vazio quando a fonte fechou). Migration 322.';
+COMMENT ON COLUMN public.contract_tasks.concluido_por_user_id IS 'Usuário que marcou a tarefa como concluída (vazio quando a fonte fechou). Migration 322.';
 
 -- SECURITY DEFINER: nome_do_usuario_logado() não é executável pelo papel authenticated.
 CREATE OR REPLACE FUNCTION public.trg_tarefa_quem_concluiu()
