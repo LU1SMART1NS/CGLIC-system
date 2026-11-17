@@ -53,8 +53,14 @@ describe('fiscalização do contrato', () => {
       c({ contractKey: 'c', situacao: 'AREA', fiscalUserId: null })
     ];
     const carga = cargaPorFiscal(lista, [{ id: 'u2', nome: 'Bia' }, { id: 'u1', nome: 'Ana' }]);
-    expect(carga[0]).toEqual({ userId: 'u1', nome: 'Ana', contratos: 2, aAutuar: 1 });
-    expect(carga[1]).toEqual({ userId: 'u2', nome: 'Bia', contratos: 0, aAutuar: 0 });
+    expect(carga[0]).toEqual({ userId: 'u1', nome: 'Ana', contratos: 2, total: 2, aAutuar: 1 });
+    expect(carga[1]).toEqual({ userId: 'u2', nome: 'Bia', contratos: 0, total: 0, aAutuar: 0 });
+  });
+
+  it('contrato fora da carga continua no total do fiscal, mas não conta nem pede autuação', () => {
+    const lista = [c({ contractKey: 'a', situacao: 'SFC', fiscalUserId: 'u1' }), c({ contractKey: 'b', situacao: 'SFC', fiscalUserId: 'u1' })];
+    const carga = cargaPorFiscal(lista, [{ id: 'u1', nome: 'Ana' }], new Set(['b']));
+    expect(carga[0]).toEqual({ userId: 'u1', nome: 'Ana', contratos: 1, total: 2, aAutuar: 1 });
   });
 
   it('quem tem contrato como fiscal aparece, seja qual for o perfil; sem contrato, só o Gestor de Fiscalização', () => {
@@ -75,7 +81,7 @@ describe('fiscalização do contrato', () => {
   });
 
   it('média da equipe de fiscais: coordenador com metade da capacidade, outro perfil fora', () => {
-    const f = (userId: string, contratos: number, outroPerfil?: string) => ({ userId, nome: userId, contratos, aAutuar: 0, ...(outroPerfil ? { outroPerfil } : {}) });
+    const f = (userId: string, contratos: number, outroPerfil?: string) => ({ userId, nome: userId, contratos, total: contratos, aAutuar: 0, ...(outroPerfil ? { outroPerfil } : {}) });
     // Ocupações: a 60, b 40, c 20, coord 30÷0,5 = 60. Média 45. Eden (Gestor) fica fora.
     const { media, porFiscal } = mediaDaEquipeFiscal([f('a', 60), f('b', 40), f('c', 20), f('coord', 30, 'Coordenador'), f('eden', 8, 'Gestor'), f('zero', 0)]);
     expect(media).toBe(45);

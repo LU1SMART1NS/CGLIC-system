@@ -248,7 +248,7 @@ export const TransferirFiscalModal: React.FC<{
   const { destinos } = useDestinos(carga.userId, ausentes);
   const [destino, setDestino] = useState('');
   const nomeDestino = destinos.find((f) => f.id === destino)?.nome ?? '';
-  const qtd = selecionados ? selecionados.length : carga.contratos;
+  const qtd = selecionados ? selecionados.length : carga.total;
   const enviar = () =>
     transferir.mutate(
       { origemUserId: carga.userId, destinoUserId: destino, contractKeys: selecionados?.map((c) => c.contractKey) },
@@ -325,7 +325,7 @@ export const TransferirFiscalTemporariamenteModal: React.FC<{ carga: CargaDoFisc
       isOpen
       onClose={onClose}
       title={`Transferir temporariamente os contratos de ${carga.nome}`}
-      subtitle={`${carga.contratos} ${carga.contratos === 1 ? 'contrato' : 'contratos'} como fiscal`}
+      subtitle={`${carga.total} ${carga.total === 1 ? 'contrato' : 'contratos'} como fiscal`}
       size="md"
       dismissible={!transferir.isPending}
       testId="fisc-temporaria-modal"

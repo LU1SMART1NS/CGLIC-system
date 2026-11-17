@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { linhaParaEntrega } from '../../services/fiscalizacaoService';
-import { agrupar, chaveDoBeneficiario, contratosFinalizados, enderecoDeEntrega, mudancasDoPrograma, passaPrazo, resumir } from '../fiscalizacaoResumo';
+import { agrupar, chaveDoBeneficiario, contratosFinalizados, contratosForaDaCarga, enderecoDeEntrega, mudancasDoPrograma, passaPrazo, resumir } from '../fiscalizacaoResumo';
 import { ataEItemDaChave, passoDoItem, passosDoItem } from '../fiscalizacaoEntregas';
 import { comQuemEstaOItem, linhasDoContrato } from '../fiscalizacaoMesa';
 
@@ -45,6 +45,27 @@ describe('resumo de um conjunto de itens', () => {
       e({ contractKey: 'C', responsavel: 'AREA' })
     ]);
     expect([...fim]).toEqual(['A']);
+  });
+
+  it('fora da carga: finalizado, ou vigência acabada sem item da SFC/CGLIC em aberto', () => {
+    const contratos = [
+      { contractKey: 'FIM', vigenciaFim: FUTURO }, // todos os itens no fim
+      { contractKey: 'VENCIDO_SEM_ITEM', vigenciaFim: PASSADO },
+      { contractKey: 'VENCIDO_SO_AREA', vigenciaFim: PASSADO }, // item aberto, mas da área requisitante
+      { contractKey: 'VENCIDO_COM_ITEM', vigenciaFim: PASSADO }, // ainda há o que fiscalizar
+      { contractKey: 'VIGENTE_SEM_ITEM', vigenciaFim: FUTURO },
+      { contractKey: 'SEM_DATA', vigenciaFim: null }
+    ];
+    const fora = contratosForaDaCarga(
+      contratos,
+      [
+        e({ contractKey: 'FIM', etapa: 'FINALIZADO' }),
+        e({ contractKey: 'VENCIDO_SO_AREA', responsavel: 'AREA' }),
+        e({ contractKey: 'VENCIDO_COM_ITEM', etapa: 'TRD' })
+      ],
+      '2026-11-17'
+    );
+    expect([...fora].sort()).toEqual(['FIM', 'VENCIDO_SEM_ITEM', 'VENCIDO_SO_AREA']);
   });
 
   it('filtro de prazo: com vencido, vencendo e em dia', () => {
