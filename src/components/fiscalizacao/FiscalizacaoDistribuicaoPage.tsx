@@ -67,7 +67,7 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
   const chave = useCallback((c: ContratoFiscalizacao) => c.contractKey, []);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(filtrados, chave, POR_PAGINA);
   // Encerrados e vencidos sem item em aberto continuam com o fiscal, mas não pesam na carga (mesma régua do Início).
-  const foraDaCarga = useMemo(() => contratosForaDaCarga(contratos, entregas.data ?? []), [contratos, entregas.data]);
+  const foraDaCarga = useMemo(() => contratosForaDaCarga(contratos, entregas.data), [contratos, entregas.data]);
   const carga = useMemo(() => cargaPorFiscal(contratos, servidores, foraDaCarga), [contratos, servidores, foraDaCarga]);
   const areas = useMemo(() => cargaPorArea(contratos), [contratos]);
   const opcoesUnidade = useMemo(() => {

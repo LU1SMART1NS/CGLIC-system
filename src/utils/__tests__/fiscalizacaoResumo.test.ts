@@ -68,6 +68,10 @@ describe('resumo de um conjunto de itens', () => {
     expect([...fora].sort()).toEqual(['FIM', 'VENCIDO_SEM_ITEM', 'VENCIDO_SO_AREA']);
   });
 
+  it('fora da carga: enquanto os itens não chegam, nenhum contrato sai (nem o vencido)', () => {
+    expect(contratosForaDaCarga([{ contractKey: 'VENCIDO', vigenciaFim: PASSADO }], undefined, '2026-11-17').size).toBe(0);
+  });
+
   it('filtro de prazo: com vencido, vencendo e em dia', () => {
     const vencido = resumir([e({ prevista: PASSADO })]);
     const emDia = resumir([e({ prevista: FUTURO })]);
