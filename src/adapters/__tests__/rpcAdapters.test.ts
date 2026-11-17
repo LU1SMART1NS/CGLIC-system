@@ -47,6 +47,14 @@ describe('RPC Persistence Adapters & Error Mapping (Fase 3 & Fase 4.3C.3)', () =
       expect(mapped.sqlState).toBe('22023');
     });
 
+    it('22023 com outro INVALID_*: mostra o texto do servidor, não o genérico', () => {
+      const err = { message: 'INVALID_FINANCIAL_VALUE: Valores financeiros de empenho não podem ser negativos.', code: '22023' };
+      const mapped = mapPostgresErrorToAppError(err);
+      expect(mapped.code).toBe('INVALID_PAYLOAD');
+      expect(mapped.message).toBe('Valores financeiros de empenho não podem ser negativos.');
+      expect(mapPostgresErrorToAppError({ message: 'algo sem prefixo', code: '22023' }).message).toBe('Dados inválidos fornecidos para a operação.');
+    });
+
     it('unidade em uso: devolve o texto do banco, sem cair em INVALID_ALLOCATION', () => {
       const err = { message: 'CANNOT_DELETE_DEPARTMENT_WITH_ALLOCATIONS: A unidade "DGI" está em uso (2 alocação(ões), 0 divisão(ões) do contratado, 0 permissão(ões) de usuário) e não pode ser excluída. Desative-a.', code: '23503' };
       const mapped = mapPostgresErrorToAppError(err);

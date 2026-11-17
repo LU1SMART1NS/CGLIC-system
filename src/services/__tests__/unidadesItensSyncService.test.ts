@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { adesaoParaGravar, itensParaLer, lerItemNasFontes, unidadeParaGravar, type ItemDaCarteira, type LeituraDaCopia } from '../unidadesItensSyncService';
+import { adesaoParaGravar, itensParaLer, lerFila, lerItemNasFontes, unidadeParaGravar, type ItemDaCarteira, type LeituraDaCopia } from '../unidadesItensSyncService';
+import { UnidadesItemIncompletasError } from '../api';
 import type { UnidadeItemRecord } from '../../types';
 
 const AGORA = Date.parse('2026-10-07T15:00:00Z');
@@ -119,5 +120,60 @@ describe('adesaoParaGravar', () => {
   it('guarda só os campos que a tela usa', () => {
     expect(adesaoParaGravar({ unidadeNaoParticipante: '929777 - X', quantidadeAprovadaAdesao: null, dataAprovacaoAnalise: '2026-01-01', extra: 1 } as any))
       .toEqual({ unidadeNaoParticipante: '929777 - X', quantidadeAprovadaAdesao: null, dataAprovacaoAnalise: '2026-01-01' });
+  });
+});
+
+describe('lerFila', () => {
+  const fila = Array.from({ length: 60 }, (_, i) => item(`00001/2026-200331-${String(i + 1).padStart(5, '0')}`, null));
+  const linha = (it: ItemDaCarteira, n = 1) => ({ linha: { item_key: it.itemKey, unidades: Array.from({ length: n }, () => ({})) }, falhaAdesoes: false });
+  const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it('lê 3 itens ao mesmo tempo e grava em lotes de 25, um lote por vez', async () => {
+    let lendo = 0; let maximo = 0; let gravando = 0; let gravacoesJuntas = 0;
+    const lotes: number[] = [];
+    const r = await lerFila(fila, {
+      ler: async (it) => { lendo++; maximo = Math.max(maximo, lendo); await esperar(2); lendo--; return linha(it); },
+      gravar: async (lote) => { gravando++; gravacoesJuntas = Math.max(gravacoesJuntas, gravando); await esperar(3); gravando--; lotes.push(lote.length); return lote.length; },
+      orcamentoMs: 60_000, inicio: Date.now(), agora: () => Date.now()
+    });
+    expect(maximo).toBe(3);
+    expect(gravacoesJuntas).toBe(1);
+    expect(lotes.reduce((a, b) => a + b, 0)).toBe(60);
+    expect(lotes.every((n) => n <= 25)).toBe(true);
+    expect(r).toMatchObject({ copiados: 60, pendentes: 0, falhas: 0 });
+  });
+
+  it('uma leitura lenta não segura as outras', async () => {
+    const ordem: string[] = [];
+    await lerFila(fila.slice(0, 6), {
+      ler: async (it) => { await esperar(it === fila[0] ? 40 : 2); ordem.push(it.itemKey); return linha(it); },
+      gravar: async (lote) => lote.length,
+      orcamentoMs: 60_000, inicio: Date.now(), agora: () => Date.now(), concorrencia: 3
+    });
+    expect(ordem[ordem.length - 1]).toBe(fila[0].itemKey);
+  });
+
+  it('orçamento esgotado: não começa itens novos e conta os pendentes', async () => {
+    let t = 0;
+    const r = await lerFila(fila.slice(0, 10), {
+      ler: async (it) => { t += 10; return linha(it); },
+      gravar: async (lote) => lote.length,
+      orcamentoMs: 25, inicio: 0, agora: () => t, concorrencia: 1
+    });
+    expect(r.pendentes).toBe(7);
+    expect(r.copiados).toBe(3);
+  });
+
+  it('conta vazios, incompletos e falhas sem gravar os que falharam', async () => {
+    const r = await lerFila(fila.slice(0, 4), {
+      ler: async (it) => {
+        if (it === fila[1]) throw new UnidadesItemIncompletasError('vieram 1 de 2');
+        if (it === fila[2]) throw new Error('HTTP 500');
+        return linha(it, it === fila[3] ? 0 : 1);
+      },
+      gravar: async (lote) => lote.length,
+      orcamentoMs: 60_000, inicio: Date.now(), agora: () => Date.now()
+    });
+    expect(r).toMatchObject({ copiados: 2, vazios: 1, incompletos: 1, falhas: 1, pendentes: 0 });
   });
 });
