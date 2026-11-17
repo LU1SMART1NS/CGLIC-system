@@ -211,10 +211,12 @@ async function gravar(uasg: string, lote: LinhaParaGravar[]): Promise<number> {
 /**
  * Itens lidos ao mesmo tempo. Um de cada vez, uma resposta lenta do Compras.gov.br (até 30 s quando a consulta não
  * está no cache dela) segurava a fila: a 200331 lia ~24 itens por execução, para 20 por hora exigidos (480 itens de
- * atas vigentes relidos a cada 24 h), e ficou PARCIAL desde 14/11/2026 com até 32 h de atraso. A API aguentou 5
- * consultas simultâneas sem demora (17/11/2026); 3 é o que a sincronização das notas já usa.
+ * atas vigentes relidos a cada 24 h), e ficou PARCIAL desde 14/11/2026 com até 32 h de atraso. Com 3 de cada vez
+ * ainda lia ~21: no servidor cada item leva ~9 s (órgãos + adesões) e as adesões que passam de 30 s comem quase um
+ * terço do orçamento. Medido a partir da Edge Function (17/11/2026), 6 consultas simultâneas terminaram em 9,2 s
+ * contra 38,5 s em série, sem nenhuma ficar mais lenta: a API não limita, então 6.
  */
-export const LEITURAS_SIMULTANEAS_UNIDADES = 3;
+export const LEITURAS_SIMULTANEAS_UNIDADES = 6;
 
 export interface ResumoDaFila {
   copiados: number;
