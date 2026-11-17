@@ -21,6 +21,7 @@ describe('fila', () => {
     const tarefas = [adiada<string>(), adiada<string>(), adiada<string>(), adiada<string>()];
     const iniciadas: number[] = [];
     const resultados = tarefas.map((t, i) => naFila(() => (iniciadas.push(i), t.promessa)));
+    resultados[0].catch(() => {}); // a falha é conferida no fim; evita rejeição solta antes disso
     await tick();
     expect(iniciadas).toEqual([0, 1]);
     tarefas[1].resolve('b');
@@ -66,8 +67,8 @@ describe('o que é leitura', () => {
 });
 
 describe('fetch do cliente do banco', () => {
-  it('no site, no máximo 6 leituras de cada vez', () => {
-    expect(LEITURAS_SIMULTANEAS).toBe(6);
+  it('no site, no máximo 12 leituras de cada vez', () => {
+    expect(LEITURAS_SIMULTANEAS).toBe(12);
   });
 
   it('leituras esperam a vez; gravação passa na frente', async () => {
