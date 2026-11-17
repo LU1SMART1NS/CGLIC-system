@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { adesaoParaGravar, itensParaLer, lerFila, lerItemNasFontes, unidadeParaGravar, type ItemDaCarteira, type LeituraDaCopia } from '../unidadesItensSyncService';
+import { LEITURAS_SIMULTANEAS_UNIDADES, adesaoParaGravar, itensParaLer, lerFila, lerItemNasFontes, unidadeParaGravar, type ItemDaCarteira, type LeituraDaCopia } from '../unidadesItensSyncService';
 import { UnidadesItemIncompletasError } from '../api';
 import type { UnidadeItemRecord } from '../../types';
 
@@ -128,7 +128,7 @@ describe('lerFila', () => {
   const linha = (it: ItemDaCarteira, n = 1) => ({ linha: { item_key: it.itemKey, unidades: Array.from({ length: n }, () => ({})) }, falhaAdesoes: false });
   const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  it('lê 3 itens ao mesmo tempo e grava em lotes de 25, um lote por vez', async () => {
+  it('lê LEITURAS_SIMULTANEAS_UNIDADES (6) itens ao mesmo tempo e grava em lotes de 25, um lote por vez', async () => {
     let lendo = 0; let maximo = 0; let gravando = 0; let gravacoesJuntas = 0;
     const lotes: number[] = [];
     const r = await lerFila(fila, {
@@ -136,7 +136,7 @@ describe('lerFila', () => {
       gravar: async (lote) => { gravando++; gravacoesJuntas = Math.max(gravacoesJuntas, gravando); await esperar(3); gravando--; lotes.push(lote.length); return lote.length; },
       orcamentoMs: 60_000, inicio: Date.now(), agora: () => Date.now()
     });
-    expect(maximo).toBe(3);
+    expect(maximo).toBe(LEITURAS_SIMULTANEAS_UNIDADES);
     expect(gravacoesJuntas).toBe(1);
     expect(lotes.reduce((a, b) => a + b, 0)).toBe(60);
     expect(lotes.every((n) => n <= 25)).toBe(true);
