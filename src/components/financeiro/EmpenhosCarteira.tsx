@@ -20,7 +20,8 @@ import { saldoRestosAPagar, situacaoDoSaldo, situacaoRestosAPagar, type EmpenhoC
 import { useContratosDoFinanceiro } from './useContratosDoFinanceiro';
 import { dataHoraTesouro, normalizarBusca } from './financeiroFormat';
 import { EmpenhosCarteiraTable } from './EmpenhosCarteiraTable';
-import { AvisoCarregando } from '../../design-system';
+import { AvisoCarregando, NoticeBar } from '../../design-system';
+import { avisoTesouroAtrasado } from '../../utils/tesouroAtrasado';
 import { useSituacaoDistribuicaoPorEmpenho } from '../../hooks/useVinculacaoEmpenhos';
 
 export interface EmpenhosFilterState {
@@ -219,6 +220,12 @@ export const EmpenhosCarteira: React.FC = () => {
                 : `${formatCurrencyCompact(resumo.saldoTotal)} de saldo a pagar`) + (resumo.tesouroEm ? ` · Tesouro em ${dataHoraTesouro(resumo.tesouroEm)}` : '')
             }
           />
+
+          {avisoTesouroAtrasado(resumo.tesouroEm) && (
+            <NoticeBar tone="warning" testId="empenhos-tesouro-atrasado">
+              {avisoTesouroAtrasado(resumo.tesouroEm)}
+            </NoticeBar>
+          )}
 
           <CarteiraFilterBar
             busca={filters.busca}
