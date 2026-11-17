@@ -342,8 +342,10 @@ export function mapPostgresErrorToAppError(error: any): AppMutationError {
   if (message.includes('INVALID_PAYLOAD') || sqlState === '22023') {
     return {
       code: 'INVALID_PAYLOAD',
-      // O servidor já explica o que está inválido; mostra a mensagem dele quando houver.
-      message: message.match(/INVALID_PAYLOAD:\s*(.+)/)?.[1]?.trim() || 'Dados inválidos fornecidos para a operação.',
+      // O servidor já explica o que está inválido; mostra a mensagem dele quando houver (INVALID_PAYLOAD,
+      // INVALID_FINANCIAL_VALUE, INVALID_UASG…). Antes só INVALID_PAYLOAD aparecia e o resto virava o texto
+      // genérico: 8 contratos da 200331 falharam por semanas sem dizer que a fonte trazia valor negativo.
+      message: message.match(/INVALID_[A-Z_]+:\s*(.+)/)?.[1]?.trim() || 'Dados inválidos fornecidos para a operação.',
       sqlState: '22023',
       details: error
     };
