@@ -69,24 +69,56 @@ export async function fetchContratosOficiaisDoBanco(uasg: string): Promise<Contr
 
 async function lerContratosDoBanco(uasg: string, coluna: ColunaRegistro): Promise<ContractDashboardRecord[]> {
   if (!supabase) return [];
+  const db = supabase;
   const cleanUasg = (uasg || '').trim();
-  const contratos: ContractDashboardRecord[] = [];
-  for (let from = 0, pagina = 1; ; from += PAGINA_LEITURA, pagina++) {
-    const { data, error } = await supabase
+  const lerPagina = (pagina: number, contar = false) =>
+    db
       .from('contratos_oficiais')
-      .select(coluna === 'registro' ? 'registro' : 'registro:registro_tela')
+      .select(coluna === 'registro' ? 'registro' : 'registro:registro_tela', contar ? { count: 'exact' } : undefined)
       .eq('uasg', cleanUasg)
       .order('contract_key', { ascending: true })
-      .range(from, from + PAGINA_LEITURA - 1);
-    if (error) {
-      throw new Error(`Não foi possível ler os contratos da UASG ${cleanUasg} no banco (página ${pagina}): ${error.message}`, {
-        cause: error
+      .range((pagina - 1) * PAGINA_LEITURA, pagina * PAGINA_LEITURA - 1);
+  type Pagina = { data: Array<{ registro: Record<string, any> }> | null; error: { message: string } | null; count?: number | null };
+  const conferir = (resposta: Pagina, pagina: number) => {
+    if (resposta.error) {
+      throw new Error(`Não foi possível ler os contratos da UASG ${cleanUasg} no banco (página ${pagina}): ${resposta.error.message}`, {
+        cause: resposta.error
       });
     }
-    for (const row of data ?? []) contratos.push(registroParaContrato(row.registro));
-    if (!data || data.length < PAGINA_LEITURA) break;
+    return resposta.data ?? [];
+  };
+
+  // A 1ª página traz o total; as outras saem juntas (antes iam uma depois da outra: 5 páginas na 200331 somavam ~3 s
+  // com o banco calmo, medição de 17/11/2026). Ainda passam pela fila do banco (filaDoBanco.ts).
+  const primeira = (await lerPagina(1, true)) as Pagina;
+  const linhas = [...conferir(primeira, 1)];
+  let ultima = linhas.length;
+  let pagina = 1;
+  if (ultima === PAGINA_LEITURA && typeof primeira.count === 'number') {
+    const totalDePaginas = Math.ceil(primeira.count / PAGINA_LEITURA);
+    const numeros = Array.from({ length: Math.max(0, totalDePaginas - 1) }, (_, i) => i + 2);
+    const respostas = (await Promise.all(numeros.map((n) => lerPagina(n)))) as Pagina[];
+    respostas.forEach((resposta, i) => {
+      const dados = conferir(resposta, numeros[i]);
+      linhas.push(...dados);
+      ultima = dados.length;
+      pagina = numeros[i];
+    });
   }
-  return ordenarContratos(contratos);
+  // Sem o total, ou se entraram contratos entre uma leitura e outra (última página cheia): segue página a página.
+  while (ultima === PAGINA_LEITURA) {
+    pagina += 1;
+    const dados = conferir((await lerPagina(pagina)) as Pagina, pagina);
+    linhas.push(...dados);
+    ultima = dados.length;
+  }
+  // Contrato gravado no meio da leitura pode empurrar outro para a página seguinte e aparecer duas vezes.
+  const porChave = new Map<string, ContractDashboardRecord>();
+  for (const row of linhas) {
+    const contrato = registroParaContrato(row.registro);
+    if (!porChave.has(contrato.id)) porChave.set(contrato.id, contrato);
+  }
+  return ordenarContratos([...porChave.values()]);
 }
 
 /**
