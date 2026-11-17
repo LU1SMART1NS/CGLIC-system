@@ -30,6 +30,7 @@ import { DistribuirEmpenhoModal } from './DistribuirEmpenhoModal';
 import { useLinhasAbertas } from './useLinhasAbertas';
 import type { ContractDashboardRecord } from '../../types';
 import { useContractFinancialSummary } from '../../hooks/useContractFinancialSummary';
+import { avisoTesouroAtrasado } from '../../utils/tesouroAtrasado';
 import { saldoAExecutar } from '../../utils/saldoAExecutar';
 import { useSincronizacaoEmpenhosContrato } from '../../hooks/useSincronizacaoEmpenhosContrato';
 import type { SincronizacaoEmpenhosContrato } from '../../services/contratoEmpenhosSincronizacaoService';
@@ -603,6 +604,7 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   // Liquidado e pago vêm do Tesouro; a data é a leitura mais recente do saldo contábil entre as notas do contrato.
   const tesouroEm = empenhosList.reduce<string | null>((acc, e) => (e.tesouro_atualizado_em && (!acc || e.tesouro_atualizado_em > acc) ? e.tesouro_atualizado_em : acc), null);
   const pelaFonte = empenhosList.filter((e) => e.fonte_execucao === 'FONTE').length;
+  const tesouroAtrasado = avisoTesouroAtrasado(tesouroEm);
   const saldoNaoExecutado = empenhosList.reduce((acc, e) => acc + saldoAExecutar(e), 0);
 
   const distribuicaoDe = (e: EmpenhoRow) => (e.empenho_id ? distribuicaoPorEmpenho.get(e.empenho_id) : undefined);
@@ -761,6 +763,11 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
                 {pelaFonte > 0 && ` · ${pelaFonte === 1 ? '1 nota ainda não está' : `${pelaFonte} notas ainda não estão`} no Tesouro e ${pelaFonte === 1 ? 'mostra' : 'mostram'} o número da fonte`}
               </>}
         </span>
+        {tesouroAtrasado && (
+          <NoticeBar tone="warning" testId="contract-financial-tesouro-atrasado">
+            {tesouroAtrasado}
+          </NoticeBar>
+        )}
         <SituacaoSincronizacaoEmpenhos sync={sync} />
         {(aDistribuir.length > 0 || aRever.length > 0) && (
           <NoticeBar
