@@ -1843,7 +1843,7 @@ export async function fetchManagementDashboardData(
   // estourando o tempo limite) não derruba o painel: usa a última leitura boa
   // dela, ou fica vazia, e entra em `fontesComFalha` para a tela avisar.
   const falhas: FonteComFalha[] = [];
-  // A fila (no máximo 6 leituras de cada vez) e a repetição no tempo esgotado ficam no cliente do banco
+  // A fila (no máximo 12 leituras de cada vez) e a repetição no tempo esgotado ficam no cliente do banco
   // (filaDoBanco.ts) e valem para o site inteiro.
   const ler = <T,>(nome: string, rotulo: string, buscar: () => Promise<T>, vazio: T) =>
     lerFonte(`${cleanUasg}:${nome}`, rotulo, buscar(), vazio, falhas);

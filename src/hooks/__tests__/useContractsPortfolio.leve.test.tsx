@@ -6,7 +6,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const { painel } = vi.hoisted(() => ({ painel: { chamadas: [] as Array<{ uasg: string; enabled: boolean }> } }));
+const { painel, contratos } = vi.hoisted(() => ({
+  painel: { chamadas: [] as Array<{ uasg: string; enabled: boolean }> },
+  contratos: { carregando200331: false }
+}));
 
 const consulta = <T,>(data: T) => ({ data, isLoading: false, isFetching: false, isError: false, error: null, dataUpdatedAt: 1, refetch: vi.fn() });
 
@@ -25,7 +28,9 @@ const contrato = (numero: string, uasg: string, extra: Record<string, unknown> =
 
 vi.mock('../useContractsDashboard', () => ({
   useContractsDashboard: (uasg: string) =>
-    consulta(uasg === '200330' ? [contrato('00001', '200330')] : [contrato('00002', '200331'), contrato('00003', '200331', { dataVigenciaFim: '2020-01-01', statusVigencia: 'Expirado' })])
+    uasg === '200331' && contratos.carregando200331
+      ? { ...consulta(undefined), isLoading: true }
+      : consulta(uasg === '200330' ? [contrato('00001', '200330')] : [contrato('00002', '200331'), contrato('00003', '200331', { dataVigenciaFim: '2020-01-01', statusVigencia: 'Expirado' })])
 }));
 vi.mock('../useSincronizacaoContratos', () => ({
   useSincronizacaoContratos: () => ({ sincronizando: false, incompleta: false, ultimoSucessoEm: null, atualizar: vi.fn(), podeForcar: true, fontesComFalha: [] })
@@ -74,6 +79,17 @@ function rodar(opcoes?: { pendencias?: boolean }) {
 describe('useContractsPortfolio — versão leve, sem o painel do Início', () => {
   beforeEach(() => {
     painel.chamadas = [];
+    contratos.carregando200331 = false;
+  });
+
+  it('o painel só é pedido depois que os contratos chegam, para a lista não esperar na fila do banco', () => {
+    contratos.carregando200331 = true;
+    const r = rodar();
+    expect(painel.chamadas).toEqual([
+      { uasg: '200330', enabled: false },
+      { uasg: '200331', enabled: false }
+    ]);
+    expect(r.isLoading).toBe(true);
   });
 
   it('a versão completa (Carteira de Contratos) continua pedindo o painel das duas UASGs e mostrando as pendências', () => {
