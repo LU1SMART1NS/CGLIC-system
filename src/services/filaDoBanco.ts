@@ -183,6 +183,26 @@ export async function ehTempoEsgotado(resposta: Response): Promise<boolean> {
   }
 }
 
+/**
+ * O erro (de qualquer leitura, mesmo embrulhado por um serviço em `new Error(..., { cause })`) é o banco cancelando a
+ * consulta por tempo esgotado? Procura o código 57014 ou "statement timeout" no erro e nas causas dele.
+ */
+export function ehErroDeTempoEsgotado(erro: unknown): boolean {
+  for (let atual: any = erro, passos = 0; atual != null && passos < 5; atual = atual.cause, passos++) {
+    if (atual.code === '57014' || /statement timeout/i.test(String(atual.message ?? atual))) return true;
+  }
+  return false;
+}
+
+/**
+ * `retry` padrão das consultas do site: repete uma vez, menos o tempo esgotado, que a fila já leu de novo. Com as duas
+ * repetições somadas, uma consulta pesada era tentada até 4 vezes de 8 s quando o banco estava apertado (medição de
+ * 17/11/2026: v_fatura_conferencia_tesouro 500, 500, 500, 200 ao abrir a Carteira), e a repetição piorava o aperto.
+ */
+export function repetirMenosTempoEsgotado(falhas: number, erro: unknown): boolean {
+  return falhas < 1 && !ehErroDeTempoEsgotado(erro);
+}
+
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
