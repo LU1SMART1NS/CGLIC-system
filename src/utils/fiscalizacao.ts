@@ -89,7 +89,10 @@ export interface CargaDoFiscal {
   nome: string;
   /** Perfil quando não é o de Gestor de Fiscalização (ex.: "Coordenador"): etiqueta no cartão. */
   outroPerfil?: string;
+  /** Contratos que pesam na carga: vigentes, ou vencidos com item da SFC/CGLIC em aberto. */
   contratos: number;
+  /** Todos os contratos em que é o fiscal, inclusive os encerrados (é o que a transferência leva). */
+  total: number;
   aAutuar: number;
 }
 
@@ -121,19 +124,30 @@ export function idsDosFiscaisComContrato(contratos: ContratoFiscalizacao[]): Set
 }
 
 /** Contratos por fiscal, com os que faltam autuar. */
-export function cargaPorFiscal(contratos: ContratoFiscalizacao[], servidores: ServidorFiscal[], rotuloDoPerfil: (perfil: string) => string = rotuloPadraoDoPerfil): CargaDoFiscal[] {
+/**
+ * Carga de cada fiscal. `foraDaCarga` (contratosForaDaCarga) tira da conta os contratos encerrados ou vencidos sem item
+ * em aberto: continuam com o fiscal (`total`), mas não pesam na média nem na pressão.
+ */
+export function cargaPorFiscal(
+  contratos: ContratoFiscalizacao[],
+  servidores: ServidorFiscal[],
+  foraDaCarga: ReadonlySet<string> = new Set(),
+  rotuloDoPerfil: (perfil: string) => string = rotuloPadraoDoPerfil
+): CargaDoFiscal[] {
   return fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos))
     .map((f) => {
       const titular = contratos.filter((c) => comSfc(c) && c.fiscalUserId === f.id);
+      const emCarga = titular.filter((c) => !foraDaCarga.has(c.contractKey));
       return {
         userId: f.id,
         nome: f.nome,
         ...(f.perfil && f.perfil !== PERFIL_FISCAL ? { outroPerfil: rotuloDoPerfil(f.perfil) } : {}),
-        contratos: titular.length,
-        aAutuar: titular.filter((c) => !autuado(c)).length
+        contratos: emCarga.length,
+        total: titular.length,
+        aAutuar: emCarga.filter((c) => !autuado(c)).length
       };
     })
-    .sort((a, b) => b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));
+    .sort((a, b) => b.contratos - a.contratos || b.total - a.total || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 export type RelacaoComEquipe = 'ACIMA' | 'NA_MEDIA' | 'ABAIXO';

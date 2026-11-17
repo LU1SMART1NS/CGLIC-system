@@ -60,6 +60,24 @@ export function contratosFinalizados(es: EntregaFiscalizacao[]): Set<string> {
   return fim;
 }
 
+/**
+ * Contratos que não pesam na carga do fiscal: a fiscalização encerrou (todos os itens da SFC/CGLIC no fim, como em
+ * contratosFinalizados) ou a vigência acabou sem nenhum item da SFC/CGLIC em aberto. Vencido com item a entregar
+ * continua na carga: ainda há o que fiscalizar.
+ */
+export function contratosForaDaCarga(
+  contratos: Array<{ contractKey: string; vigenciaFim: string | null }>,
+  es: EntregaFiscalizacao[],
+  hoje: string = hojeEmBrasilia()
+): Set<string> {
+  const fora = contratosFinalizados(es);
+  const comItemAberto = new Set(es.filter((e) => e.responsavel === 'SFC' && !itemConcluido(e)).map((e) => e.contractKey));
+  for (const c of contratos) {
+    if (c.vigenciaFim && c.vigenciaFim.slice(0, 10) < hoje && !comItemAberto.has(c.contractKey)) fora.add(c.contractKey);
+  }
+  return fora;
+}
+
 export function agrupar<K>(es: EntregaFiscalizacao[], chave: (e: EntregaFiscalizacao) => K): Map<K, EntregaFiscalizacao[]> {
   const m = new Map<K, EntregaFiscalizacao[]>();
   for (const e of es) {

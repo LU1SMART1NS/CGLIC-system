@@ -26,7 +26,7 @@ import { prazoDaEntrega } from '../../utils/fiscalizacaoEntregas';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, autuado, cargaPorFiscal, fiscaisVisiveis, idsDosFiscaisComContrato, comSfc, dataBR, ehDoFiscal, hojeEmBrasilia, numeroDoContrato, pendenciasDoContrato } from '../../utils/fiscalizacao';
 import { useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
-import { contratosFinalizados } from '../../utils/fiscalizacaoResumo';
+import { contratosFinalizados, contratosForaDaCarga } from '../../utils/fiscalizacaoResumo';
 
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
 import { GavetaDistribuicaoFiscais } from './GavetaDistribuicaoFiscais';
@@ -148,7 +148,8 @@ export const FiscalizacaoInicioPage: React.FC = () => {
     rolarParaGaveta.current = false;
     scrollToDock(dockRef.current);
   }, [gavetaAberta]);
-  const carga = useMemo(() => cargaPorFiscal(contratos, servidores), [contratos, servidores]);
+  const foraDaCarga = useMemo(() => contratosForaDaCarga(data ?? [], entregasConsulta.data ?? []), [data, entregasConsulta.data]);
+  const carga = useMemo(() => cargaPorFiscal(data ?? [], servidores, foraDaCarga), [data, servidores, foraDaCarga]);
   const fiscaisDoFiltro = useMemo(() => fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos)), [servidores, contratos]);
   const ausentes = transferencias.data ?? [];
   const botoesGavetas: PainelBotaoGaveta[] = gavetasDisponiveis.map((id) => ({

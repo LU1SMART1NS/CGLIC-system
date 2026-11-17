@@ -12,7 +12,8 @@ import { CarteiraPagination } from '../carteira/CarteiraPagination';
 import { useCarteiraPagination } from '../carteira/useCarteiraPagination';
 import { AdminListShell } from '../admin/shared/AdminListShell';
 import { colors } from '../../design-system/tokens';
-import { useContratosFiscalizacao, useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
+import { useContratosFiscalizacao, useEntregasFiscalizacao, useFiscaisAtivos, useTransferenciasFiscalizacao } from '../../hooks/useFiscalizacao';
+import { contratosForaDaCarga } from '../../utils/fiscalizacaoResumo';
 import type { ContratoFiscalizacao } from '../../services/fiscalizacaoService';
 import { NOME_SFC, UNIDADE_A_INDICAR, cargaPorArea, comArea, unidadeDaArea, cargaPorFiscal, fiscaisVisiveis, idsDosFiscaisComContrato, deEmenda, numeroDoContrato, segmentoDoContrato, type SegmentoDistribuicao } from '../../utils/fiscalizacao';
 import { ContratosFiscalizacaoTabela } from './ContratosFiscalizacaoTabela';
@@ -34,6 +35,7 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
   const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useContratosFiscalizacao();
   const { servidores } = useFiscaisAtivos();
   const transferencias = useTransferenciasFiscalizacao();
+  const entregas = useEntregasFiscalizacao(null);
   const [params, setParams] = useSearchParams();
   const contratos = useMemo(() => data ?? [], [data]);
   const aDefinir = contratos.filter((c) => segmentoDoContrato(c) === 'A_DEFINIR').length;
@@ -64,7 +66,9 @@ export const FiscalizacaoDistribuicaoPage: React.FC = () => {
   const ativos = Boolean(busca || fiscal || origem || unidade);
   const chave = useCallback((c: ContratoFiscalizacao) => c.contractKey, []);
   const { currentPage, setPage, pageItems } = useCarteiraPagination(filtrados, chave, POR_PAGINA);
-  const carga = useMemo(() => cargaPorFiscal(contratos, servidores), [contratos, servidores]);
+  // Encerrados e vencidos sem item em aberto continuam com o fiscal, mas não pesam na carga (mesma régua do Início).
+  const foraDaCarga = useMemo(() => contratosForaDaCarga(contratos, entregas.data ?? []), [contratos, entregas.data]);
+  const carga = useMemo(() => cargaPorFiscal(contratos, servidores, foraDaCarga), [contratos, servidores, foraDaCarga]);
   const areas = useMemo(() => cargaPorArea(contratos), [contratos]);
   const opcoesUnidade = useMemo(() => {
     const comA = doSeg.filter(comArea);
