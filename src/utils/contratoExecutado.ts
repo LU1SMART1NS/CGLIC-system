@@ -1,8 +1,10 @@
 /**
  * Contrato com escopo cumprido (extinção ordinária, art. 140 da Lei 14.133/2021), migration 314. O banco
  * (v_contrato_execucao) SUGERE, só nos contratos da categoria Compras (migration 319: em serviço e TIC, pago não quer
- * dizer escopo cumprido), pelos fatos das fontes e o gestor CONFIRMA com o documento SEI do recebimento
- * definitivo. Confirmado, o contrato sai de Vigentes e dos avisos de prorrogação; volta sozinho se chegar fatura,
+ * dizer escopo cumprido), pelos fatos das fontes e o gestor CONFIRMA conferindo o que já está registrado: as entregas
+ * finalizadas da Fiscalização (com o TRD que o fiscal gravou) e as faturas pagas; fora da Fiscalização, só os pagamentos
+ * (migration 320: o TRD é da Fiscalização, não se pede SEI ao gestor). Confirmado, o contrato sai de Vigentes e dos
+ * avisos de prorrogação; volta sozinho se chegar fatura,
  * nota de empenho ou aditivo novos.
  *
  * Aqui ficam só a leitura dos fatos para a tela (a conferência item a item da janela) e as pendências de fechamento.
@@ -26,6 +28,7 @@ export interface ExecucaoDoContrato {
   /** Havia decisão gravada, mas chegou fato novo (fatura, nota ou aditivo) e ela deixou de valer. */
   decisaoSuperada: boolean;
   /** Confirmação do gestor (só no estado EXECUTADO). */
+  /** sei e dataRecebimento só nas confirmações antigas (antes da migration 320 o gestor informava). */
   confirmado?: { em: string; por: string; sei: string; dataRecebimento: string };
 }
 
@@ -63,7 +66,7 @@ export function conferirExecucao(e: ExecucaoDoContrato): ConferenciaDaExecucao[]
     {
       id: 'FISCALIZACAO',
       rotulo: 'Fiscalização',
-      detalhe: e.fiscalizacao === 'FINALIZADA' ? 'Finalizada' : e.fiscalizacao === 'EM_CURSO' ? 'Ainda em curso' : 'Contrato fora da Fiscalização',
+      detalhe: e.fiscalizacao === 'FINALIZADA' ? 'Finalizada' : e.fiscalizacao === 'EM_CURSO' ? 'Ainda em curso' : 'Fora da Fiscalização: confira pelos pagamentos',
       resultado: e.fiscalizacao === 'EM_CURSO' ? 'bloqueia' : 'ok'
     },
     {
