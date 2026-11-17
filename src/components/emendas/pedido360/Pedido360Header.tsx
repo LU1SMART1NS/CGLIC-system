@@ -1,4 +1,5 @@
 import React from 'react';
+import type { EntregaDoPedido } from '../../../utils/emendasEntrega';
 import { Instrument360Hero } from '../../instrument360/Instrument360Hero';
 import { HealthTile, HealthTileGrid } from '../../instrument360/HealthStripParts';
 import { RowActionsMenu } from '../../../design-system/components/RowActionsMenu';
@@ -37,6 +38,8 @@ interface Props {
   beneficiarios: Map<string, BeneficiarioEmenda>;
   notas: Map<string, NotaDaLinha>;
   avisos: AvisoPedido[];
+  /** Entrega do pedido contratado (emendasEntrega): etapa, posição e "40 de 222 entregues". */
+  entrega?: EntregaDoPedido | null;
   valor: { valor: number; fonte: 'OFICIO' | 'PREVISTO' };
   podeGerir: boolean;
   back: { label: string; back: () => void };
@@ -81,15 +84,16 @@ const LIMITE_DO_NOME = 40;
  * mais grave em selo, o contato da assessoria e as datas ao lado, quatro indicadores e, no pé, o processo SEI, a
  * emenda (abre a Emenda 360) e o GND. A próxima tarefa é o botão principal.
  */
-export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, valor, podeGerir, back, onAlterar, onCancelar, onRetificador, comVoce, ccga, onAba, onAbrirParlamentar, onAbrirEmenda, verMais }) => {
+export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiarios, notas, avisos, entrega, valor, podeGerir, back, onAlterar, onCancelar, onRetificador, comVoce, ccga, onAba, onAbrirParlamentar, onAbrirEmenda, verMais }) => {
   const cancelado = p.etapa === 'CANCELADO';
   const ativas = linhasAtivas(p);
   const atas = atasDoPedido(p, itens);
   const contratos = p.etapa === 'CONTRATACAO' ? contratosDoPedido(p, notas) : null;
   const contratado = Boolean(contratos?.contratado);
   const execucao = jaEmpenhado(p.etapa) ? execucaoDoPedido(p, notas) : null;
-  const posicao = passoNaContratacao(p, notas)?.posicao ?? ORDEM_ETAPA[p.etapa] + 1;
-  const situacao = cancelado ? 'Cancelado' : rotuloDaEtapaDoPedido(p, notas);
+  // Contratado: a entrega (Fiscalização da SFC/CGLIC ou notas) dá a etapa e a posição.
+  const posicao = entrega?.posicao ?? passoNaContratacao(p, notas)?.posicao ?? ORDEM_ETAPA[p.etapa] + 1;
+  const situacao = cancelado ? 'Cancelado' : entrega?.rotulo ?? rotuloDaEtapaDoPedido(p, notas);
   const grave = avisos.find(avisoGrave) ?? null;
   const seguinte = !cancelado && p.autorId ? proximaAcao(p.etapa, rodadaDoPedido(p)) : null;
   const resumo = resumoDasLinhas(p, notas);
@@ -234,7 +238,10 @@ export const Pedido360Header: React.FC<Props> = ({ p, autor, itens, beneficiario
             hint={`${podeGerir && comVoce > 0 ? `${comVoce} com você · ` : ''}${
               contratos && !contratado
                 ? `${contratos.itensContratados} de ${contratos.itens} ${contratos.itens === 1 ? 'item contratado' : 'itens contratados'}`
-                : resumo.divergem
+                : entrega
+                  ? // O selo do cartão já diz a etapa: aqui só o progresso ou a previsão.
+                    (entrega.progresso ?? `${entrega.entregues} de ${entrega.total} ${entrega.total === 1 ? 'item' : 'itens'} ${entrega.pelaFiscalizacao ? 'entregues' : 'faturados'}`)
+                  : resumo.divergem
                   ? resumo.texto
                   : seguinte
                     ? `próximo: ${seguinte.rotulo.charAt(0).toLowerCase()}${seguinte.rotulo.slice(1)}`

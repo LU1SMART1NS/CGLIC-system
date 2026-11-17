@@ -2,14 +2,15 @@
  * Avisos da expectativa de pagamento (fase C da previsão mensal):
  *   PREVISAO_NAO_ENVIADA    a previsão do mês (Portaria DGFNSP 50/2025, art. 5º, § 2º, III) perto do prazo e não enviada;
  *   NOTA_MENSAL_NAO_CHEGOU  contrato marcado como mensal sem nota da competência anterior depois do dia combinado;
- *   ENTREGA_SEM_NOTA        entrega prevista que passou da data (mais a tolerância) sem nota.
+ *   ENTREGA_SEM_NOTA        item entregue (registrado pelo fiscal) há mais de N dias sem nota (regras "pagamento.notaAposEntrega*").
  * "A nota chegou" = fatura no Contratos.gov.br da competência (ou emitida depois do marco) ou ciclo com a competência
  * ou recebido depois do marco: a CGLIC só cadastra a fatura depois de conferir, então o ciclo é o primeiro sinal.
  */
 import { PAGAMENTO_RULES } from '../config/alertRules';
-import { addBusinessDays, differenceInBusinessDays, parseDateBRT } from './temporalEngineService';
+import { differenceInBusinessDays, parseDateBRT } from './temporalEngineService';
 import type { DashboardAttentionSeverity } from '../types/managementDashboard';
-import type { EntregaPrevista, ExpectativaPagamento } from './expectativaPagamentoService';
+import type { ExpectativaPagamento } from './expectativaPagamentoService';
+import type { EntregaParaPagamento } from './entregasParaPagamentoService';
 
 export type TipoAvisoPagamento = 'PREVISAO_NAO_ENVIADA' | 'NOTA_MENSAL_NAO_CHEGOU' | 'ENTREGA_SEM_NOTA';
 
@@ -50,7 +51,8 @@ export function calcularAvisosPagamento(input: {
   /** Previsão a informar (AAAA-MM), o prazo dela e se já foi enviada. Omitido na tela de um contrato. */
   previsao?: { mes: string; prazo: string; enviada: boolean };
   marcas: Map<string, ExpectativaPagamento>;
-  entregas: EntregaPrevista[];
+  /** Entregas da Fiscalização (migration 305); o aviso usa as já entregues. */
+  entregas: EntregaParaPagamento[];
   faturas: FaturaParaAviso[];
   ciclos: CicloParaAviso[];
   /** Contratos vigentes no escopo (os avisos de contrato só valem para eles). */
@@ -126,25 +128,24 @@ export function calcularAvisosPagamento(input: {
     }
   }
 
-  // 3. Entregas previstas que passaram da data sem nota.
+  // 3. Itens entregues (registrados pelo fiscal) sem nota depois de N dias corridos.
   for (const e of input.entregas) {
-    if (e.situacao !== 'PREVISTA' || !input.contratosVigentes.has(e.contractKey)) continue;
-    const data = parseDateBRT(e.dataPrevista);
+    if (e.situacao !== 'ENTREGUE' || !input.contratosVigentes.has(e.contractKey)) continue;
+    const data = parseDateBRT(e.data);
     if (!data) continue;
-    const limite = addBusinessDays(data, PAGAMENTO_RULES.entregaToleranciaDiasUteis);
-    if (limite.getTime() >= hoje.getTime()) continue;
-    const desde = iso(new Date(data.getFullYear(), data.getMonth(), data.getDate() - 30));
-    if (chegouDesde(e.contractKey, desde)) continue;
-    const dias = differenceInBusinessDays(hoje, data);
+    const dias = Math.round((hoje.getTime() - data.getTime()) / 86_400_000);
+    if (dias <= PAGAMENTO_RULES.notaAposEntregaDias) continue;
+    if (chegouDesde(e.contractKey, e.data)) continue;
+    const itens = `${e.itens} ${e.itens === 1 ? 'item entregue' : 'itens entregues'}`;
     avisos.push({
-      id: `AVISO-ENTREGA-${e.id}`,
+      id: `AVISO-ENTREGA-${e.contractKey}-${e.data}`,
       tipo: 'ENTREGA_SEM_NOTA',
-      severity: dias > 20 ? 'URGENTE' : 'ATENCAO',
-      title: `Entrega prevista sem nota: ${e.descricao}`,
-      description: `Contrato ${numero(e.contractKey)}: entrega prevista para ${br(e.dataPrevista)} e nenhuma nota desde então. Confirme a entrega ou corrija a data.`,
-      badgeLabel: `Entrega de ${br(e.dataPrevista)} sem nota`,
+      severity: dias > PAGAMENTO_RULES.notaAposEntregaUrgenteDias ? 'URGENTE' : 'ATENCAO',
+      title: `Nota não chegou: ${itens} em ${br(e.data)}`,
+      description: `Contrato ${numero(e.contractKey)}: o fiscal registrou a entrega em ${br(e.data)} (há ${dias} dias) e nenhuma nota chegou desde então. Cobre a nota do fornecedor.`,
+      badgeLabel: `Entrega de ${br(e.data)} sem nota`,
       contractKey: e.contractKey,
-      dataAlvo: e.dataPrevista,
+      dataAlvo: e.data,
       diasRelevantes: -dias,
       targetUrl: `/contratos/${encodeURIComponent(e.contractKey)}?aba=pagamentos`
     });

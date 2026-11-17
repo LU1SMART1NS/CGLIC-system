@@ -139,7 +139,8 @@ async function pedirJson<T>(url: string, fetcher: typeof fetch, esperar: (ms: nu
 }
 
 /** Lista que a fonte não tem (404) vem vazia: a ata ou a compra simplesmente não tem arquivos. */
-async function pedirLista<T>(url: string, fetcher: typeof fetch, esperar: (ms: number) => Promise<void>): Promise<T[]> {
+/** Também usada pela leitura do prazo do TR (prazoTrSyncService). */
+export async function pedirLista<T>(url: string, fetcher: typeof fetch, esperar: (ms: number) => Promise<void>): Promise<T[]> {
   try {
     const dados = await pedirJson<T[]>(url, fetcher, esperar);
     return Array.isArray(dados) ? dados : [];
@@ -149,7 +150,8 @@ async function pedirLista<T>(url: string, fetcher: typeof fetch, esperar: (ms: n
   }
 }
 
-async function baixar(url: string, fetcher: typeof fetch, esperar: (ms: number) => Promise<void>): Promise<Uint8Array | null> {
+/** Também usada pela leitura do prazo do TR (prazoTrSyncService). */
+export async function baixar(url: string, fetcher: typeof fetch, esperar: (ms: number) => Promise<void>): Promise<Uint8Array | null> {
   const controle = new AbortController();
   const relogio = setTimeout(() => controle.abort(), TEMPO_DOWNLOAD_MS);
   try {
@@ -235,7 +237,7 @@ const NOME_INUTIL = /especifica|estudo|\betp\b|planilha|mapa|risco|rela[cç][aã
 export async function textosDoArquivo(
   bytes: Uint8Array,
   leitor: LeitorDeArquivos,
-  opts: { soPartesDoEdital?: boolean; profundidade?: number; parar?: (texto: string) => boolean; lidos?: { pdfs: number } } = {}
+  opts: { soPartesDoEdital?: boolean; profundidade?: number; parar?: (texto: string) => boolean; lidos?: { pdfs: number }; /** Tamanho máximo do PDF dentro do zip (padrão: LIMITES_DO_EDITAL). */ maxBytesPdf?: number } = {}
 ): Promise<string[]> {
   const lidos = opts.lidos ?? { pdfs: 0 };
   const maxPdfs = opts.soPartesDoEdital ? LIMITES_DO_EDITAL.maxPdfs : Number.POSITIVE_INFINITY;
@@ -249,7 +251,7 @@ export async function textosDoArquivo(
   // No edital, só descompacta os PDFs úteis (ou, se nenhum tiver nome útil, os que não são inúteis) e os zips.
   const aceitar = opts.soPartesDoEdital
     ? (nome: string, tamanho: number) =>
-        (/\.zip$/i.test(nome) && tamanho <= LIMITES_DO_EDITAL.maxBytesZip) || (/\.pdf$/i.test(nome) && tamanho <= LIMITES_DO_EDITAL.maxBytesPdf && !NOME_INUTIL.test(nome))
+        (/\.zip$/i.test(nome) && tamanho <= LIMITES_DO_EDITAL.maxBytesZip) || (/\.pdf$/i.test(nome) && tamanho <= (opts.maxBytesPdf ?? LIMITES_DO_EDITAL.maxBytesPdf) && !NOME_INUTIL.test(nome))
     : undefined;
   const partes = await leitor.arquivosDoZip(bytes, aceitar);
   const pdfs = partes.filter((p) => /\.pdf$/i.test(p.nome));

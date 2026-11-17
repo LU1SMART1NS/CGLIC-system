@@ -1,5 +1,6 @@
 /**
- * Leitor de PDF e zip do servidor, usado só pelo recurso 'reajuste_atas' (editais e apostilamentos do PNCP).
+ * Leitor de PDF e zip do servidor: editais e apostilamentos do PNCP ('reajuste_atas', 'prazo_tr', 'atas_a_montar') e
+ * a ata assinada ('nome_item_ata', que precisa da posição de cada pedaço de texto para montar a tabela de preços).
  *
  * As bibliotecas não entram no package.json do app: o unpdf traz como opcional um pacote nativo (canvas)
  * que o build da Vercel tentaria compilar. No pacote da Edge Function elas ficam como `npm:` com versão
@@ -10,8 +11,10 @@
  * os arquivos aceitos são descompactados.
  */
 import type { LeitorDeArquivos } from '../../src/services/reajusteAtasSyncService';
+import type { LeitorDePedacos } from '../../src/services/nomeItemAtaSyncService';
+import type { PaginaDoPdf } from '../../src/services/nomeItemAtaParser';
 
-interface ItemDeTexto { str?: string; hasEOL?: boolean }
+interface ItemDeTexto { str?: string; hasEOL?: boolean; transform?: number[]; width?: number; height?: number }
 interface PaginaPdf {
   getTextContent(): Promise<{ items: ItemDeTexto[] }>;
   cleanup?(): void;
@@ -41,7 +44,7 @@ const CARREGADORES_DO_DENO: CarregadoresDoLeitor = {
 /** Nome do arquivo no zip: os editais vêm com nomes em CP850 ("Refer?ncia"); só o nome e a extensão importam. */
 const nomeDoArquivo = (nome: string) => nome.split('/').pop() ?? nome;
 
-export function criarLeitorDeArquivos(carregar: CarregadoresDoLeitor = CARREGADORES_DO_DENO): LeitorDeArquivos {
+export function criarLeitorDeArquivos(carregar: CarregadoresDoLeitor = CARREGADORES_DO_DENO): LeitorDeArquivos & LeitorDePedacos {
   let unpdf: Promise<ModuloUnpdf> | null = null;
   let fflate: Promise<ModuloFflate> | null = null;
   return {
@@ -60,6 +63,28 @@ export function criarLeitorDeArquivos(carregar: CarregadoresDoLeitor = CARREGADO
           pagina.cleanup?.();
         }
         return texto;
+      } finally {
+        await documento.destroy?.();
+      }
+    },
+    async pedacosDoPdf(bytes, opts = {}) {
+      unpdf ??= carregar.unpdf();
+      const m = await unpdf;
+      const documento = (await m.getDocumentProxy(new Uint8Array(bytes))) as DocumentoPdf;
+      try {
+        const total = Math.min(documento.numPages, opts.maxPaginas ?? documento.numPages);
+        const paginas: PaginaDoPdf[] = [];
+        for (let n = 1; n <= total; n++) {
+          const pagina = await documento.getPage(n);
+          const conteudo = await pagina.getTextContent();
+          paginas.push(
+            conteudo.items
+              .filter((i) => typeof i.str === 'string' && i.str !== '' && Array.isArray(i.transform))
+              .map((i) => ({ x: (i.transform as number[])[4], y: (i.transform as number[])[5], w: i.width ?? 0, h: i.height ?? 0, s: i.str as string }))
+          );
+          pagina.cleanup?.();
+        }
+        return paginas;
       } finally {
         await documento.destroy?.();
       }

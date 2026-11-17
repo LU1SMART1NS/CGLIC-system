@@ -2,6 +2,7 @@ import type { StatusBadgeVariant } from '../../design-system/components/StatusBa
 import type { EtapaPagamento, PagamentoCarteiraRow } from '../../services/financeiroCarteiraService';
 import { getPaymentStatusDisplay } from '../../utils/paymentStatusDisplay';
 import { dataBR, diasDesde } from './financeiroFormat';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 /** Ordem das etapas (para ordenar pela coluna Etapa). */
 export const ORDEM_ETAPA: Record<EtapaPagamento, number> = {
@@ -118,14 +119,14 @@ export function descreverLinha(row: PagamentoCarteiraRow, hoje: Date = new Date(
     case 'PAGA':
       return {
         ...base,
-        etapa: { label: 'Paga', variant: 'success', detalhe: f.ordensBancarias ? `${f.ordensBancarias}${npCompartilhada}` : null },
+        etapa: { label: 'Paga', variant: COR_DA_SITUACAO.CONCLUIDO, detalhe: f.ordensBancarias ? `${f.ordensBancarias}${npCompartilhada}` : null },
         prazo: { texto: `OB em ${dataBR(f.obEmissao)}`, detalhe: null, atrasado: false, ordem: f.obEmissao }
       };
     case 'AGUARDANDO_OB': {
       const n = f.dataLiquidacao ? diasDesde(f.dataLiquidacao, hoje) : 0;
       return {
         ...base,
-        etapa: { label: 'Liquidada', variant: 'info', detalhe: f.np ? `${f.np}${npCompartilhada}` : 'sem NP' },
+        etapa: { label: 'Liquidada', variant: COR_DA_SITUACAO.ANDAMENTO, detalhe: f.np ? `${f.np}${npCompartilhada}` : 'sem NP' },
         prazo: { texto: `Liquidada em ${dataBR(f.dataLiquidacao)}`, detalhe: `aguardando OB há ${dias(n)}`, atrasado: n > 5, ordem: f.dataLiquidacao }
       };
     }
@@ -134,7 +135,7 @@ export function descreverLinha(row: PagamentoCarteiraRow, hoje: Date = new Date(
         ...base,
         etapa: {
           label: 'Sem como confirmar',
-          variant: 'neutral',
+          variant: COR_DA_SITUACAO.NEUTRO,
           detalhe: f.pagamentoAConferir ? `a OB da ${f.np} é de outra despesa: ${f.obsAConferir}` : 'a fonte não informa a NP'
         },
         prazo: {
@@ -145,10 +146,10 @@ export function descreverLinha(row: PagamentoCarteiraRow, hoje: Date = new Date(
         }
       };
     case 'ERRO_SIAFI':
-      return { ...base, etapa: { label: 'Erro no SIAFI', variant: 'danger', detalhe: null }, prazo: vencimento };
+      return { ...base, etapa: { label: 'Erro no SIAFI', variant: COR_DA_SITUACAO.URGENTE, detalhe: null }, prazo: vencimento };
     case 'CANCELADA':
-      return { ...base, etapa: { label: 'Cancelada', variant: 'neutral', detalhe: null }, prazo: vencimento };
+      return { ...base, etapa: { label: 'Cancelada', variant: COR_DA_SITUACAO.NEUTRO, detalhe: null }, prazo: vencimento };
     default:
-      return { ...base, etapa: { label: f.situacao || 'Em andamento', variant: 'warning', detalhe: null }, prazo: vencimento };
+      return { ...base, etapa: { label: f.situacao || 'Em andamento', variant: COR_DA_SITUACAO.ANDAMENTO, detalhe: null }, prazo: vencimento };
   }
 }

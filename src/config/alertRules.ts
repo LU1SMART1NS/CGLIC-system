@@ -118,8 +118,12 @@ export const PAGAMENTO_RULES = {
   previsaoAvisoAntesDiasUteis: 5,
   /** Contrato marcado como mensal: a nota da competência anterior deve chegar até o dia N do mês. */
   notaMensalAteDia: 10,
-  /** Entrega prevista: avisar quando passar N dias úteis da data sem nota. */
-  entregaToleranciaDiasUteis: 5
+  /** Item entregue (registrado pelo fiscal na Fiscalização): avisar quando passar N dias corridos sem nota. */
+  notaAposEntregaDias: 10,
+  /** O aviso da nota depois da entrega fica urgente depois de N dias corridos. */
+  notaAposEntregaUrgenteDias: 30,
+  /** Só entram no aviso as entregas dos últimos N dias (as antigas vieram da planilha e já foram pagas por fora). */
+  avisoEntregaJanelaDias: 120
 };
 
 // -----------------------------------------------------------------------------
@@ -197,9 +201,25 @@ export function isLembreteNaJanela(params: { diasRestantes: number; atrasado: bo
 // Parametrização (Administração > Regras de Alertas)
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// Fiscalização: recebimento (TRP e TRD) e envio para pagamento
+// Os dias do TRP e do TRD vêm do TR de cada ata (janela do prazo da ata) e podem ser corrigidos no contrato.
+// Aqui ficam só os números que valem para todos os contratos.
+// -----------------------------------------------------------------------------
+export const FISCALIZACAO_RULES = {
+  /** Prazo interno da CGLIC para mandar o processo ao pagamento depois do TRD (cabe nos 10 da liquidação, IN 77). */
+  envioPagamentoDiasUteis: 5,
+  /** Com a comissão de recebimento: cobrar depois de N dias do envio sem TRP, ou do TRP sem TRD (ou da última cobrança). */
+  cobrarComissaoDias: 10,
+  /** Item atrasado e cobrado: espera o fornecedor por N dias; depois volta ao fiscal para cobrar de novo (entrega B). */
+  cobrarFornecedorDias: 10,
+  /** O aviso do TRP, do TRD e do envio fica em atenção quando faltar até N dias. */
+  avisoAntesDias: 3
+};
+
 export type AlertRuleUnit = '%' | 'dias' | 'dias úteis' | 'dia do mês' | 'horas';
 
-export type AlertRuleGroupId = 'saldo' | 'tarefas' | 'vigencia' | 'motor' | 'reajuste' | 'prorrogacao' | 'pagamentos' | 'emendas' | 'sincronizacao';
+export type AlertRuleGroupId = 'saldo' | 'tarefas' | 'vigencia' | 'motor' | 'reajuste' | 'prorrogacao' | 'pagamentos' | 'emendas' | 'fiscalizacao' | 'sincronizacao';
 
 export interface AlertRuleDefinition {
   /** Chave estável gravada em alert_settings.key (caminho no objeto de regras). */
@@ -221,6 +241,7 @@ export const ALERT_RULE_GROUPS: Array<{ id: AlertRuleGroupId; label: string; des
   { id: 'prorrogacao', label: 'Prorrogação contratual', description: 'Faixas usadas nas orientações de prorrogação.' },
   { id: 'pagamentos', label: 'Acompanhamento de pagamentos', description: 'Prazos em dias úteis das faturas e do processo na CGOFI.' },
   { id: 'emendas', label: 'Emendas parlamentares', description: 'Prazo para receber a indicação do parlamentar antes do fim da ata: depois do empenho ainda é preciso assinar o contrato, e isso tem de acontecer antes do vencimento. Também o prazo da emenda sem pedido.' },
+  { id: 'fiscalizacao', label: 'Fiscalização: recebimento', description: 'Cobrança da comissão de recebimento, prazo do envio para pagamento e antecedência dos avisos de TRP, TRD e envio. Os dias do TRP e do TRD vêm do Termo de Referência de cada ata e podem ser corrigidos no contrato.' },
   { id: 'sincronizacao', label: 'Atualização dos dados da API', description: 'Quando a quantidade contratada lida da API é relida.' }
 ];
 
@@ -268,7 +289,9 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
   { key: 'pagamento.chegadaMinimaDiasUteis', group: 'pagamentos', label: 'Chegada mínima antes do vencimento', hint: 'Antecedência do processo em relação ao vencimento (Portaria DGFNSP 50/2025, art. 5º).', unit: 'dias úteis', min: 0, max: 30 },
   { key: 'pagamento.previsaoAvisoAntesDiasUteis', group: 'pagamentos', label: 'Avisar a previsão mensal quando faltar', hint: 'Dias úteis até o último dia útil do mês (Portaria DGFNSP 50/2025, art. 5º, § 2º, III).', unit: 'dias úteis', min: 0, max: 20 },
   { key: 'pagamento.notaMensalAteDia', group: 'pagamentos', label: 'Nota de contrato mensal chega até o dia', hint: 'Depois desse dia, o contrato marcado como mensal sem nota do mês anterior vira aviso.', unit: 'dia do mês', min: 1, max: 28 },
-  { key: 'pagamento.entregaToleranciaDiasUteis', group: 'pagamentos', label: 'Tolerância da entrega prevista', hint: 'Dias úteis depois da data prevista sem nota até virar aviso.', unit: 'dias úteis', min: 0, max: 30 },
+  { key: 'pagamento.notaAposEntregaDias', group: 'pagamentos', label: 'Nota depois da entrega', hint: 'Dias corridos depois da entrega registrada pelo fiscal sem nota até virar aviso para o gestor do contrato.', unit: 'dias', min: 1, max: 90 },
+  { key: 'pagamento.notaAposEntregaUrgenteDias', group: 'pagamentos', label: 'Nota depois da entrega: urgente após', hint: 'Dias corridos depois da entrega sem nota até o aviso ficar urgente.', unit: 'dias', min: 1, max: 180 },
+  { key: 'pagamento.avisoEntregaJanelaDias', group: 'pagamentos', label: 'Entregas que contam para o aviso de nota', hint: 'Só as entregues nos últimos N dias (as antigas da planilha já foram pagas).', unit: 'dias', min: 30, max: 730 },
 
   { key: 'emendas.avisoIndicacaoAntesDias', group: 'emendas', label: 'Avisar a ata da emenda a partir de', hint: 'Dias antes do fim da ata: pedidos e kits avisam que o contrato precisa ser assinado até lá.', unit: 'dias', min: 1, max: 365 },
   { key: 'emendas.corteIndicacaoAntesDias', group: 'emendas', label: 'Não receber indicação a menos de', hint: 'Dias antes do fim da ata. O sistema recusa nova reserva e novo ofício com itens da ata.', unit: 'dias', min: 0, max: 365 },
@@ -276,6 +299,11 @@ export const ALERT_RULE_DEFINITIONS: AlertRuleDefinition[] = [
   { key: 'emendas.tramiteAteContratoDias', group: 'emendas', label: 'Tempo do ofício até o contrato assinado', hint: 'A minuta não sai com item a menos disso do reajuste, e o prazo do ofício termina esse tempo antes do reajuste.', unit: 'dias', min: 0, max: 365 },
   { key: 'emendas.validadeMinutaDiasUteis', group: 'emendas', label: 'Validade da minuta', hint: 'Prazo para o gabinete devolver o ofício. Depois dele, o pedido volta para nova minuta com o preço do dia.', unit: 'dias úteis', min: 1, max: 60 },
   { key: 'emendas.semPedidoDiasSemContato', group: 'emendas', label: 'Emenda sem pedido fica urgente após', hint: 'Dias sem contato registrado com a assessoria do parlamentar ou com a ASPAR dos órgãos. O aviso aparece desde o dia em que a emenda é registrada.', unit: 'dias', min: 1, max: 60 },
+
+  { key: 'fiscalizacao.envioPagamentoDiasUteis', group: 'fiscalizacao', label: 'Enviar para pagamento até', hint: 'Dias úteis depois do TRD. Precisa caber nos 10 dias úteis da liquidação (IN SEGES 77/2022, art. 7º, I).', unit: 'dias úteis', min: 1, max: 10 },
+  { key: 'fiscalizacao.cobrarComissaoDias', group: 'fiscalizacao', label: 'Cobrar a comissão de recebimento após', hint: 'Dias desde o envio à comissão sem o TRP, ou desde o TRP sem o TRD (ou desde a última cobrança).', unit: 'dias', min: 1, max: 60 },
+  { key: 'fiscalizacao.cobrarFornecedorDias', group: 'fiscalizacao', label: 'Cobrar de novo o fornecedor após', hint: 'Dias desde a última cobrança de item atrasado. Sem cobrança registrada, o item atrasado fica com o fiscal.', unit: 'dias', min: 1, max: 60 },
+  { key: 'fiscalizacao.avisoAntesDias', group: 'fiscalizacao', label: 'Avisar o TRP, o TRD e o envio quando faltar', hint: 'Antes disso o item mostra só a data; vencido, o aviso fica urgente.', unit: 'dias', min: 0, max: 30 },
 
   { key: 'sincronizacao.quantidadeContratadaVencidaEmHoras', group: 'sincronizacao', label: 'Reler a quantidade contratada após', unit: 'horas', min: 1, max: 168 }
 ];
@@ -290,6 +318,7 @@ const RULE_TARGETS: Record<string, Record<string, any>> = {
   prorrogacao: PRORROGACAO_RULES,
   pagamento: PAGAMENTO_RULES,
   emendas: EMENDAS_RULES,
+  fiscalizacao: FISCALIZACAO_RULES,
   sincronizacao: SINCRONIZACAO_RULES
 };
 
@@ -351,6 +380,8 @@ export function validateAlertRuleValues(values: Record<string, number>): Record<
   order('vigencia.faixaIntermediariaDias', 'vigencia.faixaAtencaoAteDias', 'A faixa de atenção deve ser maior que a intermediária.');
   order('atencaoNivel.criticoAteDias', 'atencaoNivel.atencaoAteDias', 'O prazo de atenção deve ser maior que o crítico.');
   order('pagamento.criticoAteDiasUteis', 'pagamento.atencaoAteDiasUteis', 'O prazo de atenção deve ser maior que o crítico.');
+  order('pagamento.notaAposEntregaDias', 'pagamento.notaAposEntregaUrgenteDias', 'O urgente deve vir depois do aviso da nota.');
+  order('pagamento.notaAposEntregaUrgenteDias', 'pagamento.avisoEntregaJanelaDias', 'A janela das entregas deve ser maior que o prazo do urgente.');
   order('emendas.corteIndicacaoAntesDias', 'emendas.avisoIndicacaoAntesDias', 'O aviso deve começar antes do corte da indicação.');
   if (!errors['emendas.tramiteAteContratoDias'] && !errors['emendas.corteReajusteAntesDias'] && values['emendas.tramiteAteContratoDias'] > values['emendas.corteReajusteAntesDias']) {
     errors['emendas.tramiteAteContratoDias'] = 'O tempo até o contrato não pode passar do corte do reajuste.';

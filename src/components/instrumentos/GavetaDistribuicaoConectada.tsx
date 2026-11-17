@@ -4,6 +4,8 @@ import type { ResumoDoGestor } from './painelResumo';
 import { usePendenciasVinculoAta } from '../atas/distribuicao/usePendenciasVinculoAta';
 import { useDistribuicaoDaCarteira } from '../atas/distribuicao/useDistribuicaoDaCarteira';
 import { useCapacidadeDosGestores } from '../atas/distribuicao/useCapacidadeDosGestores';
+import { useTarefasAbertas } from '../../hooks/useTarefasAbertas';
+import { useFaturasNaFila } from '../atas/distribuicao/useFaturasNaFila';
 import { useComplexidadeAjustes } from '../../hooks/useComplexidadeAjustes';
 import { escalaDeOcupacao } from '../atas/distribuicao/OcupacaoBarra';
 
@@ -21,7 +23,9 @@ export const GavetaDistribuicaoConectada: React.FC<{
   const { atas, contratos, links, isBusy } = usePendenciasVinculoAta();
   const { data: ajustes } = useComplexidadeAjustes();
   const { capacidadeDoGestor } = useCapacidadeDosGestores();
-  const distribuicao = useDistribuicaoDaCarteira({ atas, contratos, links, ajustes, capacidadeDoGestor });
+  const { data: tarefasAbertas } = useTarefasAbertas();
+  const faturasAbertas = useFaturasNaFila();
+  const distribuicao = useDistribuicaoDaCarteira({ atas, contratos, links, ajustes, capacidadeDoGestor, tarefasAbertas, faturasAbertas });
 
   const ocupacoes = React.useMemo<OcupacoesDaEquipe | null>(() => {
     if (isBusy) return null;

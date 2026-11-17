@@ -1,20 +1,16 @@
 import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  cancelarEntregaPrevista,
-  definirExpectativaPagamento,
-  fetchExpectativasPagamento,
-  salvarEntregaPrevista,
-  type EntregaPrevista,
-  type ExpectativaPagamento
-} from '../services/expectativaPagamentoService';
+import { definirExpectativaPagamento, fetchExpectativasPagamento, type ExpectativaPagamento } from '../services/expectativaPagamentoService';
+import { fetchEntregasParaPagamento, type EntregaParaPagamento } from '../services/entregasParaPagamentoService';
+import { PAGAMENTO_RULES } from '../config/alertRules';
 
 const SEM_MARCAS = new Map<string, ExpectativaPagamento>();
-const SEM_ENTREGAS: EntregaPrevista[] = [];
+const SEM_ENTREGAS: EntregaParaPagamento[] = [];
 
 export const EXPECTATIVAS_QUERY_KEY = ['expectativas-pagamento'] as const;
+export const ENTREGAS_PARA_PAGAMENTO_KEY = ['entregas-para-pagamento'] as const;
 
-/** Marcas de expectativa de pagamento e entregas previstas de todos os contratos (tabelas pequenas, lidas inteiras). */
+/** Marcas de expectativa de pagamento de todos os contratos (tabela pequena, lida inteira). */
 export function useExpectativasPagamento() {
   const queryClient = useQueryClient();
   const query = useQuery({
@@ -32,30 +28,29 @@ export function useExpectativasPagamento() {
     },
     [reler]
   );
-  const salvarEntrega = useCallback(
-    async (input: Parameters<typeof salvarEntregaPrevista>[0]) => {
-      await salvarEntregaPrevista(input);
-      await reler();
-    },
-    [reler]
-  );
-  const cancelarEntrega = useCallback(
-    async (id: string, motivo: string) => {
-      await cancelarEntregaPrevista(id, motivo);
-      await reler();
-    },
-    [reler]
-  );
 
   return {
     marcas: query.data?.marcas ?? SEM_MARCAS,
-    entregas: query.data?.entregas ?? SEM_ENTREGAS,
     isLoading: query.isLoading,
     error: query.error as Error | null,
-    /** A leitura, para a faixa "não carregou" (sem ela a Previsão sairia sem mensais e sem entregas, calada). */
+    /** A leitura, para a faixa "não carregou" (sem ela a Previsão sairia sem mensais, calada). */
     consulta: query,
-    definir,
-    salvarEntrega,
-    cancelarEntrega
+    definir
   };
+}
+
+/**
+ * Entregas da Fiscalização para os pagamentos (migration 305): de um contrato ou de todos. A janela das entregues é a
+ * regra "pagamento.avisoEntregaJanelaDias" da tela Regras e alertas.
+ */
+export function useEntregasParaPagamento(contractKey: string | null = null, opts: { enabled?: boolean } = {}) {
+  const janela = PAGAMENTO_RULES.avisoEntregaJanelaDias;
+  const query = useQuery({
+    queryKey: [...ENTREGAS_PARA_PAGAMENTO_KEY, contractKey ?? 'todas', janela],
+    queryFn: () => fetchEntregasParaPagamento(contractKey, janela),
+    enabled: opts.enabled ?? true,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false
+  });
+  return { entregas: query.data ?? SEM_ENTREGAS, isLoading: query.isLoading, consulta: query };
 }

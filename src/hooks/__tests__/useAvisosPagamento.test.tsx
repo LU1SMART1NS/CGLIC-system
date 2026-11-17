@@ -54,19 +54,20 @@ vi.mock('@tanstack/react-query', async (importOriginal) => ({
   })
 }));
 vi.mock('../../context/AuthContext', () => ({ useAuth: vi.fn(() => ({ role: 'admin' })) }));
-vi.mock('../useExpectativasPagamento', () => ({ useExpectativasPagamento: vi.fn() }));
+vi.mock('../useExpectativasPagamento', () => ({ useExpectativasPagamento: vi.fn(), useEntregasParaPagamento: vi.fn() }));
 vi.mock('../../components/financeiro/useContratosDoFinanceiro', () => ({ useContratosDoFinanceiro: vi.fn() }));
 
 import { useQuery } from '@tanstack/react-query';
-import { useExpectativasPagamento } from '../useExpectativasPagamento';
+import { useEntregasParaPagamento, useExpectativasPagamento } from '../useExpectativasPagamento';
 import { useContratosDoFinanceiro } from '../../components/financeiro/useContratosDoFinanceiro';
 import { faturasDosAvisosKey, useAvisosPagamentoGerais } from '../useAvisosPagamento';
 import { fetchFaturasParaAvisos } from '../../services/financeiroCarteiraService';
 import { calcularAvisosPagamento } from '../../services/avisosPagamentoService';
-import type { EntregaPrevista, ExpectativaPagamento } from '../../services/expectativaPagamentoService';
+import type { ExpectativaPagamento } from '../../services/expectativaPagamentoService';
+import type { EntregaParaPagamento } from '../../services/entregasParaPagamentoService';
 
 // Contratos: A mensal com nota de setembro; B mensal só com nota cancelada; C mensal sem nota; D sem marca (com
-// faturas); E e F com entrega prevista vencida, E com nota depois da entrega e F sem nota.
+// faturas); E e F com item entregue pela Fiscalização há mais de 10 dias, E com nota depois da entrega e F sem nota.
 const CONTRATOS = ['200331-00001-2025', '200331-00002-2025', '200331-00003-2025', '200331-00004-2025', '200330-00005-2025', '200330-00006-2025'];
 const [A, B, C, D, E, F] = CONTRATOS;
 
@@ -78,17 +79,7 @@ const marca = (contractKey: string): ExpectativaPagamento => ({
   atualizadoPorNome: null,
   atualizadoEm: '2026-09-01T00:00:00Z'
 });
-const entrega = (id: string, contractKey: string): EntregaPrevista => ({
-  id,
-  contractKey,
-  dataPrevista: '2026-09-01',
-  valor: 500,
-  empenhoCanonicalKey: null,
-  descricao: 'Entrega',
-  situacao: 'PREVISTA',
-  motivoCancelamento: null,
-  criadoPorNome: null
-});
+const entrega = (_id: string, contractKey: string): EntregaParaPagamento => ({ contractKey, situacao: 'ENTREGUE', data: '2026-09-01', itens: 2, valor: 500, semPreco: 0 });
 const fatura = (id: number, contract_key: string, o: Partial<LinhaFatura> = {}): LinhaFatura => ({
   id_fatura: id,
   contract_key,
@@ -126,7 +117,8 @@ describe('avisos de pagamento com a leitura leve das faturas', () => {
       fatura(5, E, { referencia: null, emissao: '2026-09-04' }),
       fatura(6, F, { referencia: '08/2026', emissao: '2026-07-01' })
     ];
-    vi.mocked(useExpectativasPagamento).mockReturnValue({ marcas, entregas, isLoading: false } as any);
+    vi.mocked(useExpectativasPagamento).mockReturnValue({ marcas, isLoading: false } as any);
+    vi.mocked(useEntregasParaPagamento).mockReturnValue({ entregas, isLoading: false } as any);
     vi.mocked(useContratosDoFinanceiro).mockReturnValue({
       contrato: (k: string) => ({ numero: k }),
       lista: CONTRATOS.map((contractKey) => ({ contractKey, numero: contractKey, expirado: false })),

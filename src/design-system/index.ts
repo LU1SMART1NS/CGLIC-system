@@ -45,3 +45,4 @@ export * from './components/Carregamento';
 // Hooks
 export * from './hooks/useMediaQuery';
 export * from './hooks/useScrollActiveTab';
+export { COR_DA_SITUACAO, type SignificadoDaCor } from './coresDaSituacao';

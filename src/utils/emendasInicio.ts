@@ -3,6 +3,8 @@
  * Usa os mesmos avisos da lista de Pedidos (avisosDoPedido); as contas novas são o saldo livre perto do fim da ata e os
  * itens que chegaram à CAEP sem o nome da ata assinada (no quadro do parlamentar sai o começo da descrição do catálogo).
  */
+import type { EntregaDaLinha } from '../services/fiscalizacaoService';
+import { entregaDoPedido } from './emendasEntrega';
 import type { ConferenciaEmpenho, EtapaPedido, ItemCaep, NotaDaLinha, PedidoEmenda } from '../services/emendasService';
 import { avisoIndicacaoDias, dataBR, diasEntre, limiteDaIndicacao, passouDoCorte } from './emendasKits';
 import {
@@ -124,7 +126,9 @@ export function resumoInicioEmendas(
   hoje: string,
   empenho?: Map<string, ConferenciaEmpenho[]>,
   credor?: Map<string, CredorNoPedido[]>,
-  precos?: Map<string, PrecoDoItem>
+  precos?: Map<string, PrecoDoItem>,
+  /** Entregas da Fiscalização por linha: avisos de entrega atrasada e de produto no Exército. */
+  entregas?: Map<string, EntregaDaLinha[]>
 ): ResumoInicioEmendas {
   const itens = new Map(itensLista.map((i) => [i.itemKey, i]));
   const porTipo = Object.fromEntries(TIPOS_AVISO.map((t) => [t, 0])) as Record<TipoAviso, number>;
@@ -147,7 +151,7 @@ export function resumoInicioEmendas(
         if (notaDaLinha(l, notas)) linhasComNota++;
       }
     }
-    const avisos = avisosDoPedido(p, itens, hoje, notas, empenho?.get(p.id), credor?.get(p.id), precos);
+    const avisos = avisosDoPedido(p, itens, hoje, notas, empenho?.get(p.id), credor?.get(p.id), precos, entregas ? entregaDoPedido(p, notas, entregas, hoje) : null);
     if (avisos.length === 0) continue;
     for (const t of new Set(avisos.map((a) => a.tipo))) porTipo[t]++;
     if (avisos.some(avisoGrave)) graves++;
@@ -241,6 +245,10 @@ export function prazoDoAviso(a: AvisoPedido, item: ItemCaep | null, hoje: string
       return a.texto.includes('Envie a minuta') ? 'enviar a minuta logo' : 'cobrar a assinatura do contrato';
     case 'semBeneficiario':
       return 'informar o beneficiário dos itens';
+    case 'entregaAtrasada':
+      return 'acompanhar com a SFC/CGLIC';
+    case 'noExercito':
+      return 'aguardar a autorização do Exército';
     case 'semNota':
     default:
       return 'procurar a nota pelo contrato';

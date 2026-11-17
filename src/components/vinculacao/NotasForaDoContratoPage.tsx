@@ -42,6 +42,7 @@ import {
   tipoDaNota,
   type SegmentoNotaFora
 } from './notasForaDoContrato';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 interface Filtros {
   situacao: SegmentoNotaFora;
@@ -520,11 +521,11 @@ const PainelDaNota: React.FC<{
                       <span style={{ minWidth: 0 }}>
                         <strong>{c.numero}</strong>{' '}
                         {c.contractKey === n.contratoPeloPedido ? (
-                          <StatusBadge label="Contrato do pedido" variant="info" size="sm" dot={false} />
+                          <StatusBadge label="Contrato do pedido" variant={COR_DA_SITUACAO.ANDAMENTO} size="sm" dot={false} />
                         ) : i === 0 && tipo === 'INCLUIR' ? (
-                          <StatusBadge label="Contrato novo" variant="success" size="sm" dot={false} />
+                          <StatusBadge label="Contrato novo" variant={COR_DA_SITUACAO.ANDAMENTO} size="sm" dot={false} />
                         ) : i === 0 ? (
-                          <StatusBadge label="1ª sugestão" variant="success" size="sm" dot={false} />
+                          <StatusBadge label="1ª sugestão" variant={COR_DA_SITUACAO.ANDAMENTO} size="sm" dot={false} />
                         ) : null}
                         <ul style={{ margin: '0.3rem 0 0', padding: 0, listStyle: 'none', fontSize: '0.76rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                           {motivosDoContrato(n, c).map((m) => (

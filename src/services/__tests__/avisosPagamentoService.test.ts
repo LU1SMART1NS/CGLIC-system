@@ -1,19 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { calcularAvisosPagamento, type FaturaParaAviso } from '../avisosPagamentoService';
-import type { EntregaPrevista, ExpectativaPagamento } from '../expectativaPagamentoService';
+import type { ExpectativaPagamento } from '../expectativaPagamentoService';
+import type { EntregaParaPagamento } from '../entregasParaPagamentoService';
 
 const marca = (contractKey: string, tipo: ExpectativaPagamento['tipo'] = 'MENSAL'): [string, ExpectativaPagamento] => [
   contractKey,
   { contractKey, tipo, valorMensal: null, observacao: null, atualizadoPorNome: null, atualizadoEm: '' }
 ];
-const entrega = (o: Partial<EntregaPrevista>): EntregaPrevista => ({
-  id: 'e1', contractKey: 'A', dataPrevista: '2026-09-15', valor: 1000, empenhoCanonicalKey: null, descricao: 'Lote 1',
-  situacao: 'PREVISTA', motivoCancelamento: null, criadoPorNome: null, ...o
-});
+const entrega = (o: Partial<EntregaParaPagamento>): EntregaParaPagamento => ({ contractKey: 'A', situacao: 'ENTREGUE', data: '2026-09-15', itens: 3, valor: 1000, semPreco: 0, ...o });
 const fatura = (o: Partial<FaturaParaAviso>): FaturaParaAviso => ({ contractKey: 'A', emissao: '2026-10-02', referencia: '09/2026', cancelada: false, ...o });
 const base = {
   marcas: new Map<string, ExpectativaPagamento>(),
-  entregas: [] as EntregaPrevista[],
+  entregas: [] as EntregaParaPagamento[],
   faturas: [] as FaturaParaAviso[],
   ciclos: [],
   contratosVigentes: new Set(['A', 'B'])
@@ -65,16 +63,17 @@ describe('nota mensal que não chegou', () => {
   });
 });
 
-describe('entrega prevista sem nota', () => {
-  it('dentro da tolerância: nada; depois: aviso', () => {
-    const entregas = [entrega({ dataPrevista: '2026-10-01' })];
-    expect(calcularAvisosPagamento({ ...base, entregas, hoje: new Date(2026, 9, 7) })).toHaveLength(0);
+describe('item entregue pela Fiscalização sem nota (regras pagamento.notaAposEntrega*)', () => {
+  it('até 10 dias da entrega: nada; depois: aviso; depois de 30: urgente', () => {
+    const entregas = [entrega({ data: '2026-10-01' })];
+    expect(calcularAvisosPagamento({ ...base, entregas, hoje: new Date(2026, 9, 11) })).toHaveLength(0);
     const [a] = calcularAvisosPagamento({ ...base, entregas, hoje: new Date(2026, 9, 14) });
-    expect(a).toMatchObject({ tipo: 'ENTREGA_SEM_NOTA', contractKey: 'A', badgeLabel: 'Entrega de 01/10 sem nota' });
+    expect(a).toMatchObject({ tipo: 'ENTREGA_SEM_NOTA', contractKey: 'A', severity: 'ATENCAO', title: 'Nota não chegou: 3 itens entregues em 01/10', badgeLabel: 'Entrega de 01/10 sem nota' });
+    expect(calcularAvisosPagamento({ ...base, entregas, hoje: new Date(2026, 10, 5) })[0].severity).toBe('URGENTE');
   });
-  it('nota emitida perto da entrega ou entrega cancelada: nada', () => {
-    const hoje = new Date(2026, 9, 14);
-    expect(calcularAvisosPagamento({ ...base, entregas: [entrega({ dataPrevista: '2026-10-01' })], faturas: [fatura({ emissao: '2026-09-29', referencia: null })], hoje })).toHaveLength(0);
-    expect(calcularAvisosPagamento({ ...base, entregas: [entrega({ dataPrevista: '2026-10-01', situacao: 'CANCELADA' })], hoje })).toHaveLength(0);
+  it('nota emitida depois da entrega, ou item ainda a entregar: nada', () => {
+    const hoje = new Date(2026, 9, 20);
+    expect(calcularAvisosPagamento({ ...base, entregas: [entrega({ data: '2026-10-01' })], faturas: [fatura({ emissao: '2026-10-05', referencia: null })], hoje })).toHaveLength(0);
+    expect(calcularAvisosPagamento({ ...base, entregas: [entrega({ data: '2026-10-01', situacao: 'A_ENTREGAR' })], hoje })).toHaveLength(0);
   });
 });

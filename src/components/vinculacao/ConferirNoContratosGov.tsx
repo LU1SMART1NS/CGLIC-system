@@ -30,6 +30,7 @@ import { uasgDaChave } from '../financeiro/useContratosDoFinanceiro';
 import { normalizarBusca } from '../financeiro/financeiroFormat';
 import { abrirContratosGov } from './vinculacaoEmpenhos';
 import { textoDaConferenciaDaNota, type ContratoDaConferenciaDaNota } from './conferenciaNota';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 interface ContratoDaLinha extends ContratoDaConferenciaDaNota {
   gestorNome?: string;
@@ -55,10 +56,10 @@ const SCHEMA: CarteiraFilterSchema<Filtros> = {
   busca: { param: 'busca', default: '' }
 };
 const COR: Record<TipoDeConferenciaDaNota, StatusBadgeVariant> = {
-  ITEM_FORA_DO_CONTRATO: 'danger',
-  ITEM_COM_OUTRO_PRECO: 'warning',
-  CONTRATO_SEM_ITENS: 'info',
-  VINCULO_DIFERENTE_DA_NOTA: 'warning'
+  ITEM_FORA_DO_CONTRATO: COR_DA_SITUACAO.URGENTE,
+  ITEM_COM_OUTRO_PRECO: COR_DA_SITUACAO.ATENCAO,
+  CONTRATO_SEM_ITENS: COR_DA_SITUACAO.ANDAMENTO,
+  VINCULO_DIFERENTE_DA_NOTA: COR_DA_SITUACAO.ATENCAO
 };
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
 const rotulo: React.CSSProperties = { fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' };

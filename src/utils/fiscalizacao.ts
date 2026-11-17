@@ -1,4 +1,5 @@
 import type { ContratoFiscalizacao, SituacaoFiscalizacao } from '../services/fiscalizacaoService';
+import { PESO_TAREFA_ABERTA } from '../components/atas/distribuicao/complexidade';
 
 /** Nome do setor nas telas (decisão de 10/11/2026). */
 export const NOME_SFC = 'SFC/CGLIC';
@@ -89,8 +90,13 @@ export interface CargaDoFiscal {
   nome: string;
   /** Perfil quando não é o de Gestor de Fiscalização (ex.: "Coordenador"): etiqueta no cartão. */
   outroPerfil?: string;
+  /** Contratos que pesam na carga: vigentes, ou vencidos com item da SFC/CGLIC em aberto. */
   contratos: number;
+  /** Todos os contratos em que é o fiscal, inclusive os encerrados (é o que a transferência leva). */
+  total: number;
   aAutuar: number;
+  /** Próximos passos com o fiscal na mesa dos contratos em carga (um passo em lote conta uma vez). */
+  passos?: number;
 }
 
 /** Servidor ativo que pode aparecer como fiscal; `perfil` vem da lista de usuários (gestor_fiscalizacao, coordenador…). */
@@ -121,19 +127,32 @@ export function idsDosFiscaisComContrato(contratos: ContratoFiscalizacao[]): Set
 }
 
 /** Contratos por fiscal, com os que faltam autuar. */
-export function cargaPorFiscal(contratos: ContratoFiscalizacao[], servidores: ServidorFiscal[], rotuloDoPerfil: (perfil: string) => string = rotuloPadraoDoPerfil): CargaDoFiscal[] {
+/**
+ * Carga de cada fiscal. `foraDaCarga` (contratosForaDaCarga) tira da conta os contratos encerrados ou vencidos sem item
+ * em aberto: continuam com o fiscal (`total`), mas não pesam na média nem na pressão. `passos` (passosComOFiscal) traz
+ * o trabalho em aberto de cada contrato.
+ */
+export function cargaPorFiscal(
+  contratos: ContratoFiscalizacao[],
+  servidores: ServidorFiscal[],
+  { foraDaCarga = new Set<string>(), passos }: { foraDaCarga?: ReadonlySet<string>; passos?: ReadonlyMap<string, number> } = {},
+  rotuloDoPerfil: (perfil: string) => string = rotuloPadraoDoPerfil
+): CargaDoFiscal[] {
   return fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos))
     .map((f) => {
       const titular = contratos.filter((c) => comSfc(c) && c.fiscalUserId === f.id);
+      const emCarga = titular.filter((c) => !foraDaCarga.has(c.contractKey));
       return {
         userId: f.id,
         nome: f.nome,
         ...(f.perfil && f.perfil !== PERFIL_FISCAL ? { outroPerfil: rotuloDoPerfil(f.perfil) } : {}),
-        contratos: titular.length,
-        aAutuar: titular.filter((c) => !autuado(c)).length
+        contratos: emCarga.length,
+        total: titular.length,
+        aAutuar: emCarga.filter((c) => !autuado(c)).length,
+        ...(passos ? { passos: emCarga.reduce((soma, c) => soma + (passos.get(c.contractKey) ?? 0), 0) } : {})
       };
     })
-    .sort((a, b) => b.contratos - a.contratos || a.nome.localeCompare(b.nome, 'pt-BR'));
+    .sort((a, b) => b.contratos - a.contratos || b.total - a.total || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 export type RelacaoComEquipe = 'ACIMA' | 'NA_MEDIA' | 'ABAIXO';
@@ -154,12 +173,16 @@ export interface OcupacaoDoFiscal {
  * (a fiscalização não tem peso de complexidade nem nível). Gestor de Fiscalização vale 100%; Coordenador entra com
  * metade (divide o tempo com a coordenação); outro perfil (ex.: Gestor) aparece mas fica fora da média. Faixa ±25%.
  */
+/** Carga do fiscal em pontos: cada contrato vale 1 e cada passo com ele vale meio ponto, como as tarefas dos gestores. */
+export const cargaEmPontos = (f: Pick<CargaDoFiscal, 'contratos' | 'passos'>): number => f.contratos + PESO_TAREFA_ABERTA * (f.passos ?? 0);
+
 export function mediaDaEquipeFiscal(carga: CargaDoFiscal[]): { media: number | null; porFiscal: Map<string, OcupacaoDoFiscal> } {
   const capacidade = (f: CargaDoFiscal) => (!f.outroPerfil ? 1 : f.outroPerfil === 'Coordenador' ? CAPACIDADE_COORDENADOR_FISCAL : null);
   const porFiscal = new Map<string, OcupacaoDoFiscal>();
   for (const f of carga) {
     const c = capacidade(f);
-    porFiscal.set(f.userId, { ocupacao: c ? f.contratos / c : f.contratos, relacao: null });
+    const pontos = cargaEmPontos(f);
+    porFiscal.set(f.userId, { ocupacao: c ? pontos / c : pontos, relacao: null });
   }
   const naConta = carga.filter((f) => f.contratos > 0 && capacidade(f) !== null);
   if (naConta.length < 2) return { media: null, porFiscal };

@@ -7,7 +7,7 @@ import { ROTULOS_FINANCEIRO, useFaturasCarteira } from '../../hooks/useFinanceir
 import { ROTULO_EXPECTATIVAS } from '../../hooks/usePrevisaoMensal';
 import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
 import { useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
-import { useExpectativasPagamento } from '../../hooks/useExpectativasPagamento';
+import { useEntregasParaPagamento, useExpectativasPagamento } from '../../hooks/useExpectativasPagamento';
 import { CarteiraSegmentTabs } from '../carteira/CarteiraSegmentTabs';
 import { CarteiraFilterBar, CarteiraGestorSelect, carteiraCounter } from '../carteira/CarteiraFilterBar';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
@@ -53,7 +53,8 @@ export const PrevisaoContratos: React.FC = () => {
 
   const { lista: contratos, escopo, showGestorFilter, isLoading: carregandoContratos, leituras: leiturasContratos } = useContratosDoFinanceiro();
   const faturas = useFaturasCarteira();
-  const { marcas, entregas, isLoading: carregandoMarcas, definir, consulta: expectativasQuery } = useExpectativasPagamento();
+  const { marcas, isLoading: carregandoMarcas, definir, consulta: expectativasQuery } = useExpectativasPagamento();
+  const { entregas } = useEntregasParaPagamento();
   // Uma fonte que falha não some calada: sem as faturas não há sugestão de mensal; sem as marcas, todos parecem sem marca.
   const leituras = useLeiturasComFalha([
     ...leiturasContratos,
@@ -81,7 +82,7 @@ export const PrevisaoContratos: React.FC = () => {
           marca,
           historico,
           sugestao: sugerirExpectativa(historico, meses.length),
-          entregas: entregas.filter((e) => e.contractKey === c.contractKey && e.situacao === 'PREVISTA' && e.dataPrevista >= hoje),
+          entregas: entregas.filter((e) => e.contractKey === c.contractKey && e.situacao === 'A_ENTREGAR' && e.data >= hoje),
           classe: 'SEM_CLASSE'
         };
         linha.classe = classeDaLinha(linha);

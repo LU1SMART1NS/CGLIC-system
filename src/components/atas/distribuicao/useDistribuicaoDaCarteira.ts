@@ -25,8 +25,17 @@ export function useDistribuicaoDaCarteira({
   contratos,
   links,
   ajustes,
-  capacidadeDoGestor
-}: Carteira & { ajustes?: Record<string, ComplexidadeAjuste>; capacidadeDoGestor?: (gestorNome: string) => number }) {
+  capacidadeDoGestor,
+  tarefasAbertas,
+  faturasAbertas
+}: Carteira & {
+  ajustes?: Record<string, ComplexidadeAjuste>;
+  capacidadeDoGestor?: (gestorNome: string) => number;
+  /** Fila de cada instrumento (useTarefasAbertas); sem ela, a carga fica só pela complexidade. */
+  tarefasAbertas?: Record<string, number>;
+  /** Faturas do Financeiro que precisam de ação, por contrato (useFaturasNaFila). */
+  faturasAbertas?: Record<string, number>;
+}) {
   return useMemo(
     () =>
       buildDistribuicaoEquipe({
@@ -55,8 +64,10 @@ export function useDistribuicaoDaCarteira({
         links,
         attentionItems: contratos.attentionItems,
         ajustes,
-        capacidadeDoGestor
+        capacidadeDoGestor,
+        tarefasAbertas,
+        faturasAbertas
       }),
-    [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes, capacidadeDoGestor]
+    [atas.scopedArps, atas.gestorByAta, atas.itemsByAta, contratos.rows, contratos.attentionItems, links, ajustes, capacidadeDoGestor, tarefasAbertas, faturasAbertas]
   );
 }

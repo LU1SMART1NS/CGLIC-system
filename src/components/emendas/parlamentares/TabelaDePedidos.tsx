@@ -12,6 +12,8 @@ import { faltaAnoDaEmenda, numeroDoPedido, rotaDoPedido } from '../../../utils/e
 import type { ConferenciaEmpenho, ItemCaep, NotaDaLinha, PedidoEmenda } from '../../../services/emendasService';
 import type { PrecoDoItem } from '../../../services/emendasQuadroService';
 import type { CredorNoPedido } from '../../../utils/emendasConferenciaNota';
+import { useEntregasDasEmendas } from '../../../hooks/useFiscalizacao';
+import { entregaDoPedido, VARIANTE_DA_ENTREGA } from '../../../utils/emendasEntrega';
 
 interface Props {
   pedidos: PedidoEmenda[];
@@ -32,6 +34,9 @@ export const TabelaDePedidos: React.FC<Props> = ({ pedidos, itens, notas, precos
   const navegar = useNavigateWithOrigin();
   const { data: beneficiariosLista = [] } = useBeneficiariosEmendas();
   const beneficiarios = React.useMemo(() => new Map(beneficiariosLista.map((b) => [b.id, b])), [beneficiariosLista]);
+  // Entrega pela Fiscalização: só os avisos (atrasada, no Exército); a etapa da entrega fica na lista de Pedidos e no Pedido 360.
+  const { porLinha: entregas } = useEntregasDasEmendas();
+  const entregaDe = React.useMemo(() => new Map(pedidos.map((p) => [p.id, entregaDoPedido(p, notas, entregas, hoje)])), [pedidos, notas, entregas, hoje]);
   const colunasPedidos: Column<PedidoEmenda>[] = [
     {
       key: 'pedido',
@@ -72,7 +77,8 @@ export const TabelaDePedidos: React.FC<Props> = ({ pedidos, itens, notas, precos
       header: 'Etapa',
       nowrap: true,
       render: (p) => {
-        return <StatusBadge label={rotuloDaEtapaDoPedido(p, notas)} variant={p.etapa === 'CANCELADO' ? 'neutral' : p.etapa === 'EMPENHADO' || p.etapa === 'CONTRATACAO' ? 'success' : 'info'} size="sm" dot={false} />;
+        const e = entregaDe.get(p.id);
+        return <StatusBadge label={e?.rotulo ?? rotuloDaEtapaDoPedido(p, notas)} variant={e ? VARIANTE_DA_ENTREGA[e.passo] : p.etapa === 'CANCELADO' ? 'neutral' : p.etapa === 'EMPENHADO' || p.etapa === 'CONTRATACAO' ? 'success' : 'info'} size="sm" dot={false} />;
       }
     },
     {
@@ -80,7 +86,7 @@ export const TabelaDePedidos: React.FC<Props> = ({ pedidos, itens, notas, precos
       header: 'Aviso',
       nowrap: true,
       render: (p) => {
-        const [a, ...outros] = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credor.get(p.id), precos);
+        const [a, ...outros] = avisosDoPedido(p, itens, hoje, notas, diferencas.get(p.id), credor.get(p.id), precos, entregaDe.get(p.id));
         if (!a) return <span style={carteiraDetalhe}>—</span>;
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>

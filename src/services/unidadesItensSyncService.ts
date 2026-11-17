@@ -171,7 +171,7 @@ async function fetchLeituras(): Promise<Map<string, LeituraDaCopia>> {
   return leituras;
 }
 
-type LinhaParaGravar = {
+export type LinhaParaGravar = {
   item_key: string;
   unidades: Array<Partial<UnidadeItemRecord>>;
   /** Ausente quando as adesões não puderam ser lidas com confiança (a cópia delas fica como está). */
@@ -208,6 +208,79 @@ async function gravar(uasg: string, lote: LinhaParaGravar[]): Promise<number> {
   return typeof data === 'number' ? data : 0;
 }
 
+/**
+ * Itens lidos ao mesmo tempo. Um de cada vez, uma resposta lenta do Compras.gov.br (até 30 s quando a consulta não
+ * está no cache dela) segurava a fila: a 200331 lia ~24 itens por execução, para 20 por hora exigidos (480 itens de
+ * atas vigentes relidos a cada 24 h), e ficou PARCIAL desde 14/11/2026 com até 32 h de atraso. A API aguentou 5
+ * consultas simultâneas sem demora (17/11/2026); 3 é o que a sincronização das notas já usa.
+ */
+export const LEITURAS_SIMULTANEAS_UNIDADES = 3;
+
+export interface ResumoDaFila {
+  copiados: number;
+  vazios: number;
+  falhas: number;
+  incompletos: number;
+  falhasAdesoes: number;
+  /** Itens que não começaram dentro do orçamento de tempo (ficam para a próxima execução). */
+  pendentes: number;
+}
+
+/**
+ * Lê a fila com até `concorrencia` itens ao mesmo tempo e grava em lotes de LOTE_GRAVACAO, um lote por vez.
+ * Item novo só começa dentro do orçamento; os que já começaram terminam.
+ */
+export async function lerFila(
+  fila: ItemDaCarteira[],
+  opts: {
+    ler: (item: ItemDaCarteira) => Promise<{ linha: LinhaParaGravar; falhaAdesoes: boolean }>;
+    gravar: (lote: LinhaParaGravar[]) => Promise<number>;
+    orcamentoMs: number;
+    inicio: number;
+    agora: () => number;
+    concorrencia?: number;
+  }
+): Promise<ResumoDaFila> {
+  const resumo: ResumoDaFila = { copiados: 0, vazios: 0, falhas: 0, incompletos: 0, falhasAdesoes: 0, pendentes: 0 };
+  let lote: LinhaParaGravar[] = [];
+  let gravacoes: Promise<void> = Promise.resolve();
+  // Gravações em fila: um lote só sai depois do anterior (a função do banco grava item a item).
+  const gravarLote = (linhas: LinhaParaGravar[]) => {
+    gravacoes = gravacoes.then(async () => {
+      resumo.copiados += await opts.gravar(linhas);
+    });
+    return gravacoes;
+  };
+
+  let proximo = 0;
+  const trabalhador = async () => {
+    while (proximo < fila.length) {
+      if (opts.agora() - opts.inicio > opts.orcamentoMs) return;
+      const item = fila[proximo++];
+      try {
+        const { linha, falhaAdesoes } = await opts.ler(item);
+        if (linha.unidades.length === 0) resumo.vazios++;
+        if (falhaAdesoes) resumo.falhasAdesoes++;
+        lote.push(linha);
+      } catch (err) {
+        if (err instanceof UnidadesItemIncompletasError) resumo.incompletos++;
+        else resumo.falhas++;
+        console.warn(`[unidadesItens] órgãos do item ${item.itemKey} não puderam ser lidos:`, mensagemDeErro(err));
+      }
+      if (lote.length >= LOTE_GRAVACAO) {
+        const cheio = lote;
+        lote = [];
+        await gravarLote(cheio);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, opts.concorrencia ?? LEITURAS_SIMULTANEAS_UNIDADES) }, trabalhador));
+  if (lote.length > 0) await gravarLote(lote);
+  await gravacoes;
+  resumo.pendentes = fila.length - proximo;
+  return resumo;
+}
+
 /** Quantos itens da UASG estão na fila de leitura (modo de teste do servidor; não grava nada). */
 export async function contarUnidadesItensPendentes(uasg: string, agora: number = Date.now()): Promise<{ itens: number; pendentes: number }> {
   const itens = await fetchItensDaCarteira((uasg || '').trim());
@@ -232,36 +305,13 @@ export async function sincronizarUnidadesItens(
       const itens = await fetchItensDaCarteira(cleanUasg);
       const fila = itensParaLer(itens, await fetchLeituras(), { agora: inicio, forcar: opts.forcar });
 
-      let copiados = 0;
-      let vazios = 0;
-      let falhas = 0;
-      let incompletos = 0;
-      let falhasAdesoes = 0;
-      let pendentes = 0;
-      let lote: LinhaParaGravar[] = [];
-
-      for (let i = 0; i < fila.length; i++) {
-        if (agora() - inicio > orcamento) {
-          pendentes = fila.length - i;
-          break;
-        }
-        const item = fila[i];
-        try {
-          const { linha, falhaAdesoes } = await lerItemNasFontes(item);
-          if (linha.unidades.length === 0) vazios++;
-          if (falhaAdesoes) falhasAdesoes++;
-          lote.push(linha);
-        } catch (err) {
-          if (err instanceof UnidadesItemIncompletasError) incompletos++;
-          else falhas++;
-          console.warn(`[unidadesItens] órgãos do item ${item.itemKey} não puderam ser lidos:`, mensagemDeErro(err));
-        }
-        if (lote.length >= LOTE_GRAVACAO) {
-          copiados += await gravar(cleanUasg, lote);
-          lote = [];
-        }
-      }
-      copiados += await gravar(cleanUasg, lote);
+      const { copiados, vazios, falhas, incompletos, falhasAdesoes, pendentes } = await lerFila(fila, {
+        ler: (item) => lerItemNasFontes(item),
+        gravar: (lote) => gravar(cleanUasg, lote),
+        orcamentoMs: orcamento,
+        inicio,
+        agora
+      });
 
       const problemas: string[] = [];
       if (falhas > 0) problemas.push(`${falhas} ${falhas === 1 ? 'item não teve os órgãos lidos' : 'itens não tiveram os órgãos lidos'}`);
@@ -321,4 +371,30 @@ export async function lerCopiaAdesoesItem(itemKey: string): Promise<CopiaAdesoes
   if (error) throw error;
   if (!data?.adesoes_copiado_em || !Array.isArray(data.adesoes)) return null;
   return { adesoes: data.adesoes as AdesaoItemRecord[], copiadoEm: data.adesoes_copiado_em };
+}
+
+export interface CopiaDoItem {
+  unidades: CopiaUnidadesItem | null;
+  adesoes: CopiaAdesoesItem | null;
+}
+
+/**
+ * Órgãos e adesões guardados pelo servidor numa só leitura (uma linha por item, ~1 ms no banco). A tela do Item abre
+ * com ela enquanto confere o Compras.gov.br, que leva até 17 s na primeira consulta do item (medido em 16/11/2026).
+ */
+export async function lerCopiaDoItem(itemKey: string): Promise<CopiaDoItem> {
+  if (!supabase || !itemKey) return { unidades: null, adesoes: null };
+  const { data, error } = await supabase
+    .from('itens_ata_unidades_copia')
+    .select('unidades, copiado_em, adesoes, adesoes_copiado_em')
+    .eq('item_key', itemKey)
+    .maybeSingle();
+  if (error) throw error;
+  const unidades = data?.copiado_em && Array.isArray(data.unidades) && data.unidades.length > 0
+    ? { unidades: juntarUnidadesRepetidas(data.unidades as UnidadeItemRecord[]).unidades, copiadoEm: data.copiado_em as string }
+    : null;
+  const adesoes = data?.adesoes_copiado_em && Array.isArray(data.adesoes)
+    ? { adesoes: data.adesoes as AdesaoItemRecord[], copiadoEm: data.adesoes_copiado_em as string }
+    : null;
+  return { unidades, adesoes };
 }

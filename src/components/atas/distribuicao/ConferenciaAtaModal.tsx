@@ -292,7 +292,7 @@ export const ConferenciaAtaModal: React.FC<ConferenciaAtaModalProps> = ({ contra
                   <input type="checkbox" checked={marcado} onChange={() => alternar(i.numeroItem)} disabled={!podeAgir || ocupado} data-testid={`conferencia-item-${i.numeroItem}`} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--primary)' }}>Item {i.numeroItem}</span>
-                    {!ok && marcado && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-warning-text)' }}>não confirmado pela API</span>}
+                    {!ok && marcado && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-warning-text)' }}>não confirmado pelo Contratos.gov.br</span>}
                     {i.descricao && (
                       <span title={i.descricao} style={{ display: 'block', fontSize: '0.78rem', color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {i.descricao}

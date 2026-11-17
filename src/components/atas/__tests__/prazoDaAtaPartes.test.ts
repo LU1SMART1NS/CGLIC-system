@@ -17,7 +17,18 @@ describe('prazo de entrega da ata na aba Ações (migration 301)', () => {
     expect(itemDoPrazoDaAta({ ...base, leitura: 'SEM_CLAUSULA', sugeridoDias: null, sugeridoInicio: null })).toMatchObject({ title: 'Informar o prazo de entrega', badgeLabel: 'informar' });
   });
   it('confirmado ou sem linha: nada a fazer', () => {
-    expect(itemDoPrazoDaAta({ ...base, confirmadoEm: '2026-11-13T12:00:00Z', dias: 90, contagem: 'CORRIDOS', inicio: 'EXERCITO' })).toBeNull();
+    expect(itemDoPrazoDaAta({ ...base, confirmadoEm: '2026-11-13T12:00:00Z', dias: 90, contagem: 'CORRIDOS', inicio: 'EXERCITO', recebimentoConfirmadoEm: '2026-11-13T12:00:00Z' })).toBeNull();
+    // Entrega confirmada, recebimento não (migration 305): pede o recebimento.
+    expect(itemDoPrazoDaAta({ ...base, confirmadoEm: '2026-11-13T12:00:00Z', dias: 90, contagem: 'CORRIDOS', inicio: 'EXERCITO' })).toMatchObject({ title: 'Informar o prazo de recebimento', badgeLabel: 'informar' });
     expect(itemDoPrazoDaAta(null)).toBeNull();
+    // Leitura clara do TR (migration 309): vale sozinha, nada a fazer.
+    expect(itemDoPrazoDaAta({ ...base, confirmadoEm: '2026-11-13T12:00:00Z', dias: 60, contagem: 'CORRIDOS', inicio: 'OF_RECEBIMENTO', confirmadoAutomatico: true, recebimentoConfirmadoEm: '2026-11-13T12:00:00Z', recebimentoAutomatico: true })).toBeNull();
+  });
+});
+
+describe('ata nova, fora da leitura dos editais (migration 302)', () => {
+  it('com contrato, pede para informar; sem contrato, nada', () => {
+    expect(itemDoPrazoDaAta(null, true, '00090/2026')).toMatchObject({ kind: 'PRAZO', title: 'Informar o prazo de entrega', badgeLabel: 'informar' });
+    expect(itemDoPrazoDaAta(null, false, '00090/2026')).toBeNull();
   });
 });

@@ -22,7 +22,7 @@ const empenho = (o: Partial<EmpenhoCarteiraRow>): EmpenhoCarteiraRow => ({
   credorNome: null, credorDocumento: null, valorEmpenhado: 1000, valorPago: 0, saldo: 1000, contractKeys: ['A'], planoInterno: null, naturezaDespesa: null, ...o
 });
 const dados = (o: Partial<DadosDaPrevisao>): DadosDaPrevisao => ({
-  mesAlvo: '2026-11', faturas: [], ciclos: [], ligacoes: [], empenhos: [empenho({})], marcas: new Map(), entregas: [], historicos: new Map(),
+  mesAlvo: '2026-11', faturas: [], ciclos: [], ligacoes: [], empenhos: [empenho({})], marcas: new Map(), historicos: new Map(),
   ajustes: [], contratosVigentes: new Set(['A', 'B']), ...o
 });
 const marca = (contractKey: string, valorMensal: number | null = null) =>
@@ -122,22 +122,19 @@ describe('montagem das linhas', () => {
     expect(l).toMatchObject({ chave: 'mensal-B', valor: 0, semValor: true });
   });
 
-  it('entrega entra no mês dela; os ajustes retiram, corrigem e marcam emenda', () => {
-    const entregas = [
-      { id: 'x', contractKey: 'A', dataPrevista: '2026-11-20', valor: 2000, empenhoCanonicalKey: '200331-2026-2026NE412', descricao: 'viaturas', situacao: 'PREVISTA' as const, motivoCancelamento: null, criadoPorNome: null },
-      { id: 'y', contractKey: 'A', dataPrevista: '2026-12-20', valor: 9, empenhoCanonicalKey: null, descricao: 'outra', situacao: 'PREVISTA' as const, motivoCancelamento: null, criadoPorNome: null }
-    ];
+  it('entrega da Fiscalização entra; os ajustes retiram, corrigem e marcam emenda', () => {
+    const entregasFiscalizacao = [{ contractKey: 'A', nota: '2026NE000412', itens: 2, valor: 2000, semPreco: 0, primeira: '2026-10-20', ultima: '2026-10-20' }];
     const ajustes = [
       { chave: 'fatura-1', retirada: true, valor: null, subitem: null, emenda: null, contractKey: null, empenhoKey: null, descricao: null, ajustadoPorNome: null },
-      { chave: 'entrega-x', retirada: false, valor: 1500, subitem: '52', emenda: true, contractKey: null, empenhoKey: null, descricao: null, ajustadoPorNome: null },
+      { chave: 'fisc-A-2026NE000412', retirada: false, valor: 1500, subitem: '52', emenda: true, contractKey: null, empenhoKey: null, descricao: null, ajustadoPorNome: null },
       { chave: 'manual-1', retirada: false, valor: 300, subitem: null, emenda: null, contractKey: 'B', empenhoKey: null, descricao: 'reparo', ajustadoPorNome: null }
     ];
-    const linhas = montarPrevisao(dados({ faturas: [fatura({})], entregas, ajustes }));
+    const linhas = montarPrevisao(dados({ faturas: [fatura({})], entregasFiscalizacao, ajustes }));
     expect(linhas.find((l) => l.chave === 'fatura-1')!.retirada).toBe(true);
-    expect(linhas.find((l) => l.chave === 'entrega-x')).toMatchObject({ valor: 1500, valorOriginal: 2000, subitem: '52', emenda: true, ajustada: true });
-    expect(linhas.find((l) => l.chave === 'entrega-y')).toBeUndefined();
+    expect(linhas.find((l) => l.chave === 'fisc-A-2026NE000412')).toMatchObject({ valor: 1500, valorOriginal: 2000, subitem: '52', emenda: true, ajustada: true });
     expect(linhas.find((l) => l.chave === 'manual-1')).toMatchObject({ origem: 'MANUAL', valor: 300, contractKey: 'B' });
   });
+
 
   it('avisa quando o empenho não cobre as linhas mantidas', () => {
     const linhas = montarPrevisao(dados({ empenhos: [empenho({ saldo: 150 })], faturas: [fatura({ idFatura: 1 }), fatura({ idFatura: 2 })] }));
@@ -179,5 +176,25 @@ describe('previsto × pago', () => {
     expect(r.find((l) => l.contractKey === 'B')).toMatchObject({ previsto: 300, pago: 0 });
     expect(r.find((l) => l.contractKey === 'C')).toMatchObject({ previsto: 0, pago: 80 });
     expect(r[0].contractKey).toBe('B'); // maior diferença primeiro
+  });
+});
+
+describe('entregas previstas pela Fiscalização (migration 304)', () => {
+  it('uma linha por contrato × nota, com a nota da emenda; sem nota, o empenho do contrato com mais saldo', () => {
+    const linhas = montarPrevisao(
+      dados({
+        empenhos: [empenho({}), empenho({ empenhoId: 'e2', canonicalKey: '200331-2026-2026NE157', numero: '2026NE000157', saldo: 50, contractKeys: ['B'] }), empenho({ empenhoId: 'e3', canonicalKey: '200331-2026-2026NE900', numero: '2026NE000900', saldo: 9000, contractKeys: ['B'] })],
+        entregasFiscalizacao: [
+          { contractKey: 'B', nota: '2026NE000157', itens: 3, valor: 300, semPreco: 0, primeira: '2026-10-05', ultima: '2026-10-20' },
+          { contractKey: 'A', nota: null, itens: 1, valor: 0, semPreco: 1, primeira: '2026-10-12', ultima: '2026-10-12' }
+        ]
+      })
+    );
+    const b = linhas.find((l) => l.chave === 'fisc-B-2026NE000157');
+    expect(b).toMatchObject({ origem: 'ENTREGA', empenho: '2026NE000157', valor: 300, emenda: true, semValor: false });
+    expect(b?.detalhe).toBe('Fiscalização: 3 itens com entrega prevista de 05/10 a 20/10');
+    const a = linhas.find((l) => l.chave === 'fisc-A-sem-nota');
+    expect(a).toMatchObject({ empenho: '2026NE000412', semValor: true });
+    expect(a?.detalhe).toBe('Fiscalização: 1 item com entrega prevista em 12/10 · 1 sem preço no contrato');
   });
 });

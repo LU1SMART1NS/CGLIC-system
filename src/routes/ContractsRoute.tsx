@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { PageContainer } from '../design-system/components/PageContainer';
 import { useContractsPortfolio } from '../hooks/useContractsPortfolio';
 import { canAssignManager, destinoContratoSemGestor } from '../components/carteira/ManagerAssign';
@@ -23,6 +23,20 @@ import { comparePrazo, matchesStatusFilter } from '../components/carteira/cartei
 import { ErrorState } from '../design-system/components/ErrorState';
 import { SkeletonLoader } from '../design-system/components/SkeletonLoader';
 import { AlocacoesFalhaNotice } from '../components/carteira/AlocacoesFalhaNotice';
+import { ConfirmarExecucaoModal } from '../components/contracts/portfolio/ConfirmarExecucaoModal';
+import { NoticeBar } from '../design-system/components/NoticeBar';
+import { AppButton } from '../design-system/components/AppButton';
+import { FontesComFalhaAviso } from '../components/fonte/FontesComFalhaAviso';
+import { useLeiturasComFalha } from '../components/fonte/useLeiturasComFalha';
+import { podeDecidirExecucao } from '../hooks/useContratosExecucao';
+import { estadoDaExecucao, pendenciasDoFechamento } from '../utils/contratoExecutado';
+import type { ContractPortfolioRow as Linha } from '../components/contracts/portfolio/ContractsPortfolioTable';
+
+const executado = (r: Linha) => estadoDaExecucao(r.execucao) === 'EXECUTADO';
+const sugerido = (r: Linha) => estadoDaExecucao(r.execucao) === 'SUGERIDO';
+/** Pendência na Carteira: aviso aberto, escopo cumprido a confirmar ou, no executado, o que falta para fechar. */
+const temPendencia = (r: Linha) =>
+  sugerido(r) || (executado(r) ? pendenciasDoFechamento(r.execucao).length > 0 : r.pendencias.length > 0);
 
 export const ContractsRoute: React.FC = () => {
   // Dados da carteira (contratos no escopo do usuário, com prazo, gestor e pendências).
@@ -38,8 +52,11 @@ export const ContractsRoute: React.FC = () => {
     carteiraIncompleta,
     tentarDeNovo,
     dataUpdatedAt,
-    refresh
+    refresh,
+    leituraDaExecucao
   } = useContractsPortfolio();
+  const leiturasDaExecucao = useLeiturasComFalha([leituraDaExecucao]);
+  const [execucaoAberta, setExecucaoAberta] = useState<string | null>(null);
   const { role } = useAuth();
   // Unidades internas de cada contrato: as que receberam alocação de algum item vinculado a ele.
   const { unidades, unidadesDoContrato, alocacoesComErro, recarregandoAlocacoes, recarregarAlocacoes } = useCarteiraItens({ apenasUnidadesDeContratos: true });
@@ -54,6 +71,9 @@ export const ContractsRoute: React.FC = () => {
   );
   // O perfil "gestor" já vê só os próprios contratos: sem seletor, e um ?gestor= na URL é ignorado.
   const showGestorFilter = canFilterByGestor(role);
+
+  // Escopo cumprido: o gestor do contrato e o coordenador confirmam (o banco confere o alcance).
+  const podeDecidir = podeDecidirExecucao(role);
 
   // A atribuição de gestor é só na Central de Distribuição; aqui o coordenador tem o atalho até lá.
   const canAssign = canAssignManager(role);
@@ -78,9 +98,13 @@ export const ContractsRoute: React.FC = () => {
     let criticos = 0;
     let atencao = 0;
     let historico = 0;
+    let executados = 0;
     let valorVigenteTotal = 0;
-    for (const { contract, faixa } of allRows) {
+    for (const row of allRows) {
+      const { contract, faixa } = row;
       if (faixa === 'EXPIRADO') historico++;
+      // Escopo cumprido confirmado: fora de Vigentes, Atenção, Crítico e do valor vigente.
+      else if (executado(row)) executados++;
       else if (faixa !== 'SEM_DATA') {
         vigentes++;
         valorVigenteTotal += contract.valorGlobal || contract.valorInicial || 0;
@@ -88,8 +112,11 @@ export const ContractsRoute: React.FC = () => {
         else if (faixa === 'ATENCAO') atencao++;
       }
     }
-    return { vigentes, criticos, atencao, historico, valorVigenteTotal };
+    const sugeridos = allRows.filter((r) => sugerido(r) && r.faixa !== 'EXPIRADO').length;
+    return { vigentes, criticos, atencao, historico, executados, sugeridos, valorVigenteTotal };
   }, [allRows]);
+
+  const linhaDaExecucao = execucaoAberta ? allRows.find((r) => r.contractKey === execucaoAberta) : undefined;
 
   const gestoresDisponiveis = useMemo(() => listGestores(allRows.map((r) => r.gestorNome)), [allRows]);
 
@@ -98,9 +125,11 @@ export const ContractsRoute: React.FC = () => {
     const queryDigits = query.replace(/\D/g, '');
 
     return allRows
-      .filter(({ contract, contractKey, faixa, gestorNome, pendencias, atas }) => {
-        if (!matchesStatusFilter(faixa, filterState.status)) return false;
-        if (filterState.pendencia === 'COM_PENDENCIA' && pendencias.length === 0) return false;
+      .filter((row) => {
+        const { contract, contractKey, faixa, gestorNome, atas } = row;
+        if (!matchesStatusFilter(faixa, filterState.status, executado(row))) return false;
+        if (filterState.pendencia === 'COM_PENDENCIA' && !temPendencia(row)) return false;
+        if (filterState.pendencia === 'ESCOPO_CUMPRIDO' && !sugerido(row)) return false;
         if (filterState.unidade !== TODAS_UNIDADES && !unidadesDoContrato.get(contractKey)?.has(filterState.unidade)) return false;
         if (showGestorFilter && !matchesGestorFilter(gestorNome, filterState.gestor)) return false;
 
@@ -168,11 +197,42 @@ export const ContractsRoute: React.FC = () => {
 
           {alocacoesComErro && <AlocacoesFalhaNotice onRetry={recarregarAlocacoes} isRetrying={recarregandoAlocacoes} />}
 
+          <FontesComFalhaAviso
+            falhas={leiturasDaExecucao.falhas}
+            onTentar={() => void leiturasDaExecucao.tentarDeNovo()}
+            tentando={leiturasDaExecucao.tentando}
+            onde="da carteira"
+            testIdPrefix="contracts-execucao-fontes"
+          />
+
+          {summaryMetrics.sugeridos > 0 && podeDecidir && (
+            <NoticeBar
+              tone="info"
+              testId="contracts-aviso-escopo-cumprido"
+              action={
+                <AppButton
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    handleFilterChange('status', 'VIGENTES');
+                    handleFilterChange('pendencia', 'ESCOPO_CUMPRIDO');
+                  }}
+                >
+                  Ver quais
+                </AppButton>
+              }
+            >
+              {summaryMetrics.sugeridos === 1 ? '1 contrato vigente tem' : `${summaryMetrics.sugeridos} contratos vigentes têm`} as faturas pagas
+              somando o valor do contrato. Confirme o escopo cumprido para tirá-los dos avisos de prorrogação.
+            </NoticeBar>
+          )}
+
           <ContractsPortfolioSummary
             vigentes={summaryMetrics.vigentes}
             criticos={summaryMetrics.criticos}
             atencao={summaryMetrics.atencao}
             historico={summaryMetrics.historico}
+            executados={summaryMetrics.executados}
             totalContratos={allRows.length}
             valorVigenteTotal={summaryMetrics.valorVigenteTotal}
             activeStatus={filterState.status}
@@ -183,7 +243,8 @@ export const ContractsRoute: React.FC = () => {
             filters={filterState}
             gestores={gestoresDisponiveis}
             unidades={unidades}
-            comPendencia={allRows.filter((r) => r.pendencias.length > 0 && matchesStatusFilter(r.faixa, filterState.status)).length}
+            comPendencia={allRows.filter((r) => temPendencia(r) && matchesStatusFilter(r.faixa, filterState.status, executado(r))).length}
+            escopoCumprido={allRows.filter((r) => sugerido(r) && matchesStatusFilter(r.faixa, filterState.status, executado(r))).length}
             showGestorFilter={showGestorFilter}
             onChangeFilter={handleFilterChange}
             onResetFilters={handleResetFilters}
@@ -198,6 +259,15 @@ export const ContractsRoute: React.FC = () => {
             canAssign={canAssign}
             destinoSemGestor={destinoSemGestor}
             onFilter={handleFilterChange}
+            onConfirmarExecucao={podeDecidir ? (row) => setExecucaoAberta(row.contractKey) : undefined}
+          />
+
+          <ConfirmarExecucaoModal
+            isOpen={Boolean(linhaDaExecucao)}
+            numero={linhaDaExecucao ? formatContractNumber(linhaDaExecucao.contract) : ''}
+            fornecedor={linhaDaExecucao?.contract.fornecedorNome}
+            execucao={linhaDaExecucao?.execucao}
+            onClose={() => setExecucaoAberta(null)}
           />
         </>
       )}

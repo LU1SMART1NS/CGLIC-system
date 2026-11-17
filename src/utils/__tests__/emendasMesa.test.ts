@@ -455,7 +455,7 @@ describe('Mesa do pedido: observação e datas do controle anterior (30/10/2026)
     const p = pedido({ origem: 'PLANILHA', minutaEm: null, oficioEm: null, conferidoEm: null });
     const m = mesaDoPedido(p, itens, new Map([['l1', nota('l1')]]), [], HOJE, true, beneficiarios);
     const interlocucao = m.historico.find((f) => f.fase === 'Interlocução')!;
-    expect(interlocucao.registros.map((r) => r.data)).toEqual(['sem data no controle anterior', 'sem data no controle anterior']);
+    expect(interlocucao.registros.map((r) => r.data)).toEqual(['sem data registrada', 'sem data registrada']);
   });
 });
 

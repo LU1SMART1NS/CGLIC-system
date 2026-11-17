@@ -10,6 +10,8 @@ import type { PrazoDaAta } from '../../services/ataPrazoEntregaService';
 import { NoticeBar } from '../../design-system/components/NoticeBar';
 import { carteiraDetalhe } from '../carteira/carteiraStyles';
 import { CarteiraDetailLabel } from '../carteira/CarteiraDetailLabel';
+import { textoDaRegraDeRecebimento, type RegraDoRecebimento } from '../../utils/fiscalizacaoRecebimento';
+import { CamposDoRecebimento, regraValida, type CamposDaRegra } from '../fiscalizacao/PrazoDeRecebimentoModal';
 import { INICIOS, textoDaRegra, type ContagemPrazo, type InicioPrazo } from '../../utils/fiscalizacaoPrazo';
 
 const erroDe = (err: unknown) => (err as { message?: string } | null)?.message || 'erro desconhecido';
@@ -47,19 +49,47 @@ export const PrazoDaAtaModal: React.FC<{
   const [porItemAberto, setPorItemAberto] = useState(Object.keys(p?.porItem ?? {}).length > 0);
   const [porItem, setPorItem] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(p?.porItem ?? {}).map(([k, v]) => [k, String(v)])));
   const [motivo, setMotivo] = useState('');
+  // Recebimento (TRP e TRD): o mesmo TR, na mesma janela. Sem nada no TR: "O TR não diz" (os itens ficam sem aviso).
+  const recebimentoConfirmado = Boolean(p?.recebimentoConfirmadoEm);
+  const recebimentoInicial = (recebimentoConfirmado ? p?.recebimento : p?.recebimentoSugerido) ?? null;
+  const [temRecebimento, setTemRecebimento] = useState(Boolean(recebimentoInicial));
+  const [recebimento, setRecebimento] = useState<CamposDaRegra>(recebimentoInicial ?? { trpDias: 0, trpContagem: 'CORRIDOS', trdDias: 10, trdContagem: 'UTEIS', trdInicio: 'ENTREGA' });
+  const recebimentoFinal = temRecebimento ? recebimento : null;
+  // Substituição do item recusado (migration 311): dias da notificação; vazio = o TR não diz.
+  const substInicial = p?.substituicaoConfirmadaEm ? p?.substituicao : p?.substituicaoSugerida;
+  const [diasSubst, setDiasSubst] = useState<string>(substInicial?.dias ? String(substInicial.dias) : '');
+  const [contagemSubst, setContagemSubst] = useState<ContagemPrazo>(substInicial?.contagem ?? 'CORRIDOS');
+  const substOk = !diasSubst || (Number.isInteger(Number(diasSubst)) && Number(diasSubst) >= 1 && Number(diasSubst) <= 180);
+  const recebimentoMudou = recebimentoConfirmado && JSON.stringify(recebimentoFinal) !== JSON.stringify(p?.recebimento ?? null);
+  // Prazo de entrega já confirmado e recebimento ainda não: confirma só o recebimento, sem motivo.
+  const soRecebimento = confirmado && !recebimentoConfirmado;
   const excecoes = Object.fromEntries(Object.entries(porItem).filter(([, v]) => diasValidos(Number(v))).map(([k, v]) => [k, Number(v)]));
-  const mudou =
+  const mudouEntrega =
     confirmado &&
     (semPrazo !== Boolean(p?.semPrazo) ||
       (!semPrazo && (dias !== p?.dias || contagem !== p?.contagem || inicio !== p?.inicio || JSON.stringify(excecoes) !== JSON.stringify(p?.porItem ?? {}))));
-  const ok = (semPrazo || diasValidos(dias)) && (!confirmado || mudou) && (!mudou || motivo.trim().length >= MOTIVO_MINIMO);
+  const mudou = mudouEntrega || recebimentoMudou;
+  // Leitura automática do TR (migration 309): a primeira correção não pede motivo, e confirmar sem mudar vale.
+  const entregaAuto = Boolean(p?.confirmadoAutomatico);
+  const recebimentoAuto = Boolean(p?.recebimentoAutomatico);
+  const precisaMotivo = (mudouEntrega && !entregaAuto) || (recebimentoMudou && !recebimentoAuto);
+  const ok =
+    (semPrazo || diasValidos(dias)) &&
+    (!temRecebimento || regraValida(recebimento)) &&
+    substOk &&
+    (!confirmado || mudou || soRecebimento || entregaAuto || recebimentoAuto) &&
+    (!precisaMotivo || motivo.trim().length >= MOTIVO_MINIMO);
   const confirmar = () =>
     salvar.mutate(
-      { ataKey, semPrazo, dias: semPrazo ? null : dias, contagem, inicio, porItem: semPrazo ? {} : excecoes, motivo: mudou ? motivo : null },
+      { ataKey, semPrazo, dias: semPrazo ? null : dias, contagem, inicio, porItem: semPrazo ? {} : excecoes, motivo: precisaMotivo || mudou ? motivo || null : null, recebimento: recebimentoFinal, substituicao: diasSubst ? { dias: Number(diasSubst), contagem: contagemSubst } : null },
       {
         onSuccess: (r) => {
           toast.success(
-            semPrazo
+            soRecebimento && !mudou
+              ? recebimentoFinal
+                ? `Recebimento confirmado: ${textoDaRegraDeRecebimento(recebimentoFinal as RegraDoRecebimento)}`
+                : 'Confirmado: o TR não traz o prazo de recebimento'
+              : semPrazo
               ? 'Ata marcada sem prazo de entrega'
               : `Prazo ${confirmado ? 'corrigido' : 'confirmado'}: ${textoDaRegra({ dias, contagem, inicio })}${r.itensComData ? `; ${r.itensComData} ${r.itensComData === 1 ? 'item recebeu' : 'itens receberam'} a data` : ''}`
           );
@@ -72,7 +102,7 @@ export const PrazoDaAtaModal: React.FC<{
     <Modal
       isOpen
       onClose={onClose}
-      title="Prazo de entrega da ata"
+      title="Prazos da ata"
       subtitle={`Ata ${ata}${compra ? ` · Compra ${compra}` : ''}`}
       dismissible={!salvar.isPending}
       size="lg"
@@ -81,7 +111,7 @@ export const PrazoDaAtaModal: React.FC<{
         <>
           <ActionButton action="cancelar" onClick={onClose} disabled={salvar.isPending} />
           <AppButton variant="primary" disabled={!ok} isLoading={salvar.isPending} onClick={confirmar} data-testid="ata-prazo-confirmar">
-            {confirmado ? 'Corrigir o prazo' : semPrazo ? 'Confirmar: sem prazo de entrega' : 'Confirmar o prazo'}
+            {(entregaAuto || recebimentoAuto) && !mudou ? 'Confirmar a leitura do TR' : soRecebimento && !mudou ? 'Confirmar o recebimento' : confirmado ? 'Corrigir os prazos' : semPrazo ? 'Confirmar: sem prazo de entrega' : 'Confirmar os prazos'}
           </AppButton>
         </>
       }
@@ -110,9 +140,14 @@ export const PrazoDaAtaModal: React.FC<{
           </div>
         </div>
 
-        {confirmado && (
+        {entregaAuto && (
+          <NoticeBar tone="info" testId="ata-prazo-automatico">
+            Prazo de entrega lido do TR automaticamente (leitura clara) em {p?.confirmadoEm ? new Date(p.confirmadoEm).toLocaleDateString('pt-BR') : '—'}: já vale para os contratos. Confira; para corrigir agora não precisa de motivo.
+          </NoticeBar>
+        )}
+        {confirmado && !entregaAuto && (
           <NoticeBar tone="success" testId="ata-prazo-confirmado">
-            Confirmado por {p?.confirmadoPorNome ?? '—'} em {p?.confirmadoEm ? new Date(p.confirmadoEm).toLocaleDateString('pt-BR') : '—'}. Para mudar, diga o motivo.
+            Prazo de entrega confirmado por {p?.confirmadoPorNome ?? '—'} em {p?.confirmadoEm ? new Date(p.confirmadoEm).toLocaleDateString('pt-BR') : '—'}. Para mudar, diga o motivo.
           </NoticeBar>
         )}
         {!confirmado && s.situacao === 'CONFERIR' && <NoticeBar tone="warning" testId="ata-prazo-conferir">Confira no TR: {s.motivo}. A sugestão abaixo usa o trecho mais repetido.</NoticeBar>}
@@ -161,10 +196,54 @@ export const PrazoDaAtaModal: React.FC<{
             </div>
           </>
         )}
-        {mudou && (
+        <div data-testid="ata-prazo-recebimento" style={{ borderTop: '1px solid var(--border, #e2e8f0)', paddingTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+          <CarteiraDetailLabel>Recebimento (TRP e TRD)</CarteiraDetailLabel>
+          {recebimentoAuto && <NoticeBar tone="info" testId="ata-receb-automatico">Lido do TR automaticamente (leitura clara): já vale para os contratos. Para corrigir agora não precisa de motivo.</NoticeBar>}
+          {soRecebimento && <NoticeBar tone="warning" testId="ata-receb-a-confirmar">O prazo de recebimento ainda não foi confirmado. Confira os trechos do TR e confirme.</NoticeBar>}
+          {p?.recebimentoTrechos?.length ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {p.recebimentoTrechos.map((t, i) => (
+                <blockquote key={i} style={{ margin: 0, padding: '0.5rem 0.75rem', borderLeft: '3px solid var(--primary)', background: 'var(--bg-subtle, #f8fafc)', fontSize: '0.85rem', borderRadius: 4 }}>
+                  “{t}”
+                </blockquote>
+              ))}
+            </div>
+          ) : (
+            <div style={{ ...carteiraDetalhe, marginTop: 0 }}>Não achamos a cláusula do recebimento no TR. Informe como está no TR ou marque que ele não diz.</div>
+          )}
+          <fieldset style={{ border: 0, margin: 0, padding: 0, display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.88rem' }}>
+            <label style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+              <input type="radio" name="ata-receb-tem" checked={temRecebimento} onChange={() => setTemRecebimento(true)} style={{ accentColor: 'var(--primary)' }} /> O TR traz o prazo
+            </label>
+            <label style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+              <input type="radio" name="ata-receb-tem" checked={!temRecebimento} onChange={() => setTemRecebimento(false)} style={{ accentColor: 'var(--primary)' }} data-testid="ata-receb-nao-diz" /> O TR não diz
+            </label>
+          </fieldset>
+          {temRecebimento ? (
+            <CamposDoRecebimento valor={recebimento} muda={setRecebimento} testId="ata-receb" />
+          ) : (
+            <span style={{ ...carteiraDetalhe, marginTop: 0 }}>Os itens entregues ficam com "prazo de recebimento a informar", sem aviso. O fiscal pode informar o prazo no contrato.</span>
+          )}
+          <CarteiraDetailLabel>Substituição do item recusado</CarteiraDetailLabel>
+          {p?.substituicaoTrecho && (
+            <blockquote style={{ margin: 0, padding: '0.5rem 0.75rem', borderLeft: '3px solid var(--primary)', background: 'var(--bg-subtle, #f8fafc)', fontSize: '0.85rem', borderRadius: 4 }}>
+              “{p.substituicaoTrecho}”
+            </blockquote>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: '0.75rem' }}>
+            <AppInput label="Dias para substituir" type="number" min={1} value={diasSubst} onChange={(ev) => setDiasSubst(ev.target.value)} hint="Contados da notificação ao fornecedor. Vazio: o TR não diz." error={substOk ? undefined : 'De 1 a 180 dias.'} data-testid="ata-subst-dias" />
+            <AppSelect label="Contagem" value={contagemSubst} onChange={(ev) => setContagemSubst(ev.target.value as ContagemPrazo)}>
+              <option value="CORRIDOS">Dias corridos</option>
+              <option value="UTEIS">Dias úteis</option>
+            </AppSelect>
+          </div>
+          {p?.substituicaoAutomatico && <span style={{ ...carteiraDetalhe, marginTop: 0 }}>Lido do TR automaticamente (leitura clara). Na recusa, o fiscal ainda pode mudar os dias.</span>}
+        </div>
+
+        {precisaMotivo && (
           <AppTextarea label="Por que o prazo muda?" value={motivo} onChange={(ev) => setMotivo(ev.target.value)} rows={2} placeholder="ex.: conferi o TR e o prazo é contado da assinatura" hint={`Fica no registro da ata (mínimo de ${MOTIVO_MINIMO} letras).`} data-testid="ata-prazo-motivo" />
         )}
-        <span style={{ ...carteiraDetalhe, marginTop: 0 }}>Os contratos desta ata passam a usar este prazo. Se um contrato tiver prazo próprio (aditivo), o fiscal muda no contrato, com o motivo.</span>
+        <span style={{ ...carteiraDetalhe, marginTop: 0 }}>Os contratos desta ata passam a usar estes prazos. Se um contrato tiver prazo próprio (aditivo), o fiscal muda no contrato, com o motivo.</span>
       </div>
     </Modal>
   );

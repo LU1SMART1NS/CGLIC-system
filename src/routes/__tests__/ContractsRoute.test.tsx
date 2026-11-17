@@ -22,6 +22,16 @@ vi.mock('react-router-dom', () => ({
 
 // Situação da sincronização dos contratos (consulta ao banco): fora do teste, carteira em dia.
 vi.mock('../../hooks/useUsers', () => ({ useUsers: () => ({ data: undefined }) }));
+vi.mock('../../hooks/useContratosExecucao', () => ({
+  ROTULO_CONTRATOS_EXECUCAO: 'contratos com escopo cumprido',
+  podeDecidirExecucao: () => false,
+  useContratosExecucao: () => ({
+    porContrato: new Map(),
+    executados: new Set(),
+    podeDecidir: false,
+    consulta: { data: new Map(), isError: false, isFetching: false, error: null, refetch: async () => undefined }
+  })
+}));
 vi.mock('../../hooks/useSincronizacaoContratos', () => ({
   useSincronizacaoContratos: () => ({
     ultimoSucessoEm: null,
@@ -228,6 +238,25 @@ describe('ContractsRoute & Componentes — FASE 9-F: Carteira de Contratos', () 
     expect(html).toContain('Buscar por contrato, ata, fornecedor, CNPJ...');
     expect(html).toContain('3 contratos');
     expect(html).not.toContain('Todos os Instrumentos');
+  });
+
+  it('4b. filtro "Escopo cumprido" só aparece quando há sugeridos (ou está ligado pelo "Ver quais")', () => {
+    const barra = (pendencia: 'TODOS' | 'ESCOPO_CUMPRIDO', escopoCumprido?: number) =>
+      renderToStaticMarkup(
+        <ContractsPortfolioFilters
+          filters={{ status: 'VIGENTES', pendencia, unidade: 'TODAS', gestor: 'TODOS', busca: '' }}
+          gestores={[]}
+          unidades={[]}
+          escopoCumprido={escopoCumprido}
+          onChangeFilter={vi.fn()}
+          onResetFilters={vi.fn()}
+          totalFiltered={3}
+          totalContracts={3}
+        />
+      );
+    expect(barra('TODOS')).not.toContain('contracts-filter-escopo-cumprido');
+    expect(barra('TODOS', 70)).toContain('contracts-filter-escopo-cumprido');
+    expect(barra('ESCOPO_CUMPRIDO', 0)).toContain('contracts-filter-escopo-cumprido');
   });
 
   it('5. deve renderizar a tabela com colunas operacionais e linhas de contratos', () => {

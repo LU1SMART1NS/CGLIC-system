@@ -145,7 +145,7 @@ describe('pedidos que vieram das planilhas da CAEP (migration 160)', () => {
   it('identifica pelo número da emenda; reserva da planilha não tem data', async () => {
     const { identificacaoDoPedido } = await import('../emendasPedidos');
     expect(identificacaoDoPedido({ reservadoEm: '2026-10-23', siopEmenda: '37990010', origem: 'PLANILHA' })).toBe('Emenda 37990010');
-    expect(identificacaoDoPedido({ reservadoEm: '2026-10-23', siopEmenda: null, origem: 'PLANILHA' })).toBe('Reserva da planilha');
+    expect(identificacaoDoPedido({ reservadoEm: '2026-10-23', siopEmenda: null, origem: 'PLANILHA' })).toBe('Reserva sem data');
   });
 
   it('monta a chave do contrato da planilha', async () => {

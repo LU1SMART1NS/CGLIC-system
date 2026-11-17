@@ -1,5 +1,7 @@
+import type { StatusBadgeVariant } from '../design-system/components/StatusBadge';
 import type { ItemDoContrato } from '../services/itensContratoService';
 import type { DistribuicaoDoEmpenho, NotaNoSiafi, ParcelaDoItem, SugestaoDeItem, TipoSugestao } from '../services/distribuicaoEmpenhoService';
+import { COR_DA_SITUACAO } from '../design-system/coresDaSituacao';
 
 /** Item do contrato pelo número da compra, como a view v_contrato_itens_numerados agrupa. */
 export interface ItemNumerado {
@@ -94,21 +96,21 @@ export function sugestaoCurta(tipo: TipoSugestao | null, sugestao: SugestaoDeIte
 }
 
 /** Rótulo e cor da situação da nota na coluna "Itens do contrato". */
-export function rotuloDaSituacao(d: Pick<DistribuicaoDoEmpenho, 'situacao' | 'origem'>): { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' } {
+export function rotuloDaSituacao(d: Pick<DistribuicaoDoEmpenho, 'situacao' | 'origem'>): { label: string; variant: StatusBadgeVariant } {
   switch (d.situacao) {
     case 'DISTRIBUIDA':
       return {
         label: d.origem === 'AUTO' ? 'Vinculada automaticamente' : d.origem === 'SIAFI' ? 'Vinculada pela nota' : d.origem === 'VALOR' ? 'Vinculada pelo valor' : 'Vinculada',
-        variant: 'success'
+        variant: COR_DA_SITUACAO.CONCLUIDO
       };
     case 'A_DISTRIBUIR':
-      return { label: 'A vincular', variant: 'warning' };
+      return { label: 'A vincular', variant: COR_DA_SITUACAO.ANDAMENTO };
     case 'REVISAR':
-      return { label: 'Revisar', variant: 'danger' };
+      return { label: 'Revisar', variant: COR_DA_SITUACAO.ATENCAO };
     case 'SEM_ITENS':
-      return { label: 'Contrato sem itens', variant: 'neutral' };
+      return { label: 'Contrato sem itens', variant: COR_DA_SITUACAO.NEUTRO };
     default:
-      return { label: 'Sem valor', variant: 'neutral' };
+      return { label: 'Sem valor', variant: COR_DA_SITUACAO.NEUTRO };
   }
 }
 

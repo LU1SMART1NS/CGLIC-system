@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { SkeletonLoader } from '../../design-system/components/SkeletonLoader';
 import { ErrorState } from '../../design-system/components/ErrorState';
@@ -24,7 +24,9 @@ import { CarteiraIdLink, abrirAoClicarNaLinha } from '../carteira/CarteiraRowLin
 import { CarteiraCellFilter } from '../carteira/CarteiraCellFilter';
 import { CarteiraPrazoPill } from '../carteira/CarteiraPrazoPill';
 import { CarteiraDetailLabel, CARTEIRA_EXPANDED_CELL_STYLE } from '../carteira/CarteiraDetailLabel';
-import { descricaoItemEmFrase } from '../../utils/textCase';
+import { NomeEDescricaoItem } from '../itens/NomeEDescricaoItem';
+import { ROTULO_NOMES_CURTOS, useNomesCurtosItensLeitura } from '../../hooks/useNomesCurtosItens';
+import { chaveItemGti } from '../../config/gruposGti';
 import { carteiraFornecedor, carteiraTableShell, carteiraTd, carteiraTh } from '../carteira/carteiraStyles';
 import { SeloPapelSenasp } from '../atas/SeloPapelSenasp';
 import { hasActiveCarteiraFilters, useCarteiraFilters, type CarteiraFilterSchema } from '../carteira/carteiraFilters';
@@ -45,6 +47,7 @@ import { FontesComFalhaAviso } from '../fonte/FontesComFalhaAviso';
 import { naoCarregou, useLeiturasComFalha } from '../fonte/useLeiturasComFalha';
 import { ListaNaoCarregou } from '../fonte/ListaNaoCarregou';
 import { ROTULOS_CARTEIRA_ITENS } from '../../hooks/useCarteiraItens';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 
 interface Filtros {
@@ -72,9 +75,9 @@ const SCHEMA: CarteiraFilterSchema<Filtros> = {
 const CINZA = '#94a3b8';
 /** Selo da divisão na ata, abaixo do número. */
 const SELO_DIVISAO: Record<SituacaoDivisao, { label: string; variant: 'info' | 'neutral' | 'warning'; title: string }> = {
-  DIVIDE: { label: 'Divisão pela ata', variant: 'info', title: 'A ata assinada divide o quantitativo SENASP entre as unidades internas: a alocação é a da ata.' },
-  NAO_DIVIDE: { label: 'Ata sem divisão', variant: 'neutral', title: 'A ata assinada não divide o quantitativo SENASP: alocar às unidades é opcional, sem pendência.' },
-  A_CONFERIR: { label: 'Divisão a conferir', variant: 'warning', title: 'Ninguém conferiu ainda se a ata divide o quantitativo SENASP entre as unidades internas.' }
+  DIVIDE: { label: 'Divisão pela ata', variant: COR_DA_SITUACAO.ANDAMENTO, title: 'A ata assinada divide o quantitativo SENASP entre as unidades internas: a alocação é a da ata.' },
+  NAO_DIVIDE: { label: 'Ata sem divisão', variant: COR_DA_SITUACAO.NEUTRO, title: 'A ata assinada não divide o quantitativo SENASP: alocar às unidades é opcional, sem pendência.' },
+  A_CONFERIR: { label: 'Divisão a conferir', variant: COR_DA_SITUACAO.ATENCAO, title: 'Ninguém conferiu ainda se a ata divide o quantitativo SENASP entre as unidades internas.' }
 };
 const origemDaDivisao = (d: DivisaoNaAta) =>
   d.situacao === 'A_CONFERIR' ? 'Ainda não conferida.' : d.fonte === 'PESSOA' && d.marcadoEm ? `Marcado por ${d.marcadoPorNome ?? 'alguém'} em ${formatDateBR(d.marcadoEm.slice(0, 10))}.` : '';
@@ -84,7 +87,6 @@ const TITULO_NEGATIVO =
 const AMARELO = 'var(--color-warning-solid)';
 const VERMELHO = 'var(--color-danger)';
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
-const clamp2: React.CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
 /** "00059/2025" → "2025/00059": ordena pelo ano e depois pelo número (igual à Carteira › Itens). */
 const ataOrdem = (numero: string) => numero.split('/').reverse().join('/');
 const CHIP: Record<NivelAtendimento, { color: string; bg: string; label: (n: number) => string }> = {
@@ -144,7 +146,12 @@ export const ItensUnidadesPage: React.FC = () => {
   // O empenhado não aparece nesta tela: nem é lido.
   const { rows, unidades, isLoading: loadingExecucao, leituras: leiturasDosItens } = useCarteiraItens({ arps: scopedArps, itemsByAta, gestorByAta, semEmpenhado: true });
   // Uma fonte que falha não some calada: a tela mostra o que carregou e a faixa diz o que ficou de fora.
-  const leiturasDaTela = [...(leiturasDasAtas ?? []), ...(leiturasDosItens ?? [])];
+  const { nomes: nomesCurtos, consulta: nomesCurtosQuery } = useNomesCurtosItensLeitura();
+  const nomeDaLinha = useCallback(
+    (r: CarteiraItemRow) => nomesCurtos.get(chaveItemGti(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)),
+    [nomesCurtos]
+  );
+  const leiturasDaTela = [...(leiturasDasAtas ?? []), ...(leiturasDosItens ?? []), { rotulo: ROTULO_NOMES_CURTOS, query: nomesCurtosQuery }];
   const leituras = useLeiturasComFalha(leiturasDaTela);
   const naoCarregouAlgo = (rotulo: string) => leiturasDaTela.some((l) => l.rotulo === rotulo && naoCarregou(l.query));
   // Sem as alocações, todo item pareceria "Sem alocação"; sem o saldo, nenhum item teria quantitativo SENASP; sem as
@@ -215,13 +222,14 @@ export const ItensUnidadesPage: React.FC = () => {
             ataCasaBusca(r) ||
             String(r.item.numeroItem).toLowerCase().includes(busca) ||
             (r.item.descricaoItem || '').toLowerCase().includes(busca) ||
+            (nomeDaLinha(r) || '').toLowerCase().includes(busca) ||
             Object.keys(r.alocadoPorUnidade).some((u) => u.includes(busca));
           if (!casa) return false;
         }
         return true;
       })
       .sort((a, b) => comparePrazo(a.diasRestantes, b.diasRestantes) || a.arp.numeroAtaRegistroPreco.localeCompare(b.arp.numeroAtaRegistroPreco) || Number(a.item.numeroItem) - Number(b.item.numeroItem));
-  }, [base, filters, showGestorFilter, busca, ataCasaBusca, semDivisao, divisaoNaAta]);
+  }, [base, filters, showGestorFilter, busca, ataCasaBusca, semDivisao, divisaoNaAta, nomeDaLinha]);
 
   const grupos = useMemo<GrupoAta[]>(() => {
     const todosDaAta = new Map<string, CarteiraItemRow[]>();
@@ -362,9 +370,7 @@ export const ItensUnidadesPage: React.FC = () => {
               </>
             )}
           </div>
-          <div title={r.item.descricaoItem} style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '0.15rem', ...clamp2 }}>
-            {descricaoItemEmFrase(r.item.descricaoItem) || '—'}
-          </div>
+          <NomeEDescricaoItem nome={nomeDaLinha(r)} descricao={r.item.descricaoItem} testId={`alocacao-nome-${r.key}`} />
         </td>
         <td data-label="Quantitativo SENASP" style={{ ...carteiraTd, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
           {r.quantitativoSenasp < 0 ? (

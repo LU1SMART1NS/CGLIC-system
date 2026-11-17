@@ -5,6 +5,7 @@ import type { ExecucaoNoContrato, ParcelaDoItem } from '../../utils/empenhoDoIte
 import type { DistribuicaoDoEmpenho } from '../../services/distribuicaoEmpenhoService';
 import { textoDaSugestao } from '../../utils/distribuicaoEmpenho';
 import { AvisoQuantidade, CampoQuantidadeNota } from './CampoQuantidadeNota';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 export interface AllocationOption {
   id: string;
@@ -301,7 +302,7 @@ export const ContractEmpenhosPanel: React.FC<ContractEmpenhosPanelProps> = ({
     {
       key: 'situacao',
       header: 'Situação',
-      render: (d) => <StatusBadge label={d.situacao === 'REVISAR' ? 'Revisar' : 'A vincular'} variant={d.situacao === 'REVISAR' ? 'danger' : 'warning'} size="sm" dot={false} />
+      render: (d) => <StatusBadge label={d.situacao === 'REVISAR' ? 'Revisar' : 'A vincular'} variant={d.situacao === 'REVISAR' ? COR_DA_SITUACAO.ATENCAO : COR_DA_SITUACAO.ANDAMENTO} size="sm" dot={false} />
     }
   ];
 

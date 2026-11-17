@@ -302,7 +302,7 @@ const LinkContractModalAberto: React.FC<LinkContractModalProps> = ({
         }
       }
       if (failedQty > 0) {
-        toast.error(`Contrato vinculado, mas a quantidade contratada de ${failedQty} ${failedQty === 1 ? 'item' : 'itens'} não pôde ser lida da API; o saldo só considera o contrato depois disso. Ela é lida de novo ao abrir o item.`);
+        toast.error(`Contrato vinculado, mas a quantidade contratada de ${failedQty} ${failedQty === 1 ? 'item' : 'itens'} não pôde ser lida no Contratos.gov.br; o saldo só considera o contrato depois disso. Ela é lida de novo ao abrir o item.`);
       }
     })();
   };
@@ -673,7 +673,7 @@ const LinkContractModalAberto: React.FC<LinkContractModalProps> = ({
               {/* Item fixo (modo Item) */}
               {!isAtaMode && (
                 <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.8rem', color: '#475569' }}>
-                  Este contrato será vinculado ao <strong>item {numeroItem}</strong> da ata {numeroAta}. A quantidade contratada é lida da API oficial.
+                  Este contrato será vinculado ao <strong>item {numeroItem}</strong> da ata {numeroAta}. A quantidade contratada vem do Contratos.gov.br.
                 </p>
               )}
 
@@ -687,8 +687,8 @@ const LinkContractModalAberto: React.FC<LinkContractModalProps> = ({
                     {itemQuantities.isLoading
                       ? 'Consultando os itens deste contrato na API oficial...'
                       : apiListsItems
-                        ? 'Os itens que a API oficial lista neste contrato já vêm marcados. A quantidade contratada é lida da API.'
-                        : 'A API oficial não retornou os itens deste contrato. Marque os itens que ele atende; a quantidade será lida da API quando estiver disponível.'}
+                        ? 'Os itens que o Contratos.gov.br lista neste contrato já vêm marcados, com a quantidade contratada.'
+                        : 'O Contratos.gov.br ainda não mostra os itens deste contrato. Marque os itens que ele atende; a quantidade entra quando estiver lá.'}
                   </p>
                   {itemQuantities.isLoading ? (
                     <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b' }}>

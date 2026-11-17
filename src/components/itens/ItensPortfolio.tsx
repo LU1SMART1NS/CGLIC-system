@@ -27,6 +27,7 @@ import { ItensPortfolioTable } from './ItensPortfolioTable';
 import { AvisoCarregando } from '../../design-system';
 import { contarPorPapel, passaFiltroPapel } from '../../utils/ataIdentidade';
 import { ROTULO_GTI_ITENS, useFatiasItensGtiLeitura } from '../../hooks/useGruposGti';
+import { ROTULO_NOMES_CURTOS, useNomesCurtosItensLeitura } from '../../hooks/useNomesCurtosItens';
 import { chaveItemGti, contarPorGti, passaFiltroGti, pctDoGti } from '../../config/gruposGti';
 import type { ItensPortfolioFilterState } from './ItensPortfolioFilters';
 
@@ -56,18 +57,24 @@ export const ItensPortfolio: React.FC = () => {
 
   // Fatia de cada GTI do ComprasSUSP no item (migration 139): coluna e filtro "GTI".
   const { fatias: fatiasItens, consulta: fatiasItensQuery } = useFatiasItensGtiLeitura();
+  const { nomes: nomesCurtos, consulta: nomesCurtosQuery } = useNomesCurtosItensLeitura();
   // Uma fonte que falha não some calada: a carteira mostra o que carregou e a faixa diz o que ficou de fora.
   const leituras = useLeiturasComFalha([
     ...(leiturasDasAtas ?? []),
     ...(leiturasDosSaldos ?? []),
     ...(leiturasDosItens ?? []),
-    { rotulo: ROTULO_GTI_ITENS, query: fatiasItensQuery }
+    { rotulo: ROTULO_GTI_ITENS, query: fatiasItensQuery },
+    { rotulo: ROTULO_NOMES_CURTOS, query: nomesCurtosQuery }
   ]);
   // Sem as atas (ou o recorte do gestor), a lista vazia é "não carregou", e não "nenhum item".
   const listaNaoCarregou = rows.length === 0 && Boolean(atasNaoCarregaram);
   const fatiasDaLinha = useCallback(
     (r: CarteiraItemRow) => fatiasItens.get(chaveItemGti(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)),
     [fatiasItens]
+  );
+  const nomeDaLinha = useCallback(
+    (r: CarteiraItemRow) => nomesCurtos.get(chaveItemGti(r.arp.numeroAtaRegistroPreco, r.arp.codigoUnidadeGerenciadora, r.item.numeroItem)),
+    [nomesCurtos]
   );
   const [isExportOpen, setIsExportOpen] = useState(false);
 
@@ -109,13 +116,14 @@ export const ItensPortfolio: React.FC = () => {
           (arp.numeroAtaRegistroPreco || '').toLowerCase().includes(query) ||
           String(item.numeroItem).toLowerCase().includes(query) ||
           (item.descricaoItem || '').toLowerCase().includes(query) ||
+          (nomeDaLinha(r) || '').toLowerCase().includes(query) ||
           (item.nomeRazaoSocialFornecedor || '').toLowerCase().includes(query) ||
           (queryDigits.length >= 3 && cnpj.includes(queryDigits));
         if (!casa) return false;
       }
       return true;
     });
-  }, [rows, filters.busca, filters.statusVigencia, filters.unidade, filters.gestor, filters.papel, filters.gti, filters.gtiModo, fatiasDaLinha, showGestorFilter]);
+  }, [rows, filters.busca, filters.statusVigencia, filters.unidade, filters.gestor, filters.papel, filters.gti, filters.gtiModo, fatiasDaLinha, nomeDaLinha, showGestorFilter]);
 
   // Quantos itens da situação escolhida cada GTI traria no modo de contar escolhido.
   const gtiCounts = useMemo(
@@ -271,6 +279,7 @@ export const ItensPortfolio: React.FC = () => {
             unidadeNome={unidadeNome}
             onSelectItem={abrirItem}
             fatiasDaLinha={fatiasDaLinha}
+            nomeDaLinha={nomeDaLinha}
             onFilter={setFilter}
             canFilterGestor={showGestorFilter}
             onResetFilters={resetFilters}

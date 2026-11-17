@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
 import { linhaParaEntrega } from '../../services/fiscalizacaoService';
-import { agrupar, chaveDoBeneficiario, contratosFinalizados, enderecoDeEntrega, mudancasDoPrograma, passaPrazo, resumir } from '../fiscalizacaoResumo';
+import { agrupar, chaveDoBeneficiario, contratosFinalizados, contratosForaDaCarga, enderecoDeEntrega, mudancasDoPrograma, passaPrazo, resumir } from '../fiscalizacaoResumo';
 import { ataEItemDaChave, passoDoItem, passosDoItem } from '../fiscalizacaoEntregas';
 import { comQuemEstaOItem, linhasDoContrato } from '../fiscalizacaoMesa';
 
@@ -47,6 +47,31 @@ describe('resumo de um conjunto de itens', () => {
     expect([...fim]).toEqual(['A']);
   });
 
+  it('fora da carga: finalizado, ou vigência acabada sem item da SFC/CGLIC em aberto', () => {
+    const contratos = [
+      { contractKey: 'FIM', vigenciaFim: FUTURO }, // todos os itens no fim
+      { contractKey: 'VENCIDO_SEM_ITEM', vigenciaFim: PASSADO },
+      { contractKey: 'VENCIDO_SO_AREA', vigenciaFim: PASSADO }, // item aberto, mas da área requisitante
+      { contractKey: 'VENCIDO_COM_ITEM', vigenciaFim: PASSADO }, // ainda há o que fiscalizar
+      { contractKey: 'VIGENTE_SEM_ITEM', vigenciaFim: FUTURO },
+      { contractKey: 'SEM_DATA', vigenciaFim: null }
+    ];
+    const fora = contratosForaDaCarga(
+      contratos,
+      [
+        e({ contractKey: 'FIM', etapa: 'FINALIZADO' }),
+        e({ contractKey: 'VENCIDO_SO_AREA', responsavel: 'AREA' }),
+        e({ contractKey: 'VENCIDO_COM_ITEM', etapa: 'TRD' })
+      ],
+      '2026-11-17'
+    );
+    expect([...fora].sort()).toEqual(['FIM', 'VENCIDO_SEM_ITEM', 'VENCIDO_SO_AREA']);
+  });
+
+  it('fora da carga: enquanto os itens não chegam, nenhum contrato sai (nem o vencido)', () => {
+    expect(contratosForaDaCarga([{ contractKey: 'VENCIDO', vigenciaFim: PASSADO }], undefined, '2026-11-17').size).toBe(0);
+  });
+
   it('filtro de prazo: com vencido, vencendo e em dia', () => {
     const vencido = resumir([e({ prevista: PASSADO })]);
     const emDia = resumir([e({ prevista: FUTURO })]);
@@ -87,10 +112,51 @@ describe('próximo passo do contrato (mesa)', () => {
       nada,
       nada
     );
-    expect(comVoce.map((l) => l.chave)).toEqual(['processo', 'cobrar', 'provisorio']);
-    expect(comVoce[1].titulo).toBe('Cobrar o fornecedor · 2 itens atrasados');
+    // Item entregue sem a data: primeiro registrar a data (o prazo do TRP e do TRD conta dela).
+    expect(comVoce.map((l) => l.chave)).toEqual(['processo', 'cobrar', 'entrega']);
+    expect(comVoce[1].titulo).toBe('Cobrar o fornecedor · 2 itens atrasados sem cobrança');
     expect(comVoce[1].limite).toBe(PASSADO);
     expect(comOutros.map((l) => l.quem)).toEqual(['CAEP', 'Exército (DFPC)']);
+  });
+  it('entregue: enviar à comissão; com a comissão espera o TRP; passados os dias, cobrar', () => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const antes = (d: number) => new Date(Date.parse(`${hoje}T12:00:00Z`) - d * 864e5).toISOString().slice(0, 10);
+    const r = linhasDoContrato(
+      [e({ etapa: 'ENTREGUE', entregueEm: antes(3) }), e({ etapa: 'ENTREGUE', entregueEm: antes(9), comissaoEnviadaEm: antes(5) }), e({ etapa: 'ENTREGUE', entregueEm: antes(30), comissaoEnviadaEm: antes(25) })],
+      false,
+      nada,
+      nada
+    );
+    expect(r.comVoce.map((l) => l.chave)).toEqual(['provisorio', 'cobrar-comissao-trp']);
+    expect(r.comVoce[1].titulo).toBe('Cobrar a comissão de recebimento · 1 item sem TRP');
+    expect(r.comOutros.map((l) => l.quem)).toEqual(['Comissão de recebimento']);
+    expect(comQuemEstaOItem(e({ etapa: 'ENTREGUE', entregueEm: antes(9), comissaoEnviadaEm: antes(5) }))).toBe('OUTROS');
+    // TRP registrado: a comissão deve o TRD; sem passar pela comissão, o TRD é do fiscal.
+    const trd = linhasDoContrato([e({ etapa: 'TRP', entregueEm: antes(30), etapaEm: antes(12), comissaoEnviadaEm: antes(25) }), e({ etapa: 'TRP', entregueEm: antes(9), etapaEm: antes(3), comissaoEnviadaEm: antes(8) }), e({ etapa: 'TRP', entregueEm: antes(9), etapaEm: antes(3) })], false, nada, nada);
+    expect(trd.comVoce.map((l) => l.chave)).toEqual(['definitivo', 'cobrar-comissao-trd']);
+    expect(trd.comVoce[1].titulo).toBe('Cobrar a comissão de recebimento · 1 item sem TRD');
+    expect(trd.comOutros.map((l) => l.chave)).toEqual(['comissao-trd']);
+  });
+  it('ocorrências: sem cobrança e cobrar de novo com o fiscal; cobrado, notificado e recusado com o fornecedor', () => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const antes = (d: number) => new Date(Date.parse(`${hoje}T12:00:00Z`) - d * 864e5).toISOString().slice(0, 10);
+    const oc = (x = {}) => ({ ultimaCobranca: null, cobrancas: 0, notificacao: null, pedido: null, substituicao: null, ...x });
+    const r = linhasDoContrato(
+      [
+        e({ etapa: 'PRODUCAO', prevista: antes(20), ocorrencias: oc() }),
+        e({ etapa: 'PRODUCAO', prevista: antes(30), ocorrencias: oc({ ultimaCobranca: antes(3), cobrancas: 1 }) }),
+        e({ etapa: 'PRODUCAO', prevista: antes(40), ocorrencias: oc({ ultimaCobranca: antes(15), cobrancas: 2 }) }),
+        e({ etapa: 'PRODUCAO', prevista: antes(50), ocorrencias: oc({ notificacao: { em: antes(2), ate: antes(-3), sei: '35000001' } }) }),
+        e({ etapa: 'PRODUCAO', prevista: antes(5), ocorrencias: oc({ pedido: { em: antes(1), sei: null, novaData: null } }) }),
+        e({ etapa: 'ENTREGUE', entregueEm: antes(9), ocorrencias: oc({ substituicao: { recusadoEm: antes(8), notificadoEm: antes(8), ate: antes(-22), motivo: 'viseira trincada' } }) })
+      ],
+      false,
+      nada,
+      nada
+    );
+    expect(r.comVoce.map((l) => l.chave)).toEqual(['pedido', 'cobrar', 'cobrar-de-novo']);
+    expect(r.comVoce[1].titulo).toBe('Cobrar o fornecedor · 1 item atrasado sem cobrança');
+    expect(r.comOutros.map((l) => l.chave)).toEqual(['cobrado', 'notificado', 'substituir']);
   });
   it('item pago de emenda pede o Ofício à SAL; sem emenda, finalizar', () => {
     expect(linhasDoContrato([e({ etapa: 'PAGAMENTO', pagoEm: '2026-05-01', origem: 'EMENDA' })], false, nada, nada).comVoce[0].chave).toBe('sal');

@@ -7,6 +7,7 @@ import {
   classificarAta,
   classificarContrato,
   PESO_COMPLEXIDADE,
+  PESO_TAREFA_ABERTA,
   type Complexidade,
   type NivelComplexidade
 } from './complexidade';
@@ -57,6 +58,10 @@ export interface DistribuicaoItem {
   urgentes: number;
   acompanhar: number;
   complexidade: Complexidade;
+  /** Tarefas abertas com o gestor e prazo em até 30 dias (inclui as vencidas). */
+  tarefas?: number;
+  /** Só contratos: linhas de "Precisa de ação" em Financeiro › Pagamentos (ciclo com a CGLIC, fatura com erro no SIAFI). */
+  faturas?: number;
 }
 
 export interface CargaInstrumentos {
@@ -81,6 +86,12 @@ export interface DistribuicaoLinha {
   /** Quantos instrumentos vigentes em cada faixa de complexidade. */
   complexidade: Record<NivelComplexidade, number>;
   /** Carga estrutural: soma dos pesos (Baixa = 1, Média = 2, Alta = 3). */
+  estrutural: number;
+  /** Tarefas abertas com o gestor e prazo em até 30 dias, somadas nos instrumentos vigentes dele. */
+  tarefas: number;
+  /** Faturas do Financeiro que precisam de ação, somadas nos contratos vigentes dele. */
+  faturas: number;
+  /** Carga total: estrutural + (tarefas + faturas) × PESO_TAREFA_ABERTA. É ela que vira a ocupação. */
   equivalente: number;
   /** Parte da carga cheia que o gestor aguenta, pelo nível (1 sem nível informado na entrada). */
   capacidade: number;
@@ -167,6 +178,10 @@ export function buildDistribuicaoEquipe(input: {
   ajustes?: Record<string, ComplexidadeAjuste>;
   /** Capacidade de cada gestor pelo nível (migration 140). Sem ela, ocupação = carga (capacidade 1). */
   capacidadeDoGestor?: (gestorNome: string) => number;
+  /** Tarefas abertas por instrumento, por "TIPO:chave" (RPC tarefas_abertas_por_instrumento, migration 323). */
+  tarefasAbertas?: Record<string, number>;
+  /** Faturas que precisam de ação, por chave do contrato (Financeiro › Pagamentos, segmento "Precisa de ação"). */
+  faturasAbertas?: Record<string, number>;
 }): DistribuicaoEquipe {
   const linhas = new Map<string | null, DistribuicaoLinha>();
   const linha = (gestorNome?: string) => {
@@ -182,6 +197,9 @@ export function buildDistribuicaoEquipe(input: {
         contractKeys: [],
         itens: [],
         complexidade: { ALTA: 0, MEDIA: 0, BAIXA: 0 },
+        estrutural: 0,
+        tarefas: 0,
+        faturas: 0,
         equivalente: 0,
         capacidade: 1,
         ocupacao: 0,
@@ -193,9 +211,16 @@ export function buildDistribuicaoEquipe(input: {
   };
 
   const totais: DistribuicaoEquipe['totais'] = { atas: cargaVazia(), contratos: cargaVazia(), gestores: 0, mediaEquivalente: null, mediaOcupacao: null };
-  const contarComplexidade = (l: DistribuicaoLinha, c: Complexidade) => {
-    l.complexidade[c.nivel]++;
-    l.equivalente += PESO_COMPLEXIDADE[c.nivel];
+  const contarCarga = (l: DistribuicaoLinha, item: DistribuicaoItem) => {
+    const tarefas = input.tarefasAbertas?.[`${item.tipo}:${item.chave}`] ?? 0;
+    const faturas = item.tipo === 'CONTRATO' ? input.faturasAbertas?.[item.chave] ?? 0 : 0;
+    if (tarefas > 0) item.tarefas = tarefas;
+    if (faturas > 0) item.faturas = faturas;
+    l.complexidade[item.complexidade.nivel]++;
+    l.estrutural += PESO_COMPLEXIDADE[item.complexidade.nivel];
+    l.tarefas += tarefas;
+    l.faturas += faturas;
+    l.equivalente += PESO_COMPLEXIDADE[item.complexidade.nivel] + PESO_TAREFA_ABERTA * (tarefas + faturas);
   };
   const ataPorNumero = new Map<string, DistribuicaoAta>();
   const contratoPorChave = new Map<string, DistribuicaoContrato>();
@@ -223,7 +248,7 @@ export function buildDistribuicaoEquipe(input: {
       complexidade: aplicarAjuste(classificarAta(ata.itens ?? 0), input.ajustes?.[`ATA:${chave}`])
     };
     l.itens.push(item);
-    contarComplexidade(l, item.complexidade);
+    contarCarga(l, item);
     itemAta.set(chave, item);
     somar(totais.atas, ata.faixa, ata.valor);
   }
@@ -249,7 +274,7 @@ export function buildDistribuicaoEquipe(input: {
       )
     };
     l.itens.push(item);
-    contarComplexidade(l, item.complexidade);
+    contarCarga(l, item);
     itemContrato.set(contrato.contractKey, item);
     somar(totais.contratos, contrato.faixa, contrato.valor);
   }

@@ -39,6 +39,16 @@ vi.mock('../useAllContractManagers', () => ({
 }));
 // Sem a lista de usuários, as atribuições valem como estão (a regra do gestor ativo tem teste próprio).
 vi.mock('../useUsers', () => ({ useUsers: () => ({ data: undefined }) }));
+vi.mock('../useContratosExecucao', () => ({
+  ROTULO_CONTRATOS_EXECUCAO: 'contratos com escopo cumprido',
+  podeDecidirExecucao: () => false,
+  useContratosExecucao: () => ({
+    porContrato: new Map(),
+    executados: new Set(),
+    podeDecidir: false,
+    consulta: { data: new Map(), isError: false, isFetching: false, error: null, refetch: async () => undefined }
+  })
+}));
 vi.mock('../useAtaManagers', () => ({ useArpItemContractLinks: () => consulta([{ ataKey: '00010/2024-200331', contractKey: '200331-00002-2025' }]) }));
 vi.mock('../useManagementDashboard', () => ({
   useManagementDashboard: (filtros: { uasg: string }, opts: { enabled?: boolean }) => {

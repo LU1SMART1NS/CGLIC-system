@@ -1,3 +1,4 @@
+import { COR_DA_SITUACAO } from '../../../design-system/coresDaSituacao';
 /**
  * Rótulos e contas pequenas da aba Reajuste da Ata 360 (protótipo aprovado em 23/10/2026). A conta dos ciclos e dos
  * itens vem pronta do banco; aqui só ficam os textos, as cores e o impacto em R$ sobre o saldo.
@@ -30,15 +31,15 @@ export const ROTULO_SITUACAO_ITEM: Record<SituacaoItemReajuste, string> = {
 };
 
 export const VARIANTE_SITUACAO_ITEM: Record<SituacaoItemReajuste, StatusBadgeVariant> = {
-  SEM_REAJUSTE: 'neutral',
-  SEM_BASE: 'warning',
-  PERCENTUAL_A_INFORMAR: 'warning',
-  INDICE_INDISPONIVEL: 'neutral',
-  PRECO_DESATUALIZADO: 'warning',
-  DEVIDO: 'danger',
-  PREVISTO: 'info',
-  SE_PRORROGAR: 'neutral',
-  EM_DIA: 'success'
+  SEM_REAJUSTE: COR_DA_SITUACAO.NEUTRO,
+  SEM_BASE: COR_DA_SITUACAO.ATENCAO,
+  PERCENTUAL_A_INFORMAR: COR_DA_SITUACAO.ATENCAO,
+  INDICE_INDISPONIVEL: COR_DA_SITUACAO.NEUTRO,
+  PRECO_DESATUALIZADO: COR_DA_SITUACAO.ATENCAO,
+  DEVIDO: COR_DA_SITUACAO.URGENTE,
+  PREVISTO: COR_DA_SITUACAO.ANDAMENTO,
+  SE_PRORROGAR: COR_DA_SITUACAO.NEUTRO,
+  EM_DIA: COR_DA_SITUACAO.CONCLUIDO
 };
 
 export const ROTULO_SITUACAO_ATA: Record<SituacaoAtaReajuste, string> = {
@@ -55,11 +56,11 @@ export const ROTULO_SITUACAO_CICLO: Record<SituacaoCiclo, string> = {
 };
 
 export const VARIANTE_SITUACAO_CICLO: Record<SituacaoCiclo, StatusBadgeVariant> = {
-  APLICADO: 'success',
-  PUBLICADO_SEM_PERCENTUAL: 'warning',
-  DEVIDO: 'danger',
-  PREVISTO: 'info',
-  SE_PRORROGAR: 'neutral'
+  APLICADO: COR_DA_SITUACAO.CONCLUIDO,
+  PUBLICADO_SEM_PERCENTUAL: COR_DA_SITUACAO.ATENCAO,
+  DEVIDO: COR_DA_SITUACAO.URGENTE,
+  PREVISTO: COR_DA_SITUACAO.ANDAMENTO,
+  SE_PRORROGAR: COR_DA_SITUACAO.NEUTRO
 };
 
 /** Ordem de gravidade da situação do item (a pior manda no cartão e no contador da aba). */

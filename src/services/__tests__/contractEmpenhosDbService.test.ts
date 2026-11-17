@@ -70,4 +70,21 @@ describe('fetchContractEmpenhosFromDb', () => {
     const rows = await fetchContractEmpenhosFromDb('200331-00004-2017');
     expect(rows.map((r: any) => r.outros_contratos)).toEqual([[], []]);
   });
+
+  it('junta liquidado, pago e saldo do Tesouro pela nota (UG certa) e segue sem eles se a leitura falhar', async () => {
+    respostas['contrato_empenhos:eq'] = { data: [{ empenho_id: 'a' }, { empenho_id: 'b' }], error: null };
+    respostas['v_empenho_saldo_contabil:in'] = {
+      data: [{ empenho_id: 'a', pago_total: 400, exercicio_a_liquidar: 50, exercicio_liquidado_a_pagar: 30, rp_a_liquidar: 20, rp_liquidado_a_pagar: 10, atualizado_tesouro: '2026-11-13T17:03:26' }],
+      error: null
+    };
+    const rows = await fetchContractEmpenhosFromDb('200331-00004-2017');
+    expect(rows[0].tesouro).toEqual({ pago: 400, liquidado: 440, saldo: 110, atualizadoEm: '2026-11-13T17:03:26' });
+    expect(rows[1].tesouro).toBeUndefined();
+    const consulta = chamadas.find((c) => c.tabela === 'v_empenho_saldo_contabil');
+    expect(consulta?.filtros).toContainEqual(['in', 'empenho_id', ['a', 'b']]);
+
+    respostas['v_empenho_saldo_contabil:in'] = { data: null, error: { message: 'timeout' } };
+    const semTesouro = await fetchContractEmpenhosFromDb('200331-00004-2017');
+    expect(semTesouro.map((r: any) => r.tesouro)).toEqual([undefined, undefined]);
+  });
 });

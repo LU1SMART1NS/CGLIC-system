@@ -200,6 +200,7 @@ Os jobs de sincronização chamam `disparar_sincronizacao(recurso, uasg)`, que a
 | vincular-contratos-automaticamente | :55 | `executar_vinculos_automaticos(...,'CRON')` | 95 |
 | limpar-historico-do-cron | domingo 03:00 | apaga o histórico do cron com mais de 7 dias | 77 |
 | garantir-feriados | todo dia 09:13 UTC (06:13 em Brasília) | `garantir_feriados()`: importa os feriados calculados do ano corrente e do seguinte, só no ano sem nenhuma data cadastrada | 228 |
+| limpar-auditoria-do-servidor | todo dia 06:23 UTC (03:23 em Brasília) | `limpar_auditoria_do_servidor()`: apaga em lote (10 mil) o que o servidor/rotinas gravaram em `audit_logs` há mais de 30 dias e as regravações sem mudança real; o que os usuários fizeram fica | 315 |
 | plano-automatico | todo dia 10:00 UTC (07:00 em Brasília) | `executar_plano_automatico()`: módulos que entram sozinhos no plano e tarefas que a fonte fecha; cada rodada fica em `plano_automatico_execucoes` | 225 |
 
 Nenhum job foi removido: as migrations 87 e 123 usam `cron.unschedule` só para recriar o próprio job; a 134 só troca horários (`cron.alter_job` pelo nome) e confere no fim que nenhum minuto ficou com dois jobs. O endereço da função e o segredo ficam no Vault, fora das migrations.

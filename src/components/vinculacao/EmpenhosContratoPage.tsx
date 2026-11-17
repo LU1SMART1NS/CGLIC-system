@@ -37,6 +37,7 @@ import { PainelDaConferencia, VouCorrigirDialog } from './ConferenciaForaDoContr
 import { abrirContratosGov, deixadaComoEsta, noSegmento, passaVigencia, pedeOGestor, type FiltroVigencia, type SegmentoForaDoContrato } from './vinculacaoEmpenhos';
 import { MarcaDeixada, textoEncerrado, useDeixarComoEsta } from './DeixarComoEsta';
 import { chaveAvisoDeixarFatura } from '../../services/avisosResolvidosService';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 interface Filtros {
   situacao: SegmentoForaDoContrato;
@@ -58,9 +59,9 @@ const SCHEMA: CarteiraFilterSchema<Filtros> = {
 };
 const subtle: React.CSSProperties = { fontSize: '0.75rem', color: '#64748b', fontWeight: 600 };
 const COR_DO_VEREDITO: Record<VereditoForaDoContrato, StatusBadgeVariant> = {
-  EM_OUTRO_CONTRATO: 'info',
-  NOTA_EM_DOBRO: 'warning',
-  FORA_DOS_CONTRATOS: 'danger'
+  EM_OUTRO_CONTRATO: COR_DA_SITUACAO.ANDAMENTO,
+  NOTA_EM_DOBRO: COR_DA_SITUACAO.ATENCAO,
+  FORA_DOS_CONTRATOS: COR_DA_SITUACAO.URGENTE
 };
 const COLUNAS = 6;
 

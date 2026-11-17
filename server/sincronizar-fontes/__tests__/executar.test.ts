@@ -30,6 +30,10 @@ function deps(extra: Partial<DependenciasDeExecucao> = {}): DependenciasDeExecuc
     contarReajusteAtasPendentes: vi.fn(async () => ({ pendentes: 149, semEdital: 64, mesesProjetados: 25 })),
     sincronizarAtasAMontar: vi.fn(async () => sucesso(15)),
     testarAtasAMontar: vi.fn(async () => ({ compras: 15, itensLidos: 2, minutasLidas: 1, pendentes: 0, falhas: [], pregoes: [], naFila: 0, leituras: [] })),
+    sincronizarPrazoTr: vi.fn(async () => sucesso(4)),
+    testarPrazoTr: vi.fn(async () => ({ naFila: 3, lidas: 3, pendentes: 0, falhas: [], leituras: [] })),
+    sincronizarNomeItemAta: vi.fn(async () => sucesso(7)),
+    testarNomeItemAta: vi.fn(async () => ({ naFila: 2, lidas: 2, nomes: 7, semNome: 1, pendentes: 0, falhas: [], leituras: [] })),
     sincronizarNotasDasEmendasDoTesouro: vi.fn(async () => sucesso(181)),
     contarNotasEmendasTesouroPendentes: vi.fn(async () => ({ pendentes: 198, amostra: '2026NE000043', amostraUgs: [] })),
     medirEmendasDoPortal: vi.fn(async () => ({ ano2026: { emendas: 12 } })),
@@ -375,5 +379,23 @@ describe('medição das emendas do Portal', () => {
   it('fora do modo de teste recusa', async () => {
     const r = await executarPedido({ recurso: 'emendas_portal', forcar: false, dry: false }, deps());
     expect(r).toMatchObject({ dry: false, resultado: { status: 'ERRO' } });
+  });
+
+  it('prazo_tr vale para todas as carteiras e lê o TR das atas novas (migration 303)', async () => {
+    const d = deps();
+    expect(validarPedido({ recurso: 'prazo_tr' })).toMatchObject({ ok: true, pedido: { recurso: 'prazo_tr' } });
+    await executarPedido({ recurso: 'prazo_tr', forcar: false, dry: false }, d);
+    expect(d.sincronizarPrazoTr).toHaveBeenCalledTimes(1);
+    await executarPedido({ recurso: 'prazo_tr', forcar: false, dry: true }, d);
+    expect(d.testarPrazoTr).toHaveBeenCalledTimes(1);
+  });
+
+  it('nome_item_ata vale para todas as carteiras e lê o nome do item nas atas novas (migration 313)', async () => {
+    const d = deps();
+    expect(validarPedido({ recurso: 'nome_item_ata' })).toMatchObject({ ok: true, pedido: { recurso: 'nome_item_ata' } });
+    await executarPedido({ recurso: 'nome_item_ata', forcar: true, dry: false }, d);
+    expect(d.sincronizarNomeItemAta).toHaveBeenCalledWith(expect.objectContaining({ forcar: true }));
+    await executarPedido({ recurso: 'nome_item_ata', forcar: false, dry: true }, d);
+    expect(d.testarNomeItemAta).toHaveBeenCalledTimes(1);
   });
 });

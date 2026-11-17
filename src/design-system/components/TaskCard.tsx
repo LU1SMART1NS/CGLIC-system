@@ -3,6 +3,7 @@ import { User, Calendar, Cpu } from 'lucide-react';
 import { AppButton } from './AppButton';
 import { StatusBadge, type StatusBadgeVariant } from './StatusBadge';
 import { colors, shapes, typography, spacing } from '../tokens';
+import { COR_DA_SITUACAO } from '../coresDaSituacao';
 
 export type TaskStatus = 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDA' | 'NAO_APLICAVEL' | 'CANCELADA';
 export type TaskExecutionMode = 'MANUAL' | 'AUTOMATICO' | 'SISTEMICO' | 'SEMI_AUTOMATICO';
@@ -23,11 +24,11 @@ export interface TaskCardProps {
 }
 
 const statusVariantMap: Record<TaskStatus, StatusBadgeVariant> = {
-  PENDENTE: 'warning',
-  EM_ANDAMENTO: 'info',
-  CONCLUIDA: 'success',
-  NAO_APLICAVEL: 'neutral',
-  CANCELADA: 'danger'
+  PENDENTE: COR_DA_SITUACAO.ANDAMENTO,
+  EM_ANDAMENTO: COR_DA_SITUACAO.ANDAMENTO,
+  CONCLUIDA: COR_DA_SITUACAO.CONCLUIDO,
+  NAO_APLICAVEL: COR_DA_SITUACAO.NEUTRO,
+  CANCELADA: COR_DA_SITUACAO.NEUTRO
 };
 
 const statusDisplayMap: Record<TaskStatus, string> = {

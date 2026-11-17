@@ -21,6 +21,7 @@ const divisoes = new Map([
   ['00051/2024-200331', { situacao: 'DIVIDE', fonte: 'PESSOA', marcadoPorNome: 'Fulano', marcadoEm: '2026-11-13T10:00:00Z' }]
 ]);
 
+vi.mock('../../../hooks/useNomesCurtosItens', () => ({ ROTULO_NOMES_CURTOS: 'nome curto dos itens', useNomesCurtosItensLeitura: () => ({ nomes: new Map(), consulta: { isError: false, isLoading: false, data: new Map() } }) }));
 vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ role: 'gestor_saldos' }) }));
 vi.mock('../../../hooks/useDetailOrigin', () => ({ useNavigateWithOrigin: () => () => {} }));
 vi.mock('../../../hooks/useAtasPortfolio', () => ({

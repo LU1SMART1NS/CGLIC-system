@@ -272,4 +272,19 @@ describe('QuantitativosTab', () => {
       expect(h).toContain('São operações diferentes');
     });
   });
+
+  describe('cópia do servidor', () => {
+    it('enquanto confere a fonte: aviso de "conferindo" com a data da leitura', () => {
+      const h = html({ origem: 'COPIA', copiadoEm: '2026-11-16T01:43:00Z', conferindo: true });
+      expect(h).toContain('data-testid="unidades-conferindo"');
+      expect(h).toContain('Conferindo com a fonte agora');
+      expect(h).not.toContain('não devolveu os órgãos');
+    });
+
+    it('a fonte voltou vazia: aviso de cópia guardada, como antes', () => {
+      const h = html({ origem: 'COPIA', copiadoEm: '2026-11-16T01:43:00Z' });
+      expect(h).toContain('data-testid="unidades-copia"');
+      expect(h).toContain('não devolveu os órgãos deste item agora');
+    });
+  });
 });

@@ -13,6 +13,7 @@ import { ROTULO_COMPLEXIDADE, type Complexidade, type NivelComplexidade } from '
 import { AjusteComplexidadePanel } from './AjusteComplexidadePanel';
 import type { ContratoAVincular } from './contratosSemAta';
 import { formatDateBR } from '../../../utils/format';
+import { textoDaFila } from './OcupacaoBarra';
 
 const ETIQUETA_COMPLEXIDADE: Record<NivelComplexidade, { color: string; bg: string }> = {
   ALTA: { color: '#ffffff', bg: 'var(--primary)' },
@@ -246,6 +247,7 @@ export const DistribuicaoItens: React.FC<DistribuicaoItensProps> = ({ linha, can
                   })()}
                   <span style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {item.complexidade.motivo}
+                    {textoDaFila(item.tarefas ?? 0, item.faturas ?? 0) ? ` · ${textoDaFila(item.tarefas ?? 0, item.faturas ?? 0)}` : ''}
                   </span>
                 </div>
               </div>

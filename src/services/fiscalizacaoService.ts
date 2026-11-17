@@ -1,4 +1,6 @@
 import type { ContagemPrazo, InicioPrazo, RegraDoPrazo } from '../utils/fiscalizacaoPrazo';
+import type { RegraDoRecebimento } from '../utils/fiscalizacaoRecebimento';
+import type { OcorrenciasDoItem, PrazoDeSubstituicao, TipoOcorrencia } from '../utils/fiscalizacaoOcorrencias';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { mapPostgresErrorToAppError } from '../adapters/rpcErrorAdapter';
 import { lerTodasAsPaginas } from './lerTodasAsPaginas';
@@ -46,6 +48,8 @@ export interface ContratoFiscalizacao {
   prazoEntrega?: RegraDoPrazo | null;
   /** As atas do contrato têm prazos confirmados diferentes (migration 301): o fiscal informa o do contrato. */
   prazoConflito?: boolean;
+  /** Prazos do TRP e do TRD (TR da ata confirmado pelo gestor da ata, ou corrigido no contrato). */
+  prazoRecebimento?: RegraDoRecebimento | null;
 }
 
 function cliente() {
@@ -77,6 +81,7 @@ export function linhaParaContrato(r: any): ContratoFiscalizacao {
     definidoEm: r.definido_em || null,
     prazoEntrega: r.prazo_entrega && !r.prazo_entrega.conflito ? r.prazo_entrega : null,
     prazoConflito: Boolean(r.prazo_entrega?.conflito),
+    prazoRecebimento: r.prazo_recebimento && !r.prazo_recebimento.conflito ? r.prazo_recebimento : null,
     atas: Array.isArray(r.atas) ? r.atas.filter(Boolean) : [],
     unidadeArea: r.unidade_area || null,
     unidadesDoContrato: Array.isArray(r.unidades_do_contrato) ? r.unidades_do_contrato.filter(Boolean) : []
@@ -195,6 +200,18 @@ export interface EntregaFiscalizacao {
   /** Data prevista pela Ordem, antes de qualquer prorrogação. */
   previstaOriginal?: string | null;
   entregueEm: string | null;
+  /** Até quando emitir o TRP, o TRD e enviar para pagamento (calculados pela regra do recebimento; só a etapa atual). */
+  trpAte?: string | null;
+  trdAte?: string | null;
+  envioAte?: string | null;
+  /** Enviado à comissão de recebimento para o TRP, e a última cobrança (a próxima conta dela). */
+  /** O que está em aberto nas ocorrências do item: cobrança, notificação, pedido de prorrogação, substituição. */
+  ocorrencias?: OcorrenciasDoItem | null;
+  comissaoEnviadaEm?: string | null;
+  comissaoCobradaEm?: string | null;
+  comissaoCobrancas?: number;
+  /** false = o contrato não tem prazo de recebimento (TR sem regra e nada informado no contrato). */
+  regraDeRecebimento?: boolean;
   divididaDe: string | null;
   /** Programa da carga (Projeto Pegasus, BNDES · Fogo Zero), até o cadastro de programas. */
   programaTexto: string | null;
@@ -265,6 +282,14 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
     previstaAnterior: r.prevista_anterior || null,
     previstaOriginal: r.prevista_original || null,
     entregueEm: r.entregue_em || null,
+    trpAte: r.trp_ate || null,
+    trdAte: r.trd_ate || null,
+    envioAte: r.envio_ate || null,
+    ocorrencias: r.ocorrencias || null,
+    comissaoEnviadaEm: r.comissao_enviada_em || null,
+    comissaoCobradaEm: r.comissao_cobrada_em || null,
+    comissaoCobrancas: Number(r.comissao_cobrancas) || 0,
+    regraDeRecebimento: r.regra_recebimento == null ? undefined : Boolean(r.regra_recebimento),
     divididaDe: r.dividida_de || null,
     programaTexto: r.programa_texto || null,
     cargaLinha: r.carga_linha == null ? null : Number(r.carga_linha),
@@ -287,7 +312,7 @@ export function linhaParaEntrega(r: any): EntregaFiscalizacao {
 
 export interface MovimentoEntrega {
   id: string;
-  tipo: 'CRIADA' | 'ETAPA' | 'VOLTA' | 'DESFEITO' | 'CORRECAO' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM' | 'BENEFICIARIO' | 'RECEBIMENTO' | 'PRORROGACAO' | 'SUSPENSAO';
+  tipo: 'CRIADA' | 'ETAPA' | 'VOLTA' | 'DESFEITO' | 'CORRECAO' | 'DIVISAO' | 'PREVISTA' | 'RESPONSAVEL' | 'AUTOMATICA' | 'CARGA' | 'PROGRAMA' | 'ITEM' | 'BENEFICIARIO' | 'RECEBIMENTO' | 'PRORROGACAO' | 'SUSPENSAO' | 'COMISSAO' | 'COBRANCA' | 'OCORRENCIA';
   etapa: EtapaEntrega | null;
   data: string | null;
   documentoSei: string | null;
@@ -411,6 +436,52 @@ export async function prorrogarPrazoEntregas(input: { ids: string[]; novaData: s
 export async function definirPrazoDoContrato(input: { contractKey: string; dias: number | null; contagem?: ContagemPrazo; inicio?: InicioPrazo; motivo?: string }): Promise<void> {
   const { error } = await cliente().rpc('definir_prazo_entrega_contrato', { p_contract_key: input.contractKey, p_dias: input.dias, p_contagem: input.contagem ?? 'CORRIDOS', p_inicio: input.inicio ?? 'OF_RECEBIMENTO', p_motivo: input.motivo ?? null });
   if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Prazos do TRP e do TRD do contrato: corrige o que veio do TR da ata (motivo obrigatório) ou informa quando o TR não diz. null volta ao TR. */
+export async function definirPrazoDeRecebimento(input: { contractKey: string; regra: Pick<RegraDoRecebimento, 'trpDias' | 'trpContagem' | 'trdDias' | 'trdContagem' | 'trdInicio'> | null; motivo?: string }): Promise<void> {
+  const { error } = await cliente().rpc('definir_prazo_recebimento_contrato', {
+    p_contract_key: input.contractKey,
+    p_trp_dias: input.regra?.trpDias ?? null,
+    p_trp_contagem: input.regra?.trpContagem ?? null,
+    p_trd_dias: input.regra?.trdDias ?? null,
+    p_trd_contagem: input.regra?.trdContagem ?? null,
+    p_trd_inicio: input.regra?.trdInicio ?? null,
+    p_motivo: input.motivo?.trim() || null
+  });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Envio dos itens entregues à comissão de recebimento (para o TRP) ou nova cobrança; fica no histórico do item. */
+export async function registrarComissaoRecebimento(input: { ids: string[]; tipo: 'ENVIO' | 'COBRANCA'; data: string; documentoSei: string | null }): Promise<void> {
+  const { error } = await cliente().rpc('registrar_comissao_recebimento', { p_ids: input.ids, p_tipo: input.tipo, p_data: input.data, p_documento_sei: input.documentoSei?.replace(/\D/g, '') || null });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/**
+ * Ocorrência em um ou mais itens (entrega B): cobrança, notificação (com prazo de resposta), resposta, pedido de
+ * prorrogação (com a data pedida), pedido negado, recusa (abre o prazo de substituição) e substituição recebida.
+ */
+export async function registrarOcorrencia(input: { ids: string[]; tipo: TipoOcorrencia; data: string; documentoSei: string | null; texto: string | null; prazoDias?: number | null; novaData?: string | null; notificadoEm?: string | null }): Promise<void> {
+  const { error } = await cliente().rpc('registrar_ocorrencia_entregas', {
+    p_ids: input.ids,
+    p_tipo: input.tipo,
+    p_data: input.data,
+    p_documento_sei: input.documentoSei?.replace(/\D/g, '') || null,
+    p_texto: input.texto?.trim() || null,
+    p_prazo_dias: input.prazoDias ?? null,
+    p_nova_data: input.novaData ?? null,
+    p_notificado_em: input.notificadoEm ?? null
+  });
+  if (error) throw mapPostgresErrorToAppError(error);
+}
+
+/** Prazo de substituição do item recusado, pelo TR das atas do contrato (migration 311); null sem prazo ou com atas que divergem. */
+export async function fetchPrazoDeSubstituicao(contractKey: string): Promise<PrazoDeSubstituicao | null> {
+  const { data, error } = await cliente().rpc('fisc_regra_de_substituicao', { p_contrato: contractKey });
+  if (error) throw mapPostgresErrorToAppError(error);
+  const r = data as (PrazoDeSubstituicao & { conflito?: boolean }) | null;
+  return r && !r.conflito && r.dias ? r : null;
 }
 
 /** Encerra entregas (migration 274): saem das listas de trabalho e o motivo fica no histórico. */
@@ -542,6 +613,28 @@ export async function fetchEntregasDoPedido(pedidoId: string): Promise<EntregaDa
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return ((data || []) as any[]).map((r) => ({
     id: r.id,
+    linhaId: r.linha_id,
+    contractKey: r.contract_key,
+    quantidade: Number(r.quantidade) || 0,
+    responsavel: r.responsavel,
+    etapa: r.etapa,
+    etapaEm: r.etapa_em || null,
+    prevista: r.prevista || null,
+    entregueEm: r.entregue_em || null,
+    divididaDe: r.dividida_de || null,
+    fiscalNome: r.fiscal_nome || null
+  }));
+}
+
+/**
+ * Entregas de todas as linhas de pedidos de emenda (listas de Emendas, Início e telas 360): a mesma linha de
+ * fisc_entregas_do_pedido, com o pedido. Uma leitura só, paginada.
+ */
+export async function fetchEntregasDasEmendas(): Promise<Array<EntregaDaLinha & { pedidoId: string }>> {
+  const linhas = await lerTodasAsPaginas<Record<string, any>>((de, ate) => cliente().rpc('fisc_entregas_das_emendas').order('id').range(de, ate));
+  return linhas.map((r) => ({
+    id: r.id,
+    pedidoId: r.pedido_id,
     linhaId: r.linha_id,
     contractKey: r.contract_key,
     quantidade: Number(r.quantidade) || 0,

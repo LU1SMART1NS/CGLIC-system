@@ -32,6 +32,7 @@ import type { OrigemUnidadesItem } from '../../hooks/useItemUnidades';
 import { useCadastroUasgs } from '../../hooks/useCadastroUasgs';
 import { localDaUasg } from '../../services/cadastroUasgsSyncService';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 /**
  * Aba Órgãos e quantitativos nas atas de OUTROS órgãos (migration 114): a SENASP participante ou em adesão.
@@ -56,6 +57,8 @@ export interface QuantitativosOutroOrgaoTabProps {
   error: string | null;
   origem: OrigemUnidadesItem;
   copiadoEm: string | null;
+  /** A lista é a cópia do servidor enquanto o Compras.gov.br ainda responde. */
+  conferindo?: boolean;
   /** Participante: registrado da SENASP no Compras.gov.br. Adesão: aprovado nas adesões. É a base do saldo. */
   quantidadeSenasp: number;
   contratadoSenasp: number;
@@ -249,7 +252,7 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.15rem', flexWrap: 'wrap' }}>
             <span style={pequeno}>UASG {l.uasg}{l.local ? ` · ${l.local}` : ''}</span>
             {l.ehSenasp && !participante
-              ? <StatusBadge label="Adesão" variant="warning" size="sm" dot={false} />
+              ? <StatusBadge label="Adesão" variant={COR_DA_SITUACAO.NEUTRO} size="sm" dot={false} />
               : <StatusBadge label={l.gerenciadora ? 'Gerenciadora' : 'Participante'} variant={l.gerenciadora ? 'info' : 'neutral'} size="sm" dot={false} />}
             {l.ehSenasp && <span style={pequeno}>{p.totalUnidadesInternas} {p.totalUnidadesInternas === 1 ? 'unidade interna' : 'unidades internas'}</span>}
           </div>
@@ -427,8 +430,10 @@ export const QuantitativosOutroOrgaoTab: React.FC<QuantitativosOutroOrgaoTabProp
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} data-testid="quantitativos-tab">
       {!p.loading && p.origem === 'COPIA' && p.copiadoEm && (
-        <NoticeBar tone="info" testId="unidades-copia">
-          O Compras.gov.br não devolveu os órgãos deste item agora. A lista abaixo é a última cópia guardada, lida em {formatDataHoraBR(p.copiadoEm)}.
+        <NoticeBar tone="info" testId={p.conferindo ? 'unidades-conferindo' : 'unidades-copia'}>
+          {p.conferindo
+            ? <>Órgãos lidos do Compras.gov.br em {formatDataHoraBR(p.copiadoEm)}. Conferindo com a fonte agora; a lista se atualiza sozinha se algo mudou.</>
+            : <>O Compras.gov.br não devolveu os órgãos deste item agora. A lista abaixo é a última cópia guardada, lida em {formatDataHoraBR(p.copiadoEm)}.</>}
         </NoticeBar>
       )}
       {cabecalho}

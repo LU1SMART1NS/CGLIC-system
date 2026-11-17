@@ -1,5 +1,5 @@
 /**
- * Expectativa de pagamento do contrato (migration 89): MENSAL, ENTREGA (entregas previstas) ou EVENTUAL; sem marca =
+ * Expectativa de pagamento do contrato (migration 89): MENSAL, ENTREGA (as datas vêm da Fiscalização, migration 305) ou EVENTUAL; sem marca =
  * automático, com a sugestão do sistema pelo histórico (pago nos 3 últimos meses fechados = mensal).
  * Base da previsão mensal da Portaria DGFNSP 50/2025 (art. 5º, § 2º, III) e dos avisos de nota que não chegou.
  */
@@ -18,31 +18,14 @@ export interface ExpectativaPagamento {
   atualizadoEm: string;
 }
 
-export interface EntregaPrevista {
-  id: string;
-  contractKey: string;
-  dataPrevista: string;
-  valor: number;
-  empenhoCanonicalKey: string | null;
-  descricao: string;
-  situacao: 'PREVISTA' | 'CANCELADA';
-  motivoCancelamento: string | null;
-  criadoPorNome: string | null;
-}
-
 export interface ExpectativasDados {
   marcas: Map<string, ExpectativaPagamento>;
-  entregas: EntregaPrevista[];
 }
 
 export async function fetchExpectativasPagamento(): Promise<ExpectativasDados> {
-  if (!isSupabaseConfigured || !supabase) return { marcas: new Map(), entregas: [] };
-  const [m, e] = await Promise.all([
-    supabase.from('contrato_expectativa_pagamento').select('*'),
-    supabase.from('contrato_entregas_previstas').select('*').order('data_prevista', { ascending: true })
-  ]);
+  if (!isSupabaseConfigured || !supabase) return { marcas: new Map() };
+  const m = await supabase.from('contrato_expectativa_pagamento').select('*');
   if (m.error) throw mapPostgresErrorToAppError(m.error);
-  if (e.error) throw mapPostgresErrorToAppError(e.error);
   const marcas = new Map<string, ExpectativaPagamento>();
   for (const r of (m.data ?? []) as any[]) {
     marcas.set(String(r.contract_key), {
@@ -54,18 +37,7 @@ export async function fetchExpectativasPagamento(): Promise<ExpectativasDados> {
       atualizadoEm: r.atualizado_em
     });
   }
-  const entregas = ((e.data ?? []) as any[]).map((r) => ({
-    id: String(r.id),
-    contractKey: String(r.contract_key),
-    dataPrevista: String(r.data_prevista),
-    valor: Number(r.valor),
-    empenhoCanonicalKey: r.empenho_canonical_key ?? null,
-    descricao: r.descricao,
-    situacao: r.situacao,
-    motivoCancelamento: r.motivo_cancelamento ?? null,
-    criadoPorNome: r.criado_por_nome ?? null
-  }));
-  return { marcas, entregas };
+  return { marcas };
 }
 
 async function rpc(nome: string, args: Record<string, unknown>): Promise<void> {
@@ -91,30 +63,6 @@ export function definirExpectativaPagamento(input: {
     p_observacao: input.observacao ?? null,
     p_registrado_por_nome: input.registradoPorNome ?? null
   });
-}
-
-export function salvarEntregaPrevista(input: {
-  id?: string | null;
-  contractKey: string;
-  dataPrevista: string;
-  valor: number;
-  descricao: string;
-  empenhoCanonicalKey?: string | null;
-  registradoPorNome?: string;
-}): Promise<void> {
-  return rpc('salvar_entrega_prevista', {
-    p_id: input.id ?? null,
-    p_contract_key: input.contractKey,
-    p_data_prevista: input.dataPrevista,
-    p_valor: input.valor,
-    p_descricao: input.descricao,
-    p_empenho_canonical_key: input.empenhoCanonicalKey ?? null,
-    p_registrado_por_nome: input.registradoPorNome ?? null
-  });
-}
-
-export function cancelarEntregaPrevista(id: string, motivo: string): Promise<void> {
-  return rpc('cancelar_entrega_prevista', { p_id: id, p_motivo: motivo });
 }
 
 // -----------------------------------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 import React from 'react';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 import { DataTable, type Column } from '../../design-system/components/DataTable';
 import { StatusBadge, type StatusBadgeVariant } from '../../design-system/components/StatusBadge';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
@@ -7,13 +8,26 @@ import { ErrorState } from '../../design-system/components/ErrorState';
 import { carteiraIdentificacao, carteiraDetalhe, carteiraNumero, carteiraValor } from '../carteira/carteiraStyles';
 import { useMovimentosDaEntrega } from '../../hooks/useFiscalizacao';
 import type { EntregaFiscalizacao } from '../../services/fiscalizacaoService';
-import { NOME_SFC, dataBR } from '../../utils/fiscalizacao';
+import { NOME_SFC, dataBR, hojeEmBrasilia } from '../../utils/fiscalizacao';
 import { ataEItemDaChave, autorDoHistorico, etapaDef, observacaoDoHistorico, nomeDoItem, prazoDaEntrega, rotuloDoBeneficiario, textoDoAviso, type FaseEntrega } from '../../utils/fiscalizacaoEntregas';
 import { IdentificacaoDoContrato } from './ContratosFiscalizacaoTabela';
 import { NomeComSigla } from '../emendas/emendasPartes';
 import { chaveDeOrdem, ordemDaSituacao } from '../../utils/fiscalizacaoResumo';
+import { cobrancaDaComissao, prazoDoRecebimento } from '../../utils/fiscalizacaoRecebimento';
+import { situacaoDaCobranca, situacaoDaNotificacao, situacaoDaSubstituicao, textoDoVencimento } from '../../utils/fiscalizacaoOcorrencias';
 
-const VARIANTE_DA_FASE: Record<FaseEntrega, StatusBadgeVariant> = { PREPARACAO: 'neutral', EXECUCAO: 'info', RECEBIMENTO: 'warning', PAGAMENTO: 'success', FINALIZADO: 'success' };
+/**
+ * Cor da etiqueta da etapa por fase, a mesma das telas de Emendas (parecer de UX, 13/11/2026): azul enquanto o
+ * fornecedor trabalha, roxo no recebimento, verde no pagamento e no fim. Amarelo e vermelho ficam só para alertas
+ * (prazo, aviso da entrega); o Exército é etapa normal, com o "prazo suspenso" no texto e a régua do item em vermelho.
+ */
+const VARIANTE_DA_FASE: Record<FaseEntrega, StatusBadgeVariant> = {
+  PREPARACAO: COR_DA_SITUACAO.ANDAMENTO,
+  EXECUCAO: COR_DA_SITUACAO.ANDAMENTO,
+  RECEBIMENTO: COR_DA_SITUACAO.CONFERENCIA,
+  PAGAMENTO: COR_DA_SITUACAO.CONCLUIDO,
+  FINALIZADO: COR_DA_SITUACAO.CONCLUIDO
+};
 const COR_DO_PRAZO = { danger: 'var(--color-danger-text)', warning: 'var(--color-warning-text)', success: 'var(--color-success-text)', neutral: '#64748b' } as const;
 
 export const CelulaEtapa: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
@@ -35,7 +49,7 @@ export const CelulaEtapa: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
     );
   return (
     <>
-      <StatusBadge label={d.nome} variant={e.etapa === 'CONTROLADO' ? 'danger' : VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
+      <StatusBadge label={d.nome} variant={VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
       {e.etapaEm && <div style={carteiraDetalhe}>desde {dataBR(e.etapaEm)}</div>}
       {e.pagoEm ? <div style={carteiraDetalhe}>pago em {dataBR(e.pagoEm)}</div> : e.faturadoEm ? <div style={carteiraDetalhe}>faturado em {dataBR(e.faturadoEm)}</div> : null}
     </>
@@ -65,7 +79,7 @@ export const EtapaEmLinha: React.FC<{ e: EntregaFiscalizacao }> = ({ e }) => {
   const p = prazoDaEntrega(e);
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-      <StatusBadge label={d.nome} variant={e.etapa === 'CONTROLADO' ? 'danger' : VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
+      <StatusBadge label={d.nome} variant={VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
       {!e.entregueEm && p.tom === 'danger' && <span style={{ color: COR_DO_PRAZO.danger, fontWeight: 700, fontSize: '0.78rem' }}>{p.texto.toLowerCase()}</span>}
     </span>
   );
@@ -77,11 +91,46 @@ export const CelulaSituacaoDoItem: React.FC<{ e: EntregaFiscalizacao }> = ({ e }
   const p = prazoDaEntrega(e);
   const dias = (a: string, b: string) => Math.round((Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`)) / 864e5);
   const atraso = e.entregueEm && e.prevista && e.entregueEm > e.prevista ? dias(e.entregueEm, e.prevista) : 0;
+  // Entre a entrega e o envio para pagamento, o prazo que conta é o do TRP, do TRD ou do envio (o da entrega já passou).
+  const r = prazoDoRecebimento(e, hojeEmBrasilia());
+  const comissao = cobrancaDaComissao(e, hojeEmBrasilia());
+  const hoje = hojeEmBrasilia();
+  // Ocorrências em aberto (entrega B): uma linha curta com o que espera e até quando.
+  const notif = situacaoDaNotificacao(e.ocorrencias, hoje);
+  const subst = situacaoDaSubstituicao(e.ocorrencias, hoje);
+  const atrasado = !e.entregueEm && p.tom === 'danger';
+  const cob = atrasado ? situacaoDaCobranca(e, hoje) : null;
+  const linhaOcorrencia = notif ? (
+    <span style={{ color: notif.vencida ? COR_DO_PRAZO.danger : undefined, fontWeight: notif.vencida ? 700 : 400 }}>notificado em {dataBR(notif.em)} · resposta {textoDoVencimento(notif.dias)}</span>
+  ) : e.ocorrencias?.pedido ? (
+    <span style={{ color: COR_DO_PRAZO.warning, fontWeight: 700 }}>pediu prorrogação em {dataBR(e.ocorrencias.pedido.em)} · decidir</span>
+  ) : subst ? (
+    <span style={{ color: subst.vencida ? COR_DO_PRAZO.danger : undefined, fontWeight: subst.vencida ? 700 : 400 }}>recusado · substituição {textoDoVencimento(subst.dias)}</span>
+  ) : cob ? (
+    cob.estado === 'SEM_COBRANCA' ? <span style={{ color: COR_DO_PRAZO.danger, fontWeight: 700 }}>sem cobrança registrada</span> : <>cobrado em {dataBR(cob.desde)}{cob.estado === 'COBRAR_DE_NOVO' ? <b style={{ color: COR_DO_PRAZO.danger }}> · cobrar de novo</b> : ''}</>
+  ) : null;
   return (
     <>
-      <StatusBadge label={d.nome} variant={e.etapa === 'CONTROLADO' ? 'danger' : VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
+      <StatusBadge label={d.nome} variant={VARIANTE_DA_FASE[d.fase]} size="sm" dot={false} />
+      {r && !comissao && !subst && (
+        <div style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }} data-testid="prazo-recebimento">
+          <span style={{ color: COR_DO_PRAZO[r.tom], fontWeight: r.tom === 'neutral' ? 400 : 700 }}>{r.texto}</span>
+          {r.limite && r.tom === 'danger' && <> · era até {dataBR(r.limite)}</>}
+        </div>
+      )}
+      {linhaOcorrencia && <div style={carteiraDetalhe} data-testid="situacao-ocorrencia">{linhaOcorrencia}</div>}
+      {comissao && (
+        <div style={carteiraDetalhe} data-testid="situacao-comissao">
+          {comissao.vencida ? (
+            <span style={{ color: COR_DO_PRAZO.danger, fontWeight: 700 }}>Cobrar a comissão · sem {comissao.passo} há {comissao.dias} dias</span>
+          ) : (
+            <>{comissao.passo} com a comissão desde {dataBR(comissao.desde)} · cobrar em {dataBR(comissao.cobrarEm)}</>
+          )}
+          {r?.limite && <div>pelo TR, o {comissao.passo} era até {dataBR(r.limite)}</div>}
+        </div>
+      )}
       <div style={{ ...carteiraDetalhe, whiteSpace: 'nowrap' }}>
-        {e.entregueEm ? (
+        {r && !e.entregueEm ? null : e.entregueEm ? (
           <>
             entregue em {dataBR(e.entregueEm)}
             {atraso > 0 && <span style={{ color: COR_DO_PRAZO.warning }}> · {atraso} {atraso === 1 ? 'dia' : 'dias'} de atraso</span>}
@@ -160,7 +209,7 @@ export const HistoricoDaEntrega: React.FC<{ entregaId: string }> = ({ entregaId 
             <b style={{ color: 'var(--color-danger-text)' }}>Voltou para {etapaDef(m.etapa).nome}</b>
           ) : m.tipo === 'DESFEITO' && m.etapa ? (
             <b style={{ textDecoration: 'line-through', color: '#94a3b8' }}>{etapaDef(m.etapa).nome}</b>
-          ) : <b>{m.etapa ? etapaDef(m.etapa).nome : m.tipo === 'DIVISAO' ? 'Divisão' : m.tipo === 'PREVISTA' ? `Data prevista: ${dataBR(m.data)}` : m.tipo === 'RECEBIMENTO' ? `Ordem recebida pelo fornecedor em ${dataBR(m.data)}` : m.tipo === 'PRORROGACAO' ? `Prazo prorrogado para ${dataBR(m.data)}` : m.tipo === 'SUSPENSAO' ? 'Prazo suspenso no Exército' : m.tipo === 'RESPONSAVEL' ? 'Quem fiscaliza' : m.tipo === 'BENEFICIARIO' ? 'Beneficiário' : m.tipo === 'ITEM' ? 'Item da ata' : m.tipo === 'PROGRAMA' ? 'Programa' : 'Registro'}</b>}
+          ) : <b>{m.etapa ? etapaDef(m.etapa).nome : m.tipo === 'DIVISAO' ? 'Divisão' : m.tipo === 'PREVISTA' ? `Data prevista: ${dataBR(m.data)}` : m.tipo === 'RECEBIMENTO' ? `Ordem recebida pelo fornecedor em ${dataBR(m.data)}` : m.tipo === 'PRORROGACAO' ? `Prazo prorrogado para ${dataBR(m.data)}` : m.tipo === 'SUSPENSAO' ? 'Prazo suspenso no Exército' : m.tipo === 'RESPONSAVEL' ? 'Quem fiscaliza' : m.tipo === 'BENEFICIARIO' ? 'Beneficiário' : m.tipo === 'ITEM' ? 'Item da ata' : m.tipo === 'PROGRAMA' ? 'Programa' : m.tipo === 'OCORRENCIA' ? (m.observacao ?? 'Ocorrência').split(': ')[0] : 'Registro'}</b>}
           {m.tipo === 'DESFEITO' && <span style={carteiraDetalhe}> (desfeito)</span>}
           {m.tipo === 'CORRECAO' && <span style={carteiraDetalhe}> (correção do coordenador)</span>}
           {m.etapa && m.data && m.tipo !== 'VOLTA' && <span> em {dataBR(m.data)}</span>}
@@ -169,6 +218,7 @@ export const HistoricoDaEntrega: React.FC<{ entregaId: string }> = ({ entregaId 
               <NumeroSeiEtiqueta numero={m.documentoSei} testId={`fisc-historico-sei-${m.id}`} />
             </span>
           )}
+          {m.tipo === 'OCORRENCIA' && m.data && <span> em {dataBR(m.data)}</span>}
           {observacaoDoHistorico(m.tipo, m.observacao) && <span style={carteiraDetalhe}> · {observacaoDoHistorico(m.tipo, m.observacao)}</span>}
           <span style={carteiraDetalhe}> · {autorDoHistorico(m.criadoPorNome)}, {dataBR(m.criadoEm)}</span>
         </li>

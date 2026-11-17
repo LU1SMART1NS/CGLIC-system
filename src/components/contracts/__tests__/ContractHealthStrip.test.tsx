@@ -5,7 +5,10 @@ import * as eventsModule from '../../../hooks/useContractEvents';
 import type { ContractDashboardRecord } from '../../../types';
 
 vi.mock('../../../hooks/useContractEvents', () => ({ useContractEvents: vi.fn() }));
-vi.mock('../../../hooks/useContractFinancialSummary', () => ({ useContractFinancialSummary: () => ({ summary: null, isLoading: false }) }));
+const financeiro = vi.hoisted(() => ({ summary: null as any, isLoading: false }));
+const faturasMock = vi.hoisted(() => ({ data: undefined as any, isLoading: false, isError: false }));
+vi.mock('../../../hooks/useContractFinancialSummary', () => ({ useContractFinancialSummary: () => financeiro }));
+vi.mock('../../../hooks/useFaturasDoContrato', () => ({ useFaturasDoContrato: () => faturasMock }));
 
 const contract = {
   id: 'c1',
@@ -50,5 +53,34 @@ describe('ContractHealthStrip: valor atual', () => {
     expect(html).toContain('igual ao valor inicial');
     expect(html).not.toContain('termo');
     expect(html).not.toContain('valor acumulado');
+  });
+});
+
+describe('ContractHealthStrip: cartão Empenhos', () => {
+  beforeEach(() => {
+    vi.mocked(eventsModule.useContractEvents).mockReturnValue({ data: { eventos: [], historico: { origem: 'API', copiadoEm: null } } } as any);
+    financeiro.summary = { totalValorEmpenhadoGlobal: 7601435.45, totalValorPagoGlobal: 0 };
+    faturasMock.data = undefined;
+    faturasMock.isLoading = false;
+    faturasMock.isError = false;
+  });
+
+  it('o pago vem das faturas pagas, não do pago das notas (que a fonte traz zerado)', () => {
+    faturasMock.data = { faturas: [{}], resumo: { valorPago: 7563400 }, sincronizadoEm: null };
+    const html = render();
+    expect(html).toContain('99% pago');
+    expect(html).toMatch(/R\$.7\.563\.400 pagos/);
+  });
+
+  it('sem fatura paga, 0% pago com o empenhado', () => {
+    faturasMock.data = { faturas: [], resumo: null, sincronizadoEm: null };
+    expect(render()).toContain('0% pago');
+  });
+
+  it('faturas que não carregaram não viram 0% pago', () => {
+    faturasMock.isError = true;
+    const html = render();
+    expect(html).not.toContain('% pago');
+    expect(html).toContain('As faturas não carregaram');
   });
 });

@@ -19,6 +19,9 @@ import { formatContractNumber, formatContractKey } from '../utils/contractNumber
 import { fetchResumoReajusteAtas, type ResumoReajusteAta } from './reajusteAtasService';
 import { avisosDoReajusteDasAtas } from './reajusteAtasAvisos';
 import { fetchRegistrosFornecedorPncp, type RegistroFornecedorPncp } from './fornecedorAtaPncpService';
+import { fetchPrazosAConfirmar, type PrazoDaAta } from './ataPrazoEntregaService';
+import { textoDaRegra } from '../utils/fiscalizacaoPrazo';
+import { textoDaRegraDeRecebimento, type RegraDoRecebimento } from '../utils/fiscalizacaoRecebimento';
 import { fetchAusentesDaFonte, rotuloAusente, trabalhoNaFonte, type AusenteDaFonte } from './ausentesDaFonteService';
 import { fetchEmpenhadoAcima, textoDaOrigem, type EmpenhadoAcima } from './empenhadoAcimaService';
 import { fetchVinculosAConferir, numeroDoContrato, textoDoMotivoVinculo, trabalhoDoGestor, type VinculoAConferir } from './vinculosAConferirService';
@@ -75,6 +78,7 @@ import { quantidadeBaseSenasp } from '../utils/quantitativoSenasp';
 import { alocadoAcimaDoLimite, contratadoAcimaDoLimite, limiteComPreposicao, limiteProvisorio } from '../utils/ataAssinadaPendente';
 import { VIGENCIA_RULES, PAGAMENTO_RULES, TAREFA_RULES, classifyTarefaPrazo, isLembreteNaJanela } from '../config/alertRules';
 import { chaveDoContrato } from '../utils/contractKeyUtils';
+import { fetchContratosExecutados } from './contratoExecucaoService';
 import { MOTIVO_CONTRATADO_ACIMA_DA_COTA, MOTIVO_QUANTITATIVOS_A_CONFERIR, motivoDoLembrete, motivoDoReajuste } from '../utils/motivoDetalhe';
 import { aguardandoResposta, COBRAR_CRITICO_DIAS, prazoEfetivo, textoCobrarResposta } from '../utils/modeloGestao';
 
@@ -160,7 +164,9 @@ export function calculateExecutiveKPIs(
  */
 export function calculateDeadlinesSummary(
   contracts: ContractDashboardRecord[] = [],
-  currentDate?: Date
+  currentDate?: Date,
+  /** Escopo cumprido confirmado (migration 314): fora das contas de vencimento. */
+  contratosExecutados: ReadonlySet<string> = new Set<string>()
 ): ManagementDashboardDeadlinesSummary {
   let vencendo30Dias = 0;
   let vencendo60Dias = 0;
@@ -175,6 +181,7 @@ export function calculateDeadlinesSummary(
     const dias = getContractDaysRemaining(contract.dataVigenciaFim, currentDate);
 
     if (dias === null) continue;
+    if (dias >= 0 && contratosExecutados.has(contractKey)) continue;
 
     let faixa: '30D' | '60D' | '90D' | 'VENCIDO' | null = null;
 
@@ -340,6 +347,8 @@ export function calculateAttentionSummary(params: {
   arpItems?: Array<{ percentual_consumido?: number }>;
   /** Atas publicadas no PNCP sem fornecedor (atas_fornecedor_pncp, migration 107). */
   fornecedoresPncp?: RegistroFornecedorPncp[];
+  /** Prazos de entrega do TR a confirmar (ata_prazo_entrega, migration 301). */
+  prazosAta?: PrazoDaAta[];
   /** Vínculos automáticos desmentidos pela fonte com trabalho do gestor (vinculo_automatico_a_conferir, migration 112). */
   vinculosAConferir?: VinculoAConferir[];
   /** Notas e faturas que a fonte deixou de listar e têm trabalho da equipe (migration 113). */
@@ -350,6 +359,8 @@ export function calculateAttentionSummary(params: {
   atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
   /** Chaves dos avisos "registrado acima" com decisão do gestor da ata (migration 223): saem da fila. */
   registradoAcimaDecididos?: ReadonlySet<string>;
+  /** Contratos com escopo cumprido confirmado (migration 314): sem lembretes de prorrogação e término. */
+  contratosExecutados?: ReadonlySet<string>;
   currentDate?: Date;
 }): ManagementDashboardAttentionSummary {
   const {
@@ -363,10 +374,12 @@ export function calculateAttentionSummary(params: {
     paymentCycles = [],
     arpItems = [],
     fornecedoresPncp = [],
+    prazosAta = [],
     vinculosAConferir = [],
     ausentesDaFonte = [],
     empenhadoAcima = [],
     reajustesAtas = [],
+    contratosExecutados,
     currentDate
   } = params;
 
@@ -401,6 +414,7 @@ export function calculateAttentionSummary(params: {
     arps,
     managers,
     plans,
+    contratosExecutados,
     currentDate
   });
   const prazosKpis = calculateCentralPrazosKPIs(prazosItems);
@@ -454,6 +468,46 @@ export function calculateAttentionSummary(params: {
     });
   }
 
+
+  // 0a. Prazo de entrega lido do TR ainda não confirmado (migration 301): o gestor da ata (ou o coordenador) confere
+  // na Ata 360. Sem "Resolvido": some ao confirmar.
+  const prazoPorAta = new Map(prazosAta.filter((p) => !p.confirmadoEm || !p.recebimentoConfirmadoEm).map((p) => [p.ataKey, p]));
+  for (const arp of arps) {
+    const p = prazoPorAta.get(chaveGestaoDaArp(arp));
+    if (!p) continue;
+    // Prazo de entrega já confirmado: falta o do recebimento (TRP e TRD, migration 305).
+    if (p.confirmadoEm) {
+      const arpKeyR = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
+      const rec = p.recebimentoSugerido ? textoDaRegraDeRecebimento(p.recebimentoSugerido as RegraDoRecebimento) : null;
+      items.push({
+        id: `ATT-PRAZO-RECEB-${arpKeyR}`,
+        category: 'PRAZO_ENTREGA',
+        severity: rec ? 'INFO' : 'ATENCAO',
+        title: rec ? 'Confirmar o prazo de recebimento lido do TR' : 'Informar o prazo de recebimento',
+        description: `Ata ${arp.numeroAtaRegistroPreco} — ${rec ?? 'o TR não traz o TRP e o TRD, ou não foi lido'}; os contratos da ata herdam o prazo`,
+        arpKey: arpKeyR,
+        numeroAta: arp.numeroAtaRegistroPreco,
+        objetoItem: arp.objeto,
+        targetUrl: `/atas/detalhe/${encodeURIComponent(arpKeyR)}?aba=acoes`,
+        badgeLabel: rec ? 'a confirmar' : 'a informar'
+      });
+      continue;
+    }
+    const sugerido = p.sugeridoDias && p.sugeridoInicio ? textoDaRegra({ dias: p.sugeridoDias, contagem: p.sugeridoContagem ?? 'CORRIDOS', inicio: p.sugeridoInicio }) : null;
+    const arpKey = `${arp.numeroAtaRegistroPreco}-${arp.codigoUnidadeGerenciadora}`;
+    items.push({
+      id: `ATT-PRAZO-${arpKey}`,
+      category: 'PRAZO_ENTREGA',
+      severity: p.leitura === 'CLARO' ? 'INFO' : 'ATENCAO',
+      title: p.leitura === 'CLARO' ? 'Confirmar o prazo de entrega lido do TR' : p.leitura === 'CONFERIR' ? 'Conferir o prazo de entrega no TR' : 'Informar o prazo de entrega',
+      description: `Ata ${arp.numeroAtaRegistroPreco} — ${p.leitura === 'CLARO' && sugerido ? sugerido : p.leitura === 'CONFERIR' ? p.leituraMotivo ?? 'trechos do TR a conferir' : p.leitura ? 'o TR publicado no PNCP não traz a cláusula' : 'ata nova: informe o prazo do TR'}; os contratos da ata herdam o prazo`,
+      arpKey,
+      numeroAta: arp.numeroAtaRegistroPreco,
+      objetoItem: arp.objeto,
+      targetUrl: `/atas/detalhe/${encodeURIComponent(arpKey)}?aba=acoes`,
+      badgeLabel: p.leitura === 'CLARO' ? 'a confirmar' : p.leitura === 'CONFERIR' ? 'a conferir' : 'a informar'
+    });
+  }
 
   // 0b. Vínculo automático desmentido pela fonte com trabalho do gestor (migration 112): o cron não o apaga, e o
   // gestor da ata e do contrato precisa saber. O coordenador decide manter ou retirar; o gestor pode marcar o aviso
@@ -1462,12 +1516,15 @@ export function buildManagementDashboardReadModel(params: {
   itemsSaldo?: Array<any>;
   paymentCycles?: PaymentFollowUpCycle[];
   fornecedoresPncp?: RegistroFornecedorPncp[];
+  prazosAta?: PrazoDaAta[];
   vinculosAConferir?: VinculoAConferir[];
   ausentesDaFonte?: AusenteDaFonte[];
   empenhadoAcima?: EmpenhadoAcima[];
   reajustesAtas?: ResumoReajusteAta[];
   atasComProrrogacaoSoSaldo?: ReadonlySet<string>;
   registradoAcimaDecididos?: ReadonlySet<string>;
+  /** Contratos com escopo cumprido confirmado (migration 314). */
+  contratosExecutados?: ReadonlySet<string>;
   syncInfo?: SyncMetadata;
   currentDate?: Date;
   filters?: ManagementDashboardFilters;
@@ -1713,7 +1770,7 @@ export function buildManagementDashboardReadModel(params: {
   );
 
   const executive = calculateExecutiveKPIs(filteredContracts, filteredEventsMap);
-  const deadlines = calculateDeadlinesSummary(filteredContracts, currentDate);
+  const deadlines = calculateDeadlinesSummary(filteredContracts, currentDate, params.contratosExecutados);
   const attention = calculateAttentionSummary({
     contracts: filteredContracts,
     arps: filteredArps,
@@ -1725,12 +1782,14 @@ export function buildManagementDashboardReadModel(params: {
     paymentCycles: filteredPaymentCycles,
     arpItems: filteredItemsSaldo,
     fornecedoresPncp: params.fornecedoresPncp,
+    prazosAta: params.prazosAta,
     vinculosAConferir: params.vinculosAConferir,
     ausentesDaFonte: params.ausentesDaFonte,
     empenhadoAcima: params.empenhadoAcima,
     reajustesAtas: params.reajustesAtas,
     atasComProrrogacaoSoSaldo: params.atasComProrrogacaoSoSaldo,
     registradoAcimaDecididos: params.registradoAcimaDecididos,
+    contratosExecutados: params.contratosExecutados,
     currentDate
   });
   const financial = calculateFinancialSummary(filteredEmpenhos);
@@ -1784,8 +1843,10 @@ export async function fetchManagementDashboardData(
   // estourando o tempo limite) não derruba o painel: usa a última leitura boa
   // dela, ou fica vazia, e entra em `fontesComFalha` para a tela avisar.
   const falhas: FonteComFalha[] = [];
-  const ler = <T,>(nome: string, rotulo: string, p: Promise<T>, vazio: T) =>
-    lerFonte(`${cleanUasg}:${nome}`, rotulo, p, vazio, falhas);
+  // A fila (no máximo 6 leituras de cada vez) e a repetição no tempo esgotado ficam no cliente do banco
+  // (filaDoBanco.ts) e valem para o site inteiro.
+  const ler = <T,>(nome: string, rotulo: string, buscar: () => Promise<T>, vazio: T) =>
+    lerFonte(`${cleanUasg}:${nome}`, rotulo, buscar(), vazio, falhas);
   // Fontes que não dependem da UASG: o Início abre as duas UASGs ao mesmo tempo e lia cada uma em dobro.
   // Agora as duas chamadas dividem a mesma leitura; o recorte por UASG é feito depois, no read model.
   const lerSemUasg = <T,>(nome: string, rotulo: string, buscar: () => Promise<T>, vazio: T) =>
@@ -1802,35 +1863,39 @@ export async function fetchManagementDashboardData(
     arpItemsSaldo,
     itensComAlocacao,
     fornecedoresPncp,
+    prazosAta,
     vinculosAConferir,
     ausentesDaFonte,
     empenhadoAcima,
     reajustesAtas,
     atasComProrrogacaoSoSaldo,
-    registradoAcimaDecididos
+    registradoAcimaDecididos,
+    contratosExecutados
   ] = await Promise.all([
-    ler('contratos', 'contratos', cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg), [] as ContractDashboardRecord[]),
-    ler('arps', 'atas (ARPs)', cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg), { arps: [], syncInfo: { isCachedInDb: false } }),
+    ler('contratos', 'contratos', () => (cache ? cache.contratos(cleanUasg) : fetchContratosParaTela(cleanUasg)), [] as ContractDashboardRecord[]),
+    ler('arps', 'atas (ARPs)', () => (cache ? cache.atas(cleanUasg) : fetchArpsFromDb(cleanUasg)), { arps: [], syncInfo: { isCachedInDb: false } }),
     // Rótulos iguais aos das leituras da tela (ROTULO_GESTORES_CONTRATOS, ROTULO_AVISOS_RESOLVIDOS): a faixa junta numa linha.
-    ler('gestores', 'gestores dos contratos', cache ? cache.gestores(cleanUasg) : fetchAllContractManagers(cleanUasg), {} as Record<string, ContractManager>),
-    ler('planos', 'planos de tarefas dos contratos', fetchAllContractTaskPlans(cleanUasg), {} as Record<string, ContractTaskPlan>),
+    ler('gestores', 'gestores dos contratos', () => (cache ? cache.gestores(cleanUasg) : fetchAllContractManagers(cleanUasg)), {} as Record<string, ContractManager>),
+    ler('planos', 'planos de tarefas dos contratos', () => fetchAllContractTaskPlans(cleanUasg), {} as Record<string, ContractTaskPlan>),
     lerSemUasg('planosAtas', 'planos de gestão das atas', fetchAllAtaTaskPlans, {} as Record<string, AtaTaskPlan>),
     lerSemUasg('avisosResolvidos', 'avisos resolvidos e notas deixadas como estão', () => fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))), new Set<string>()),
     lerSemUasg('empenhos', 'empenhos', fetchEmpenhosResumoFromDb, [] as any[]),
-    ler('saldoItens', 'saldo dos itens', fetchArpItemSaldosFromDb(cleanUasg), [] as any[]),
+    ler('saldoItens', 'saldo dos itens', () => fetchArpItemSaldosFromDb(cleanUasg), [] as any[]),
     lerSemUasg('alocacao', 'alocação interna dos itens', fetchItensComAlocacao, new Set<string>()),
     lerSemUasg('fornecedorPncp', 'atas sem fornecedor no PNCP', fetchRegistrosFornecedorPncp, [] as RegistroFornecedorPncp[]),
+    lerSemUasg('prazosAta', 'prazo de entrega das atas', fetchPrazosAConfirmar, [] as PrazoDaAta[]),
     lerSemUasg('vinculos', 'vínculos a conferir', fetchVinculosAConferir, [] as VinculoAConferir[]),
     lerSemUasg('ausentes', 'notas e faturas a conferir', fetchAusentesDaFonte, [] as AusenteDaFonte[]),
     lerSemUasg('empenhadoAcima', 'empenhado acima do contratado', fetchEmpenhadoAcima, [] as EmpenhadoAcima[]),
     lerSemUasg('reajusteAtas', 'reajuste das atas', fetchResumoReajusteAtas, [] as ResumoReajusteAta[]),
     lerSemUasg('termosProrrogacao', 'termos de prorrogação das atas', fetchAtasComProrrogacaoSoSaldo, new Set<string>()),
-    lerSemUasg('decisoesRegistradoAcima', 'decisões do registrado acima do homologado', () => fetchDecisoesRegistradoAcima().then((l) => new Set(l.map((d) => d.chave))), new Set<string>())
+    lerSemUasg('decisoesRegistradoAcima', 'decisões do registrado acima do homologado', () => fetchDecisoesRegistradoAcima().then((l) => new Set(l.map((d) => d.chave))), new Set<string>()),
+    lerSemUasg('contratosExecutados', 'contratos com escopo cumprido', fetchContratosExecutados, new Set<string>())
   ]);
   // Marca nos saldos os itens que já têm unidade alocada (pendência de contratado sem unidade, migration 103).
   const arpItemsSaldoComAlocacao = arpItemsSaldo.map((r: any) => ({ ...r, tem_alocacao: itensComAlocacao.has(r.item_key) }));
 
-  const paymentCycles = await ler('ciclos', 'ciclos de pagamento', fetchAllPaymentCyclesForDashboard(contracts), [] as PaymentFollowUpCycle[]);
+  const paymentCycles = await ler('ciclos', 'ciclos de pagamento', () => fetchAllPaymentCyclesForDashboard(contracts), [] as PaymentFollowUpCycle[]);
 
   const readModel = buildManagementDashboardReadModel({
     uasg: cleanUasg,
@@ -1844,12 +1909,14 @@ export async function fetchManagementDashboardData(
     itemsSaldo: arpItemsSaldoComAlocacao,
     paymentCycles,
     fornecedoresPncp,
+    prazosAta,
     vinculosAConferir,
     ausentesDaFonte,
     empenhadoAcima,
     reajustesAtas,
     atasComProrrogacaoSoSaldo,
     registradoAcimaDecididos,
+    contratosExecutados,
     filters,
     syncInfo: arpsRes.syncInfo,
     currentDate

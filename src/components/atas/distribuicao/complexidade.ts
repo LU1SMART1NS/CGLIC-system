@@ -29,6 +29,22 @@ export const MOTIVOS_AJUSTE = [
 /** Peso de cada faixa na carga equivalente (Baixa = 1, Média = 2, Alta = 3). */
 export const PESO_COMPLEXIDADE: Record<NivelComplexidade, number> = { BAIXA: 1, MEDIA: 2, ALTA: 3 };
 
+/**
+ * Peso de cada tarefa aberta com o gestor e prazo em até 30 dias (decisão de 17/11/2026): meio ponto, ou seja,
+ * 2 tarefas na fila = 1 instrumento Baixa. Quem zera a fila fica mais leve e passa a receber mais.
+ */
+export const PESO_TAREFA_ABERTA = 0.5;
+
+/** Janela das tarefas que contam na carga (prazo até hoje + N dias, inclusive as vencidas). */
+export const DIAS_DA_FILA = 30;
+
+/**
+ * Carga de um instrumento: o peso da complexidade mais a fila dele (tarefas abertas e faturas do Financeiro que
+ * precisam de ação, meio ponto cada). Mudar de gestor leva tudo junto.
+ */
+export const pesoDoInstrumento = (item: { complexidade: { nivel: NivelComplexidade }; tarefas?: number; faturas?: number }): number =>
+  PESO_COMPLEXIDADE[item.complexidade.nivel] + PESO_TAREFA_ABERTA * ((item.tarefas ?? 0) + (item.faturas ?? 0));
+
 export const ROTULO_COMPLEXIDADE: Record<NivelComplexidade, string> = { ALTA: 'Alta', MEDIA: 'Média', BAIXA: 'Baixa' };
 
 /**

@@ -1,6 +1,8 @@
 // Contas das listas e telas 360 da Fiscalização (Contratos, Beneficiários, Programas), a partir dos itens.
 import type { EntregaFiscalizacao, OrigemDoRecurso } from '../services/fiscalizacaoService';
 import { etapaDef, foiEntregue, itemConcluido, ordemDaEtapa, prazoDaEntrega, rotuloDoBeneficiario, type FaseEntrega, type TomPrazo, nomeDoItem } from './fiscalizacaoEntregas';
+import { hojeEmBrasilia } from './fiscalizacao';
+import { prazoDoItemNoRecebimento } from './fiscalizacaoRecebimento';
 
 const ORDEM_DA_FASE: FaseEntrega[] = ['PREPARACAO', 'EXECUCAO', 'RECEBIMENTO', 'PAGAMENTO', 'FINALIZADO'];
 const somar = (es: EntregaFiscalizacao[]) => es.reduce((t, e) => t + e.quantidade, 0);
@@ -58,6 +60,26 @@ export function contratosFinalizados(es: EntregaFiscalizacao[]): Set<string> {
   return fim;
 }
 
+/**
+ * Contratos que não pesam na carga do fiscal: a fiscalização encerrou (todos os itens da SFC/CGLIC no fim, como em
+ * contratosFinalizados) ou a vigência acabou sem nenhum item da SFC/CGLIC em aberto. Vencido com item a entregar
+ * continua na carga: ainda há o que fiscalizar. Sem os itens carregados (`undefined`), nada sai da carga: tirar só os
+ * vencidos pela data mostraria por alguns segundos uma conta errada (vencidos com item a entregar fora).
+ */
+export function contratosForaDaCarga(
+  contratos: Array<{ contractKey: string; vigenciaFim: string | null }>,
+  es: EntregaFiscalizacao[] | undefined,
+  hoje: string = hojeEmBrasilia()
+): Set<string> {
+  if (!es) return new Set();
+  const fora = contratosFinalizados(es);
+  const comItemAberto = new Set(es.filter((e) => e.responsavel === 'SFC' && !itemConcluido(e)).map((e) => e.contractKey));
+  for (const c of contratos) {
+    if (c.vigenciaFim && c.vigenciaFim.slice(0, 10) < hoje && !comItemAberto.has(c.contractKey)) fora.add(c.contractKey);
+  }
+  return fora;
+}
+
 export function agrupar<K>(es: EntregaFiscalizacao[], chave: (e: EntregaFiscalizacao) => K): Map<K, EntregaFiscalizacao[]> {
   const m = new Map<K, EntregaFiscalizacao[]>();
   for (const e of es) {
@@ -89,6 +111,9 @@ export const passaPrazo = (r: Resumo, filtro: string) => !filtro || (filtro === 
 /** Ordena a situação pelo prazo: vencidos (mais antigos) primeiro, depois os que vencem, por fim entregues e área. */
 export const ordemDaSituacao = (e: EntregaFiscalizacao): number => {
   if (e.responsavel === 'AREA') return 1e9;
+  // Entregue com o TRP, o TRD ou o envio em aberto: pelo prazo do recebimento (vencido sobe).
+  const r = prazoDoItemNoRecebimento(e, hojeEmBrasilia());
+  if (r?.dias != null) return r.dias;
   if (e.entregueEm) return 1e8 + ordemDaEtapa(e.etapa);
   return prazoDaEntrega(e).dias ?? 1e7;
 };

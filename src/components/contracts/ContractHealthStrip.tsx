@@ -6,6 +6,7 @@ import { buildContractLifeline } from '../../services/contractLifelineService';
 import { getContractDaysRemaining } from '../../services/dashboardService';
 import { useContractFinancialSummary } from '../../hooks/useContractFinancialSummary';
 import { useContractEvents } from '../../hooks/useContractEvents';
+import { useFaturasDoContrato } from '../../hooks/useFaturasDoContrato';
 import { classifyPrazo } from '../carteira/carteiraPrazo';
 import { formatCurrencyCompact } from '../carteira/carteiraFormat';
 import { HealthTile, HealthTileGrid, LifelineRule, PendenciasTile } from '../instrument360/HealthStripParts';
@@ -38,6 +39,7 @@ export const ContractHealthStrip: React.FC<ContractHealthStripProps> = ({ contra
   const eventos = dadosEventos?.eventos;
   const lifeline = React.useMemo(() => buildContractLifeline(contract, undefined, eventos), [contract, eventos]);
   const financial = useContractFinancialSummary(contract, contractKey);
+  const faturas = useFaturasDoContrato(contractKey);
 
   const dias = getContractDaysRemaining(contract.dataVigenciaFim);
   const expirado = contract.statusVigencia === 'Expirado';
@@ -73,17 +75,25 @@ export const ContractHealthStrip: React.FC<ContractHealthStripProps> = ({ contra
       ? [...valorHints, `valor acumulado nas vigências: ${formatCurrencyRounded(valorAcumulado)}`].join(' · ')
       : undefined;
 
-  const totalPago = financial.summary?.totalValorPagoGlobal ?? 0;
+  // Pago = faturas do contrato com a OB que confirma o pagamento (v_contrato_faturas_resumo), o mesmo número da aba
+  // Pagamentos. O "pago" das notas de empenho vem zerado da fonte em boa parte dos contratos (114 vigentes com faturas
+  // pagas mostravam 0% em 16/11/2026) e não serve aqui.
+  const totalPago = faturas.data?.resumo?.valorPago ?? 0;
   const totalEmpenhado = financial.summary?.totalValorEmpenhadoGlobal ?? 0;
-  const pagoValue = financial.isLoading && !financial.summary
+  const carregando = (financial.isLoading && !financial.summary) || (faturas.isLoading && !faturas.data);
+  const faturasFalharam = faturas.isError && !faturas.data;
+  const temDados = Boolean(financial.summary) || (faturas.data?.faturas.length ?? 0) > 0;
+  const pagoValue = carregando
     ? '…'
-    : financial.summary && valorGlobal > 0
-    ? `${Math.round((totalPago / valorGlobal) * 100)}% pago`
-    : '—';
-  const financeiroHint: string | string[] = financial.summary && valorGlobal > 0
-    ? [`${formatCurrencyRounded(totalPago)} pagos`, `empenhado ${formatCurrencyCompact(totalEmpenhado)}`]
-    : financial.isLoading
+    : faturasFalharam || !temDados || valorGlobal <= 0
+    ? '—'
+    : `${Math.round((totalPago / valorGlobal) * 100)}% pago`;
+  const financeiroHint: string | string[] = carregando
     ? 'Carregando empenhos'
+    : faturasFalharam
+    ? 'As faturas não carregaram'
+    : temDados && valorGlobal > 0
+    ? [`${formatCurrencyRounded(totalPago)} pagos`, financial.summary ? `empenhado ${formatCurrencyCompact(totalEmpenhado)}` : 'sem empenhos vinculados']
     : 'Sem empenhos vinculados';
 
   return (

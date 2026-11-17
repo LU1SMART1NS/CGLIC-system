@@ -85,3 +85,24 @@ describe('pendenciasDoMenu: Início', () => {
     expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, emendasAContratar: null })['visao-geral']).toBeUndefined();
   });
 });
+
+describe('pendenciasDoMenu: Início do fiscal (envio à SFC, 13/11/2026)', () => {
+  it('informações da CAEP recebidas: o número abre os itens com a Ordem a emitir', () => {
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, ordemAEmitir: 3 })['visao-geral']).toEqual({ contagem: 3, destino: '/fiscalizacao/itens?ver=VOCE&fase=PREPARACAO' });
+  });
+  it('sem Ordem a emitir (ou sem a contagem), sem número', () => {
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, ordemAEmitir: 0 })['visao-geral']).toBeUndefined();
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, ordemAEmitir: null })['visao-geral']).toBeUndefined();
+  });
+});
+
+describe('pendenciasDoMenu: Fiscalização (contratos Com você, 16/11/2026)', () => {
+  it('contratos com o passo do fiscal: número abre Contratos; vermelho com passo vencido', () => {
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, fiscalizacao: { total: 4, vencidos: 0 } }).fiscalizacao).toEqual({ contagem: 4, vermelho: false, motivoVermelho: 'com passo vencido', destino: '/fiscalizacao/contratos' });
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, fiscalizacao: { total: 4, vencidos: 1 } }).fiscalizacao?.vermelho).toBe(true);
+  });
+  it('nada com o fiscal (ou sem a contagem), sem número', () => {
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, fiscalizacao: { total: 0, vencidos: 0 } }).fiscalizacao).toBeUndefined();
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, fiscalizacao: null }).fiscalizacao).toBeUndefined();
+  });
+});

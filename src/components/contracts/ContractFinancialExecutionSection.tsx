@@ -30,6 +30,8 @@ import { DistribuirEmpenhoModal } from './DistribuirEmpenhoModal';
 import { useLinhasAbertas } from './useLinhasAbertas';
 import type { ContractDashboardRecord } from '../../types';
 import { useContractFinancialSummary } from '../../hooks/useContractFinancialSummary';
+import { avisoTesouroAtrasado } from '../../utils/tesouroAtrasado';
+import { saldoAExecutar } from '../../utils/saldoAExecutar';
 import { useSincronizacaoEmpenhosContrato } from '../../hooks/useSincronizacaoEmpenhosContrato';
 import type { SincronizacaoEmpenhosContrato } from '../../services/contratoEmpenhosSincronizacaoService';
 import { CarteiraIdLink } from '../carteira/CarteiraRowLink';
@@ -51,6 +53,7 @@ import {
   type Column
 } from '../../design-system';
 import { formatCurrencyOrDash, formatDateBR } from '../../utils/format';
+import { COR_DA_SITUACAO } from '../../design-system/coresDaSituacao';
 
 interface ContractFinancialExecutionSectionProps {
   contract: ContractDashboardRecord;
@@ -69,6 +72,24 @@ const COMO_CORRIGIR_NA_FONTE =
   'Se não for deste contrato, retire a nota do contrato no Contratos.gov.br. A correção aparece aqui na próxima sincronização.';
 
 type EmpenhoRow = ReturnType<typeof useContractFinancialSummary>['empenhosList'][number];
+
+/**
+ * Liquidado ou pago da nota. Vem do Tesouro (SIAFI); a nota que ainda não está no saldo do Tesouro mostra o número do
+ * Contratos.gov.br com o aviso "pela fonte", porque a fonte quase nunca atualiza esses campos.
+ */
+const ValorDaExecucao: React.FC<{ empenho: EmpenhoRow; valor: number; tipo: 'liquidado' | 'pago' }> = ({ empenho, valor, tipo }) => {
+  if (empenho.fonte_execucao !== 'FONTE') {
+    const quando = empenho.tesouro_atualizado_em ? `, atualizado em ${formatDateBR(empenho.tesouro_atualizado_em)}` : '';
+    const titulo = tipo === 'pago' ? `Pago no Tesouro (SIAFI), somando todos os anos${quando}` : `Pago mais liquidado a pagar no Tesouro (SIAFI)${quando}`;
+    return <span title={titulo}>{formatCurrencyOrDash(valor)}</span>;
+  }
+  return (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }} title="A nota ainda não está no saldo do Tesouro; o valor é o do Contratos.gov.br, que pode estar desatualizado">
+      {formatCurrencyOrDash(valor)}
+      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }} data-testid={`empenho-execucao-fonte-${tipo}`}>pela fonte</span>
+    </span>
+  );
+};
 
 /** Data e hora local, ex.: 06/10/2026 14:25. */
 const formatDataHora = (val?: string | null) => {
@@ -252,7 +273,7 @@ export const EmpenhoDetalhe: React.FC<{
                 dot={false}
               />
             ) : (
-              <StatusBadge label={d.situacao === 'REVISAR' ? 'Revisar o vínculo aos itens' : 'A vincular aos itens'} variant="warning" size="sm" dot={false} />
+              <StatusBadge label={d.situacao === 'REVISAR' ? 'Revisar o vínculo aos itens' : 'A vincular aos itens'} variant={d.situacao === 'REVISAR' ? COR_DA_SITUACAO.ATENCAO : COR_DA_SITUACAO.ANDAMENTO} size="sm" dot={false} />
             )}
             {sugestao && <span style={{ color: 'var(--text-muted)' }}>sugestão: {sugestao}</span>}
             {fechada && d.origem === 'VALOR' && (
@@ -580,6 +601,12 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
   const pctPago = totalEmpenhado > 0 ? (totalPago / totalEmpenhado) * 100 : 0;
   const pctLiquidado = totalEmpenhado > 0 ? (totalLiquidado / totalEmpenhado) * 100 : 0;
 
+  // Liquidado e pago vêm do Tesouro; a data é a leitura mais recente do saldo contábil entre as notas do contrato.
+  const tesouroEm = empenhosList.reduce<string | null>((acc, e) => (e.tesouro_atualizado_em && (!acc || e.tesouro_atualizado_em > acc) ? e.tesouro_atualizado_em : acc), null);
+  const pelaFonte = empenhosList.filter((e) => e.fonte_execucao === 'FONTE').length;
+  const tesouroAtrasado = avisoTesouroAtrasado(tesouroEm);
+  const saldoNaoExecutado = empenhosList.reduce((acc, e) => acc + saldoAExecutar(e), 0);
+
   const distribuicaoDe = (e: EmpenhoRow) => (e.empenho_id ? distribuicaoPorEmpenho.get(e.empenho_id) : undefined);
   const chaveDaLinha = (e: EmpenhoRow, i: number) => e.numero_oficial || e.canonical_key || String(i);
 
@@ -661,9 +688,23 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
     },
     { key: 'data', header: 'Emissão', sortValue: (e) => e.data_emissao, render: (e) => formatDate(e.data_emissao) },
     { key: 'empenhado', header: 'Empenhado', sortValue: (e) => e.valor_empenhado, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrencyOrDash(e.valor_empenhado) },
-    { key: 'liquidado', header: 'Liquidado', sortValue: (e) => e.valor_liquidado, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrencyOrDash(e.valor_liquidado) },
-    { key: 'pago', header: 'Pago', sortValue: (e) => e.valor_pago, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrencyOrDash(e.valor_pago) },
-    { key: 'saldo', header: 'Saldo a executar', sortValue: (e) => Math.max(0, e.valor_empenhado - e.valor_pago), sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrencyOrDash(Math.max(0, e.valor_empenhado - e.valor_pago)) },
+    {
+      key: 'liquidado',
+      header: 'Liquidado',
+      sortValue: (e) => e.valor_liquidado,
+      sortFirstDir: 'desc',
+      align: 'right',
+      render: (e) => <ValorDaExecucao empenho={e} valor={e.valor_liquidado} tipo="liquidado" />
+    },
+    {
+      key: 'pago',
+      header: 'Pago',
+      sortValue: (e) => e.valor_pago,
+      sortFirstDir: 'desc',
+      align: 'right',
+      render: (e) => <ValorDaExecucao empenho={e} valor={e.valor_pago} tipo="pago" />
+    },
+    { key: 'saldo', header: 'Saldo a executar', sortValue: saldoAExecutar, sortFirstDir: 'desc', align: 'right', render: (e) => formatCurrencyOrDash(saldoAExecutar(e)) },
     {
       key: 'itens',
       header: 'Itens do contrato',
@@ -707,13 +748,26 @@ export const ContractFinancialExecutionSection: React.FC<ContractFinancialExecut
           { label: 'Empenhado', value: formatCurrencyOrDash(totalEmpenhado), unit: '' },
           { label: 'Liquidado', value: `${formatCurrencyOrDash(totalLiquidado)} (${pctLiquidado.toFixed(1)}%)`, unit: '' },
           { label: 'Pago', value: `${formatCurrencyOrDash(totalPago)} (${pctPago.toFixed(1)}%)`, unit: '', tone: 'success' },
-          { label: 'Saldo não executado', value: formatCurrencyOrDash(summary.saldoNaoExecutadoGlobal), unit: '', tone: 'warning' }
+          { label: 'Saldo não executado', value: formatCurrencyOrDash(saldoNaoExecutado), unit: '', tone: 'warning' }
         ]}
         progress={{ value: totalPago, max: totalEmpenhado, label: 'Pago do empenhado' }}
       >
         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
           A liquidar <strong>{formatCurrencyOrDash(summary.saldoALiquidarGlobal)}</strong> · A pagar <strong>{formatCurrencyOrDash(summary.saldoAPagarGlobal)}</strong>
         </span>
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }} data-testid="contract-financial-fonte-execucao">
+          {pelaFonte === empenhosList.length
+            ? 'Liquidado e pago do Contratos.gov.br: as notas ainda não estão no saldo do Tesouro'
+            : <>
+                Liquidado e pago pelo Tesouro (SIAFI){tesouroEm ? `, atualizado em ${formatDateBR(tesouroEm)}` : ''}
+                {pelaFonte > 0 && ` · ${pelaFonte === 1 ? '1 nota ainda não está' : `${pelaFonte} notas ainda não estão`} no Tesouro e ${pelaFonte === 1 ? 'mostra' : 'mostram'} o número da fonte`}
+              </>}
+        </span>
+        {tesouroAtrasado && (
+          <NoticeBar tone="warning" testId="contract-financial-tesouro-atrasado">
+            {tesouroAtrasado}
+          </NoticeBar>
+        )}
         <SituacaoSincronizacaoEmpenhos sync={sync} />
         {(aDistribuir.length > 0 || aRever.length > 0) && (
           <NoticeBar

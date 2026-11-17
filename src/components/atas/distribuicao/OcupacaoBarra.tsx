@@ -1,16 +1,27 @@
 import React from 'react';
-import { PESO_COMPLEXIDADE, ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
+import { DIAS_DA_FILA, PESO_COMPLEXIDADE, PESO_TAREFA_ABERTA, ROTULO_COMPLEXIDADE, type NivelComplexidade } from './complexidade';
 import { percentual } from './nivelGestor';
 import type { DistribuicaoLinha } from './distribuicaoEquipe';
 
 /** Cores das faixas de complexidade (barra de ocupação). */
 export const COR_COMPLEXIDADE: Record<NivelComplexidade, string> = { ALTA: 'var(--primary)', MEDIA: '#5b8bd6', BAIXA: '#c7d7f0' };
+/** Parte da barra que vem das tarefas abertas (fila), em cinza para não se confundir com a complexidade. */
+export const COR_FILA = '#94a3b8';
 const NIVEIS: NivelComplexidade[] = ['ALTA', 'MEDIA', 'BAIXA'];
 const RELACAO_ROTULO = { ACIMA: 'Acima da média', NA_MEDIA: 'Na média', ABAIXO: 'Abaixo da média' } as const;
 
 /** Régua comum às barras de uma lista: a maior ocupação (ou a média) ocupa quase toda a largura. */
 export function escalaDeOcupacao(linhas: DistribuicaoLinha[], media: number | null): number {
   return Math.max(0, ...linhas.map((l) => l.ocupacao), media ?? 0) * 1.1;
+}
+
+/** "40 tarefas e 3 faturas na fila"; vazio sem fila. */
+export function textoDaFila(tarefas: number, faturas: number): string {
+  const partes = [
+    tarefas ? `${tarefas} ${tarefas === 1 ? 'tarefa' : 'tarefas'}` : '',
+    faturas ? `${faturas} ${faturas === 1 ? 'fatura' : 'faturas'}` : ''
+  ].filter(Boolean);
+  return partes.length ? `${partes.join(' e ')} na fila` : '';
 }
 
 export type RelacaoComAEquipe = 'ACIMA' | 'NA_MEDIA' | 'ABAIXO';
@@ -67,9 +78,15 @@ export const OcupacaoBarra: React.FC<{ l: DistribuicaoLinha; escala: number; med
     relacao={l.relacaoEquipe}
     escala={escala}
     media={media}
-    partes={NIVEIS.map((n) => ({ chave: n, peso: l.complexidade[n] * PESO_COMPLEXIDADE[n], cor: COR_COMPLEXIDADE[n] }))}
-    rodape={NIVEIS.map((n) => `${l.complexidade[n]} ${ROTULO_COMPLEXIDADE[n]}`).join(' · ')}
-    title={`A barra mostra a ocupação (carga ÷ capacidade ${percentual(l.capacidade)}), dividida pelo peso de cada complexidade. O tracejado é a média da equipe.`}
+    partes={[
+      ...NIVEIS.map((n) => ({ chave: n, peso: l.complexidade[n] * PESO_COMPLEXIDADE[n], cor: COR_COMPLEXIDADE[n] })),
+      { chave: 'FILA', peso: ((l.tarefas ?? 0) + (l.faturas ?? 0)) * PESO_TAREFA_ABERTA, cor: COR_FILA }
+    ]}
+    rodape={[
+      ...NIVEIS.map((n) => `${l.complexidade[n]} ${ROTULO_COMPLEXIDADE[n]}`),
+      ...(textoDaFila(l.tarefas ?? 0, l.faturas ?? 0) ? [textoDaFila(l.tarefas ?? 0, l.faturas ?? 0)] : [])
+    ].join(' · ')}
+    title={`A barra mostra a ocupação (carga ÷ capacidade ${percentual(l.capacidade)}): em azul, o peso de cada complexidade; em cinza, a fila: tarefas abertas com prazo em até ${DIAS_DA_FILA} dias e faturas que precisam de ação no Financeiro (meio ponto cada). O tracejado é a média da equipe.`}
     testId={`distribuicao-relacao-${l.gestorNome}`}
     minWidth={minWidth}
   />

@@ -18,6 +18,15 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 const CarteiraCell: React.FC<{ f: CargaDoFiscal; ausencia: TransferenciaFiscal | null; recebidas: TransferenciaFiscal[]; relacao?: RelacaoComEquipe }> = ({ f, ausencia, recebidas, relacao }) => (
   <div>
     <span style={{ fontWeight: 700 }}>{plural(f.contratos, 'contrato', 'contratos')}</span>
+    {f.total > f.contratos && (
+      <div
+        style={{ fontSize: '0.75rem', color: '#64748b' }}
+        title="Fiscalização encerrada ou vigência acabada sem item em aberto: continuam com o fiscal, mas não contam na carga"
+        data-testid={`fisc-equipe-encerrados-${f.userId}`}
+      >
+        + {plural(f.total - f.contratos, 'encerrado', 'encerrados')} fora da carga
+      </div>
+    )}
     {relacao && (
       <div style={{ fontSize: '0.75rem', fontWeight: 800, color: relacao === 'ACIMA' ? 'var(--color-danger-text)' : '#475569' }} data-testid={`fisc-equipe-relacao-${f.userId}`}>
         {ROTULO_RELACAO_EQUIPE[relacao]}
@@ -39,6 +48,7 @@ const CarteiraCell: React.FC<{ f: CargaDoFiscal; ausencia: TransferenciaFiscal |
 /** Pressão do momento, no desenho da Equipe de Atas e Contratos: o que falta fazer agora. */
 const PressaoCell: React.FC<{ f: CargaDoFiscal }> = ({ f }) => {
   const partes: Array<{ texto: string; cor: string }> = [];
+  if (f.passos) partes.push({ texto: plural(f.passos, 'passo com o fiscal', 'passos com o fiscal'), cor: '#475569' });
   if (f.aAutuar > 0) partes.push({ texto: `${f.aAutuar} a autuar`, cor: 'var(--color-warning-text)' });
   if (partes.length === 0) return <span style={{ color: '#94a3b8' }}>—</span>;
   return (
@@ -160,7 +170,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
               <tbody>
                 {filtradas.map((f) => {
                   const expandido = aberto === f.userId;
-                  const temContratos = f.contratos > 0;
+                  const temContratos = f.total > 0;
                   const ausencia = ausenciaDe(f.userId);
                   return (
                     <React.Fragment key={f.userId}>
@@ -211,7 +221,7 @@ export const FiscaisEquipe: React.FC<FiscaisEquipeProps> = ({ carga, contratos, 
                                     data-testid={`fisc-equipe-transferir-${f.userId}`}
                                     title="Passar de vez todos os contratos deste fiscal; para só alguns, abra a lista e marque"
                                   />
-                                  {f.contratos > 0 && (
+                                  {f.total > 0 && (
                                     <ActionButton
                                       action="transferirTemporariamente"
                                       label="Temporariamente"

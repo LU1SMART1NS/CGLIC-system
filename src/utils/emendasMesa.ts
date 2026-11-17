@@ -850,7 +850,7 @@ export function mesaDoPedido(
       chave: t.chave,
       texto: t.nome,
       // Pedido do controle anterior da CAEP: a falta de data se explica na própria linha (antes, uma frase no rodapé).
-      data: t.feito ?? (p.origem === 'PLANILHA' ? 'sem data no controle anterior' : null),
+      data: t.feito ?? (p.origem === 'PLANILHA' ? 'sem data registrada' : null),
       sei,
       semSei: temDocumento && sei.length === 0,
       maisSei: podeGerir && sei.length > 0 && (e === 'EMPENHADO' || (e === 'CONTRATACAO' && !porAta)) ? (e === 'EMPENHADO' ? 'MAIS_EMPENHADO' : 'MAIS_CONTRATACAO') : undefined
