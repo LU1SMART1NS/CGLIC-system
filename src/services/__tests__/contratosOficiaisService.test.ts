@@ -16,6 +16,12 @@ const banco = vi.hoisted(() => ({
   /** Só esta página (1, 2, ...) falha; as outras respondem. */
   erroNaPagina: null as null | number,
   paginasLidas: 0,
+  /** Cada select pediu o total (count: 'exact')? */
+  contagens: [] as boolean[],
+  /** O banco não devolve o total. */
+  semTotal: false,
+  emAndamento: 0,
+  picoSimultaneas: 0,
   faixas: [] as Array<[number, number]>,
   ordens: [] as Array<{ coluna: string; ascending?: boolean }>,
   rpc: null as unknown as ReturnType<typeof vi.fn<(...args: any[]) => Promise<any>>>
@@ -26,9 +32,12 @@ vi.mock('../supabaseClient', () => {
   const from = (tabela: string) => {
     const filtros: Record<string, string> = {};
     let colunas = '';
+    let contar = false;
     const consulta: any = {
-      select: (cols: string) => {
+      select: (cols: string, opcoes?: { count?: string }) => {
         colunas = cols;
+        contar = opcoes?.count === 'exact';
+        banco.contagens.push(contar);
         banco.selects.push(cols);
         return consulta;
       },
@@ -41,10 +50,14 @@ vi.mock('../supabaseClient', () => {
         return consulta;
       },
       range: async (de: number, ate: number) => {
-        banco.paginasLidas++;
+        const estaLeitura = ++banco.paginasLidas;
+        banco.emAndamento++;
+        banco.picoSimultaneas = Math.max(banco.picoSimultaneas, banco.emAndamento);
+        await new Promise((r) => setTimeout(r, 0));
+        banco.emAndamento--;
         banco.faixas.push([de, ate]);
         if (banco.erroLeitura) return { data: null, error: banco.erroLeitura };
-        if (banco.erroNaPagina === banco.paginasLidas) return { data: null, error: { message: 'canceling statement due to statement timeout' } };
+        if (banco.erroNaPagina === estaLeitura) return { data: null, error: { message: 'canceling statement due to statement timeout' } };
         const todas = banco.linhas
           .filter((l) => tabela === 'contratos_oficiais' && l.uasg === filtros.uasg)
           .sort((a, b) => a.contract_key.localeCompare(b.contract_key));
@@ -52,7 +65,11 @@ vi.mock('../supabaseClient', () => {
           return { data: null, error: { message: `colunas inesperadas: ${colunas}` } };
         }
         const pagina = todas.slice(de, ate + 1);
-        return { data: pagina.map((l) => ({ registro: colunas === 'registro' ? l.registro : l.registro_tela })), error: null };
+        return {
+          data: pagina.map((l) => ({ registro: colunas === 'registro' ? l.registro : l.registro_tela })),
+          error: null,
+          count: contar ? (banco.semTotal ? null : todas.length) : null
+        };
       }
     };
     return consulta;
@@ -128,6 +145,10 @@ beforeEach(() => {
   banco.faixas = [];
   banco.ordens = [];
   banco.selects = [];
+  banco.contagens = [];
+  banco.semTotal = false;
+  banco.emAndamento = 0;
+  banco.picoSimultaneas = 0;
 });
 
 describe('leitura dos contratos pelo banco', () => {
@@ -146,6 +167,33 @@ describe('leitura dos contratos pelo banco', () => {
     ]);
   });
 
+  it('a 1ª página pede o total e as outras saem juntas, sem esperar uma pela outra', async () => {
+    gravarNoBanco(1081);
+    const lista = await fetchContratosOficiaisDoBanco(UASG);
+    expect(lista).toHaveLength(1081);
+    expect(banco.contagens).toEqual([true, false, false, false, false]);
+    // Página 1 sozinha; as 4 restantes ao mesmo tempo.
+    expect(banco.picoSimultaneas).toBe(4);
+  });
+
+  it('sem o total do banco, lê página a página como antes', async () => {
+    gravarNoBanco(600);
+    banco.semTotal = true;
+    const lista = await fetchContratosOficiaisDoBanco(UASG);
+    expect(lista).toHaveLength(600);
+    expect(banco.faixas).toEqual([
+      [0, 249],
+      [250, 499],
+      [500, 749]
+    ]);
+  });
+
+  it('carteira de até 250 contratos: uma leitura só', async () => {
+    gravarNoBanco(120);
+    expect(await fetchContratosOficiaisDoBanco(UASG)).toHaveLength(120);
+    expect(banco.faixas).toEqual([[0, 249]]);
+  });
+
   it('toda página pede a mesma ordem fixa (contract_key crescente, único na UASG)', async () => {
     gravarNoBanco(600);
     await fetchContratosOficiaisDoBanco(UASG);
@@ -161,8 +209,8 @@ describe('leitura dos contratos pelo banco', () => {
       await expect(fetchContratosOficiaisDoBanco(UASG)).rejects.toThrow(
         `Não foi possível ler os contratos da UASG ${UASG} no banco (página ${pagina}): canceling statement due to statement timeout`
       );
-      // Parou na página que falhou.
-      expect(banco.paginasLidas).toBe(pagina);
+      // Falha na 1ª página para ali; depois dela as outras já tinham saído juntas.
+      expect(banco.paginasLidas).toBe(pagina === 1 ? 1 : 5);
     }
   });
 
