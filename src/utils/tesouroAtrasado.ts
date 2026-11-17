@@ -13,7 +13,7 @@ export function diasUteisDesdeTesouro(atualizadoEm: string | null | undefined, h
 
 /**
  * Aviso para quando o Tesouro não é lido há mais de DIAS_UTEIS_TESOURO_ATRASADO dias úteis. Liquidado e pago das notas
- * continuam os da última leitura boa (migration 323); o pagamento mais novo aparece na OB da fatura.
+ * continuam os da última leitura boa (migration 324); o pagamento mais novo aparece na OB da fatura.
  */
 export function avisoTesouroAtrasado(atualizadoEm: string | null | undefined, hoje: Date = new Date()): string | null {
   const dias = diasUteisDesdeTesouro(atualizadoEm, hoje);

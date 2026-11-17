@@ -11,15 +11,15 @@
 --     restos a pagar) e pago = pago de todos os anos (v_empenho_saldo_contabil); sem ela, o valor da fonte;
 --   - aplicar_empenhado_do_tesouro (cron a cada 6 h): aplica a mesma regra a todas as notas que não são manuais,
 --     não só às trazidas pelo Tesouro/Portal. Quando o Tesouro não é lido, fica a última leitura boa.
--- Mesmos corpos de produção com os trechos "Migration 323". CREATE OR REPLACE mantém as permissões.
+-- Mesmos corpos de produção com os trechos "Migration 324". CREATE OR REPLACE mantém as permissões.
 -- ==============================================================================
 
 ALTER TABLE public.empenhos
   ADD COLUMN IF NOT EXISTS valor_liquidado_fonte NUMERIC(18, 4),
   ADD COLUMN IF NOT EXISTS valor_pago_fonte NUMERIC(18, 4);
 
-COMMENT ON COLUMN public.empenhos.valor_liquidado_fonte IS 'Liquidado informado pelo Contratos.gov.br; valor_liquidado vem do Tesouro quando a nota está no saldo contábil (migration 323).';
-COMMENT ON COLUMN public.empenhos.valor_pago_fonte IS 'Pago informado pelo Contratos.gov.br; valor_pago vem do Tesouro quando a nota está no saldo contábil (migration 323).';
+COMMENT ON COLUMN public.empenhos.valor_liquidado_fonte IS 'Liquidado informado pelo Contratos.gov.br; valor_liquidado vem do Tesouro quando a nota está no saldo contábil (migration 324).';
+COMMENT ON COLUMN public.empenhos.valor_pago_fonte IS 'Pago informado pelo Contratos.gov.br; valor_pago vem do Tesouro quando a nota está no saldo contábil (migration 324).';
 
 -- Até aqui valor_liquidado/valor_pago das notas da fonte eram os da fonte.
 UPDATE public.empenhos
@@ -140,7 +140,7 @@ BEGIN
   v_valor_liquidado := COALESCE((p_empenho->>'valor_liquidado')::NUMERIC, 0);
   v_valor_pago := COALESCE((p_empenho->>'valor_pago')::NUMERIC, 0);
   v_valor_rpinscrito := COALESCE((p_empenho->>'valor_rpinscrito')::NUMERIC, 0);
-  -- Migration 323: o que a fonte disse fica nas colunas _fonte.
+  -- Migration 324: o que a fonte disse fica nas colunas _fonte.
   v_liquidado_fonte := v_valor_liquidado;
   v_pago_fonte := v_valor_pago;
 
@@ -168,7 +168,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- Migration 323: o Contratos.gov.br não acompanha a execução da nota (UG 200331: nota parada como na emissão;
+  -- Migration 324: o Contratos.gov.br não acompanha a execução da nota (UG 200331: nota parada como na emissão;
   -- UG 200330: pagamento sem a emissão e às vezes em dobro). Com a nota no saldo contábil do Tesouro, liquidado e
   -- pago vêm de lá, sem "o maior dos dois": pago = pago de todos os anos; liquidado = pago + liquidado a pagar
   -- (exercício e restos a pagar). Mesma regra do Financeiro e do Contrato 360.
@@ -407,7 +407,7 @@ BEGIN
   -- PASSO 5: RESPOSTA JSONB ESTRUTURADA
   -- --------------------------------------------------------------------------
   -- Guarda o que a fonte disse (migration 136).
-  -- Migration 323: também liquidado e pago da fonte.
+  -- Migration 324: também liquidado e pago da fonte.
   IF v_fonte_origem <> 'MANUAL'
      AND (v_record.valor_empenhado_fonte, v_record.valor_liquidado_fonte, v_record.valor_pago_fonte)
          IS DISTINCT FROM (v_valor_empenhado_fonte, v_liquidado_fonte, v_pago_fonte) THEN
@@ -544,7 +544,7 @@ BEGIN
   SELECT count(*) INTO v_vinculos FROM ev;
 
   -- Notas trazidas pelo Tesouro ou pelo Portal (migrations 184 e 192): não têm valor da fonte; empenhado, liquidado
-  -- e pago vêm todos do saldo contábil (migration 195). Migration 323: liquidado e pago do Tesouro em todas as notas
+  -- e pago vêm todos do saldo contábil (migration 195). Migration 324: liquidado e pago do Tesouro em todas as notas
   -- que não são manuais (o empenhado das notas da fonte segue a regra de cima). Sem leitura do Tesouro para a nota,
   -- ficam como estão.
   DROP TABLE IF EXISTS pg_temp.notas_tesouro_mudaram;
