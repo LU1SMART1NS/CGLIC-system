@@ -64,8 +64,69 @@ export function resumirSincronizacao(statuses: SincronizacaoFonteStatus[], uasgs
 }
 
 /**
+ * Vigia único por recurso. Várias partes da mesma tela usam este hook para o mesmo recurso (no Início, a
+ * carteira de contratos entra no painel, nas gavetas e nos números do menu). A consulta da situação já era uma
+ * só (mesma chave no React Query), mas cada cópia guardava a própria "última assinatura" e pedia a releitura
+ * sozinha: uma sincronização terminada virava várias releituras iguais, cada uma cancelando e recomeçando a
+ * anterior, no momento em que o banco está mais ocupado. Agora a assinatura vista fica aqui, uma por recurso:
+ * a primeira cópia que nota a mudança relê, as outras já a encontram vista.
+ */
+interface Vigia {
+  assinatura: string | null;
+  montados: number;
+}
+const vigiasPorCliente = new WeakMap<QueryClient, Map<RecursoSincronizado, Vigia>>();
+
+function vigiasDe(queryClient: QueryClient): Map<RecursoSincronizado, Vigia> {
+  let vigias = vigiasPorCliente.get(queryClient);
+  if (!vigias) {
+    vigias = new Map();
+    vigiasPorCliente.set(queryClient, vigias);
+  }
+  return vigias;
+}
+
+function vigiaDe(queryClient: QueryClient, recurso: RecursoSincronizado): Vigia {
+  const vigias = vigiasDe(queryClient);
+  let vigia = vigias.get(recurso);
+  if (!vigia) {
+    vigia = { assinatura: null, montados: 0 };
+    vigias.set(recurso, vigia);
+  }
+  return vigia;
+}
+
+/** Uma cópia do vigia entrou na tela; devolve a saída. Saindo a última, a memória do recurso se apaga. */
+export function montarVigia(queryClient: QueryClient, recurso: RecursoSincronizado): () => void {
+  const vigias = vigiasDe(queryClient);
+  const vigia = vigiaDe(queryClient, recurso);
+  vigia.montados++;
+  return () => {
+    vigia.montados--;
+    if (vigia.montados <= 0 && vigias.get(recurso) === vigia) vigias.delete(recurso);
+  };
+}
+
+/**
+ * Uma cópia viu esta assinatura da situação. Devolve true só para a primeira cópia que vê uma mudança depois da
+ * primeira leitura, com a sincronização já terminada: é ela que pede a releitura.
+ */
+export function notarAssinatura(
+  queryClient: QueryClient,
+  recurso: RecursoSincronizado,
+  assinatura: string,
+  emAndamento: boolean
+): boolean {
+  const vigia = vigiaDe(queryClient, recurso);
+  const anterior = vigia.assinatura;
+  if (anterior === assinatura) return false;
+  vigia.assinatura = assinatura;
+  return anterior !== null && !emAndamento;
+}
+
+/**
  * Situação da sincronização de um recurso, lida do banco. Quando uma sincronização (deste ou de outro
- * navegador) termina, chama `aoConcluirOutra` para as telas relerem os dados.
+ * navegador) termina, chama `aoConcluirOutra` uma vez só, por mais cópias do hook que a tela tenha.
  */
 export function useSituacaoSincronizacao(
   recurso: RecursoSincronizado,
@@ -91,19 +152,20 @@ export function useSituacaoSincronizacao(
 
   const resumo = useMemo(() => resumirSincronizacao(statusQuery.data ?? []), [statusQuery.data]);
 
-  // Uma sincronização terminou desde a última leitura: relê os dados do banco.
+  // Conta as cópias montadas: saindo a última, a memória do recurso se apaga (quem montar depois começa do
+  // zero e não relê só por ter chegado, como antes).
+  useEffect(() => montarVigia(queryClient, recurso), [queryClient, recurso]);
+
+  // Uma sincronização terminou desde a última leitura: relê os dados do banco (uma vez por recurso).
   const aoConcluirRef = useRef(aoConcluirOutra);
   aoConcluirRef.current = aoConcluirOutra;
-  const assinaturaAnterior = useRef<string | null>(null);
   const assinatura = (statusQuery.data ?? []).map((s) => `${s.uasg}:${s.ultimaTentativaEm}:${s.emAndamentoDesde}`).sort().join('|');
   useEffect(() => {
     if (!statusQuery.data) return;
-    const anterior = assinaturaAnterior.current;
-    assinaturaAnterior.current = assinatura;
-    if (anterior !== null && anterior !== assinatura && !resumo.emAndamentoNoBanco) {
+    if (notarAssinatura(queryClient, recurso, assinatura, resumo.emAndamentoNoBanco)) {
       aoConcluirRef.current(queryClient);
     }
-  }, [assinatura, statusQuery.data, resumo.emAndamentoNoBanco, queryClient]);
+  }, [assinatura, statusQuery.data, resumo.emAndamentoNoBanco, queryClient, recurso]);
 
   return {
     ...resumo,
