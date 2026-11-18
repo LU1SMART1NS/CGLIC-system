@@ -39,3 +39,4 @@ Levantamentos e medições feitos antes de mudar o sistema. Nenhum estudo altera
 |---|---|---|
 | [inicio-fila-do-banco.md](inicio-fila-do-banco.md) | 16/10/2026 | Por que o Início leva cerca de 15 s para encher. |
 | [telas-leituras-auditoria.md](telas-leituras-auditoria.md) | 16/10/2026 | As outras telas têm leituras que falham caladas, param em 1.000 ou pesam demais? |
+| [contagens-do-menu.md](contagens-do-menu.md) | 18/11/2026 | Vale contar os números do menu no banco em vez de baixar listas inteiras? Onda do menu, custo de cada view e opções. |
