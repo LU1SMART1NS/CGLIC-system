@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert } from 'lucide-react';
+import { RefreshCw, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
 import type { AppRole } from '../../types/rbac';
@@ -34,7 +34,7 @@ function getSafeFallbackRoute(role: AppRole | null): string {
  * restrição continuam sem este wrapper.
  */
 export const RequireRole: React.FC<RequireRoleProps> = ({ allowedRoles, children }) => {
-  const { loading, role, roleStatus } = useAuth();
+  const { loading, role, roleStatus, recarregarPerfil } = useAuth();
   const navigate = useNavigate();
 
   // Sem Supabase configurado (ex.: suíte de testes) não há RBAC real a
@@ -58,6 +58,25 @@ export const RequireRole: React.FC<RequireRoleProps> = ({ allowedRoles, children
         }}
       >
         Verificando permissões de acesso...
+      </div>
+    );
+  }
+
+  // A leitura do perfil falhou (já repetida pelo AuthContext): não é falta de permissão. Não libera a tela, mas também
+  // não diz "Acesso não autorizado" a quem tem acesso; oferece ler de novo.
+  if (roleStatus === 'error') {
+    return (
+      <div data-testid="require-role-erro" style={{ padding: '2rem' }}>
+        <EmptyState
+          icon={<RefreshCw size={32} color="var(--primary)" aria-hidden="true" />}
+          title="Não foi possível conferir seu perfil"
+          description="A leitura do seu perfil no banco falhou. Suas permissões não mudaram: tente de novo em alguns segundos."
+          action={
+            <AppButton variant="primary" onClick={() => (recarregarPerfil ? recarregarPerfil() : window.location.reload())}>
+              Tentar de novo
+            </AppButton>
+          }
+        />
       </div>
     );
   }

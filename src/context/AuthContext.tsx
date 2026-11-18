@@ -21,6 +21,8 @@ interface AuthContextType {
   role: AppRole | null;
   roleStatus: RoleStatus;
   signOut: () => Promise<void>;
+  /** Lê o perfil de novo (botão "Tentar de novo" quando a leitura falhou, roleStatus 'error'). */
+  recarregarPerfil?: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -57,12 +59,37 @@ export async function resolveOwnAppRole(userId: string): Promise<AppRole | null>
   return roleIds.includes('admin') ? 'admin' : roleIds[0];
 }
 
+/** Pausas antes de cada nova tentativa de ler o perfil (3 tentativas ao todo). */
+export const PAUSAS_LEITURA_PERFIL_MS = [400, 1200] as const;
+
+/**
+ * Lê o perfil repetindo quando a leitura falha. Em 18/11/2026, com o banco cheio, a leitura de user_roles voltou 500
+ * em 0,3 s e o admin viu "Acesso não autorizado" até recarregar a página: uma falha momentânea virava falta de
+ * permissão. Só a falha é repetida; perfil vazio (null) volta na hora.
+ */
+export async function resolveOwnAppRoleComRepeticao(
+  userId: string,
+  pausas: readonly number[] = PAUSAS_LEITURA_PERFIL_MS,
+  ler: (id: string) => Promise<AppRole | null> = resolveOwnAppRole
+): Promise<AppRole | null> {
+  for (let tentativa = 0; ; tentativa++) {
+    try {
+      return await ler(userId);
+    } catch (erro) {
+      if (tentativa >= pausas.length) throw erro;
+      await new Promise((r) => setTimeout(r, pausas[tentativa]));
+    }
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState<boolean>(isSupabaseConfigured);
   const [role, setRole] = useState<AppRole | null>(null);
   const [roleStatus, setRoleStatus] = useState<RoleStatus>('loading');
+  // Muda a cada "Tentar de novo": relê o perfil do mesmo usuário.
+  const [leituraDoPerfil, setLeituraDoPerfil] = useState(0);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
@@ -113,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let cancelled = false;
     setRoleStatus('loading');
 
-    resolveOwnAppRole(userId)
+    resolveOwnAppRoleComRepeticao(userId)
       .then((resolved) => {
         if (cancelled) return;
         setRole(resolved);
@@ -128,7 +155,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, leituraDoPerfil]);
+
+  const recarregarPerfil = () => setLeituraDoPerfil((n) => n + 1);
 
   const signOut = async () => {
     if (supabase) {
@@ -141,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, role, roleStatus, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, role, roleStatus, signOut, recarregarPerfil }}>
       {children}
     </AuthContext.Provider>
   );
