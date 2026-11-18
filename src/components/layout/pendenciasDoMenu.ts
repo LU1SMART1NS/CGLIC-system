@@ -29,7 +29,7 @@ export interface FontesDoMenu {
   emendasAContratar?: number | null;
   /** Itens com as informações da CAEP recebidas e a Ordem a emitir (envio à SFC): só o gestor de fiscalização. */
   ordemAEmitir?: number | null;
-  /** Contratos "Com você" da Fiscalização e, deles, os com o passo vencido: só o gestor de fiscalização. */
+  /** Contratos "Com você" (fiscal) ou "Com o fiscal" (coordenador) da Fiscalização e, deles, os com o passo vencido. */
   fiscalizacao?: { total: number; vencidos: number } | null;
 }
 
@@ -94,9 +94,9 @@ export function pendenciasDoMenu({ empenhos, financeiro, extras, gruposUasgs, gr
     };
 
   // Fiscalização (padrão do Financeiro): contratos com o próximo passo do fiscal; vermelho com passo vencido. Abre
-  // Contratos, que para o fiscal já começa em "Com você".
+  // Contratos em "Com você" (fiscal) ou "Com o fiscal" (coordenador).
   if (fiscalizacao && fiscalizacao.total > 0)
-    r.fiscalizacao = { contagem: fiscalizacao.total, vermelho: fiscalizacao.vencidos > 0, motivoVermelho: 'com passo vencido', destino: '/fiscalizacao/contratos' };
+    r.fiscalizacao = { contagem: fiscalizacao.total, vermelho: fiscalizacao.vencidos > 0, motivoVermelho: 'com passo vencido', destino: '/fiscalizacao/contratos?ver=VOCE' };
 
   // Ajustes: UASGs (coordenador) e beneficiários de emenda (coordenador e gestor de emendas) sem grupo confirmado. Abre
   // na primeira tela com pendência, na ordem das abas (Grupos das UASGs antes de Grupos dos beneficiários), em "A
