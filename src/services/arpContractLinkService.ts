@@ -1,3 +1,4 @@
+import { lerVinculosItemContrato } from './vinculosItemContratoLeitura';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import type {
   ArpItemContractLink,
@@ -201,30 +202,8 @@ export async function fetchAllArpItemContractLinks(): Promise<ArpItemContractLin
   if (!isSupabaseConfigured || !supabase) return [];
 
   try {
-    // O banco devolve no máximo 1000 linhas por consulta: com o vínculo automático (migration 95) passam disso.
-    const PAGINA = 1000;
-    let colunas = 'id, item_key, contract_key, origem';
-    const rows: Array<{ item_key: string; contract_key: string; origem?: string }> = [];
-    for (let desde = 0; ; desde += PAGINA) {
-      let { data, error } = await supabase
-        .from('arp_item_contract_links')
-        .select(colunas)
-        .order('id', { ascending: true })
-        .range(desde, desde + PAGINA - 1);
-      // Antes da migration 95 não existe a coluna origem: lê sem ela.
-      if (error && colunas.includes('origem') && String((error as { code?: string }).code) === '42703') {
-        colunas = 'id, item_key, contract_key';
-        ({ data, error } = await supabase
-          .from('arp_item_contract_links')
-          .select(colunas)
-          .order('id', { ascending: true })
-          .range(desde, desde + PAGINA - 1));
-      }
-      if (error) throw error;
-      const pagina = (data ?? []) as unknown as Array<{ item_key: string; contract_key: string; origem?: string }>;
-      rows.push(...pagina);
-      if (pagina.length < PAGINA) break;
-    }
+    // Mesma leitura da carteira de itens (lerVinculosItemContrato): as duas começam juntas e dividem a consulta.
+    const rows = await lerVinculosItemContrato();
 
     const pairs: ArpItemContractLinkPair[] = [];
     for (const row of rows) {

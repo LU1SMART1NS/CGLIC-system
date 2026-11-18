@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient, type QueryFunctionContext } from '@tanstack/react-query';
 import { fetchArpsWithItemsFromDb, fetchAtaWithItemsFromDb } from '../services/dbCacheService';
 import { sementeDaCarteira } from './sementeDaCarteira';
 import { COLUNAS_SALDO_CARTEIRA, fetchArpItemSaldosFromDb } from '../services/dashboardService';
@@ -125,10 +125,42 @@ export function getCarteiraSaldosQueryOptions(uasg?: string) {
   const cleanUasg = (uasg || '').trim();
   return {
     queryKey: ['ata-item-saldos', cleanUasg, 'carteira'] as const,
-    queryFn: () => fetchArpItemSaldosFromDb(cleanUasg, COLUNAS_SALDO_CARTEIRA),
+    // O saldo completo (painel, saldo de uma ata) já no cache e ainda válido tem estas colunas: não lê de novo.
+    queryFn: (ctx?: Pick<QueryFunctionContext, 'client'>) => {
+      const completo = ctx?.client ? saldoCompletoValido(ctx.client, cleanUasg) : undefined;
+      return completo ? Promise.resolve(completo.map(soColunasDaCarteira)) : fetchArpItemSaldosFromDb(cleanUasg, COLUNAS_SALDO_CARTEIRA);
+    },
     enabled: Boolean(cleanUasg),
-    staleTime: 5 * 60 * 1000
+    staleTime: SALDO_STALE_MS
   };
+}
+
+const SALDO_STALE_MS = 5 * 60 * 1000;
+
+/**
+ * Saldo dos itens com todas as colunas (v_arp_item_saldo_detalhado). Mesma chave do saldo de uma ata e do painel: as
+ * duas leituras são uma só.
+ */
+export function getSaldosCompletosQueryOptions(uasg?: string) {
+  const cleanUasg = (uasg || '').trim();
+  return {
+    queryKey: ['ata-item-saldos', cleanUasg] as const,
+    queryFn: () => fetchArpItemSaldosFromDb(cleanUasg),
+    staleTime: SALDO_STALE_MS
+  };
+}
+
+/** O saldo completo da UASG no cache, se ainda válido (lido há menos de SALDO_STALE_MS e não invalidado). */
+export function saldoCompletoValido(client: QueryClient, uasg: string): any[] | undefined {
+  const estado = client.getQueryState<any[]>(getSaldosCompletosQueryOptions(uasg).queryKey);
+  if (!estado?.data || estado.isInvalidated || Date.now() - estado.dataUpdatedAt >= SALDO_STALE_MS) return undefined;
+  return estado.data;
+}
+
+function soColunasDaCarteira(linha: Record<string, unknown>): Record<string, unknown> {
+  const resultado: Record<string, unknown> = {};
+  for (const coluna of COLUNAS_SALDO_CARTEIRA) resultado[coluna] = linha[coluna];
+  return resultado;
 }
 
 export function useAllAtaItemSaldos(uasg?: string, { enabled = true }: { enabled?: boolean } = {}) {
@@ -141,10 +173,8 @@ export function useAtaItemSaldos(numeroAta?: string, uasg?: string) {
   const cleanUasg = (uasg || '').trim();
 
   const query = useQuery({
-    queryKey: ['ata-item-saldos', cleanUasg] as const,
-    queryFn: () => fetchArpItemSaldosFromDb(cleanUasg),
-    enabled: Boolean(numeroAta && cleanUasg),
-    staleTime: 5 * 60 * 1000
+    ...getSaldosCompletosQueryOptions(cleanUasg),
+    enabled: Boolean(numeroAta && cleanUasg)
   });
 
   // A consulta da carteira traz também atas de outros órgãos de mesmo número (migration 106): filtra pela UASG.

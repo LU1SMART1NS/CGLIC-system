@@ -28,6 +28,11 @@ export const ROTULOS_CARTEIRA_ITENS = {
 
 /** Chaves de cache que uma mudança de alocação ou de vínculo precisa invalidar. */
 export const CARTEIRA_ALOCACOES_KEY = ['carteira-alocacoes'] as const;
+
+/** Opções da leitura das alocações às unidades internas (carteiras e painel do Início leem pela mesma chave). */
+export function getAlocacoesQueryOptions() {
+  return { queryKey: CARTEIRA_ALOCACOES_KEY, queryFn: fetchAllAllocationsGlobal, staleTime: STALE };
+}
 export const CARTEIRA_VINCULOS_KEY = ['carteira-vinculos-itens'] as const;
 /** Sob o prefixo do vínculo das notas aos itens: vincular ou desfazer relê o empenhado da carteira. */
 export const CARTEIRA_EMPENHOS_KEY = ['contrato-empenho-distribuicao', 'carteira-itens'] as const;
@@ -52,7 +57,7 @@ export function useCarteiraItens(params?: {
   const { arps, itemsByAta, gestorByAta, apenasUnidadesDeContratos = false, semEmpenhado = false } = params ?? {};
   const leEmpenhado = !apenasUnidadesDeContratos && !semEmpenhado;
 
-  const allocationsQuery = useQuery({ queryKey: CARTEIRA_ALOCACOES_KEY, queryFn: fetchAllAllocationsGlobal, staleTime: STALE });
+  const allocationsQuery = useQuery(getAlocacoesQueryOptions());
   const linksQuery = useQuery({ queryKey: CARTEIRA_VINCULOS_KEY, queryFn: fetchCarteiraItemLinks, staleTime: STALE });
   const empenhosQuery = useQuery({
     queryKey: CARTEIRA_EMPENHOS_KEY,
