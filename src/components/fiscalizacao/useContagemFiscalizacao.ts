@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useContratosFiscalizacao, useEntregasFiscalizacao } from '../../hooks/useFiscalizacao';
 import { naoCarregou } from '../fonte/useLeiturasComFalha';
-import { useTelaCarregada } from '../layout/useTelaCarregada';
+import { ETAPA_DO_MENU, useEtapaDoMenu } from '../layout/useTelaCarregada';
 import { hojeEmBrasilia } from '../../utils/fiscalizacao';
 import { linhasDosContratos } from '../../utils/fiscalizacaoContratosLista';
 
@@ -13,7 +13,7 @@ import { linhasDosContratos } from '../../utils/fiscalizacaoContratosLista';
  */
 export function useContagemFiscalizacao(): { total: number; vencidos: number } | null {
   const { role, user } = useAuth();
-  const telaCarregada = useTelaCarregada();
+  const telaCarregada = useEtapaDoMenu(ETAPA_DO_MENU.financeiro);
   const fiscal = role === 'gestor_fiscalizacao';
   // Mesmas consultas da tela Contratos e do Início do fiscal (cache compartilhado); esperam a tela aberta encher.
   const contratos = useContratosFiscalizacao({ enabled: telaCarregada && fiscal });

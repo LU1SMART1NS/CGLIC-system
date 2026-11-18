@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useBeneficiariosEmendas, useGruposBeneficiarios, usePodeGerirEmendas } from '../../hooks/useEmendas';
 import { contarBeneficiariosSemGrupo } from '../../config/captacaoEmendas';
-import { useTelaCarregada } from '../layout/useTelaCarregada';
+import { ETAPA_DO_MENU, useEtapaDoMenu } from '../layout/useTelaCarregada';
 
 /**
  * Parte do número no ícone de Ajustes: beneficiários de emenda ainda sem grupo confirmado, com ou sem sugestão. Quem
@@ -10,7 +10,7 @@ import { useTelaCarregada } from '../layout/useTelaCarregada';
  */
 export function useContagemGruposBeneficiarios(): { aConfirmar: number; semSugestao: number } | null {
   const ativo = usePodeGerirEmendas();
-  const telaCarregada = useTelaCarregada();
+  const telaCarregada = useEtapaDoMenu(ETAPA_DO_MENU.emendas);
   const enabled = ativo && telaCarregada;
   const beneficiarios = useBeneficiariosEmendas({ enabled });
   const grupos = useGruposBeneficiarios({ enabled });

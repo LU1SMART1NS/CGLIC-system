@@ -10,7 +10,7 @@ import { usePendenciasVinculoAta } from '../atas/distribuicao/usePendenciasVincu
 import { useDistribuicaoDaCarteira } from '../atas/distribuicao/useDistribuicaoDaCarteira';
 import { contarItensAAlocar, definirContagemExtra } from './contagemExtras';
 import { carregarCarteiraParaOMenu } from './cargaDaCarteiraDoMenu';
-import { useTelaCarregada } from '../layout/useTelaCarregada';
+import { ETAPA_DO_MENU, useEtapaDoMenu } from '../layout/useTelaCarregada';
 import { ROTULO_GESTORES_ATAS } from '../../hooks/useAssignedManagementScope';
 import { naoCarregou } from '../fonte/useLeiturasComFalha';
 
@@ -68,7 +68,7 @@ const CalculoItensAAlocar: React.FC = () => {
 export const ContagensDaCarteira: React.FC = () => {
   const { role } = useAuth();
   const queryClient = useQueryClient();
-  const telaCarregada = useTelaCarregada();
+  const telaCarregada = useEtapaDoMenu(ETAPA_DO_MENU.carteira);
   const contaContratos = role === 'admin' || role === 'gestor';
   const contaItens = role === 'admin' || role === 'gestor_saldos';
 

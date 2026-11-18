@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useUasgsParticipantesGti } from '../../hooks/useGruposGti';
 import { contarUasgsSemGrupo } from '../../config/gruposGti';
-import { useTelaCarregada } from '../layout/useTelaCarregada';
+import { ETAPA_DO_MENU, useEtapaDoMenu } from '../layout/useTelaCarregada';
 
 /**
  * Número no ícone de Ajustes: UASGs ainda sem grupo (GTI) confirmado, com ou sem sugestão. Só o coordenador confirma,
@@ -11,7 +11,7 @@ import { useTelaCarregada } from '../layout/useTelaCarregada';
  */
 export function useContagemGruposUasgs(): { aConfirmar: number; semSugestao: number } | null {
   const { role } = useAuth();
-  const telaCarregada = useTelaCarregada();
+  const telaCarregada = useEtapaDoMenu(ETAPA_DO_MENU.carteira);
   const ativo = role === 'admin';
   const consulta = useUasgsParticipantesGti({ enabled: ativo && telaCarregada });
   return useMemo(() => {
