@@ -45,6 +45,7 @@ import { useGruposDasUasgs } from '../../hooks/useGruposGti';
 import { GtiTag } from '../gti/GtiVisual';
 import type { GrupoDaFatia } from '../../config/gruposGti';
 import { NumeroSeiEtiqueta } from '../../design-system/components/NumeroSeiEtiqueta';
+import type { OrgaoDoRelatorioImportado } from '../../services/relatorioAtaContratosService';
 
 export interface QuantitativosTabProps {
   itemKey: string;
@@ -89,6 +90,8 @@ export interface QuantitativosTabProps {
   /** Adesões do item e o limite de adesão: base dos limites do remanejamento a não participante (migration 219). */
   adesoes: AdesaoItemRecord[];
   limiteAdesao: number;
+  /** Relatório do Contratos.gov.br já importado para o item (migration 325; importa-se na Ata 360). */
+  relatorioContratos?: OrgaoDoRelatorioImportado[];
 }
 
 interface Linha {
@@ -536,6 +539,8 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
       ];
 
   const semOrgaos = !p.loading && linhas.length === 0;
+  // Relatório do Contratos.gov.br importado na Ata 360 (migration 325).
+  const relatorioInfo = (p.relatorioContratos ?? [])[0] ?? null;
   const foraDaAta = q.orgaos.filter((o) => o.situacao === 'FORA_DA_ATA').length;
 
   return (
@@ -545,6 +550,13 @@ export const QuantitativosTab: React.FC<QuantitativosTabProps> = (p) => {
           {p.conferindo
             ? <>Órgãos lidos do Compras.gov.br em {formatDataHoraBR(p.copiadoEm)}. Conferindo com a fonte agora; a lista se atualiza sozinha se algo mudou.</>
             : <>O Compras.gov.br não devolveu os órgãos deste item agora. A lista abaixo é a última cópia guardada, lida em {formatDataHoraBR(p.copiadoEm)}.</>}
+        </NoticeBar>
+      )}
+      {relatorioInfo && (
+        <NoticeBar tone="info" testId="relatorio-contratos-importado">
+          Quantidades pelo relatório do Contratos.gov.br gerado em <b>{formatDataHoraBR(relatorioInfo.geradoEm)}</b>
+          {relatorioInfo.importadoPorNome ? <>, importado por {relatorioInfo.importadoPorNome} em {formatDataHoraBR(relatorioInfo.importadoEm)}</> : null}.
+          {' '}Cada órgão volta a seguir o Compras.gov.br quando ele publicar uma atualização mais nova. Relatório mais novo se importa na Ata 360, aba Itens.
         </NoticeBar>
       )}
       {cabecalho}

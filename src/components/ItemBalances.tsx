@@ -124,6 +124,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
     isLoading: loading,
     conferindo: conferindoUnidades,
     copia: copiaDoItem,
+    relatorio: relatorioContratos,
     error: unidadesQueryError
   } = useItemUnidades(
     arp.numeroAtaRegistroPreco,
@@ -852,6 +853,7 @@ export const ItemBalances: React.FC<ItemBalancesProps> = ({ arp, item, onBack, b
               unidadesAlocadas={alocacoesComErro ? undefined : allocationRows}
               adesoes={adesoes}
               limiteAdesao={totalLimiteAdesao}
+              relatorioContratos={relatorioContratos}
             />
           ) : (
             <QuantitativosOutroOrgaoTab

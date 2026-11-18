@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchUnidadesItem } from '../services/api';
 import { lerCopiaDoItem, lerCopiaUnidadesItem, type CopiaDoItem } from '../services/unidadesItensSyncService';
+import { aplicarRelatorio, lerRelatorioDoItem, type OrgaoDoRelatorioImportado } from '../services/relatorioAtaContratosService';
 import { normalizeItemKey } from '../utils/itemKeyUtils';
 import type { UnidadeItemRecord } from '../types';
 
@@ -19,6 +20,26 @@ export interface UnidadesDoItem {
   copiadoEm: string | null;
   /** A cópia está na tela enquanto o Compras.gov.br ainda responde; a lista de agora a substitui ao chegar. */
   conferindo?: boolean;
+  /** Órgãos cuja quantidade veio do relatório do Contratos.gov.br importado (migration 325). */
+  trocadosPeloRelatorio?: number;
+}
+
+/** Relatório do Contratos.gov.br importado para o item (migration 325). */
+export function getRelatorioDoItemQueryOptions(itemKey: string) {
+  return {
+    queryKey: ['item-relatorio-contratos', itemKey] as const,
+    queryFn: () => lerRelatorioDoItem(itemKey),
+    enabled: Boolean(itemKey),
+    staleTime: 5 * 60 * 1000,
+    retry: 1
+  };
+}
+
+/** A lista da tela com o relatório aplicado órgão a órgão (mesma regra do banco). */
+export function comRelatorio(lista: UnidadesDoItem | undefined, relatorio: OrgaoDoRelatorioImportado[] | undefined): UnidadesDoItem | undefined {
+  if (!lista || !relatorio || relatorio.length === 0) return lista;
+  const r = aplicarRelatorio(lista.unidades, relatorio);
+  return { ...lista, unidades: r.unidades, trocadosPeloRelatorio: r.trocados };
 }
 
 /**
@@ -97,9 +118,13 @@ export function useItemUnidades(numeroAta?: string, uasg?: string, numeroItem?: 
   const copia = useQuery<CopiaDoItem, Error>(getCopiaDoItemQueryOptions(itemKey));
   // A cópia que falhou não atrapalha: a tela espera o Compras.gov.br, como antes.
   const copiaLida = copia.isError ? undefined : copia.data;
-  const data = escolherUnidades(aoVivo.data, copiaLida);
+  // O relatório que falhou também não atrapalha: a lista fica como a do Compras.gov.br.
+  const relatorio = useQuery<OrgaoDoRelatorioImportado[], Error>(getRelatorioDoItemQueryOptions(itemKey));
+  const relatorioLido = relatorio.isError ? undefined : relatorio.data;
+  const data = comRelatorio(escolherUnidades(aoVivo.data, copiaLida), relatorioLido);
   return {
     data,
+    relatorio: relatorioLido ?? [],
     isLoading: aoVivo.isLoading && !data,
     conferindo: Boolean(data?.conferindo),
     error: aoVivo.error,

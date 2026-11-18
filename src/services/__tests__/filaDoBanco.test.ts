@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { criarFila, criarFetchComFila, ehLeitura, FUNCOES_DE_LEITURA, LEITURAS_SIMULTANEAS } from '../filaDoBanco';
+import { criarFila, criarFetchComFila, ehErroDeTempoEsgotado, ehLeitura, FUNCOES_DE_LEITURA, LEITURAS_SIMULTANEAS, repetirMenosTempoEsgotado } from '../filaDoBanco';
+import { queryClient } from '../../lib/queryClient';
 
 const BASE = 'https://exemplo.supabase.co';
 const adiada = <T,>() => {
@@ -113,5 +114,28 @@ describe('fetch do cliente do banco', () => {
     const gravacao = vi.fn(async () => esgotou());
     await criarFetchComFila(gravacao as unknown as typeof fetch, 6, 0)(`${BASE}/rest/v1/rpc/confirmar_execucao_contrato`, { method: 'POST', body: '{}' });
     expect(gravacao).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('repetição das consultas (React Query) depois da fila', () => {
+  const tempoEsgotado = { code: '57014', message: 'canceling statement due to statement timeout' };
+
+  it('reconhece o tempo esgotado direto, embrulhado por um serviço ou só pela mensagem', () => {
+    expect(ehErroDeTempoEsgotado(tempoEsgotado)).toBe(true);
+    expect(ehErroDeTempoEsgotado(new Error('Não foi possível ler os contratos (página 2)', { cause: tempoEsgotado }))).toBe(true);
+    expect(ehErroDeTempoEsgotado(new Error('Não foi possível ler o saldo dos itens: canceling statement due to statement timeout'))).toBe(true);
+    expect(ehErroDeTempoEsgotado(new Error('Failed to fetch'))).toBe(false);
+    expect(ehErroDeTempoEsgotado({ code: '42501', message: 'permission denied' })).toBe(false);
+    expect(ehErroDeTempoEsgotado(null)).toBe(false);
+  });
+
+  it('tempo esgotado não é repetido de novo (a fila já repetiu); outros erros, uma vez', () => {
+    expect(repetirMenosTempoEsgotado(0, tempoEsgotado)).toBe(false);
+    expect(repetirMenosTempoEsgotado(0, new Error('Failed to fetch'))).toBe(true);
+    expect(repetirMenosTempoEsgotado(1, new Error('Failed to fetch'))).toBe(false);
+  });
+
+  it('é o padrão de todas as consultas do site', () => {
+    expect(queryClient.getDefaultOptions().queries?.retry).toBe(repetirMenosTempoEsgotado);
   });
 });
