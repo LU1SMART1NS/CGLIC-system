@@ -4,7 +4,7 @@ import { ROTULOS_FINANCEIRO, usePagamentosCarteira } from '../../hooks/useFinanc
 import { naoCarregou } from '../fonte/useLeiturasComFalha';
 import { resumirPrecisaDeAcao } from '../../services/financeiroCarteiraService';
 import { useContratosDoFinanceiro } from './useContratosDoFinanceiro';
-import { useTelaCarregada } from '../layout/useTelaCarregada';
+import { ETAPA_DO_MENU, useEtapaDoMenu } from '../layout/useTelaCarregada';
 
 /**
  * Número no ícone do Financeiro: o segmento "Precisa de ação" de Pagamentos (ciclos com a CGLIC e faturas com erro no
@@ -14,7 +14,7 @@ import { useTelaCarregada } from '../layout/useTelaCarregada';
  */
 export function useContagemFinanceiro(): { total: number; urgente: boolean } | null {
   const { role } = useAuth();
-  const telaCarregada = useTelaCarregada();
+  const telaCarregada = useEtapaDoMenu(ETAPA_DO_MENU.financeiro);
   const ativo = role === 'admin' || role === 'gestor';
   const { rows, isLoading, leituras } = usePagamentosCarteira({ enabled: ativo && telaCarregada });
   // Os contratos (recorte do gestor) também esperam a tela encher: eram a carteira inteira lida ao abrir qualquer tela.

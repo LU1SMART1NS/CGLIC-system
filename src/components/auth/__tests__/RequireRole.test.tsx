@@ -89,7 +89,7 @@ describe('RequireRole — Autorização Central de Rotas (Fase Frontend RBAC)', 
     expect(html).not.toContain(PROTECTED_CONTENT);
   });
 
-  it('trata explicitamente erro na resolução da role (roleStatus "error") como acesso negado, nunca como liberado', () => {
+  it('erro na leitura do perfil (roleStatus "error"): não libera a tela, mas também não diz "Acesso não autorizado"; oferece tentar de novo', () => {
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
       user: { id: 'u4' } as any,
       session: {} as any,
@@ -101,8 +101,10 @@ describe('RequireRole — Autorização Central de Rotas (Fase Frontend RBAC)', 
 
     const html = renderRequireRole(['admin']);
 
-    expect(html).toContain('Acesso não autorizado');
     expect(html).not.toContain(PROTECTED_CONTENT);
+    expect(html).not.toContain('Acesso não autorizado');
+    expect(html).toContain('Não foi possível conferir seu perfil');
+    expect(html).toContain('Tentar de novo');
   });
 
   it('libera o acesso e renderiza os filhos quando a role está na lista permitida', () => {

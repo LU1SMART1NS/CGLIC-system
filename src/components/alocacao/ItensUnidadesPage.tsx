@@ -63,7 +63,7 @@ interface Filtros {
 const TODOS = 'TODOS';
 const PAGE_SIZE = 20;
 const SCHEMA: CarteiraFilterSchema<Filtros> = {
-  nivel: { param: 'alocacao', default: 'SEM', values: ['SEM', 'PARCIAL', 'TOTAL', 'LIVRE', TODOS] },
+  nivel: { param: 'alocacao', default: 'SEM', values: ['SEM', 'PARCIAL', 'TOTAL', TODOS] },
   vigencia: { param: 'situacao', default: 'VIGENTES', values: ['VIGENTES', 'HISTORICO', TODOS] },
   unidade: { param: 'unidade', default: TODAS_UNIDADES },
   uasg: { param: 'uasg', default: TODOS },
@@ -72,7 +72,6 @@ const SCHEMA: CarteiraFilterSchema<Filtros> = {
   ver: { param: 'ver', default: 'ATA', values: ['ATA', 'ITEM'] },
   divisao: { param: 'divisao', default: TODOS, values: ['DIVIDE', 'NAO_DIVIDE', 'A_CONFERIR', TODOS] }
 };
-const CINZA = '#94a3b8';
 /** Selo da divisão na ata, abaixo do número. */
 const SELO_DIVISAO: Record<SituacaoDivisao, { label: string; variant: 'info' | 'neutral' | 'warning'; title: string }> = {
   DIVIDE: { label: 'Divisão pela ata', variant: COR_DA_SITUACAO.ANDAMENTO, title: 'A ata assinada divide o quantitativo SENASP entre as unidades internas: a alocação é a da ata.' },
@@ -82,6 +81,8 @@ const SELO_DIVISAO: Record<SituacaoDivisao, { label: string; variant: 'info' | '
 const origemDaDivisao = (d: DivisaoNaAta) =>
   d.situacao === 'A_CONFERIR' ? 'Ainda não conferida.' : d.fonte === 'PESSOA' && d.marcadoEm ? `Marcado por ${d.marcadoPorNome ?? 'alguém'} em ${formatDateBR(d.marcadoEm.slice(0, 10))}.` : '';
 const VERDE = 'var(--color-success)';
+const tituloComOpcionais = (titulo: string, opcionais: number) =>
+  opcionais > 0 ? `${titulo}. ${formatNumber(opcionais)} ${opcionais === 1 ? 'é de ata sem divisão (opcional, sem pendência)' : 'são de atas sem divisão (opcionais, sem pendência)'}.` : titulo;
 const TITULO_NEGATIVO =
   'O registrado da SENASP no Compras.gov.br é menor que o que ela gerencia para os participantes. Confira o remanejamento na fonte; até lá a alocação só pode diminuir.';
 const AMARELO = 'var(--color-warning-solid)';
@@ -94,6 +95,10 @@ const CHIP: Record<NivelAtendimento, { color: string; bg: string; label: (n: num
   PARCIAL: { color: 'var(--color-warning-text)', bg: 'var(--color-warning-bg)', label: () => 'parcial' },
   TOTAL: { color: 'var(--color-success-text)', bg: 'var(--color-success-bg)', label: (n) => (n === 1 ? 'alocado' : 'alocados') }
 };
+/** Na ata sem divisão, faltar alocar não é pendência: a mesma situação, em cinza e com "(opcional)". */
+const CHIP_OPCIONAL = { color: '#475569', bg: '#f1f5f9' };
+const opcionalLabel = (label: string) => `${label} (opcional)`;
+const TITULO_OPCIONAL = 'A ata não divide o quantitativo SENASP entre as unidades: alocar é opcional e o que falta fica livre na SENASP, sem pendência.';
 
 /** Alocado contra o quantitativo SENASP: número e barra (âmbar enquanto parcial, verde quando completo). */
 const AlocadoBar: React.FC<{ alocado: number; senasp: number; opcional?: boolean }> = ({ alocado, senasp, opcional }) => {
@@ -128,8 +133,6 @@ interface GrupoAta {
   achouItem: boolean;
   /** Se a ata assinada divide o quantitativo SENASP entre as unidades internas. */
   divisao: DivisaoNaAta;
-  /** Itens com alguma alocação (mostrado só nas atas sem divisão). */
-  comAlocacao: number;
 }
 
 /**
@@ -184,9 +187,15 @@ export const ItensUnidadesPage: React.FC = () => {
   const base = useMemo(() => rows.filter((r) => r.quantitativoSenasp !== 0), [rows]);
   const negativos = useMemo(() => base.filter((r) => r.quantitativoSenasp < 0 && r.faixa !== 'EXPIRADO'), [base]);
   const nivelCounts = useMemo(() => {
-    const n: Record<NivelAtendimento | 'LIVRE', number> = { SEM: 0, PARCIAL: 0, TOTAL: 0, LIVRE: 0 };
-    for (const r of base) if (filters.vigencia === TODOS || (filters.vigencia === 'HISTORICO' ? r.faixa === 'EXPIRADO' : r.faixa !== 'EXPIRADO')) n[semDivisao(r) ? 'LIVRE' : r.nivelAlocacao]++;
-    return n;
+    // A situação vale para todas as atas; "opcionais" são os itens de ata sem divisão (não contam como pendência).
+    const n: Record<NivelAtendimento, number> = { SEM: 0, PARCIAL: 0, TOTAL: 0 };
+    const opcionais: Record<NivelAtendimento, number> = { SEM: 0, PARCIAL: 0, TOTAL: 0 };
+    for (const r of base)
+      if (filters.vigencia === TODOS || (filters.vigencia === 'HISTORICO' ? r.faixa === 'EXPIRADO' : r.faixa !== 'EXPIRADO')) {
+        n[r.nivelAlocacao]++;
+        if (semDivisao(r)) opcionais[r.nivelAlocacao]++;
+      }
+    return { ...n, opcionais, pendentes: n.SEM + n.PARCIAL - opcionais.SEM - opcionais.PARCIAL };
   }, [base, filters.vigencia, semDivisao]);
   const divisaoCounts = useMemo(() => {
     const n: Record<string, number> = {};
@@ -209,8 +218,7 @@ export const ItensUnidadesPage: React.FC = () => {
   const lista = useMemo(() => {
     return base
       .filter((r) => {
-        if (filters.nivel === 'LIVRE' && !semDivisao(r)) return false;
-        if (filters.nivel !== TODOS && filters.nivel !== 'LIVRE' && (semDivisao(r) || r.nivelAlocacao !== filters.nivel)) return false;
+        if (filters.nivel !== TODOS && r.nivelAlocacao !== filters.nivel) return false;
         if (filters.divisao !== TODOS && divisaoNaAta.de(r.ataKey).situacao !== filters.divisao) return false;
         if (filters.vigencia === 'VIGENTES' && r.faixa === 'EXPIRADO') return false;
         if (filters.vigencia === 'HISTORICO' && r.faixa !== 'EXPIRADO') return false;
@@ -228,7 +236,8 @@ export const ItensUnidadesPage: React.FC = () => {
         }
         return true;
       })
-      .sort((a, b) => comparePrazo(a.diasRestantes, b.diasRestantes) || a.arp.numeroAtaRegistroPreco.localeCompare(b.arp.numeroAtaRegistroPreco) || Number(a.item.numeroItem) - Number(b.item.numeroItem));
+      // A pendência (ata que divide ou a conferir) vem antes da alocação opcional (ata sem divisão).
+      .sort((a, b) => Number(semDivisao(a)) - Number(semDivisao(b)) || comparePrazo(a.diasRestantes, b.diasRestantes) || a.arp.numeroAtaRegistroPreco.localeCompare(b.arp.numeroAtaRegistroPreco) || Number(a.item.numeroItem) - Number(b.item.numeroItem));
   }, [base, filters, showGestorFilter, busca, ataCasaBusca, semDivisao, divisaoNaAta, nomeDaLinha]);
 
   const grupos = useMemo<GrupoAta[]>(() => {
@@ -263,8 +272,7 @@ export const ItensUnidadesPage: React.FC = () => {
         nivel: agregarNivel(itens.map((r) => r.nivelAlocacao)) ?? 'SEM',
         contagem,
         achouItem: !!busca && !ataCasaBusca(vis[0]),
-        divisao: divisaoNaAta.de(ataKey),
-        comAlocacao: itens.filter((r) => r.alocado > 0).length
+        divisao: divisaoNaAta.de(ataKey)
       };
     });
   }, [base, lista, busca, ataCasaBusca, divisaoNaAta]);
@@ -308,7 +316,7 @@ export const ItensUnidadesPage: React.FC = () => {
       situacao === 'NAO_DIVIDE'
         ? {
             title: `A ata ${numero} não divide entre as unidades?`,
-            message: `Os ${g.itens.length} itens saem de "Sem alocação" e "Parcialmente alocados" e vão para "Sem divisão na ata". O que já estiver alocado continua, como alocação opcional.`,
+            message: `Os ${g.itens.length} itens continuam na mesma situação, mas deixam de ser pendência: o que falta alocar fica livre na SENASP. O que já estiver alocado continua.`,
             confirmLabel: 'Marcar sem divisão'
           }
         : {
@@ -343,7 +351,7 @@ export const ItensUnidadesPage: React.FC = () => {
   }
   const hasActive = hasActiveCarteiraFilters(SCHEMA, { ...filters, ver: SCHEMA.ver.default }) && filters.nivel === SCHEMA.nivel.default;
   const isBusy = (isLoading && arps.length === 0) || scopeLoading || loadingExecucao;
-  const nivelAtivo = (filters.nivel === TODOS ? 'TODOS' : filters.nivel) as NivelAtendimento | 'LIVRE' | 'TODOS';
+  const nivelAtivo = (filters.nivel === TODOS ? 'TODOS' : filters.nivel) as NivelAtendimento | 'TODOS';
   const nomeUnidade = (u: string) => unidades.find((x) => x.chave === u)?.nome ?? u;
 
   /** Colunas do item, as mesmas na lista corrida e dentro da ata aberta. */
@@ -425,8 +433,10 @@ export const ItensUnidadesPage: React.FC = () => {
           {opcional ? <span style={{ ...subtle, fontWeight: 600 }} title="Sem divisão na ata: o que não foi alocado fica livre, sem pendência">{formatNumber(falta)} livre</span> : falta > 0 ? `${formatNumber(falta)} un` : '—'}
         </td>
         <td data-label="Situação" style={carteiraTd}>
-          {opcional ? (
-            <StatusBadge label={r.alocado > 0 ? 'Com alocação' : 'Sem divisão'} variant={r.alocado > 0 ? 'info' : 'neutral'} size="sm" testId={`alocacao-sem-divisao-${r.key}`} />
+          {opcional && r.nivelAlocacao !== 'TOTAL' ? (
+            <span title={TITULO_OPCIONAL}>
+              <StatusBadge label={opcionalLabel(NIVEL_ALOCACAO_LABEL[r.nivelAlocacao])} variant="neutral" size="sm" testId={`alocacao-sem-divisao-${r.key}`} />
+            </span>
           ) : (
             <CarteiraNivelPill nivel={r.nivelAlocacao} labels={NIVEL_ALOCACAO_LABEL} />
           )}
@@ -568,15 +578,14 @@ export const ItensUnidadesPage: React.FC = () => {
                           {g.itens.length} {g.itens.length === 1 ? 'item' : 'itens'}
                         </div>
                         <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-                          {semDiv && g.comAlocacao > 0 && (
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', padding: '0.05rem 0.4rem', color: 'var(--color-info-text-strong)', background: 'var(--color-info-bg)' }}>
-                              {g.comAlocacao} com alocação
-                            </span>
-                          )}
-                          {!semDiv && (['SEM', 'PARCIAL', 'TOTAL'] as const)
+                          {(['SEM', 'PARCIAL', 'TOTAL'] as const)
                             .filter((n) => g.contagem[n] > 0)
                             .map((n) => (
-                              <span key={n} style={{ fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', padding: '0.05rem 0.4rem', color: CHIP[n].color, background: CHIP[n].bg }}>
+                              <span
+                                key={n}
+                                title={semDiv && n !== 'TOTAL' ? TITULO_OPCIONAL : undefined}
+                                style={{ fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', padding: '0.05rem 0.4rem', ...(semDiv && n !== 'TOTAL' ? CHIP_OPCIONAL : { color: CHIP[n].color, background: CHIP[n].bg }) }}
+                              >
                                 {g.contagem[n]} {CHIP[n].label(g.contagem[n])}
                               </span>
                             ))}
@@ -590,7 +599,13 @@ export const ItensUnidadesPage: React.FC = () => {
                       {semDiv ? <span style={{ ...subtle, fontWeight: 600 }}>{formatNumber(g.falta)} livre</span> : g.falta > 0 ? `${formatNumber(g.falta)} un` : '—'}
                     </td>
                     <td data-label="Situação" style={carteiraTd}>
-                      {semDiv ? <StatusBadge label="Sem divisão" variant="neutral" size="sm" /> : <CarteiraNivelPill nivel={g.nivel} labels={NIVEL_ALOCACAO_ATA_LABEL} />}
+                      {semDiv && g.nivel !== 'TOTAL' ? (
+                        <span title={TITULO_OPCIONAL}>
+                          <StatusBadge label={opcionalLabel(NIVEL_ALOCACAO_ATA_LABEL[g.nivel])} variant="neutral" size="sm" testId={`vinc-atas-opcional-${g.ataKey}`} />
+                        </span>
+                      ) : (
+                        <CarteiraNivelPill nivel={g.nivel} labels={NIVEL_ALOCACAO_ATA_LABEL} />
+                      )}
                     </td>
                     {showGestorFilter && (
                       <td data-label="Gestor" style={{ ...carteiraTd, whiteSpace: 'nowrap' }}>
@@ -630,7 +645,7 @@ export const ItensUnidadesPage: React.FC = () => {
                             </AppButton>
                           )}
                         </div>
-                        <CarteiraDetailLabel>{mostrarTodos || filters.nivel === 'LIVRE' ? 'Itens da ata' : `Itens da ata · ${NIVEL_ALOCACAO_LABEL[filters.nivel as NivelAtendimento].toLowerCase()}`}</CarteiraDetailLabel>
+                        <CarteiraDetailLabel>{mostrarTodos ? 'Itens da ata' : `Itens da ata · ${NIVEL_ALOCACAO_LABEL[filters.nivel as NivelAtendimento].toLowerCase()}`}</CarteiraDetailLabel>
                         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto' }}>
                           <table className="carteira-stack" style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
@@ -750,11 +765,11 @@ export const ItensUnidadesPage: React.FC = () => {
             onSelect={(v) => setFilter('nivel', v)}
             segments={[
               { id: 'TOTAL', label: 'Alocados', count: nivelCounts.TOTAL, dot: VERDE, title: 'O alocado alcança o quantitativo SENASP' },
-              { id: 'PARCIAL', label: 'Parcialmente alocados', count: nivelCounts.PARCIAL, dot: AMARELO, title: 'O alocado não alcança o quantitativo SENASP' },
-              { id: 'SEM', label: 'Sem alocação', count: nivelCounts.SEM, dot: VERMELHO, title: 'Nenhuma unidade recebeu o item' },
-              { id: 'LIVRE', label: 'Sem divisão na ata', count: nivelCounts.LIVRE, dot: CINZA, title: 'A ata não divide o quantitativo SENASP: alocar às unidades é opcional, sem pendência' },
-              { id: 'TODOS', label: 'Todos', count: nivelCounts.SEM + nivelCounts.PARCIAL + nivelCounts.TOTAL + nivelCounts.LIVRE }
+              { id: 'PARCIAL', label: 'Parcialmente alocados', count: nivelCounts.PARCIAL, dot: AMARELO, title: tituloComOpcionais('O alocado não alcança o quantitativo SENASP', nivelCounts.opcionais.PARCIAL) },
+              { id: 'SEM', label: 'Sem alocação', count: nivelCounts.SEM, dot: VERMELHO, title: tituloComOpcionais('Nenhuma unidade recebeu o item', nivelCounts.opcionais.SEM) },
+              { id: 'TODOS', label: 'Todos', count: nivelCounts.SEM + nivelCounts.PARCIAL + nivelCounts.TOTAL }
             ]}
+            meta={nivelCounts.pendentes > 0 ? `${formatNumber(nivelCounts.pendentes)} ${nivelCounts.pendentes === 1 ? 'pendente' : 'pendentes'} nas atas que dividem` : 'Nenhuma pendência nas atas que dividem'}
           />
 
           <CarteiraFilterBar

@@ -3,7 +3,9 @@ import { fetchManagementDashboardData, type FontesDoPainelNoCache } from '../ser
 import { ehErroDeTempoEsgotado } from '../services/filaDoBanco';
 import { getContractsDashboardQueryOptions } from './useContractsDashboard';
 import { getAllContractManagersQueryOptions } from './useAllContractManagers';
-import { getAtaSourceQueryOptions } from './useAta';
+import { getAtaSourceQueryOptions, getSaldosCompletosQueryOptions } from './useAta';
+import { getAvisosResolvidosQueryOptions } from './useAvisosResolvidos';
+import { getAlocacoesQueryOptions } from './useCarteiraItens';
 import type {
   ManagementDashboardReadModel,
   ManagementDashboardFilters
@@ -90,7 +92,10 @@ export function fontesDoPainelNoCache(client: QueryClient): FontesDoPainelNoCach
   return {
     contratos: (uasg) => client.fetchQuery(getContractsDashboardQueryOptions(uasg)),
     gestores: (uasg) => client.fetchQuery(getAllContractManagersQueryOptions(uasg)),
-    atas: (uasg) => client.fetchQuery(getAtaSourceQueryOptions(uasg))
+    atas: (uasg) => client.fetchQuery(getAtaSourceQueryOptions(uasg)),
+    saldoItens: (uasg) => client.fetchQuery(getSaldosCompletosQueryOptions(uasg)),
+    avisosResolvidos: () => client.fetchQuery(getAvisosResolvidosQueryOptions()),
+    alocacoes: () => client.fetchQuery(getAlocacoesQueryOptions())
   };
 }
 

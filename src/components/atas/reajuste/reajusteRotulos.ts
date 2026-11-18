@@ -77,6 +77,16 @@ export function mesPorExtenso(iso: string | null | undefined): string {
   return m >= 1 && m <= 12 ? `${MESES[m - 1]}/${y}` : '—';
 }
 
+/**
+ * Ata sem data-base (sem Termo de Conformidade, sem data do orçamento e sem apostilamento lido): o primeiro mês do
+ * índice do reajuste passa a ser o mês do Termo (gatilho da migration 326), e o preço novo é pedido em seguida.
+ * `de` no formato "2025-06".
+ */
+export function avisoSemDataBase(de: string): string {
+  const mes = /^\d{4}-\d{2}$/.test(de) ? mesPorExtenso(`${de}-01`) : null;
+  return `Esta ata ainda não tem data-base (Termo de Conformidade). ${mes ? `O primeiro mês do índice, ${mes},` : 'O primeiro mês do índice'} passa a ser o mês do Termo; depois de gravar, a aba pede o preço novo de cada item.`;
+}
+
 /** 4,44% (duas casas, como nos apostilamentos). */
 export function percentual(v: number | null | undefined): string {
   return typeof v === 'number' && Number.isFinite(v) ? `${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : '—';

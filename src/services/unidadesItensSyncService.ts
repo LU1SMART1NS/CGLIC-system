@@ -185,7 +185,7 @@ export type LinhaParaGravar = {
 export async function lerItemNasFontes(
   item: ItemDaCarteira,
   fontes: { unidades: typeof fetchUnidadesItem; adesoes: typeof fetchAdesoesItem } = { unidades: fetchUnidadesItem, adesoes: fetchAdesoesItem }
-): Promise<{ linha: LinhaParaGravar; falhaAdesoes: boolean }> {
+): Promise<{ linha: LinhaParaGravar; falhaAdesoes: boolean; motivoAdesoes?: string }> {
   // Lista incompleta ou com cópias divergentes lança: o item não é gravado (a cópia anterior fica).
   const resposta = await fontes.unidades(item.numeroAta, item.uasg, item.numeroItem, { falharSeErro: true });
   const unidades = (resposta.resultado || []).map(unidadeParaGravar);
@@ -197,8 +197,33 @@ export async function lerItemNasFontes(
     return { linha, falhaAdesoes: false };
   } catch (err) {
     console.warn(`[unidadesItens] adesões do item ${item.itemKey} não puderam ser lidas:`, mensagemDeErro(err));
-    return { linha, falhaAdesoes: true };
+    return { linha, falhaAdesoes: true, motivoAdesoes: motivoDaFalha(err) };
   }
+}
+
+/**
+ * Motivo curto de uma leitura que falhou, para a mensagem da sincronização contar as falhas por tipo. O erro de
+ * cada item só ia para o log da Edge Function, que não se lê de fora: com 6 leituras ao mesmo tempo, 96 a 122
+ * itens falhavam rápido por rodada sem se saber por quê (17-18/11/2026).
+ */
+export function motivoDaFalha(err: unknown): string {
+  const texto = mensagemDeErro(err).trim();
+  const status = texto.match(/status:?\s*(\d{3})/i);
+  if (status) return `HTTP ${status[1]}`;
+  const semResposta = texto.match(/não respondeu em (\d+) s/);
+  if (semResposta) return `sem resposta em ${semResposta[1]} s`;
+  const nome = err && typeof err === 'object' && 'name' in err ? String((err as { name: unknown }).name) : '';
+  if (nome === 'SyntaxError') return 'resposta que não é JSON';
+  if (nome === 'TypeError') return `falha de rede (${texto.slice(0, 60)})`;
+  return texto.slice(0, 80) || 'erro sem mensagem';
+}
+
+/** "HTTP 429: 90, sem resposta em 30 s: 6", do mais frequente ao menos. */
+export function resumirMotivos(motivos: Record<string, number>): string {
+  return Object.entries(motivos)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([motivo, n]) => `${motivo}: ${n}`)
+    .join(', ');
 }
 
 async function gravar(uasg: string, lote: LinhaParaGravar[]): Promise<number> {
@@ -224,6 +249,10 @@ export interface ResumoDaFila {
   falhas: number;
   incompletos: number;
   falhasAdesoes: number;
+  /** Falhas dos órgãos por motivo (ver motivoDaFalha). */
+  motivosFalhas: Record<string, number>;
+  /** Falhas das adesões por motivo. */
+  motivosAdesoes: Record<string, number>;
   /** Itens que não começaram dentro do orçamento de tempo (ficam para a próxima execução). */
   pendentes: number;
 }
@@ -235,7 +264,7 @@ export interface ResumoDaFila {
 export async function lerFila(
   fila: ItemDaCarteira[],
   opts: {
-    ler: (item: ItemDaCarteira) => Promise<{ linha: LinhaParaGravar; falhaAdesoes: boolean }>;
+    ler: (item: ItemDaCarteira) => Promise<{ linha: LinhaParaGravar; falhaAdesoes: boolean; motivoAdesoes?: string }>;
     gravar: (lote: LinhaParaGravar[]) => Promise<number>;
     orcamentoMs: number;
     inicio: number;
@@ -243,7 +272,7 @@ export async function lerFila(
     concorrencia?: number;
   }
 ): Promise<ResumoDaFila> {
-  const resumo: ResumoDaFila = { copiados: 0, vazios: 0, falhas: 0, incompletos: 0, falhasAdesoes: 0, pendentes: 0 };
+  const resumo: ResumoDaFila = { copiados: 0, vazios: 0, falhas: 0, incompletos: 0, falhasAdesoes: 0, pendentes: 0, motivosFalhas: {}, motivosAdesoes: {} };
   let lote: LinhaParaGravar[] = [];
   let gravacoes: Promise<void> = Promise.resolve();
   // Gravações em fila: um lote só sai depois do anterior (a função do banco grava item a item).
@@ -260,13 +289,21 @@ export async function lerFila(
       if (opts.agora() - opts.inicio > opts.orcamentoMs) return;
       const item = fila[proximo++];
       try {
-        const { linha, falhaAdesoes } = await opts.ler(item);
+        const { linha, falhaAdesoes, motivoAdesoes } = await opts.ler(item);
         if (linha.unidades.length === 0) resumo.vazios++;
-        if (falhaAdesoes) resumo.falhasAdesoes++;
+        if (falhaAdesoes) {
+          resumo.falhasAdesoes++;
+          const motivo = motivoAdesoes ?? 'motivo não informado';
+          resumo.motivosAdesoes[motivo] = (resumo.motivosAdesoes[motivo] ?? 0) + 1;
+        }
         lote.push(linha);
       } catch (err) {
         if (err instanceof UnidadesItemIncompletasError) resumo.incompletos++;
-        else resumo.falhas++;
+        else {
+          resumo.falhas++;
+          const motivo = motivoDaFalha(err);
+          resumo.motivosFalhas[motivo] = (resumo.motivosFalhas[motivo] ?? 0) + 1;
+        }
         console.warn(`[unidadesItens] órgãos do item ${item.itemKey} não puderam ser lidos:`, mensagemDeErro(err));
       }
       if (lote.length >= LOTE_GRAVACAO) {
@@ -307,7 +344,7 @@ export async function sincronizarUnidadesItens(
       const itens = await fetchItensDaCarteira(cleanUasg);
       const fila = itensParaLer(itens, await fetchLeituras(), { agora: inicio, forcar: opts.forcar });
 
-      const { copiados, vazios, falhas, incompletos, falhasAdesoes, pendentes } = await lerFila(fila, {
+      const { copiados, vazios, falhas, incompletos, falhasAdesoes, pendentes, motivosFalhas, motivosAdesoes } = await lerFila(fila, {
         ler: (item) => lerItemNasFontes(item),
         gravar: (lote) => gravar(cleanUasg, lote),
         orcamentoMs: orcamento,
@@ -316,9 +353,9 @@ export async function sincronizarUnidadesItens(
       });
 
       const problemas: string[] = [];
-      if (falhas > 0) problemas.push(`${falhas} ${falhas === 1 ? 'item não teve os órgãos lidos' : 'itens não tiveram os órgãos lidos'}`);
+      if (falhas > 0) problemas.push(`${falhas} ${falhas === 1 ? 'item não teve os órgãos lidos' : 'itens não tiveram os órgãos lidos'} (${resumirMotivos(motivosFalhas)})`);
       if (incompletos > 0) problemas.push(`${incompletos} ${incompletos === 1 ? 'item veio com a lista de órgãos incompleta ou repetida de forma diferente e não foi gravado' : 'itens vieram com a lista de órgãos incompleta ou repetida de forma diferente e não foram gravados'}`);
-      if (falhasAdesoes > 0) problemas.push(`${falhasAdesoes} ${falhasAdesoes === 1 ? 'item não teve as adesões lidas' : 'itens não tiveram as adesões lidas'}`);
+      if (falhasAdesoes > 0) problemas.push(`${falhasAdesoes} ${falhasAdesoes === 1 ? 'item não teve as adesões lidas' : 'itens não tiveram as adesões lidas'} (${resumirMotivos(motivosAdesoes)})`);
       if (vazios > 0) problemas.push(`o Compras.gov.br não devolveu órgãos para ${vazios} ${vazios === 1 ? 'item' : 'itens'}`);
       if (pendentes > 0) problemas.push(`${pendentes} ${pendentes === 1 ? 'item ficou' : 'itens ficaram'} para a próxima execução`);
       const fontesComFalha = [

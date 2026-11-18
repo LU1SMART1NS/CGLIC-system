@@ -15,7 +15,7 @@ import { usePrecosDosItens } from '../../hooks/useEmendasQuadro';
 import { avisosDosPedidosParaOMenu } from '../../utils/emendasInicio';
 import { contaEmendasSemPedido, emendasNaLista } from '../../utils/emendasSemPedido';
 import { naoCarregou } from '../fonte/useLeiturasComFalha';
-import { useTelaCarregada } from '../layout/useTelaCarregada';
+import { ETAPA_DO_MENU, useEtapaDoMenu } from '../layout/useTelaCarregada';
 
 /**
  * Número no ícone de Emendas, no padrão do Financeiro: pedidos com algum aviso, vermelho quando algum tem aviso vermelho
@@ -26,7 +26,7 @@ import { useTelaCarregada } from '../layout/useTelaCarregada';
  */
 export function useContagemEmendas(): { total: number; urgentes: number; semPedido: number } | null {
   const ativo = usePodeGerirEmendas();
-  const telaCarregada = useTelaCarregada();
+  const telaCarregada = useEtapaDoMenu(ETAPA_DO_MENU.emendas);
   const enabled = ativo && telaCarregada;
   const pedidos = usePedidosEmendas({ enabled });
   const itens = useItensCaep({ enabled });

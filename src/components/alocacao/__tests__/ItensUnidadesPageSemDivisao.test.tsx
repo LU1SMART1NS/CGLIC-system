@@ -43,14 +43,14 @@ const { ItensUnidadesPage } = await import('../ItensUnidadesPage');
 const render = (url: string) => renderToStaticMarkup(<MemoryRouter initialEntries={[url]}><ItensUnidadesPage /></MemoryRouter>);
 
 describe('Alocação: ata que não divide entre as unidades', () => {
-  it('trilho próprio: a ata sem divisão sai de "Sem alocação"', () => {
+  it('trilho único: a ata sem divisão fica na mesma situação, em cinza e depois das pendências', () => {
     const html = render('/alocacao');
-    expect(html).toContain('Sem divisão na ata');
+    expect(html).not.toContain('Sem divisão na ata');
     expect(html).toContain('data-testid="vinc-atas-row-00051/2024-200331"');
-    expect(html).not.toContain('data-testid="vinc-atas-row-00031/2025-200331"');
-    const livre = render('/alocacao?alocacao=LIVRE');
-    expect(livre).toContain('data-testid="vinc-atas-row-00031/2025-200331"');
-    expect(livre).not.toContain('data-testid="vinc-atas-row-00051/2024-200331"');
+    expect(html).toContain('data-testid="vinc-atas-row-00031/2025-200331"');
+    expect(html.indexOf('vinc-atas-row-00051/2024-200331')).toBeLessThan(html.indexOf('vinc-atas-row-00031/2025-200331'));
+    expect(html).toContain('Sem alocação (opcional)');
+    expect(html).toContain('1 pendente nas atas que dividem');
   });
 
   it('selo ao lado do número e situação "Sem divisão"', () => {
@@ -59,6 +59,7 @@ describe('Alocação: ata que não divide entre as unidades', () => {
     expect(html).toContain('Ata sem divisão');
     expect(html).toContain('Divisão pela ata');
     expect(html).toContain('2.000 livre');
+    expect(html).toContain('data-testid="vinc-atas-opcional-00031/2025-200331"');
   });
 
   it('filtro "Divisão na ata" e caixa de marcação na ata aberta, com quem marcou (só para marcação na tela)', () => {

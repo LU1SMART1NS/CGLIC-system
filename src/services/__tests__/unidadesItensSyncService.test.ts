@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { LEITURAS_SIMULTANEAS_UNIDADES, adesaoParaGravar, itensParaLer, lerFila, lerItemNasFontes, unidadeParaGravar, type ItemDaCarteira, type LeituraDaCopia } from '../unidadesItensSyncService';
+import { LEITURAS_SIMULTANEAS_UNIDADES, adesaoParaGravar, motivoDaFalha, resumirMotivos, itensParaLer, lerFila, lerItemNasFontes, unidadeParaGravar, type ItemDaCarteira, type LeituraDaCopia } from '../unidadesItensSyncService';
 import { UnidadesItemIncompletasError } from '../api';
 import type { UnidadeItemRecord } from '../../types';
 
@@ -143,6 +143,23 @@ describe('lerFila', () => {
     expect(r).toMatchObject({ copiados: 60, pendentes: 0, falhas: 0 });
   });
 
+  it('conta as falhas por motivo, dos órgãos e das adesões', async () => {
+    const r = await lerFila(fila.slice(0, 5), {
+      ler: async (it) => {
+        if (it === fila[0] || it === fila[1]) throw new Error('HTTP error! status: 429');
+        if (it === fila[2]) throw new TypeError('A fonte não respondeu em 30 s: https://x');
+        if (it === fila[3]) return { ...linha(it), falhaAdesoes: true, motivoAdesoes: 'HTTP 503' };
+        return linha(it);
+      },
+      gravar: async (lote) => lote.length,
+      orcamentoMs: 60_000, inicio: Date.now(), agora: () => Date.now()
+    });
+    expect(r.falhas).toBe(3);
+    expect(r.motivosFalhas).toEqual({ 'HTTP 429': 2, 'sem resposta em 30 s': 1 });
+    expect(r.motivosAdesoes).toEqual({ 'HTTP 503': 1 });
+    expect(resumirMotivos(r.motivosFalhas)).toBe('HTTP 429: 2, sem resposta em 30 s: 1');
+  });
+
   it('uma leitura lenta não segura as outras', async () => {
     const ordem: string[] = [];
     await lerFila(fila.slice(0, 6), {
@@ -175,5 +192,15 @@ describe('lerFila', () => {
       orcamentoMs: 60_000, inicio: Date.now(), agora: () => Date.now()
     });
     expect(r).toMatchObject({ copiados: 2, vazios: 1, incompletos: 1, falhas: 1, pendentes: 0 });
+  });
+});
+
+describe('motivoDaFalha', () => {
+  it('resume o erro num motivo curto', () => {
+    expect(motivoDaFalha(new Error('HTTP error! status: 500'))).toBe('HTTP 500');
+    expect(motivoDaFalha(new TypeError('A fonte não respondeu em 30 s: https://x'))).toBe('sem resposta em 30 s');
+    expect(motivoDaFalha(new SyntaxError('Unexpected token <'))).toBe('resposta que não é JSON');
+    expect(motivoDaFalha(new TypeError('error sending request'))).toBe('falha de rede (error sending request)');
+    expect(motivoDaFalha(new Error('outra coisa'))).toBe('outra coisa');
   });
 });

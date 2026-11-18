@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useEntregasFiscalizacao } from '../../hooks/useFiscalizacao';
 import { naoCarregou } from '../fonte/useLeiturasComFalha';
-import { useTelaCarregada } from '../layout/useTelaCarregada';
+import { ETAPA_DO_MENU, useEtapaDoMenu } from '../layout/useTelaCarregada';
 
 /**
  * Número do Início do fiscal (13/11/2026): itens com as informações da CAEP recebidas e a Ordem de Fornecimento a
@@ -11,7 +11,7 @@ import { useTelaCarregada } from '../layout/useTelaCarregada';
  */
 export function useContagemOrdemAEmitir(): number | null {
   const { role, user } = useAuth();
-  const telaCarregada = useTelaCarregada();
+  const telaCarregada = useEtapaDoMenu(ETAPA_DO_MENU.financeiro);
   // Só o fiscal lê (a lista é grande); espera a tela aberta encher, como as outras contagens do menu.
   const consulta = useEntregasFiscalizacao(null, { enabled: telaCarregada && role === 'gestor_fiscalizacao' });
   return useMemo(() => {

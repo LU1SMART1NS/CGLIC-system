@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { lerVinculosItemContrato } from './vinculosItemContratoLeitura';
 
 /** Vínculo item↔contrato com a quantidade do item no contrato (ajustada ou da fonte; nula quando nenhuma das duas existe). */
 export interface CarteiraItemLink {
@@ -15,31 +16,11 @@ export interface CarteiraItemEmpenho {
 
 const PAGE_SIZE = 1000;
 
-/** O PostgREST devolve no máximo 1000 linhas por consulta: lê a tabela inteira, página a página. */
-async function fetchAllRows<T>(table: string, columns: string): Promise<T[]> {
-  if (!isSupabaseConfigured || !supabase) return [];
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from(table)
-      .select(columns)
-      .order('id', { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
-    if (error) throw error;
-    const page = (data as unknown as T[]) || [];
-    rows.push(...page);
-    if (page.length < PAGE_SIZE) break;
-  }
-  return rows;
-}
-
 /** Todos os vínculos item↔contrato da carteira (base da quantidade contratada por item e dos contratos de cada unidade). */
 export async function fetchCarteiraItemLinks(): Promise<CarteiraItemLink[]> {
   // A quantidade usada é a ajustada pelo gestor (migration 103) e, sem ajuste, a lida da fonte.
-  const rows = await fetchAllRows<{ item_key: string; contract_key: string; quantidade_contratada_api: number | null; quantidade_ajustada: number | null }>(
-    'arp_item_contract_links',
-    'item_key, contract_key, quantidade_contratada_api, quantidade_ajustada'
-  );
+  // Mesma leitura do escopo do gestor (lerVinculosItemContrato): as duas começam juntas e dividem a consulta.
+  const rows = await lerVinculosItemContrato();
   return rows.map((r) => {
     const q = r.quantidade_ajustada ?? r.quantidade_contratada_api;
     return { itemKey: r.item_key, contractKey: r.contract_key, quantidadeContratada: q == null ? null : Number(q) };
