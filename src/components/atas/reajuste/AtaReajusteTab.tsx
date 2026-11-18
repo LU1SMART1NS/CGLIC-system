@@ -414,6 +414,7 @@ export const AtaReajusteTab: React.FC<Props> = ({ dados, isLoading, numeroAta, u
             publicado={percentualDe?.ciclo ? publicadoDoCiclo(percentualDe.ciclo, publicados) : null}
             publicados={publicados}
             versao={parametros.versao}
+            semDataBase={origem === null}
             onFechar={() => setPercentualDe(null)}
           />
           <ConfirmDialog

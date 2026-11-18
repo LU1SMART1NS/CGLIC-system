@@ -6,7 +6,7 @@ import { useAcoesReajuste } from '../../../hooks/useReajusteAtas';
 import type { CicloReajuste, ReajustePublicado } from '../../../services/reajusteAtasService';
 import { ehConflitoEdicao, MENSAGEM_CONFLITO_EDICAO } from '../../../utils/conflitoEdicao';
 import { formatDateBR } from '../../../services/temporalEngineService';
-import { percentual } from './reajusteRotulos';
+import { avisoSemDataBase, percentual } from './reajusteRotulos';
 
 interface Props {
   aberto: boolean;
@@ -19,13 +19,15 @@ interface Props {
   /** Reajustes já registrados na ata: um novo com os mesmos meses do índice é repetido. */
   publicados?: ReajustePublicado[];
   versao: number | null;
+  /** A ata não tem data-base: o reajuste novo dá o mês do Termo de Conformidade (migration 326). */
+  semDataBase?: boolean;
   onFechar: () => void;
 }
 
 const mes = (iso: string | null | undefined) => (iso ? iso.slice(0, 7) : '');
 
 /** Percentual do apostilamento (PDF sem número legível, correção, ou reajuste fora do PNCP): gestor da ata ou coordenador. */
-export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numeroAta, uasg, ciclo, publicado, publicados = [], versao, onFechar }) => {
+export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numeroAta, uasg, ciclo, publicado, publicados = [], versao, semDataBase = false, onFechar }) => {
   const toast = useToast();
   const { informarPercentual } = useAcoesReajuste(numeroAta, uasg);
   const [valor, setValor] = React.useState('');
@@ -74,7 +76,7 @@ export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numero
         sei,
         versao
       });
-      toast.success('Percentual gravado. A projeção foi refeita.');
+      toast.success(semDataBase && !publicado ? 'Reajuste gravado. Informe agora o preço novo de cada item.' : 'Percentual gravado. A projeção foi refeita.');
       onFechar();
     } catch (err) {
       setErro(ehConflitoEdicao(err) ? MENSAGEM_CONFLITO_EDICAO : (err as Error)?.message || 'Não foi possível gravar o percentual.');
@@ -131,6 +133,9 @@ export const InformarPercentualModal: React.FC<Props> = ({ aberto, ataId, numero
           <AppInput id="reajuste-percentual-sei" inputMode="numeric" maxLength={10} placeholder="34985144" value={sei} style={{ width: 180 }}
             onChange={(e) => setSei(e.target.value.replace(/\D/g, ''))} data-testid="informar-percentual-sei" />
         </label>
+        {semDataBase && !publicado && (
+          <NoticeBar tone="info" testId="informar-percentual-sem-base">{avisoSemDataBase(de)}</NoticeBar>
+        )}
         {repetido && (
           <NoticeBar tone="warning" testId="informar-percentual-repetido">
             O reajuste destes meses do índice já está na ata

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { CicloReajuste, ItemReajuste, ParametrosReajuste, ReajusteDaAta } from '../../../../services/reajusteAtasService';
-import { avisoDaAba, contarComAcao, dataBaseNaTela, impactoDoItem, mesPorExtenso, percentual, piorSituacao, quadroDoCartao, totaisDaAta } from '../reajusteRotulos';
+import { avisoDaAba, avisoSemDataBase, contarComAcao, dataBaseNaTela, impactoDoItem, mesPorExtenso, percentual, piorSituacao, quadroDoCartao, totaisDaAta } from '../reajusteRotulos';
 
 const HOJE = new Date('2026-10-23T12:00:00Z');
 
@@ -133,5 +133,17 @@ describe('situação da ata', () => {
 
   it('sem parâmetros (reajuste ainda não lido): sem quadro no cartão', () => {
     expect(quadroDoCartao(dados({ parametros: null }), [], HOJE)).toBeNull();
+  });
+});
+
+describe('ata sem data-base (migration 326)', () => {
+  it('avisa que o primeiro mês do índice vira o mês do Termo e que o preço vem depois', () => {
+    // Ata 00058/2025: IPCA de 06/2025 a 05/2026, sem Termo de Conformidade.
+    const texto = avisoSemDataBase('2025-06');
+    expect(texto).toContain('jun/2025');
+    expect(texto).toContain('preço novo');
+  });
+  it('sem o mês preenchido, não inventa a data', () => {
+    expect(avisoSemDataBase('')).not.toContain('/');
   });
 });
