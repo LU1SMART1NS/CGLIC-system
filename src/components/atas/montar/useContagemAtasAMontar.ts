@@ -1,5 +1,5 @@
 import { useAtasAMontar, usePodeMontarAta } from '../../../hooks/useAtasAMontar';
-import { useTelaCarregada } from '../../layout/useTelaCarregada';
+import { ETAPA_DO_MENU, useEtapaDoMenu } from '../../layout/useTelaCarregada';
 
 /**
  * Número no ícone de Atas e Contratos: fornecedores vencedores de pregão homologado ainda sem ata (Carteira › Atas › A
@@ -8,7 +8,7 @@ import { useTelaCarregada } from '../../layout/useTelaCarregada';
  */
 export function useContagemAtasAMontar(): number | null {
   const ativo = usePodeMontarAta();
-  const telaCarregada = useTelaCarregada();
+  const telaCarregada = useEtapaDoMenu(ETAPA_DO_MENU.carteira);
   const { data, isError } = useAtasAMontar(ativo && telaCarregada);
   if (!ativo || !telaCarregada || isError || !data) return null;
   return data.length;

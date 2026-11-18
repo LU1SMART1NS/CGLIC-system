@@ -8,7 +8,11 @@ vi.mock('../../../hooks/useVinculacaoEmpenhos', () => ({ useEmpenhosParaVincular
 vi.mock('../../../hooks/useEmpenhosForaDoContrato', () => ({ useEmpenhosForaDoContrato: vi.fn() }));
 vi.mock('../../../hooks/useNotasForaDoContrato', () => ({ useNotasForaDoContrato: vi.fn() }));
 vi.mock('../../financeiro/useContratosDoFinanceiro', () => ({ useContratosDoFinanceiro: vi.fn() }));
-vi.mock('../../layout/useTelaCarregada', () => ({ useTelaCarregada: vi.fn(() => true) }));
+vi.mock('../../layout/useTelaCarregada', () => {
+  const useTelaCarregada = vi.fn(() => true);
+  // A etapa do menu segue a tela: liberada quando a tela encheu (as etapas têm teste próprio).
+  return { useTelaCarregada, useEtapaDoMenu: () => useTelaCarregada(), ETAPA_DO_MENU: { financeiro: 0, vinculos: 1, emendas: 2, carteira: 3 } };
+});
 
 import { useAuth } from '../../../context/AuthContext';
 import { useEmpenhosParaVincularAosItens } from '../../../hooks/useVinculacaoEmpenhos';

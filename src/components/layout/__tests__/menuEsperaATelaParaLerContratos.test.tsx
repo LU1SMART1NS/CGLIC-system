@@ -27,7 +27,12 @@ vi.mock('@tanstack/react-query', async (orig) => {
   };
 });
 vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ role: estado.role, user: { id: 'u1' } }) }));
-vi.mock('../useTelaCarregada', () => ({ useTelaCarregada: () => estado.telaCarregada }));
+vi.mock('../useTelaCarregada', () => ({
+  useTelaCarregada: () => estado.telaCarregada,
+  // A etapa do menu segue a tela: liberada quando a tela encheu (as etapas têm teste próprio).
+  useEtapaDoMenu: () => estado.telaCarregada,
+  ETAPA_DO_MENU: { financeiro: 0, vinculos: 1, emendas: 2, carteira: 3 }
+}));
 
 import { useContagemFinanceiro } from '../../financeiro/useContagemFinanceiro';
 import { useContagemVinculacao } from '../../vinculacao/useContagemVinculacao';

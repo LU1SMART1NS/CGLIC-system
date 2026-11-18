@@ -5,7 +5,7 @@ import { useEmpenhosForaDoContrato } from '../../hooks/useEmpenhosForaDoContrato
 import { useNotasForaDoContrato } from '../../hooks/useNotasForaDoContrato';
 import { contratoIndicado, notaNoSegmento, semNotasCitadasEmFatura } from './notasForaDoContrato';
 import { useContratosDoFinanceiro } from '../financeiro/useContratosDoFinanceiro';
-import { useTelaCarregada } from '../layout/useTelaCarregada';
+import { ETAPA_DO_MENU, useEtapaDoMenu } from '../layout/useTelaCarregada';
 import { aguardaVinculoAosItens, contaNoMenu, pedeOGestor } from './vinculacaoEmpenhos';
 
 /**
@@ -17,7 +17,7 @@ import { aguardaVinculoAosItens, contaNoMenu, pedeOGestor } from './vinculacaoEm
  */
 export function useContagemVinculacao(): { aosItens: number; aoContrato: number; notasForaDoContrato: number } | null {
   const { role } = useAuth();
-  const telaCarregada = useTelaCarregada();
+  const telaCarregada = useEtapaDoMenu(ETAPA_DO_MENU.vinculos);
   const ativo = (role === 'admin' || role === 'gestor') && telaCarregada;
   const { data: notas } = useEmpenhosParaVincularAosItens(ativo);
   const { data: foraDoContrato } = useEmpenhosForaDoContrato(ativo);
