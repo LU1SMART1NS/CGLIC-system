@@ -5,6 +5,11 @@ import { fetchAvisosResolvidos, type AvisoResolvido } from '../services/avisosRe
 import { useAuth } from '../context/AuthContext';
 
 export const AVISOS_RESOLVIDOS_QUERY_KEY = ['avisos-resolvidos'] as const;
+
+/** Opções da leitura dos avisos resolvidos (telas e painel do Início leem pela mesma chave). */
+export function getAvisosResolvidosQueryOptions() {
+  return { queryKey: AVISOS_RESOLVIDOS_QUERY_KEY, queryFn: fetchAvisosResolvidos, staleTime: 5 * 60 * 1000 };
+}
 /** Rótulo da leitura na faixa "não carregou": sem ela, avisos resolvidos e notas deixadas como estão voltam a aparecer. */
 export const ROTULO_AVISOS_RESOLVIDOS = 'avisos resolvidos e notas deixadas como estão';
 const SEM_AVISOS: AvisoResolvido[] = [];
@@ -27,11 +32,7 @@ export function useAvisosResolvidos() {
   const queryClient = useQueryClient();
   const { role } = useAuth();
 
-  const consulta = useQuery<AvisoResolvido[], Error>({
-    queryKey: AVISOS_RESOLVIDOS_QUERY_KEY,
-    queryFn: fetchAvisosResolvidos,
-    staleTime: 5 * 60 * 1000
-  });
+  const consulta = useQuery<AvisoResolvido[], Error>(getAvisosResolvidosQueryOptions());
   const data = consulta.data ?? SEM_AVISOS;
 
   const porChave = useMemo(() => new Map(data.map((a) => [a.chave, a])), [data]);

@@ -1815,7 +1815,9 @@ export function buildManagementDashboardReadModel(params: {
 }
 
 /**
- * Leituras do painel que a página e o menu também fazem. O hook do painel (useManagementDashboard) as passa lendo pelo
+ * Leituras do painel que a página e o menu também fazem (contratos, gestores, atas, saldo dos itens, avisos resolvidos e
+ * alocações; os três últimos desde 18/11/2026, quando a Carteira de Contratos os lia duas vezes). O hook do painel
+ * (useManagementDashboard) as passa lendo pelo
  * cache do React Query, com as mesmas chaves e opções das outras telas: o que já foi lido e ainda vale não é lido de
  * novo, e o que está sendo lido é aproveitado. Sem elas (chamada direta), o painel lê do banco como antes.
  */
@@ -1823,6 +1825,12 @@ export interface FontesDoPainelNoCache {
   contratos: (uasg: string) => Promise<ContractDashboardRecord[]>;
   gestores: (uasg: string) => Promise<Record<string, ContractManager>>;
   atas: (uasg: string) => Promise<{ arps: ArpRecord[]; syncInfo: SyncMetadata }>;
+  /** Saldo dos itens com todas as colunas (a mesma leitura do saldo de uma ata). */
+  saldoItens: (uasg: string) => Promise<any[]>;
+  /** Avisos resolvidos (a mesma leitura das telas). */
+  avisosResolvidos: () => Promise<Array<{ chave: string }>>;
+  /** Alocações às unidades internas (a mesma leitura das carteiras de Itens e Alocação). */
+  alocacoes: () => Promise<Array<{ itemKey: string }>>;
 }
 
 /**
@@ -1878,10 +1886,10 @@ export async function fetchManagementDashboardData(
     ler('gestores', 'gestores dos contratos', () => (cache ? cache.gestores(cleanUasg) : fetchAllContractManagers(cleanUasg)), {} as Record<string, ContractManager>),
     ler('planos', 'planos de tarefas dos contratos', () => fetchAllContractTaskPlans(cleanUasg), {} as Record<string, ContractTaskPlan>),
     lerSemUasg('planosAtas', 'planos de gestão das atas', fetchAllAtaTaskPlans, {} as Record<string, AtaTaskPlan>),
-    lerSemUasg('avisosResolvidos', 'avisos resolvidos e notas deixadas como estão', () => fetchAvisosResolvidos().then((lista) => new Set(lista.map((a) => a.chave))), new Set<string>()),
+    lerSemUasg('avisosResolvidos', 'avisos resolvidos e notas deixadas como estão', () => (cache ? cache.avisosResolvidos() : fetchAvisosResolvidos()).then((lista) => new Set(lista.map((a) => a.chave))), new Set<string>()),
     lerSemUasg('empenhos', 'empenhos', fetchEmpenhosResumoFromDb, [] as any[]),
-    ler('saldoItens', 'saldo dos itens', () => fetchArpItemSaldosFromDb(cleanUasg), [] as any[]),
-    lerSemUasg('alocacao', 'alocação interna dos itens', fetchItensComAlocacao, new Set<string>()),
+    ler('saldoItens', 'saldo dos itens', () => (cache ? cache.saldoItens(cleanUasg) : fetchArpItemSaldosFromDb(cleanUasg)), [] as any[]),
+    lerSemUasg('alocacao', 'alocação interna dos itens', () => (cache ? cache.alocacoes().then((lista) => new Set(lista.map((a) => a.itemKey).filter(Boolean))) : fetchItensComAlocacao()), new Set<string>()),
     lerSemUasg('fornecedorPncp', 'atas sem fornecedor no PNCP', fetchRegistrosFornecedorPncp, [] as RegistroFornecedorPncp[]),
     lerSemUasg('prazosAta', 'prazo de entrega das atas', fetchPrazosAConfirmar, [] as PrazoDaAta[]),
     lerSemUasg('vinculos', 'vínculos a conferir', fetchVinculosAConferir, [] as VinculoAConferir[]),
