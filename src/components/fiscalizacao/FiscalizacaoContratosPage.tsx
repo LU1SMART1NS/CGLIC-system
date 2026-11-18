@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FileText } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { PageContainer } from '../../design-system/components/PageContainer';
 import { PageHeader } from '../../design-system/components/PageHeader';
 import { HeaderRefreshAction } from '../../design-system/components/HeaderRefreshAction';
@@ -91,7 +92,16 @@ export const FiscalizacaoContratosPage: React.FC = () => {
   const fiscais = useMemo(() => fiscaisVisiveis(servidores, idsDosFiscaisComContrato(contratos)), [servidores, contratos]);
   const hoje = hojeEmBrasilia();
   const ehFiscal = role === 'gestor_fiscalizacao';
-  const [seg, setSeg] = useState<SegContrato>(ehFiscal ? 'VOCE' : 'TODOS');
+  // O número do menu abre em "Com você" / "Com o fiscal" (?ver=VOCE); sem ele, o fiscal começa em "Com você" e os demais em Todos.
+  const [params] = useSearchParams();
+  const verDaUrl = params.get('ver');
+  const [seg, setSeg] = useState<SegContrato>(
+    verDaUrl === 'VOCE' || verDaUrl === 'OUTROS' || verDaUrl === 'FINALIZADO' || verDaUrl === 'TODOS' ? verDaUrl : ehFiscal ? 'VOCE' : 'TODOS'
+  );
+  // Clique no número do menu com a tela já aberta: o endereço muda, a aba acompanha.
+  useEffect(() => {
+    if (verDaUrl === 'VOCE' || verDaUrl === 'OUTROS' || verDaUrl === 'FINALIZADO' || verDaUrl === 'TODOS') setSeg(verDaUrl);
+  }, [verDaUrl]);
   const doFiscalPadrao = ehFiscal && user?.id ? user.id : '';
   const [fiscal, setFiscal] = useState(doFiscalPadrao);
   const [busca, setBusca] = useState('');

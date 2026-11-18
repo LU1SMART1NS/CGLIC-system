@@ -98,7 +98,7 @@ describe('pendenciasDoMenu: Início do fiscal (envio à SFC, 13/11/2026)', () =>
 
 describe('pendenciasDoMenu: Fiscalização (contratos Com você, 16/11/2026)', () => {
   it('contratos com o passo do fiscal: número abre Contratos; vermelho com passo vencido', () => {
-    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, fiscalizacao: { total: 4, vencidos: 0 } }).fiscalizacao).toEqual({ contagem: 4, vermelho: false, motivoVermelho: 'com passo vencido', destino: '/fiscalizacao/contratos' });
+    expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, fiscalizacao: { total: 4, vencidos: 0 } }).fiscalizacao).toEqual({ contagem: 4, vermelho: false, motivoVermelho: 'com passo vencido', destino: '/fiscalizacao/contratos?ver=VOCE' });
     expect(pendenciasDoMenu({ empenhos: null, financeiro: null, extras, fiscalizacao: { total: 4, vencidos: 1 } }).fiscalizacao?.vermelho).toBe(true);
   });
   it('nada com o fiscal (ou sem a contagem), sem número', () => {

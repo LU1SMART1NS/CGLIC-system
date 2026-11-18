@@ -4,23 +4,35 @@ import { useContratosFiscalizacao, useEntregasFiscalizacao } from '../../hooks/u
 import { naoCarregou } from '../fonte/useLeiturasComFalha';
 import { ETAPA_DO_MENU, useEtapaDoMenu } from '../layout/useTelaCarregada';
 import { hojeEmBrasilia } from '../../utils/fiscalizacao';
-import { linhasDosContratos } from '../../utils/fiscalizacaoContratosLista';
+import { linhasDosContratos, type LinhaContrato } from '../../utils/fiscalizacaoContratosLista';
 
 /**
- * Número do menu Fiscalização (16/11/2026): contratos "Com você" da tela Contratos (a entrada do menu), os do fiscal
- * logado com o próximo passo dele; vermelho quando algum passo está vencido. Só o gestor de fiscalização, que abre a
- * tela já em "Com você" e filtrada nele (o coordenador e a consulta abrem em Todos, sem número).
+ * Conta do número do menu sobre as linhas da tela Contratos (aba "Com você" / "Com o fiscal"). Com `fiscalUserId`, só
+ * os contratos desse fiscal (a tela do fiscal abre filtrada nele); sem, os de todos os fiscais (a tela do coordenador).
+ */
+export function contarFiscalizacaoDoMenu(linhas: LinhaContrato[], fiscalUserId: string | null): { total: number; vencidos: number } {
+  const comOFiscal = linhas.filter((l) => l.seg === 'VOCE' && (!fiscalUserId || l.c.fiscalUserId === fiscalUserId));
+  return { total: comOFiscal.length, vencidos: comOFiscal.filter((l) => l.dias != null && l.dias < 0).length };
+}
+
+/**
+ * Número do menu Fiscalização: os contratos da aba "Com você" / "Com o fiscal" da tela Contratos (a entrada do menu),
+ * vermelho quando algum passo está vencido.
+ * - Gestor de fiscalização (16/11/2026): os dele, como a tela, que já abre em "Com você" e filtrada nele.
+ * - Coordenador (18/11/2026, pedido do usuário: "como ocorre com os outros menus"): os de todos os fiscais, como o
+ *   "Precisa de ação" do Financeiro; o clique abre a tela em "Com o fiscal".
+ * - Consulta: sem número, como nos outros menus.
  */
 export function useContagemFiscalizacao(): { total: number; vencidos: number } | null {
   const { role, user } = useAuth();
   const telaCarregada = useEtapaDoMenu(ETAPA_DO_MENU.financeiro);
   const fiscal = role === 'gestor_fiscalizacao';
-  // Mesmas consultas da tela Contratos e do Início do fiscal (cache compartilhado); esperam a tela aberta encher.
-  const contratos = useContratosFiscalizacao({ enabled: telaCarregada && fiscal });
-  const entregas = useEntregasFiscalizacao(null, { enabled: telaCarregada && fiscal });
+  const ativo = fiscal || role === 'admin';
+  // Mesmas consultas da tela Contratos e do Início do fiscal (cache compartilhado); esperam a etapa do menu.
+  const contratos = useContratosFiscalizacao({ enabled: telaCarregada && ativo });
+  const entregas = useEntregasFiscalizacao(null, { enabled: telaCarregada && ativo });
   return useMemo(() => {
-    if (!fiscal || !user || !contratos.data || !entregas.data || naoCarregou(contratos) || naoCarregou(entregas)) return null;
-    const comVoce = linhasDosContratos(contratos.data, entregas.data, hojeEmBrasilia()).filter((l) => l.seg === 'VOCE' && l.c.fiscalUserId === user.id);
-    return { total: comVoce.length, vencidos: comVoce.filter((l) => l.dias != null && l.dias < 0).length };
-  }, [fiscal, user, contratos, entregas]);
+    if (!ativo || !user || !contratos.data || !entregas.data || naoCarregou(contratos) || naoCarregou(entregas)) return null;
+    return contarFiscalizacaoDoMenu(linhasDosContratos(contratos.data, entregas.data, hojeEmBrasilia()), fiscal ? user.id : null);
+  }, [ativo, fiscal, user, contratos, entregas]);
 }
